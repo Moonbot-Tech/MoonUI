@@ -1,4 +1,6 @@
 use std::{
+    marker::PhantomData,
+    ptr::NonNull,
     slice,
     sync::{Arc, OnceLock},
 };
@@ -7,7 +9,7 @@ use anyhow::{Context, Result};
 use gpui_util::ResultExt;
 use windows::{
     Win32::{
-        Foundation::HWND,
+        Foundation::{DXGI_STATUS_OCCLUDED, HWND, RECT},
         Graphics::{
             Direct3D::*,
             Direct3D11::*,
@@ -27,6 +29,10 @@ pub(crate) const DISABLE_DIRECT_COMPOSITION: &str = "GPUI_DISABLE_DIRECT_COMPOSI
 const RENDER_TARGET_FORMAT: DXGI_FORMAT = DXGI_FORMAT_B8G8R8A8_UNORM;
 // This configuration is used for MSAA rendering on paths only, and it's guaranteed to be supported by DirectX 11.
 const PATH_MULTISAMPLE_COUNT: u32 = 4;
+const GPU_CANVAS_SHADER_RESOURCE_SLOTS: usize = 2;
+const GPU_CANVAS_CONSTANT_BUFFER_SLOTS: usize = 1;
+const GPU_CANVAS_SAMPLER_SLOTS: usize = 1;
+const GPU_CANVAS_VERTEX_BUFFER_SLOTS: usize = 1;
 
 pub(crate) struct FontInfo {
     pub gamma_ratios: [f32; 4],
@@ -53,6 +59,200 @@ pub(crate) struct DirectXRenderer {
     /// In that case we want to discard the first frame that we draw as we got reset in the middle of a frame
     /// meaning we lost all the allocated gpu textures and scene resources.
     skip_draws: bool,
+    presentable: bool,
+    device_generation: u64,
+}
+
+struct D3d11StateGuard {
+    context: ID3D11DeviceContext,
+    render_targets:
+        [Option<ID3D11RenderTargetView>; D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT as usize],
+    depth_stencil_view: Option<ID3D11DepthStencilView>,
+    blend_state: Option<ID3D11BlendState>,
+    blend_factor: [f32; 4],
+    sample_mask: u32,
+    depth_stencil_state: Option<ID3D11DepthStencilState>,
+    stencil_ref: u32,
+    rasterizer_state: Option<ID3D11RasterizerState>,
+    viewports: [D3D11_VIEWPORT; D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE as usize],
+    viewport_count: u32,
+    scissor_rects: [RECT; D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE as usize],
+    scissor_rect_count: u32,
+    input_layout: Option<ID3D11InputLayout>,
+    primitive_topology: D3D_PRIMITIVE_TOPOLOGY,
+    vertex_buffers: [Option<ID3D11Buffer>; GPU_CANVAS_VERTEX_BUFFER_SLOTS],
+    vertex_buffer_strides: [u32; GPU_CANVAS_VERTEX_BUFFER_SLOTS],
+    vertex_buffer_offsets: [u32; GPU_CANVAS_VERTEX_BUFFER_SLOTS],
+    index_buffer: Option<ID3D11Buffer>,
+    index_format: DXGI_FORMAT,
+    index_offset: u32,
+    vertex_shader: Option<ID3D11VertexShader>,
+    pixel_shader: Option<ID3D11PixelShader>,
+    vertex_shader_resources: [Option<ID3D11ShaderResourceView>; GPU_CANVAS_SHADER_RESOURCE_SLOTS],
+    pixel_shader_resources: [Option<ID3D11ShaderResourceView>; GPU_CANVAS_SHADER_RESOURCE_SLOTS],
+    vertex_constant_buffers: [Option<ID3D11Buffer>; GPU_CANVAS_CONSTANT_BUFFER_SLOTS],
+    pixel_constant_buffers: [Option<ID3D11Buffer>; GPU_CANVAS_CONSTANT_BUFFER_SLOTS],
+    vertex_samplers: [Option<ID3D11SamplerState>; GPU_CANVAS_SAMPLER_SLOTS],
+    pixel_samplers: [Option<ID3D11SamplerState>; GPU_CANVAS_SAMPLER_SLOTS],
+    restored: bool,
+}
+
+impl D3d11StateGuard {
+    fn capture(context: &ID3D11DeviceContext) -> Self {
+        let mut render_targets = std::array::from_fn(|_| None);
+        let mut depth_stencil_view = None;
+        let mut blend_state = None;
+        let mut blend_factor = [0.0; 4];
+        let mut sample_mask = 0;
+        let mut depth_stencil_state = None;
+        let mut stencil_ref = 0;
+        let rasterizer_state;
+        let mut viewports = std::array::from_fn(|_| D3D11_VIEWPORT::default());
+        let mut viewport_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+        let mut scissor_rects = std::array::from_fn(|_| RECT::default());
+        let mut scissor_rect_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+        let input_layout;
+        let primitive_topology;
+        let mut vertex_buffers = std::array::from_fn(|_| None);
+        let mut vertex_buffer_strides = [0; GPU_CANVAS_VERTEX_BUFFER_SLOTS];
+        let mut vertex_buffer_offsets = [0; GPU_CANVAS_VERTEX_BUFFER_SLOTS];
+        let mut index_buffer = None;
+        let mut index_format = DXGI_FORMAT_UNKNOWN;
+        let mut index_offset = 0;
+        let mut vertex_shader = None;
+        let mut pixel_shader = None;
+        let mut vertex_shader_resources = std::array::from_fn(|_| None);
+        let mut pixel_shader_resources = std::array::from_fn(|_| None);
+        let mut vertex_constant_buffers = std::array::from_fn(|_| None);
+        let mut pixel_constant_buffers = std::array::from_fn(|_| None);
+        let mut vertex_samplers = std::array::from_fn(|_| None);
+        let mut pixel_samplers = std::array::from_fn(|_| None);
+
+        unsafe {
+            context.OMGetRenderTargets(Some(&mut render_targets), Some(&mut depth_stencil_view));
+            context.OMGetBlendState(
+                Some(&mut blend_state),
+                Some(&mut blend_factor),
+                Some(&mut sample_mask),
+            );
+            context.OMGetDepthStencilState(Some(&mut depth_stencil_state), Some(&mut stencil_ref));
+            rasterizer_state = context.RSGetState().ok();
+            context.RSGetViewports(&mut viewport_count, Some(viewports.as_mut_ptr()));
+            context.RSGetScissorRects(&mut scissor_rect_count, Some(scissor_rects.as_mut_ptr()));
+            input_layout = context.IAGetInputLayout().ok();
+            primitive_topology = context.IAGetPrimitiveTopology();
+            context.IAGetVertexBuffers(
+                0,
+                GPU_CANVAS_VERTEX_BUFFER_SLOTS as u32,
+                Some(vertex_buffers.as_mut_ptr()),
+                Some(vertex_buffer_strides.as_mut_ptr()),
+                Some(vertex_buffer_offsets.as_mut_ptr()),
+            );
+            context.IAGetIndexBuffer(
+                Some(&mut index_buffer),
+                Some(&mut index_format),
+                Some(&mut index_offset),
+            );
+            context.VSGetShader(&mut vertex_shader, None, None);
+            context.PSGetShader(&mut pixel_shader, None, None);
+            context.VSGetShaderResources(0, Some(&mut vertex_shader_resources));
+            context.PSGetShaderResources(0, Some(&mut pixel_shader_resources));
+            context.VSGetConstantBuffers(0, Some(&mut vertex_constant_buffers));
+            context.PSGetConstantBuffers(0, Some(&mut pixel_constant_buffers));
+            context.VSGetSamplers(0, Some(&mut vertex_samplers));
+            context.PSGetSamplers(0, Some(&mut pixel_samplers));
+        }
+
+        Self {
+            context: context.clone(),
+            render_targets,
+            depth_stencil_view,
+            blend_state,
+            blend_factor,
+            sample_mask,
+            depth_stencil_state,
+            stencil_ref,
+            rasterizer_state,
+            viewports,
+            viewport_count,
+            scissor_rects,
+            scissor_rect_count,
+            input_layout,
+            primitive_topology,
+            vertex_buffers,
+            vertex_buffer_strides,
+            vertex_buffer_offsets,
+            index_buffer,
+            index_format,
+            index_offset,
+            vertex_shader,
+            pixel_shader,
+            vertex_shader_resources,
+            pixel_shader_resources,
+            vertex_constant_buffers,
+            pixel_constant_buffers,
+            vertex_samplers,
+            pixel_samplers,
+            restored: false,
+        }
+    }
+
+    fn restore(&mut self) {
+        if self.restored {
+            return;
+        }
+        self.restored = true;
+
+        unsafe {
+            self.context
+                .OMSetRenderTargets(Some(&self.render_targets), self.depth_stencil_view.as_ref());
+            self.context.OMSetBlendState(
+                self.blend_state.as_ref(),
+                Some(&self.blend_factor),
+                self.sample_mask,
+            );
+            self.context
+                .OMSetDepthStencilState(self.depth_stencil_state.as_ref(), self.stencil_ref);
+            self.context.RSSetState(self.rasterizer_state.as_ref());
+            self.context
+                .RSSetViewports(Some(&self.viewports[..self.viewport_count as usize]));
+            self.context.RSSetScissorRects(Some(
+                &self.scissor_rects[..self.scissor_rect_count as usize],
+            ));
+            self.context.IASetInputLayout(self.input_layout.as_ref());
+            self.context.IASetPrimitiveTopology(self.primitive_topology);
+            self.context.IASetVertexBuffers(
+                0,
+                GPU_CANVAS_VERTEX_BUFFER_SLOTS as u32,
+                Some(self.vertex_buffers.as_ptr()),
+                Some(self.vertex_buffer_strides.as_ptr()),
+                Some(self.vertex_buffer_offsets.as_ptr()),
+            );
+            self.context.IASetIndexBuffer(
+                self.index_buffer.as_ref(),
+                self.index_format,
+                self.index_offset,
+            );
+            self.context.VSSetShader(self.vertex_shader.as_ref(), None);
+            self.context.PSSetShader(self.pixel_shader.as_ref(), None);
+            self.context
+                .VSSetShaderResources(0, Some(&self.vertex_shader_resources));
+            self.context
+                .PSSetShaderResources(0, Some(&self.pixel_shader_resources));
+            self.context
+                .VSSetConstantBuffers(0, Some(&self.vertex_constant_buffers));
+            self.context
+                .PSSetConstantBuffers(0, Some(&self.pixel_constant_buffers));
+            self.context.VSSetSamplers(0, Some(&self.vertex_samplers));
+            self.context.PSSetSamplers(0, Some(&self.pixel_samplers));
+        }
+    }
+}
+
+impl Drop for D3d11StateGuard {
+    fn drop(&mut self) {
+        self.restore();
+    }
 }
 
 /// Direct3D objects
@@ -144,8 +344,14 @@ impl DirectXRenderer {
             .context("Creating DirectX devices")?;
         let atlas = Arc::new(DirectXAtlas::new(&devices.device, &devices.device_context));
 
-        let resources = DirectXResources::new(&devices, 1, 1, hwnd, disable_direct_composition)
-            .context("Creating DirectX resources")?;
+        let resources = DirectXResources::new(
+            &devices,
+            1,
+            1,
+            hwnd,
+            disable_direct_composition,
+        )
+        .context("Creating DirectX resources")?;
         let globals = DirectXGlobalElements::new(&devices.device)
             .context("Creating DirectX global elements")?;
         let pipelines = DirectXRenderPipelines::new(&devices.device)
@@ -174,11 +380,90 @@ impl DirectXRenderer {
             width: 1,
             height: 1,
             skip_draws: false,
+            presentable: true,
+            device_generation: 0,
         })
     }
 
     pub(crate) fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {
         self.atlas.clone()
+    }
+
+    fn raw_gpu_access(&self) -> Option<RawGpuAccess<'_>> {
+        let devices = self.devices.as_ref()?;
+        let resources = self.resources.as_ref()?;
+        let render_target = resources.render_target_view.as_ref()?;
+        Some(RawGpuAccess::D3d11(D3d11RawAccess {
+            device_generation: self.device_generation,
+            device: NonNull::new(devices.device.as_raw())?,
+            context: NonNull::new(devices.device_context.as_raw())?,
+            render_target: NonNull::new(render_target.as_raw())?,
+            render_target_format: RENDER_TARGET_FORMAT.0 as u64,
+            width: resources.viewport.Width as u32,
+            height: resources.viewport.Height as u32,
+            _marker: PhantomData,
+        }))
+    }
+
+    fn run_gpu_canvas_prepare(&mut self, canvases: &[PaintGpuCanvas], layer: GpuCanvasLayer) {
+        if canvases.is_empty() {
+            return;
+        }
+        let Some(raw) = self.raw_gpu_access() else {
+            return;
+        };
+        let Some(devices) = self.devices.as_ref() else {
+            return;
+        };
+        let _state_guard = D3d11StateGuard::capture(&devices.device_context);
+        for canvas in canvases {
+            let mut ctx = GpuCanvasPrepareContext {
+                gpu: raw,
+                bounds: canvas.bounds,
+                content_mask: canvas.content_mask,
+                layer,
+            };
+            if let Err(error) = canvas.driver.prepare_gpu(&mut ctx) {
+                log::error!("failed to prepare {layer:?} gpu canvas: {error:?}");
+            }
+        }
+    }
+
+    fn run_gpu_canvas_draw(&mut self, canvases: &[PaintGpuCanvas], layer: GpuCanvasLayer) {
+        if canvases.is_empty() {
+            return;
+        }
+        let Some(raw) = self.raw_gpu_access() else {
+            return;
+        };
+        let Some(devices) = self.devices.as_ref() else {
+            return;
+        };
+        let _state_guard = D3d11StateGuard::capture(&devices.device_context);
+        for canvas in canvases {
+            let clip = canvas.bounds.intersect(&canvas.content_mask.bounds);
+            if clip.is_empty() {
+                continue;
+            }
+            let rect = [RECT {
+                left: clip.left().0.floor() as i32,
+                top: clip.top().0.floor() as i32,
+                right: clip.right().0.ceil() as i32,
+                bottom: clip.bottom().0.ceil() as i32,
+            }];
+            unsafe {
+                devices.device_context.RSSetScissorRects(Some(&rect));
+            }
+            let mut ctx = GpuCanvasDrawContext {
+                gpu: raw,
+                bounds: canvas.bounds,
+                content_mask: canvas.content_mask,
+                layer,
+            };
+            if let Err(error) = canvas.driver.draw(&mut ctx) {
+                log::error!("failed to draw {layer:?} gpu canvas: {error:?}");
+            }
+        }
     }
 
     fn pre_draw(&self, clear_color: &[f32; 4]) -> Result<()> {
@@ -216,6 +501,26 @@ impl DirectXRenderer {
     }
 
     #[inline]
+    pub(crate) fn can_present(&mut self) -> bool {
+        if self.presentable {
+            return true;
+        }
+
+        let Some(resources) = self.resources.as_ref() else {
+            return false;
+        };
+        let result = unsafe { resources.swap_chain.Present(0, DXGI_PRESENT_TEST) };
+        if result == DXGI_STATUS_OCCLUDED {
+            self.presentable = false;
+        } else if result.ok().is_ok() {
+            self.presentable = true;
+        } else if let Err(error) = result.ok() {
+            log::warn!("DXGI_PRESENT_TEST failed while probing occluded swapchain: {error}");
+        }
+        self.presentable
+    }
+
+    #[inline]
     fn present(&mut self) -> Result<()> {
         let result = unsafe {
             self.resources
@@ -224,7 +529,14 @@ impl DirectXRenderer {
                 .swap_chain
                 .Present(0, DXGI_PRESENT(0))
         };
-        result.ok().context("Presenting swap chain failed")
+        if result == DXGI_STATUS_OCCLUDED {
+            self.presentable = false;
+            return Ok(());
+        }
+
+        result.ok().context("Presenting swap chain failed")?;
+        self.presentable = true;
+        Ok(())
     }
 
     pub(crate) fn handle_device_lost(&mut self, directx_devices: &DirectXDevices) -> Result<()> {
@@ -298,6 +610,8 @@ impl DirectXRenderer {
         self.pipelines = pipelines;
         self.direct_composition = direct_composition;
         self.skip_draws = true;
+        self.presentable = true;
+        self.device_generation = self.device_generation.wrapping_add(1);
         Ok(())
     }
 
@@ -311,12 +625,19 @@ impl DirectXRenderer {
             // and so likely do not have the textures anymore that are required for drawing
             return Ok(());
         }
+        if !self.can_present() {
+            return Ok(());
+        }
+        self.run_gpu_canvas_prepare(&scene.gpu_canvases_under_scene, GpuCanvasLayer::UnderScene);
+        self.run_gpu_canvas_prepare(&scene.gpu_canvases_over_scene, GpuCanvasLayer::OverScene);
         self.pre_draw(&match background_appearance {
             WindowBackgroundAppearance::Opaque => [1.0f32; 4],
             _ => [0.0f32; 4],
         })?;
 
         self.upload_scene_buffers(scene)?;
+
+        self.run_gpu_canvas_draw(&scene.gpu_canvases_under_scene, GpuCanvasLayer::UnderScene);
 
         for batch in scene.batches() {
             match batch {
@@ -352,6 +673,7 @@ impl DirectXRenderer {
                 scene.surfaces.len(),
             ))?;
         }
+        self.run_gpu_canvas_draw(&scene.gpu_canvases_over_scene, GpuCanvasLayer::OverScene);
         self.present()
     }
 

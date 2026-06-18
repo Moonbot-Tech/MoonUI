@@ -6,7 +6,10 @@ use std::{
     path::PathBuf,
     rc::{Rc, Weak},
     str::FromStr,
-    sync::{Arc, Once, atomic::AtomicBool},
+    sync::{
+        Arc, Once,
+        atomic::AtomicBool,
+    },
     time::{Duration, Instant},
 };
 
@@ -80,6 +83,8 @@ pub struct WindowsWindowState {
     /// Flag to instruct the `VSyncProvider` thread to invalidate the directx devices
     /// as resizing them has failed, causing us to have lost at least the render target.
     pub invalidate_devices: Arc<AtomicBool>,
+    /// Coalesces private frame-clock messages posted by the vsync thread.
+    pub frame_clock_pending: Arc<AtomicBool>,
     fullscreen: Cell<Option<StyleAndBounds>>,
     initial_placement: Cell<Option<WindowOpenStatus>>,
     hwnd: HWND,
@@ -176,6 +181,7 @@ impl WindowsWindowState {
             initial_placement: Cell::new(initial_placement),
             hwnd,
             invalidate_devices,
+            frame_clock_pending: Arc::new(AtomicBool::new(false)),
             direct_manipulation,
             a11y: RefCell::new(None),
         })
@@ -528,11 +534,16 @@ impl WindowsWindow {
         set_non_rude_hwnd(hwnd, true);
         configure_dwm_dark_mode(hwnd, appearance);
         this.state.border_offset.update(hwnd)?;
+        let display_scale_factor = display.scale_factor();
+        this.state.scale_factor.set(display_scale_factor);
+        this.state
+            .direct_manipulation
+            .set_scale_factor(display_scale_factor);
         let placement = retrieve_window_placement(
             hwnd,
             display,
             params.bounds,
-            this.state.scale_factor.get(),
+            display_scale_factor,
             &this.state.border_offset,
         )?;
         if params.show {
@@ -937,6 +948,10 @@ impl PlatformWindow for WindowsWindow {
             .callbacks
             .appearance_changed
             .set(Some(callback));
+    }
+
+    fn can_present(&self) -> bool {
+        self.state.renderer.borrow_mut().can_present()
     }
 
     fn draw(&self, scene: &Scene) {
@@ -1471,7 +1486,7 @@ fn retrieve_window_placement(
     hwnd: HWND,
     display: WindowsDisplay,
     initial_bounds: Bounds<Pixels>,
-    scale_factor: f32,
+    display_scale_factor: f32,
     border_offset: &WindowBorderOffset,
 ) -> Result<WINDOWPLACEMENT> {
     let mut placement = WINDOWPLACEMENT {
@@ -1485,7 +1500,10 @@ fn retrieve_window_placement(
     } else {
         display.default_bounds()
     };
-    let bounds = bounds.to_device_pixels(scale_factor);
+    // Initial HWND DPI can still reflect the primary/current monitor here.
+    // Stored window bounds are in the target display's logical coordinate space,
+    // so placement must round-trip through that display's DPI scale.
+    let bounds = bounds.to_device_pixels(display_scale_factor);
     placement.rcNormalPosition = calculate_window_rect(bounds, border_offset);
     Ok(placement)
 }

@@ -28,6 +28,7 @@ pub(crate) const WM_GPUI_FORCE_UPDATE_WINDOW: u32 = WM_USER + 5;
 pub(crate) const WM_GPUI_KEYBOARD_LAYOUT_CHANGED: u32 = WM_USER + 6;
 pub(crate) const WM_GPUI_GPU_DEVICE_LOST: u32 = WM_USER + 7;
 pub(crate) const WM_GPUI_KEYDOWN: u32 = WM_USER + 8;
+pub(crate) const WM_GPUI_FRAME_CLOCK: u32 = WM_USER + 9;
 
 const SIZE_MOVE_LOOP_TIMER_ID: usize = 1;
 
@@ -110,6 +111,7 @@ impl WindowsWindowInner {
             WM_SHOWWINDOW => self.handle_window_visibility_changed(handle, wparam),
             WM_GPUI_CURSOR_STYLE_CHANGED => self.handle_cursor_changed(lparam),
             WM_GPUI_FORCE_UPDATE_WINDOW => self.draw_window(handle, true),
+            WM_GPUI_FRAME_CLOCK => self.handle_frame_clock_msg(handle),
             WM_GPUI_GPU_DEVICE_LOST => self.handle_device_lost(lparam),
             DM_POINTERHITTEST => self.handle_dm_pointer_hit_test(wparam),
             WM_GETOBJECT => self.handle_wm_getobject(wparam, lparam),
@@ -261,6 +263,13 @@ impl WindowsWindowInner {
     }
 
     fn handle_paint_msg(&self, handle: HWND) -> Option<isize> {
+        self.draw_window(handle, false)
+    }
+
+    fn handle_frame_clock_msg(&self, handle: HWND) -> Option<isize> {
+        self.state
+            .frame_clock_pending
+            .store(false, std::sync::atomic::Ordering::Release);
         self.draw_window(handle, false)
     }
 
