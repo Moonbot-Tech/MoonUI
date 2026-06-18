@@ -21,6 +21,13 @@ cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 
 
 ## Patch Layers On `master`
 
+0. Standalone extraction hygiene on `upstream-clean`:
+   - `xtask` materializes Apache license files instead of preserving symlinks
+     or Windows text pointers such as `../../LICENSE`.
+   - Root `LICENSE` and `LICENSE-APACHE` are canonical Apache-2.0 text.
+   - Every Apache crate has a real `LICENSE-APACHE` file. No pointer files,
+     no symlink-only licenses, no BOM-only Windows artifacts.
+
 1. Moon GPUI runtime patches:
    - `gpu_canvas`
    - `GpuCanvasDriver::frame() -> Skip | RequestPresent`
@@ -28,14 +35,20 @@ cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 
    - retained GPU canvas prepare/draw integration
    - visible-canvas pacing hooks where the platform needs them
 
-2. Platform fixes:
+2. Zed bugfix candidates kept separate from `gpu_canvas` when possible:
    - Windows DPI/restore-bounds behavior
    - Linux/X11 borderless decoration fallback
+   - These are useful upstream fixes on their own. Do not hide them inside
+     feature work when preparing Zed pull requests.
 
 3. Moon UI components:
    - `moon-ui`
    - `moon-ui-components`
    - component assets and macros
+
+4. MoonUI-only integration:
+   - GPL helper crates removed from the extraction.
+   - Runtime shader/font fallbacks and component integration needed by Moonbot.
 
 Do not mix terminal application logic into this repository.
 
