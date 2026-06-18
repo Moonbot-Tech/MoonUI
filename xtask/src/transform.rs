@@ -6,6 +6,8 @@ use std::process::Command;
 use toml_edit::{DocumentMut, Item, Value};
 use walkdir::WalkDir;
 
+const APACHE_2_LICENSE: &str = include_str!("../../LICENSE-APACHE");
+
 /// GPUI crates to extract, in topological order (dependencies first).
 pub const CRATE_PUBLISH_ORDER: &[&str] = &[
     // Tier 1 - Leaf crates
@@ -73,6 +75,7 @@ pub fn run(zed_tag: &str, zed_path: Option<&str>, output_dir: &str, use_local_de
         fs::remove_dir_all(&output_path)?;
     }
     fs::create_dir_all(&output_path)?;
+    write_root_license_files(&output_path)?;
 
     // Transform each crate
     for crate_name in CRATE_PUBLISH_ORDER {
@@ -160,7 +163,7 @@ fn transform_crate(
 
     // Copy crate directory
     copy_dir_recursive(&src_dir, &dest_dir)?;
-    patch_apache_license_pointers(&dest_dir)?;
+    materialize_apache_license_files(&dest_dir)?;
 
     // Patch examples that reference external assets
     if crate_name == "gpui" {
@@ -209,22 +212,66 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-fn patch_apache_license_pointers(crate_dir: &Path) -> Result<()> {
+fn write_root_license_files(output_dir: &Path) -> Result<()> {
+    let root_dir = if output_dir.is_absolute() {
+        output_dir.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
+    } else {
+        std::env::current_dir()?
+    };
+
+    write_utf8_no_bom(&root_dir.join("LICENSE"), APACHE_2_LICENSE)?;
+    write_utf8_no_bom(&root_dir.join("LICENSE-APACHE"), APACHE_2_LICENSE)?;
+    Ok(())
+}
+
+fn materialize_apache_license_files(crate_dir: &Path) -> Result<()> {
+    let mut found = false;
+
     for entry in WalkDir::new(crate_dir) {
         let entry = entry?;
-        if !entry.file_type().is_file()
-            || entry.path().file_name().and_then(|name| name.to_str()) != Some("LICENSE-APACHE")
-        {
+        if entry.path().file_name().and_then(|name| name.to_str()) != Some("LICENSE-APACHE") {
             continue;
         }
+        found = true;
 
-        let content = fs::read_to_string(entry.path())?;
-        let patched = content.replace("LICENSE-APACHE", "LICENSE");
-        if patched != content {
-            fs::write(entry.path(), patched)?;
+        if apache_license_needs_materialization(entry.path())? {
+            write_utf8_no_bom(entry.path(), APACHE_2_LICENSE)?;
         }
     }
 
+    if !found {
+        write_utf8_no_bom(&crate_dir.join("LICENSE-APACHE"), APACHE_2_LICENSE)?;
+    }
+
+    Ok(())
+}
+
+fn apache_license_needs_materialization(path: &Path) -> Result<bool> {
+    let metadata = fs::symlink_metadata(path)?;
+    if metadata.file_type().is_symlink() {
+        return Ok(true);
+    }
+
+    let content = fs::read_to_string(path)?;
+    let pointer = content.trim_start_matches('\u{feff}').trim();
+    Ok(pointer == "LICENSE"
+        || pointer == "LICENSE-APACHE"
+        || (pointer.lines().count() == 1
+            && pointer.contains("LICENSE")
+            && (pointer.starts_with("../") || pointer.starts_with("..\\"))))
+}
+
+fn write_utf8_no_bom(path: &Path, content: &str) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let mut normalized = content.replace("\r\n", "\n");
+    if !normalized.ends_with('\n') {
+        normalized.push('\n');
+    }
+
+    fs::write(path, normalized.as_bytes())?;
     Ok(())
 }
 
