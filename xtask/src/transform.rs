@@ -6,7 +6,7 @@ use std::process::Command;
 use toml_edit::{DocumentMut, Item, Value};
 use walkdir::WalkDir;
 
-const APACHE_2_LICENSE: &str = include_str!("../../LICENSE-APACHE");
+const APACHE_2_LICENSE: &str = include_str!("../../LICENSE");
 
 /// GPUI crates to extract, in topological order (dependencies first).
 pub const CRATE_PUBLISH_ORDER: &[&str] = &[
@@ -220,7 +220,6 @@ fn write_root_license_files(output_dir: &Path) -> Result<()> {
     };
 
     write_utf8_no_bom(&root_dir.join("LICENSE"), APACHE_2_LICENSE)?;
-    write_utf8_no_bom(&root_dir.join("LICENSE-APACHE"), APACHE_2_LICENSE)?;
     Ok(())
 }
 
