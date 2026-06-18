@@ -8,9 +8,6 @@
     "tooling/perf",
     "util_macros",
     "util",
-    "zlog",
-    "ztracing_macro",
-    "ztracing",
     "scheduler",
     "sum_tree",
     "http_client",
@@ -26,7 +23,7 @@
     "gpui_web",
     "gpui_platform"
   ],
-  "transformed_at": "2026-06-18T00:01:28.523128700+00:00",
+  "transformed_at": "2026-06-17T21:49:06.666964+00:00",
   "zed_commit": "84b753cb51441f104fc35b540b9fe77a409f4529",
   "zed_tag": "v0.0.0"
 }

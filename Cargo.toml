@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["xtask", "crates/moon-gpui-util", "crates/moon-gpui-shared-string", "crates/moon-collections", "crates/moon-derive-refineable", "crates/moon-refineable", "crates/moon-perf", "crates/moon-util-macros", "crates/moon-util", "crates/moon-zlog", "crates/moon-ztracing-macro", "crates/moon-ztracing", "crates/moon-scheduler", "crates/moon-sum-tree", "crates/moon-http-client", "crates/moon-http-client-tls", "crates/moon-reqwest-client", "crates/moon-media", "crates/moon-gpui-macros", "crates/moon-gpui", "crates/moon-gpui-wgpu", "crates/moon-gpui-macos", "crates/moon-gpui-linux", "crates/moon-gpui-windows", "crates/moon-gpui-web", "crates/moon-gpui-platform"]
+members = ["xtask", "crates/moon-gpui-util", "crates/moon-gpui-shared-string", "crates/moon-collections", "crates/moon-derive-refineable", "crates/moon-refineable", "crates/moon-perf", "crates/moon-util-macros", "crates/moon-util", "crates/moon-scheduler", "crates/moon-sum-tree", "crates/moon-http-client", "crates/moon-http-client-tls", "crates/moon-reqwest-client", "crates/moon-media", "crates/moon-gpui-macros", "crates/moon-gpui", "crates/moon-gpui-wgpu", "crates/moon-gpui-macos", "crates/moon-gpui-linux", "crates/moon-gpui-windows", "crates/moon-gpui-web", "crates/moon-gpui-platform"]
 
 [workspace.package]
 edition = "2024"

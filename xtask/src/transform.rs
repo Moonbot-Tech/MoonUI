@@ -17,9 +17,6 @@ pub const CRATE_PUBLISH_ORDER: &[&str] = &[
     "tooling/perf",
     "util_macros",
     "util",
-    "zlog",
-    "ztracing_macro",
-    "ztracing",
     // Tier 2 - Core infrastructure
     "scheduler",
     "sum_tree",
@@ -172,6 +169,11 @@ fn transform_crate(
     // Transform Cargo.toml
     transform_cargo_toml(&dest_dir, output_dir, crate_name, workspace_deps, zed_tag, use_local_deps)?;
 
+    // MoonUI intentionally does not carry Zed's GPL zlog/ztracing helper crates.
+    if crate_name == "sum_tree" {
+        patch_sum_tree_tracing(&dest_dir)?;
+    }
+
     // Patch source files for specific crates to remove inspector feature references
     if crate_name == "gpui_macros" || crate_name == "gpui" {
         patch_inspector_cfgs(&dest_dir)?;
@@ -291,6 +293,11 @@ fn transform_cargo_toml(
 
     // Transform dependencies, collecting any optional deps that get removed (git-only, no crates.io equiv)
     let mut removed_optionals: Vec<String> = Vec::new();
+    if original_name == "sum_tree" {
+        remove_dependency(&mut doc, "dependencies", "ztracing");
+        remove_dependency(&mut doc, "dev-dependencies", "zlog");
+        remove_dependency(&mut doc, "dev-dependencies", "ctor");
+    }
     transform_dependencies(&mut doc, "dependencies", workspace_deps, &version, output_dir, use_local_deps, &mut removed_optionals)?;
     transform_dependencies(&mut doc, "dev-dependencies", workspace_deps, &version, output_dir, use_local_deps, &mut removed_optionals)?;
     transform_dependencies(&mut doc, "build-dependencies", workspace_deps, &version, output_dir, use_local_deps, &mut removed_optionals)?;
@@ -613,6 +620,14 @@ pub(crate) fn remove_dep_from_features(doc: &mut DocumentMut, dep_name: &str) {
     }
 }
 
+fn remove_dependency(doc: &mut DocumentMut, section: &str, dep_name: &str) {
+    if let Some(deps) = doc.get_mut(section)
+        && let Some(table) = deps.as_table_like_mut()
+    {
+        table.remove(dep_name);
+    }
+}
+
 // Features don't need transformation since we use package aliasing
 // e.g., `collections/test-support` still works because the dependency key is
 // `collections`, even though the actual package is `moon-collections`.
@@ -707,6 +722,37 @@ fn patch_gpui_macos_source(crate_dir: &Path) -> Result<()> {
 
     if patched != content {
         fs::write(&window_rs, patched)?;
+    }
+
+    Ok(())
+}
+
+/// Remove GPL zlog/ztracing instrumentation from sum_tree during extraction.
+fn patch_sum_tree_tracing(crate_dir: &Path) -> Result<()> {
+    for rel_path in ["src/sum_tree.rs", "src/cursor.rs"] {
+        let path = crate_dir.join(rel_path);
+        if !path.exists() {
+            continue;
+        }
+
+        let content = fs::read_to_string(&path)?;
+        let patched = content
+            .replace("use ztracing::instrument;\n", "")
+            .replace("use ztracing::instrument;\r\n", "")
+            .replace("    #[instrument(skip_all)]\n", "")
+            .replace("    #[instrument(skip_all)]\r\n", "")
+            .replace(
+                "\n    #[ctor::ctor(unsafe)]\n    fn init_logger() {\n        zlog::init_test();\n    }\n",
+                "\n",
+            )
+            .replace(
+                "\r\n    #[ctor::ctor(unsafe)]\r\n    fn init_logger() {\r\n        zlog::init_test();\r\n    }\r\n",
+                "\r\n",
+            );
+
+        if patched != content {
+            fs::write(&path, patched)?;
+        }
     }
 
     Ok(())
@@ -820,7 +866,6 @@ fn add_proptest_dependency(doc: &mut DocumentMut) {
 /// Add lints configuration for crates that use custom cfg attributes.
 fn add_custom_cfg_lints(doc: &mut DocumentMut, crate_name: &str) {
     let check_cfgs: &[&str] = match crate_name {
-        "ztracing" => &["cfg(ztracing)", "cfg(ztracing_with_memory)"],
         "util_macros" => &["cfg(perf_enabled)"],
         "gpui" => &["cfg(rust_analyzer)"],
         // objc crate macros use cargo-clippy cfg
