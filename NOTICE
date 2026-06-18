@@ -1,0 +1,18 @@
+MoonUI
+
+MoonUI contains code derived from Zed's GPUI crates.
+
+Zed-derived portions:
+Copyright 2022 - 2025 Zed Industries, Inc.
+Licensed under Apache-2.0 or GPL-3.0-or-later as indicated by each crate
+manifest and by `LICENSE-APACHE` / `LICENSE-GPL`.
+
+Moon UI components contain code derived from Longbridge gpui-component.
+
+Longbridge-derived component portions:
+Copyright 2024 - 2025 Longbridge <https://longbridge.com>
+Licensed under Apache-2.0. See `crates/moon-ui-components/LICENSE-APACHE`.
+
+Moonbot-specific additions:
+Copyright Moonbot-Tech.
+Licensed under Apache-2.0 unless a file or crate manifest says otherwise.

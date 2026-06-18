@@ -58,6 +58,20 @@ cmd.exe /d /s /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\Buil
 macOS requires the full Xcode Metal toolchain. Linux requires the GPUI Linux
 backend dependencies used by Zed.
 
+## Licensing
+
+MoonUI preserves upstream licensing from the projects it is built from.
+
+- GPUI-derived crates are based on Zed and carry their original Zed license
+  metadata. See `LICENSE-APACHE` and `LICENSE-GPL`.
+- `moon-zlog`, `moon-ztracing`, and `moon-ztracing-macro` are
+  `GPL-3.0-or-later`, matching their crate manifests.
+- Moon UI component crates are an Apache-2.0 port of Longbridge
+  `gpui-component`. The component crate also keeps its upstream copyright
+  notice in `crates/moon-ui-components/LICENSE-APACHE`.
+- Moonbot-specific additions are distributed under Apache-2.0 unless a file or
+  crate manifest says otherwise.
+
 ## Updating From Zed
 
 Regenerate a clean extraction from the new Zed revision on `upstream-clean`,
