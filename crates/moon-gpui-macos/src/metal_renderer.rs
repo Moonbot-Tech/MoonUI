@@ -7,9 +7,10 @@ use cocoa::{
     quartzcore::AutoresizingMask,
 };
 use gpui::{
-    AtlasTextureId, Background, Bounds, ContentMask, DevicePixels, MonochromeSprite, PaintSurface,
-    Path, Point, PolychromeSprite, PrimitiveBatch, Quad, ScaledPixels, Scene, Shadow, Size,
-    Surface, Underline, point, size,
+    point, size, AtlasTextureId, Background, Bounds, ContentMask, DevicePixels,
+    GpuCanvasDrawContext, GpuCanvasLayer, GpuCanvasPrepareContext, MetalRawAccess,
+    MonochromeSprite, PaintGpuCanvas, PaintSurface, Path, Point, PolychromeSprite, PrimitiveBatch,
+    Quad, RawGpuAccess, ScaledPixels, Scene, Shadow, Size, Surface, Underline,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -27,7 +28,17 @@ use metal::{
 use objc::{self, msg_send, sel, sel_impl};
 use parking_lot::Mutex;
 
-use std::{cell::Cell, ffi::c_void, mem, ptr, sync::Arc};
+use std::{
+    cell::Cell,
+    ffi::c_void,
+    marker::PhantomData,
+    mem,
+    ptr::{self, NonNull},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
 
 // Exported to metal
 pub(crate) type PointF = gpui::Point<f32>;
@@ -39,6 +50,7 @@ const SHADERS_SOURCE_FILE: &str = include_str!(concat!(env!("OUT_DIR"), "/stitch
 // Use 4x MSAA, all devices support it.
 // https://developer.apple.com/documentation/metal/mtldevice/1433355-supportstexturesamplecount
 const PATH_SAMPLE_COUNT: u32 = 4;
+static NEXT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) type Context = Arc<Mutex<InstanceBufferPool>>;
 pub(crate) type Renderer = MetalRenderer;
@@ -133,6 +145,7 @@ pub(crate) struct MetalRenderer {
     path_intermediate_texture: Option<metal::Texture>,
     path_intermediate_msaa_texture: Option<metal::Texture>,
     path_sample_count: u32,
+    device_generation: u64,
     /// Offscreen render target reused across `render_scene` calls when
     /// rendering headlessly without reading pixels back.
     #[cfg(any(test, feature = "test-support"))]
@@ -351,6 +364,7 @@ impl MetalRenderer {
             path_intermediate_texture: None,
             path_intermediate_msaa_texture: None,
             path_sample_count: PATH_SAMPLE_COUNT,
+            device_generation: NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed),
             #[cfg(any(test, feature = "test-support"))]
             headless_render_target: None,
         }
@@ -815,6 +829,116 @@ impl MetalRenderer {
         }
     }
 
+    fn raw_gpu_access<'a>(
+        &'a self,
+        command_buffer: &'a metal::CommandBufferRef,
+        command_encoder: Option<&'a metal::RenderCommandEncoderRef>,
+        texture: &'a metal::TextureRef,
+        viewport_size: Size<DevicePixels>,
+    ) -> RawGpuAccess<'a> {
+        RawGpuAccess::Metal(MetalRawAccess {
+            device_generation: self.device_generation,
+            device: NonNull::new(self.device.as_ptr() as *mut c_void)
+                .expect("Metal device must be non-null"),
+            command_buffer: NonNull::new(command_buffer.as_ptr() as *mut c_void)
+                .expect("Metal command buffer must be non-null"),
+            command_encoder: command_encoder
+                .map(|encoder| encoder.as_ptr() as *mut c_void)
+                .and_then(NonNull::new),
+            render_target: NonNull::new(texture.as_ptr() as *mut c_void)
+                .expect("Metal render target texture must be non-null"),
+            render_target_format: texture.pixel_format() as u64,
+            width: i32::from(viewport_size.width).max(0) as u32,
+            height: i32::from(viewport_size.height).max(0) as u32,
+            _marker: PhantomData,
+        })
+    }
+
+    fn run_gpu_canvas_prepare(
+        &self,
+        canvases: &[PaintGpuCanvas],
+        layer: GpuCanvasLayer,
+        command_buffer: &metal::CommandBufferRef,
+        texture: &metal::TextureRef,
+        viewport_size: Size<DevicePixels>,
+    ) {
+        if canvases.is_empty() {
+            return;
+        }
+
+        let raw = self.raw_gpu_access(command_buffer, None, texture, viewport_size);
+        for canvas in canvases {
+            let mut ctx = GpuCanvasPrepareContext {
+                gpu: raw,
+                bounds: canvas.bounds,
+                content_mask: canvas.content_mask,
+                layer,
+            };
+            if let Err(error) = canvas.driver.prepare_gpu(&mut ctx) {
+                log::error!("failed to prepare {layer:?} gpu canvas: {error:?}");
+            }
+        }
+    }
+
+    fn run_gpu_canvas_draw(
+        &self,
+        canvases: &[PaintGpuCanvas],
+        layer: GpuCanvasLayer,
+        command_buffer: &metal::CommandBufferRef,
+        texture: &metal::TextureRef,
+        viewport_size: Size<DevicePixels>,
+        load_action: metal::MTLLoadAction,
+        clear_alpha: f64,
+    ) {
+        if canvases.is_empty() {
+            return;
+        }
+
+        let command_encoder =
+            new_command_encoder_for_texture(command_buffer, texture, viewport_size, |attachment| {
+                attachment.set_load_action(load_action);
+                if matches!(load_action, metal::MTLLoadAction::Clear) {
+                    attachment.set_clear_color(metal::MTLClearColor::new(0., 0., 0., clear_alpha));
+                }
+            });
+
+        let raw = self.raw_gpu_access(
+            command_buffer,
+            Some(command_encoder),
+            texture,
+            viewport_size,
+        );
+        for canvas in canvases {
+            let clip = canvas.bounds.intersect(&canvas.content_mask.bounds);
+            if clip.is_empty() {
+                continue;
+            }
+
+            let left = clip.left().0.floor().max(0.) as u64;
+            let top = clip.top().0.floor().max(0.) as u64;
+            let right = clip.right().0.ceil().max(left as f32) as u64;
+            let bottom = clip.bottom().0.ceil().max(top as f32) as u64;
+            command_encoder.set_scissor_rect(metal::MTLScissorRect {
+                x: left,
+                y: top,
+                width: right.saturating_sub(left),
+                height: bottom.saturating_sub(top),
+            });
+
+            let mut ctx = GpuCanvasDrawContext {
+                gpu: raw,
+                bounds: canvas.bounds,
+                content_mask: canvas.content_mask,
+                layer,
+            };
+            if let Err(error) = canvas.driver.draw(&mut ctx) {
+                log::error!("failed to draw {layer:?} gpu canvas: {error:?}");
+            }
+        }
+
+        command_encoder.end_encoding();
+    }
+
     fn draw_primitives(
         &mut self,
         scene: &Scene,
@@ -837,13 +961,45 @@ impl MetalRenderer {
         let alpha = if self.opaque { 1. } else { 0. };
         let mut instance_offset = 0;
 
+        self.run_gpu_canvas_prepare(
+            &scene.gpu_canvases_under_scene,
+            GpuCanvasLayer::UnderScene,
+            command_buffer,
+            texture,
+            viewport_size,
+        );
+        self.run_gpu_canvas_prepare(
+            &scene.gpu_canvases_over_scene,
+            GpuCanvasLayer::OverScene,
+            command_buffer,
+            texture,
+            viewport_size,
+        );
+
+        let scene_load_action = if scene.gpu_canvases_under_scene.is_empty() {
+            metal::MTLLoadAction::Clear
+        } else {
+            self.run_gpu_canvas_draw(
+                &scene.gpu_canvases_under_scene,
+                GpuCanvasLayer::UnderScene,
+                command_buffer,
+                texture,
+                viewport_size,
+                metal::MTLLoadAction::Clear,
+                alpha,
+            );
+            metal::MTLLoadAction::Load
+        };
+
         let mut command_encoder = new_command_encoder_for_texture(
             command_buffer,
             texture,
             viewport_size,
             |color_attachment| {
-                color_attachment.set_load_action(metal::MTLLoadAction::Clear);
-                color_attachment.set_clear_color(metal::MTLClearColor::new(0., 0., 0., alpha));
+                color_attachment.set_load_action(scene_load_action);
+                if matches!(scene_load_action, metal::MTLLoadAction::Clear) {
+                    color_attachment.set_clear_color(metal::MTLClearColor::new(0., 0., 0., alpha));
+                }
             },
         );
 
@@ -946,6 +1102,15 @@ impl MetalRenderer {
         }
 
         command_encoder.end_encoding();
+        self.run_gpu_canvas_draw(
+            &scene.gpu_canvases_over_scene,
+            GpuCanvasLayer::OverScene,
+            command_buffer,
+            texture,
+            viewport_size,
+            metal::MTLLoadAction::Load,
+            alpha,
+        );
 
         if !self.is_unified_memory {
             // Sync the instance buffer to the GPU
