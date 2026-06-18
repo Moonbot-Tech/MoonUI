@@ -8,6 +8,7 @@ description = "Macros used by gpui"
 repository = "https://github.com/Moonbot-Tech/MoonUI"
 
 [features]
+inspector = []
 
 [lib]
 path = "src/gpui_macros.rs"

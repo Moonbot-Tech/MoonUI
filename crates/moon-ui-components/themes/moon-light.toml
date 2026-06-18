@@ -1,0 +1,75 @@
+mode = "Light"
+
+[dark.palette]
+shell = 0x131416
+shell_high = 0x1A1C1F
+panel = 0x20232A
+panel_high = 0x23262D
+border = 0x2A2D31
+text = 0xE8E4DC
+text_soft = 0x97928A
+text_muted = 0x5E5A53
+table_head = 0x20232A
+table_body = 0x1A1C1F
+table_selected = 0x212120
+green = 0x2FA85C
+red = 0xFF4A4A
+orange = 0xFF8E5A
+amber = 0xFFB347
+blue = 0x7FC9FF
+accent = 0xD2691E
+yellow = 0xFFD93D
+
+[dark.metrics]
+header_top_h = 32.0
+toolbar_h = 32.0
+status_h = 22.0
+dock_tab_h = 26.0
+table_header_h = 26.0
+table_row_h = 25.0
+button_radius = 4.0
+hairline = 1.0
+
+[dark.typography]
+font_family = "Inter"
+mono_font_family = "Geist Mono"
+font_size = 12.0
+mono_font_size = 11.0
+rem_size = 16.0
+
+[light.palette]
+shell = 0xF3F5F7
+shell_high = 0xFFFFFF
+panel = 0xE7EBEF
+panel_high = 0xFFFFFF
+border = 0xCDD3DA
+text = 0x18202A
+text_soft = 0x4F5B68
+text_muted = 0x7A8591
+table_head = 0xEEF2F5
+table_body = 0xFFFFFF
+table_selected = 0xE7F1FF
+green = 0x168A49
+red = 0xD92D3A
+orange = 0xC85F17
+amber = 0xB97800
+blue = 0x126CBF
+accent = 0xB95C18
+yellow = 0xB48A00
+
+[light.metrics]
+header_top_h = 32.0
+toolbar_h = 32.0
+status_h = 22.0
+dock_tab_h = 26.0
+table_header_h = 26.0
+table_row_h = 25.0
+button_radius = 4.0
+hairline = 1.0
+
+[light.typography]
+font_family = "Inter"
+mono_font_family = "Geist Mono"
+font_size = 12.0
+mono_font_size = 11.0
+rem_size = 16.0

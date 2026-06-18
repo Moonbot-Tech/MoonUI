@@ -1,0 +1,140 @@
+use gpui::prelude::FluentBuilder;
+use gpui::*;
+
+use super::tokens::{MoonPalette, MoonRect, rgba_from};
+
+#[derive(Clone, Copy, Debug)]
+pub struct MoonTextStyle {
+    pub color: u32,
+    pub alpha: f32,
+    pub font_size: f32,
+    pub line_height: f32,
+    pub weight: f32,
+    pub tracking: f32,
+    pub uppercase: bool,
+    pub mono: bool,
+}
+
+impl Default for MoonTextStyle {
+    fn default() -> Self {
+        Self {
+            color: MoonPalette::TERMINAL.text_muted,
+            alpha: 1.0,
+            font_size: 9.0,
+            line_height: 11.0,
+            weight: 400.0,
+            tracking: 0.0,
+            uppercase: true,
+            mono: false,
+        }
+    }
+}
+
+pub struct MoonText {
+    bounds: Option<MoonRect>,
+    text: SharedString,
+    style: MoonTextStyle,
+}
+
+impl MoonText {
+    pub fn new(text: impl Into<SharedString>) -> Self {
+        Self {
+            bounds: None,
+            text: text.into(),
+            style: MoonTextStyle::default(),
+        }
+    }
+
+    pub fn bounds(mut self, bounds: MoonRect) -> Self {
+        self.bounds = Some(bounds);
+        self
+    }
+
+    pub fn style(mut self, style: MoonTextStyle) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn color(mut self, color: u32) -> Self {
+        self.style.color = color;
+        self
+    }
+
+    pub fn alpha(mut self, alpha: f32) -> Self {
+        self.style.alpha = alpha;
+        self
+    }
+
+    pub fn font_size(mut self, font_size: f32) -> Self {
+        self.style.font_size = font_size;
+        self
+    }
+
+    pub fn line_height(mut self, line_height: f32) -> Self {
+        self.style.line_height = line_height;
+        self
+    }
+
+    pub fn weight(mut self, weight: f32) -> Self {
+        self.style.weight = weight;
+        self
+    }
+
+    pub fn tracking(mut self, tracking: f32) -> Self {
+        self.style.tracking = tracking;
+        self
+    }
+
+    pub fn uppercase(mut self, uppercase: bool) -> Self {
+        self.style.uppercase = uppercase;
+        self
+    }
+
+    pub fn mono(mut self, mono: bool) -> Self {
+        self.style.mono = mono;
+        self
+    }
+
+    pub fn render(self) -> Div {
+        let style = self.style;
+        let text = if style.uppercase {
+            self.text.as_ref().to_uppercase()
+        } else {
+            self.text.as_ref().to_string()
+        };
+
+        let mut element = div()
+            .relative()
+            .flex()
+            .items_center()
+            .h(px(style.line_height))
+            .font_family(if style.mono { "Geist Mono" } else { "Inter" })
+            .text_size(px(style.font_size))
+            .line_height(px(style.line_height))
+            .font_weight(FontWeight(style.weight))
+            .text_color(rgba_from(style.color, style.alpha))
+            .whitespace_nowrap()
+            .when(style.tracking.abs() > f32::EPSILON, |this| {
+                this.gap(px(style.tracking))
+            });
+
+        if let Some(bounds) = self.bounds {
+            element = element
+                .absolute()
+                .left(px(bounds.x))
+                .top(px(bounds.y))
+                .w(px(bounds.w))
+                .h(px(bounds.h));
+        }
+
+        if style.tracking.abs() > f32::EPSILON {
+            for ch in text.chars() {
+                element = element.child(ch.to_string());
+            }
+        } else {
+            element = element.child(text);
+        }
+
+        element
+    }
+}

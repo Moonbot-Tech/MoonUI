@@ -1,0 +1,18 @@
+[package]
+name = "moon-ui"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Moon UI facade: Moon-styled GPUI components on top of the standalone Moon GPUI runtime."
+publish = false
+
+[lib]
+name = "moon_ui"
+path = "src/lib.rs"
+
+[dependencies]
+gpui-component = { workspace = true }
+
+[lints]
+workspace = true
