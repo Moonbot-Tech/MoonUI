@@ -27,9 +27,9 @@ enum Commands {
         #[arg(long, default_value = "crates")]
         output: String,
 
-        /// Use path dependencies for local testing (instead of version deps)
+        /// Use version dependencies for publish-style generated crates.
         #[arg(long)]
-        local: bool,
+        versioned_deps: bool,
     },
 
     /// List crates in extraction order.
@@ -44,8 +44,8 @@ fn main() -> Result<()> {
             zed_tag,
             zed_path,
             output,
-            local,
-        } => transform::run(&zed_tag, zed_path.as_deref(), &output, local),
+            versioned_deps,
+        } => transform::run(&zed_tag, zed_path.as_deref(), &output, !versioned_deps),
         Commands::ListCrates => {
             for crate_name in transform::CRATE_PUBLISH_ORDER {
                 println!("{crate_name}");

@@ -748,7 +748,9 @@ fn patch_sum_tree_tracing(crate_dir: &Path) -> Result<()> {
             .replace(
                 "\r\n    #[ctor::ctor(unsafe)]\r\n    fn init_logger() {\r\n        zlog::init_test();\r\n    }\r\n",
                 "\r\n",
-            );
+            )
+            .replace("\n\n\n    #[test]", "\n\n    #[test]")
+            .replace("\r\n\r\n\r\n    #[test]", "\r\n\r\n    #[test]");
 
         if patched != content {
             fs::write(&path, patched)?;

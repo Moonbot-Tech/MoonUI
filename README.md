@@ -63,6 +63,15 @@ backend dependencies used by Zed.
 Regenerate a clean extraction from the new Zed revision on `upstream-clean`,
 commit it there, then rebase `master` onto the updated `upstream-clean`.
 
+Use path dependencies for the repository image. That is the default:
+
+```powershell
+cargo run -p xtask -- transform --zed-tag v0.0.0 --zed-path R:\path\to\zed --output crates
+```
+
+`--versioned-deps` is only for a publish-style experiment where MoonUI crates
+exist as versioned packages. Do not use it for the Git repository image.
+
 That workflow lets Git do a real three-way merge. Most upstream movement merges
 without noise, and real conflicts appear only where MoonUI's patches touch the
 same code.
