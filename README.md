@@ -51,8 +51,8 @@ shape of the dependency graph.
 Windows MSVC:
 
 ```powershell
-cmd.exe /d /s /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul && "C:\files\utils\rust\cargo\bin\cargo.exe" check -p moon-gpui --target x86_64-pc-windows-msvc'
-cmd.exe /d /s /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul && "C:\files\utils\rust\cargo\bin\cargo.exe" check -p moon-ui --target x86_64-pc-windows-msvc'
+cmd.exe /d /s /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul && cargo check -p moon-gpui --target x86_64-pc-windows-msvc'
+cmd.exe /d /s /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul && cargo check -p moon-ui --target x86_64-pc-windows-msvc'
 ```
 
 macOS requires the full Xcode Metal toolchain. Linux requires the GPUI Linux

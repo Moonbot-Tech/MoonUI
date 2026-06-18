@@ -742,6 +742,7 @@ impl MacWindow {
             bounds,
             titlebar,
             kind,
+            relationship,
             is_movable,
             is_resizable,
             is_minimizable,
@@ -750,6 +751,7 @@ impl MacWindow {
             display_id,
             window_min_size,
             tabbing_identifier,
+            taskbar_visibility: _,
             ..
         }: WindowParams,
         cursor_visible: Arc<AtomicBool>,
@@ -964,6 +966,10 @@ impl MacWindow {
 
             let app: id = NSApplication::sharedApplication(nil);
             let main_window: id = msg_send![app, mainWindow];
+            let owner_window = relationship
+                .owner()
+                .and_then(Self::native_window_for_handle)
+                .filter(|owner| !owner.is_null() && *owner != native_window);
             let mut sheet_parent = None;
 
             match kind {
@@ -975,6 +981,17 @@ impl MacWindow {
                         native_window.setLevel_(NSNormalWindowLevel);
                     }
                     native_window.setAcceptsMouseMovedEvents_(YES);
+
+                    if kind == WindowKind::Floating
+                        && let Some(owner_window) = owner_window
+                    {
+                        let _: () = msg_send![
+                            owner_window,
+                            addChildWindow:native_window
+                            ordered:NSWindowOrderingMode::NSWindowAbove
+                        ];
+                        let _: () = msg_send![native_window, setExcludedFromWindowsMenu:YES];
+                    }
 
                     if let Some(tabbing_identifier) = tabbing_identifier {
                         let tabbing_id = ns_string(tabbing_identifier.as_str());
@@ -1092,6 +1109,23 @@ impl MacWindow {
             } else {
                 None
             }
+        }
+    }
+
+    fn native_window_for_handle(target: AnyWindowHandle) -> Option<id> {
+        unsafe {
+            let app = NSApplication::sharedApplication(nil);
+            let windows: id = msg_send![app, orderedWindows];
+            let count: NSUInteger = msg_send![windows, count];
+
+            for i in 0..count {
+                let window: id = msg_send![windows, objectAtIndex:i];
+                if is_gpui_window(window) && get_window_state(&*window).lock().handle == target {
+                    return Some(window);
+                }
+            }
+
+            None
         }
     }
 

@@ -207,6 +207,15 @@ impl WindowsPlatform {
             .and_then(|hwnd| window_from_hwnd(hwnd.as_raw()))
     }
 
+    pub(crate) fn hwnd_for_window(&self, handle: AnyWindowHandle) -> Option<HWND> {
+        self.raw_window_handles.read().iter().find_map(|entry| {
+            let hwnd = entry.as_raw();
+            window_from_hwnd(hwnd)
+                .filter(|window| window.handle == handle)
+                .map(|_| hwnd)
+        })
+    }
+
     #[inline]
     fn post_message(&self, message: u32, wparam: WPARAM, lparam: LPARAM) {
         self.raw_window_handles
@@ -229,6 +238,7 @@ impl WindowsPlatform {
             platform_window_handle: self.handle,
             disable_direct_composition: self.disable_direct_composition,
             directx_devices: self.inner.state.directx_devices.borrow().clone().unwrap(),
+            owner_hwnd: None,
             invalidate_devices: self.invalidate_devices.clone(),
         }
     }
@@ -536,7 +546,13 @@ impl Platform for WindowsPlatform {
         handle: AnyWindowHandle,
         options: WindowParams,
     ) -> Result<Box<dyn PlatformWindow>> {
-        let window = WindowsWindow::new(handle, options, self.generate_creation_info())?;
+        let owner_hwnd = options
+            .relationship
+            .owner()
+            .and_then(|owner| self.hwnd_for_window(owner));
+        let mut creation_info = self.generate_creation_info();
+        creation_info.owner_hwnd = owner_hwnd;
+        let window = WindowsWindow::new(handle, options, creation_info)?;
         let handle = window.get_raw_handle();
         self.raw_window_handles.write().push(FrameClockWindow::new(
             handle,
@@ -1064,6 +1080,7 @@ pub(crate) struct WindowCreationInfo {
     pub(crate) platform_window_handle: HWND,
     pub(crate) disable_direct_composition: bool,
     pub(crate) directx_devices: DirectXDevices,
+    pub(crate) owner_hwnd: Option<HWND>,
     /// Flag to instruct the `VSyncProvider` thread to invalidate the directx devices
     /// as resizing them has failed, causing us to have lost at least the render target.
     pub(crate) invalidate_devices: Arc<AtomicBool>,

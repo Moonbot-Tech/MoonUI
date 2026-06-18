@@ -822,7 +822,17 @@ impl LinuxClient for WaylandClient {
     ) -> anyhow::Result<Box<dyn PlatformWindow>> {
         let mut state = self.0.borrow_mut();
 
-        let parent = state.keyboard_focused_window.clone();
+        let parent = params
+            .relationship
+            .owner()
+            .and_then(|owner| {
+                state
+                    .windows
+                    .values()
+                    .find(|window| window.handle() == owner)
+                    .cloned()
+            })
+            .or_else(|| state.keyboard_focused_window.clone());
 
         let target_output = params.display_id.and_then(|display_id| {
             let target_protocol_id: u64 = display_id.into();

@@ -24,9 +24,16 @@ use windows::{
         Graphics::Dwm::*,
         Graphics::Gdi::*,
         System::{
-            Com::*, Diagnostics::Debug::MessageBeep, LibraryLoader::*, Ole::*, SystemServices::*,
+            Com::*, Com::StructuredStorage::PROPVARIANT, Diagnostics::Debug::MessageBeep,
+            LibraryLoader::*, Ole::*, SystemServices::*,
         },
-        UI::{Controls::*, HiDpi::*, Input::KeyboardAndMouse::*, Shell::*, WindowsAndMessaging::*},
+        UI::{
+            Controls::*,
+            HiDpi::*,
+            Input::KeyboardAndMouse::*,
+            Shell::{PropertiesSystem::*, *},
+            WindowsAndMessaging::*,
+        },
     },
     core::*,
 };
@@ -422,6 +429,7 @@ impl WindowsWindow {
             platform_window_handle,
             disable_direct_composition,
             directx_devices,
+            owner_hwnd,
             invalidate_devices,
         } = creation_info;
         register_window_class(icon);
@@ -436,6 +444,8 @@ impl WindowsWindow {
                 };
                 Some(parent_window)
             }
+        } else if params.relationship.is_owned() {
+            owner_hwnd
         } else {
             None
         };
@@ -468,8 +478,10 @@ impl WindowsWindow {
             let dwexstyle = if params.kind == WindowKind::Dialog {
                 dwstyle |= WS_POPUP | WS_CAPTION;
                 WS_EX_DLGMODALFRAME
-            } else {
+            } else if params.taskbar_visibility.show_for(params.relationship) {
                 WS_EX_APPWINDOW
+            } else {
+                WINDOW_EX_STYLE(0)
             };
 
             (dwexstyle, dwstyle)
@@ -836,6 +848,12 @@ impl PlatformWindow for WindowsWindow {
     fn set_title(&mut self, title: &str) {
         unsafe { SetWindowTextW(self.0.hwnd, &HSTRING::from(title)) }
             .inspect_err(|e| log::error!("Set title failed: {e}"))
+            .ok();
+    }
+
+    fn set_app_id(&mut self, app_id: &str) {
+        set_window_app_id(self.0.hwnd, app_id)
+            .inspect_err(|e| log::error!("Set app id failed: {e}"))
             .ok();
     }
 
@@ -1335,6 +1353,10 @@ enum WindowOpenState {
 }
 
 const WINDOW_CLASS_NAME: PCWSTR = w!("Zed::Window");
+const PKEY_APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
+    fmtid: GUID::from_u128(0x9f4c2855_9f79_4b39_a8d0_e1d42de1d5f3),
+    pid: 5,
+};
 
 fn register_window_class(icon_handle: HICON) {
     static ONCE: Once = Once::new();
@@ -1350,6 +1372,16 @@ fn register_window_class(icon_handle: HICON) {
         };
         unsafe { RegisterClassW(&wc) };
     });
+}
+
+fn set_window_app_id(hwnd: HWND, app_id: &str) -> Result<()> {
+    let store: IPropertyStore = unsafe { SHGetPropertyStoreForWindow(hwnd)? };
+    let value = PROPVARIANT::from(app_id);
+    unsafe {
+        store.SetValue(&PKEY_APP_USER_MODEL_ID, &value)?;
+        store.Commit()?;
+    }
+    Ok(())
 }
 
 unsafe extern "system" fn window_procedure(

@@ -1498,6 +1498,12 @@ pub struct WindowOptions {
     /// The kind of window to create
     pub kind: WindowKind,
 
+    /// Relationship between this window and another application window.
+    pub relationship: WindowRelationship,
+
+    /// Controls whether the native window should have its own taskbar/dock entry when supported.
+    pub taskbar_visibility: WindowTaskbarVisibility,
+
     /// Whether the window should be movable by the user
     pub is_movable: bool,
 
@@ -1551,6 +1557,9 @@ pub struct WindowParams {
     /// The kind of window to create
     #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
     pub kind: WindowKind,
+
+    pub relationship: WindowRelationship,
+    pub taskbar_visibility: WindowTaskbarVisibility,
 
     /// Whether the window should be movable by the user
     #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
@@ -1632,6 +1641,8 @@ impl Default for WindowOptions {
             focus: true,
             show: true,
             kind: WindowKind::Normal,
+            relationship: WindowRelationship::default(),
+            taskbar_visibility: WindowTaskbarVisibility::default(),
             is_movable: true,
             is_resizable: true,
             is_minimizable: true,
@@ -1658,6 +1669,70 @@ pub struct TitlebarOptions {
 
     /// The position of the macOS traffic light buttons
     pub traffic_light_position: Option<Point<Pixels>>,
+}
+
+/// Describes how a native window relates to another application window.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WindowRelationship {
+    /// The window is a normal top-level window.
+    #[default]
+    Independent,
+
+    /// The window is owned by another GPUI window.
+    ///
+    /// Backends map this to the native non-modal owner/child primitive:
+    /// Win32 owned windows, AppKit child windows, Wayland xdg parent, or X11 transient-for.
+    Owned {
+        /// The GPUI window that owns this native window.
+        owner: AnyWindowHandle,
+    },
+}
+
+impl WindowRelationship {
+    /// Create a native owned/floating relationship to `owner`.
+    pub fn owned(owner: impl Into<AnyWindowHandle>) -> Self {
+        Self::Owned {
+            owner: owner.into(),
+        }
+    }
+
+    /// Return the owner window handle, if this is an owned relationship.
+    pub fn owner(&self) -> Option<AnyWindowHandle> {
+        match self {
+            Self::Independent => None,
+            Self::Owned { owner } => Some(*owner),
+        }
+    }
+
+    /// Whether this relationship should use native owned-window semantics.
+    pub fn is_owned(&self) -> bool {
+        self.owner().is_some()
+    }
+}
+
+/// Controls native taskbar/dock visibility where the platform has per-window entries.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WindowTaskbarVisibility {
+    /// Use the platform default. Owned windows default to hidden on platforms with taskbars.
+    #[default]
+    Default,
+
+    /// Force a separate taskbar entry where the platform supports it.
+    Visible,
+
+    /// Hide the window from the taskbar where the platform supports it.
+    Hidden,
+}
+
+impl WindowTaskbarVisibility {
+    /// Compute whether a platform with per-window taskbar entries should show this window.
+    pub fn show_for(self, relationship: WindowRelationship) -> bool {
+        match self {
+            Self::Default => !relationship.is_owned(),
+            Self::Visible => true,
+            Self::Hidden => false,
+        }
+    }
 }
 
 /// The kind of window to create

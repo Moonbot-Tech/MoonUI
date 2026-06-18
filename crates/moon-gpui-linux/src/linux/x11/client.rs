@@ -1583,10 +1583,22 @@ impl LinuxClient for X11Client {
         params: WindowParams,
     ) -> anyhow::Result<Box<dyn PlatformWindow>> {
         let mut state = self.0.borrow_mut();
-        let parent_window = state
-            .keyboard_focused_window
-            .and_then(|focused_window| state.windows.get(&focused_window))
-            .map(|w| w.window.clone());
+        let parent_window = params
+            .relationship
+            .owner()
+            .and_then(|owner| {
+                state
+                    .windows
+                    .values()
+                    .find(|window| window.window.state.borrow().handle == owner)
+                    .map(|window| window.window.clone())
+            })
+            .or_else(|| {
+                state
+                    .keyboard_focused_window
+                    .and_then(|focused_window| state.windows.get(&focused_window))
+                    .map(|w| w.window.clone())
+            });
         let x_window = state
             .xcb_connection
             .generate_id()

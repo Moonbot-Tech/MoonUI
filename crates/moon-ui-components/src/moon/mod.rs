@@ -4,7 +4,6 @@ mod background;
 mod badge;
 mod button;
 mod checkbox;
-mod chrome;
 mod color_picker;
 mod context_menu;
 mod data_table;
@@ -29,6 +28,7 @@ mod theme;
 mod tokens;
 mod tooltip;
 mod virtual_list;
+mod window_frame;
 
 pub mod foundation;
 
@@ -38,7 +38,6 @@ pub use button::{
     MoonButton, MoonButtonIconSlot, MoonButtonSegment, MoonButtonSize, MoonButtonVariant,
 };
 pub use checkbox::{MoonCheckbox, MoonCheckboxSize};
-pub use chrome::{MoonWindowChrome, MoonWindowChromeButton};
 pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};
 pub use data_table::{
     MoonDataCell, MoonDataRow, MoonDataTable, MoonDataTableColumn, MoonDataTableState,
@@ -70,3 +69,6 @@ pub use theme::{
 pub use tokens::{MoonMetrics, MoonPalette, MoonRect, MoonTone, rgba_from};
 pub use tooltip::MoonTooltipView;
 pub use virtual_list::{MoonVirtualList, MoonVirtualListScrollHandle};
+pub use window_frame::{
+    MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, MoonWindowFrameKind,
+};

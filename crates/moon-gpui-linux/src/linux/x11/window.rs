@@ -67,6 +67,7 @@ x11rb::atom_manager! {
         _NET_WM_STATE_FULLSCREEN,
         _NET_WM_STATE_HIDDEN,
         _NET_WM_STATE_FOCUSED,
+        _NET_WM_STATE_SKIP_TASKBAR,
         _NET_ACTIVE_WINDOW,
         _NET_WM_SYNC_REQUEST,
         _NET_WM_SYNC_REQUEST_COUNTER,
@@ -593,6 +594,19 @@ impl X11WindowState {
                 }
             }
 
+            if !params.taskbar_visibility.show_for(params.relationship) {
+                check_reply(
+                    || "X11 ChangeProperty32 setting _NET_WM_STATE_SKIP_TASKBAR failed.",
+                    xcb.change_property32(
+                        xproto::PropMode::REPLACE,
+                        x_window,
+                        atoms._NET_WM_STATE,
+                        xproto::AtomEnum::ATOM,
+                        &[atoms._NET_WM_STATE_SKIP_TASKBAR],
+                    ),
+                )?;
+            }
+
             let parent = if params.kind == WindowKind::Dialog
                 && let Some(parent) = parent_window
             {
@@ -620,6 +634,10 @@ impl X11WindowState {
                 // We set the modal state for dialog windows, so that the window manager
                 // can handle it appropriately (e.g., prevent interaction with the parent window
                 // while the dialog is open).
+                let mut wm_states = vec![atoms._NET_WM_STATE_MODAL];
+                if !params.taskbar_visibility.show_for(params.relationship) {
+                    wm_states.push(atoms._NET_WM_STATE_SKIP_TASKBAR);
+                }
                 check_reply(
                     || "X11 ChangeProperty32 setting modal state for dialog window failed.",
                     xcb.change_property32(
@@ -627,7 +645,7 @@ impl X11WindowState {
                         x_window,
                         atoms._NET_WM_STATE,
                         xproto::AtomEnum::ATOM,
-                        &[atoms._NET_WM_STATE_MODAL],
+                        &wm_states,
                     ),
                 )?;
             }
