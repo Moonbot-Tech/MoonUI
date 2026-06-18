@@ -264,6 +264,9 @@ fn resize_hit_zones(
                 .w(zone_size.width)
                 .h(zone_size.height)
                 .cursor(cursor_style_for_resize_edge(edge))
+                .on_mouse_down(MouseButton::Left, move |_, window, _| {
+                    window.start_window_resize(edge);
+                })
                 .into_any_element(),
         );
     };

@@ -1819,21 +1819,17 @@ impl PlatformWindow for X11Window {
         let mut state = self.0.state.borrow_mut();
 
         // Client-side decoration metadata (_GTK_FRAME_EXTENTS/tiling) is not
-        // universally available on X11 window managers. Still honor the
-        // user's "no server titlebar" request through Motif hints, but keep
-        // GPUI's internal state server-managed when CSD protocol support is
-        // missing. That gives applications a borderless normal window without
-        // entering the compositor-dependent CSD path.
-        let state_decorations = if matches!(decorations, gpui::WindowDecorations::Client)
+        // universally advertised by X11 window managers. Still keep GPUI's
+        // internal state client-decorated when the app requested it: Motif
+        // hints remove the server titlebar, and the app-drawn border/resize
+        // hit zones must remain active even if the WM ignores GTK frame extents.
+        if matches!(decorations, gpui::WindowDecorations::Client)
             && !state.client_side_decorations_supported
         {
             log::info!(
-                "x11: client-side decoration protocol unsupported, using undecorated server-managed window"
+                "x11: client-side decoration protocol unsupported; using app-drawn client decorations"
             );
-            gpui::WindowDecorations::Server
-        } else {
-            decorations
-        };
+        }
 
         // https://github.com/rust-windowing/winit/blob/master/src/platform_impl/linux/x11/util/hint.rs#L53-L87
         let hints_data: [u32; 5] = match decorations {
@@ -1859,7 +1855,7 @@ impl PlatformWindow for X11Window {
             return;
         };
 
-        match state_decorations {
+        match decorations {
             WindowDecorations::Server => {
                 state.decorations = WindowDecorations::Server;
                 let is_transparent = state.is_transparent();
