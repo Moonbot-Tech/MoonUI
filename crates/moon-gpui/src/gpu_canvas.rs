@@ -114,7 +114,13 @@ impl RawGpuAccess<'_> {
         }
     }
 
-    /// Monotonic generation bumped by the backend when native resources are recreated.
+    /// Monotonic generation bumped when the backend replaces its native device/context
+    /// after device loss or equivalent recovery.
+    ///
+    /// This is not a resize or render-target generation. Consumers should use
+    /// `width`, `height`, and `render_target_format` to react to target changes.
+    /// On Metal this value may remain stable for the renderer lifetime because
+    /// Metal devices do not have the same device-lost recovery path as D3D/wgpu.
     pub fn device_generation(&self) -> u64 {
         match self {
             Self::D3d11(access) => access.device_generation,
@@ -127,7 +133,7 @@ impl RawGpuAccess<'_> {
 /// Opaque borrowed Direct3D 11 handles for a canvas callback.
 #[derive(Clone, Copy, Debug)]
 pub struct D3d11RawAccess<'a> {
-    /// Monotonic generation bumped when GPUI recreates D3D resources.
+    /// Monotonic generation bumped when GPUI recreates D3D resources after device loss.
     pub device_generation: u64,
     /// `ID3D11Device*`.
     pub device: NonNull<c_void>,
@@ -148,7 +154,11 @@ pub struct D3d11RawAccess<'a> {
 /// Opaque borrowed Metal handles for a canvas callback.
 #[derive(Clone, Copy, Debug)]
 pub struct MetalRawAccess<'a> {
-    /// Monotonic generation bumped when GPUI recreates Metal resources.
+    /// Metal renderer/device generation.
+    ///
+    /// This normally remains stable for the renderer lifetime; target texture
+    /// changes from resize are reported through `width`, `height`, and
+    /// `render_target_format` instead.
     pub device_generation: u64,
     /// `MTLDevice*`.
     pub device: NonNull<c_void>,
@@ -171,7 +181,7 @@ pub struct MetalRawAccess<'a> {
 /// Opaque borrowed wgpu handles for a canvas callback.
 #[derive(Clone, Copy, Debug)]
 pub struct WgpuRawAccess<'a> {
-    /// Monotonic generation bumped when GPUI recreates wgpu resources.
+    /// Monotonic generation bumped when GPUI recreates wgpu resources after device loss.
     pub device_generation: u64,
     /// `wgpu::Device*`.
     pub device: NonNull<c_void>,
