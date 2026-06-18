@@ -1,15 +1,19 @@
 use crate::{CompositorGpuHint, WgpuAtlas, WgpuContext};
 use bytemuck::{Pod, Zeroable};
 use gpui::{
-    AtlasTextureId, Background, Bounds, DevicePixels, GpuSpecs, MonochromeSprite, Path, Point,
-    PolychromeSprite, PrimitiveBatch, Quad, ScaledPixels, Scene, Shadow, Size, SubpixelSprite,
-    Underline, get_gamma_correction_ratios,
+    AtlasTextureId, Background, Bounds, DevicePixels, GpuCanvasDrawContext, GpuCanvasLayer,
+    GpuCanvasPrepareContext, GpuSpecs, MonochromeSprite, PaintGpuCanvas, Path, Point,
+    PolychromeSprite, PrimitiveBatch, Quad, RawGpuAccess, ScaledPixels, Scene, Shadow, Size,
+    SubpixelSprite, Underline, WgpuRawAccess, get_gamma_correction_ratios,
 };
 use log::warn;
 #[cfg(not(target_family = "wasm"))]
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::cell::RefCell;
+use std::ffi::c_void;
+use std::marker::PhantomData;
 use std::num::NonZeroU64;
+use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -155,6 +159,7 @@ pub struct WgpuRenderer {
     max_texture_size: u32,
     last_error: Arc<Mutex<Option<String>>>,
     failed_frame_count: u32,
+    device_generation: u64,
     device_lost: std::sync::Arc<std::sync::atomic::AtomicBool>,
     surface_configured: bool,
     needs_redraw: bool,
@@ -485,6 +490,7 @@ impl WgpuRenderer {
             max_texture_size,
             last_error,
             failed_frame_count: 0,
+            device_generation: 0,
             device_lost: context.device_lost_flag(),
             surface_configured: true,
             needs_redraw: false,
@@ -1079,6 +1085,105 @@ impl WgpuRenderer {
         self.max_texture_size
     }
 
+    fn raw_gpu_access<'a>(
+        &'a self,
+        command_encoder: *mut c_void,
+        render_pass: *mut c_void,
+        render_target: &'a wgpu::TextureView,
+    ) -> RawGpuAccess<'a> {
+        let resources = self.resources();
+        RawGpuAccess::Wgpu(WgpuRawAccess {
+            device_generation: self.device_generation,
+            device: NonNull::new(Arc::as_ptr(&resources.device) as *mut c_void)
+                .expect("wgpu device must be non-null"),
+            queue: NonNull::new(Arc::as_ptr(&resources.queue) as *mut c_void)
+                .expect("wgpu queue must be non-null"),
+            command_encoder: NonNull::new(command_encoder)
+                .expect("wgpu command encoder must be non-null"),
+            render_pass: NonNull::new(render_pass),
+            render_target: NonNull::from(render_target).cast(),
+            render_target_format: NonNull::from(&self.surface_config.format).cast(),
+            width: self.surface_config.width,
+            height: self.surface_config.height,
+            _marker: PhantomData,
+        })
+    }
+
+    fn run_gpu_canvas_prepare(
+        &self,
+        canvases: &[PaintGpuCanvas],
+        layer: GpuCanvasLayer,
+        encoder: &mut wgpu::CommandEncoder,
+        frame_view: &wgpu::TextureView,
+    ) {
+        if canvases.is_empty() {
+            return;
+        }
+
+        let raw = self.raw_gpu_access(
+            encoder as *mut wgpu::CommandEncoder as *mut c_void,
+            std::ptr::null_mut(),
+            frame_view,
+        );
+        for canvas in canvases {
+            let mut ctx = GpuCanvasPrepareContext {
+                gpu: raw,
+                bounds: canvas.bounds,
+                content_mask: canvas.content_mask,
+                layer,
+            };
+            if let Err(error) = canvas.driver.prepare_gpu(&mut ctx) {
+                log::error!("failed to prepare {layer:?} gpu canvas: {error:?}");
+            }
+        }
+    }
+
+    fn run_gpu_canvas_draw(
+        &self,
+        canvases: &[PaintGpuCanvas],
+        layer: GpuCanvasLayer,
+        encoder_ptr: *mut c_void,
+        pass: &mut wgpu::RenderPass<'_>,
+        frame_view: &wgpu::TextureView,
+    ) {
+        if canvases.is_empty() {
+            return;
+        }
+
+        let raw = self.raw_gpu_access(
+            encoder_ptr,
+            pass as *mut wgpu::RenderPass<'_> as *mut c_void,
+            frame_view,
+        );
+        for canvas in canvases {
+            let clip = canvas.bounds.intersect(&canvas.content_mask.bounds);
+            if clip.is_empty() {
+                continue;
+            }
+
+            let left = clip.left().0.floor().max(0.) as u32;
+            let top = clip.top().0.floor().max(0.) as u32;
+            let right = clip.right().0.ceil().max(left as f32) as u32;
+            let bottom = clip.bottom().0.ceil().max(top as f32) as u32;
+            let width = right.saturating_sub(left);
+            let height = bottom.saturating_sub(top);
+            if width == 0 || height == 0 {
+                continue;
+            }
+            pass.set_scissor_rect(left, top, width, height);
+
+            let mut ctx = GpuCanvasDrawContext {
+                gpu: raw,
+                bounds: canvas.bounds,
+                content_mask: canvas.content_mask,
+                layer,
+            };
+            if let Err(error) = canvas.driver.draw(&mut ctx) {
+                log::error!("failed to draw {layer:?} gpu canvas: {error:?}");
+            }
+        }
+    }
+
     pub fn draw(&mut self, scene: &Scene) -> bool {
         // Bail out early if the surface has been unconfigured (e.g. during
         // Android background/rotation transitions).  Attempting to acquire
@@ -1208,6 +1313,49 @@ impl WgpuRenderer {
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                         label: Some("main_encoder"),
                     });
+            let encoder_ptr = &mut encoder as *mut wgpu::CommandEncoder as *mut c_void;
+
+            self.run_gpu_canvas_prepare(
+                &scene.gpu_canvases_under_scene,
+                GpuCanvasLayer::UnderScene,
+                &mut encoder,
+                &frame_view,
+            );
+            self.run_gpu_canvas_prepare(
+                &scene.gpu_canvases_over_scene,
+                GpuCanvasLayer::OverScene,
+                &mut encoder,
+                &frame_view,
+            );
+
+            let scene_load = if scene.gpu_canvases_under_scene.is_empty() {
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT)
+            } else {
+                {
+                    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("gpu_canvas_under_pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &frame_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                                store: wgpu::StoreOp::Store,
+                            },
+                            depth_slice: None,
+                        })],
+                        depth_stencil_attachment: None,
+                        ..Default::default()
+                    });
+                    self.run_gpu_canvas_draw(
+                        &scene.gpu_canvases_under_scene,
+                        GpuCanvasLayer::UnderScene,
+                        encoder_ptr,
+                        &mut pass,
+                        &frame_view,
+                    );
+                }
+                wgpu::LoadOp::Load
+            };
 
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -1216,7 +1364,7 @@ impl WgpuRenderer {
                         view: &frame_view,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            load: scene_load,
                             store: wgpu::StoreOp::Store,
                         },
                         depth_slice: None,
@@ -1325,6 +1473,30 @@ impl WgpuRenderer {
                 }
                 self.grow_instance_buffer();
                 continue;
+            }
+
+            if !scene.gpu_canvases_over_scene.is_empty() {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("gpu_canvas_over_pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &frame_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                        depth_slice: None,
+                    })],
+                    depth_stencil_attachment: None,
+                    ..Default::default()
+                });
+                self.run_gpu_canvas_draw(
+                    &scene.gpu_canvases_over_scene,
+                    GpuCanvasLayer::OverScene,
+                    encoder_ptr,
+                    &mut pass,
+                    &frame_view,
+                );
             }
 
             self.resources()
@@ -1829,6 +2001,7 @@ impl WgpuRenderer {
         let gpu_context = Rc::clone(gpu_context);
         let ctx_ref = gpu_context.borrow();
         let context = ctx_ref.as_ref().expect("context should exist");
+        let next_device_generation = self.device_generation.wrapping_add(1);
 
         self.resources = None;
         self.atlas.handle_device_lost(context);
@@ -1841,6 +2014,7 @@ impl WgpuRenderer {
             self.compositor_gpu,
             self.atlas.clone(),
         )?;
+        self.device_generation = next_device_generation;
 
         log::info!("GPU recovery complete");
         Ok(())
