@@ -4,9 +4,9 @@ MoonUI contains code derived from Zed's GPUI crates.
 
 Zed-derived portions:
 Copyright 2022 - 2025 Zed Industries, Inc.
-Licensed under Apache-2.0 as indicated by each crate manifest and by `LICENSE`
-and `LICENSE-APACHE`. Zed's GPL zlog/ztracing helper crates are not extracted
-into MoonUI.
+Licensed under Apache-2.0 as indicated by each crate manifest, the root
+`LICENSE`, and crate-level `LICENSE-APACHE` files. Zed's GPL zlog/ztracing
+helper crates are not extracted into MoonUI.
 
 Moon UI components contain code derived from Longbridge gpui-component.
 

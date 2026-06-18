@@ -24,7 +24,7 @@ cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 
 0. Standalone extraction hygiene on `upstream-clean`:
    - `xtask` materializes Apache license files instead of preserving symlinks
      or Windows text pointers such as `../../LICENSE`.
-   - Root `LICENSE` and `LICENSE-APACHE` are canonical Apache-2.0 text.
+   - Root `LICENSE` is canonical Apache-2.0 text.
    - Every Apache crate has a real `LICENSE-APACHE` file. No pointer files,
      no symlink-only licenses, no BOM-only Windows artifacts.
 
