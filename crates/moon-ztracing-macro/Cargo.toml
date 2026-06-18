@@ -1,0 +1,13 @@
+[package]
+name = "moon-ztracing-macro"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Moonbot-Tech/MoonUI"
+description = "Moon standalone build of Zed's ztracing_macro crate"
+
+[lib]
+proc-macro = true
+
+[dependencies]

@@ -1,0 +1,37 @@
+[package]
+name = "moon-gpui-platform"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "Apache-2.0"
+repository = "https://github.com/Moonbot-Tech/MoonUI"
+description = "Moon standalone build of Zed's gpui_platform crate"
+
+[lib]
+path = "src/gpui_platform.rs"
+
+[features]
+default = []
+font-kit = ["gpui_macos/font-kit"]
+test-support = ["gpui/test-support", "gpui_macos/test-support"]
+screen-capture = ["gpui/screen-capture", "gpui_macos/screen-capture", "gpui_windows/screen-capture", "gpui_linux/screen-capture"]
+runtime_shaders = ["gpui_macos/runtime_shaders"]
+wayland = ["gpui_linux/wayland"]
+x11 = ["gpui_linux/x11"]
+
+[dependencies]
+gpui = { package = "moon-gpui", path = "../moon-gpui" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+gpui_macos = { package = "moon-gpui-macos", path = "../moon-gpui-macos" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+gpui_windows = { package = "moon-gpui-windows", path = "../moon-gpui-windows" }
+gpui = { package = "moon-gpui", path = "../moon-gpui", features = ["windows-manifest"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
+gpui_linux = { package = "moon-gpui-linux", path = "../moon-gpui-linux" }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+gpui_web = { package = "moon-gpui-web", path = "../moon-gpui-web" }
+console_error_panic_hook = "0.1.7"

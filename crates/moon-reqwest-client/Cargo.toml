@@ -1,0 +1,39 @@
+[package]
+name = "moon-reqwest-client"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "Apache-2.0"
+repository = "https://github.com/Moonbot-Tech/MoonUI"
+description = "Moon standalone build of Zed's reqwest_client crate"
+
+[features]
+test-support = []
+
+[lib]
+path = "src/reqwest_client.rs"
+doctest = true
+
+[dependencies]
+anyhow = { version = "1.0.86" }
+bytes = { version = "1.0" }
+futures = { version = "0.3.32" }
+http_client = { package = "moon-http-client", path = "../moon-http-client" }
+serde = { version = "1.0.221", features = ["derive", "rc"] }
+log = { version = "0.4.16", features = ["kv_unstable_serde", "serde"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+regex = { version = "1.5" }
+reqwest = { version = "0.12.15-zed", package = "zed-reqwest", default-features = false, features = [
+    "charset",
+    "http2",
+    "macos-system-configuration",
+    "multipart",
+    "rustls-tls-native-roots",
+    "socks",
+    "stream"] }
+gpui_util = { package = "moon-gpui-util", path = "../moon-gpui-util" }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+http_client_tls = { package = "moon-http-client-tls", path = "../moon-http-client-tls" }
+
+[dev-dependencies]

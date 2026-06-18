@@ -1,0 +1,15 @@
+[package]
+name = "moon-refineable"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "Apache-2.0"
+description = "A macro for creating 'refinement' types that can be used to partially initialize or mutate a complex struct"
+repository = "https://github.com/Moonbot-Tech/MoonUI"
+
+[lib]
+path = "src/refineable.rs"
+doctest = false
+
+[dependencies]
+derive_refineable = { package = "moon-derive-refineable", path = "../moon-derive-refineable" }

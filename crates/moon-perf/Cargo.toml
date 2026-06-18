@@ -1,0 +1,15 @@
+[package]
+name = "moon-perf"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "Apache-2.0"
+description = "A tool for measuring Zed test performance, with too many Clippy lints"
+repository = "https://github.com/Moonbot-Tech/MoonUI"
+
+[lib]
+
+[dependencies]
+collections = { package = "moon-collections", path = "../moon-collections" }
+serde = { version = "1.0.221", features = ["derive", "rc"] }
+serde_json = { version = "1.0.144", features = ["preserve_order", "raw_value"] }
