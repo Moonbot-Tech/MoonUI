@@ -160,6 +160,7 @@ fn transform_crate(
 
     // Copy crate directory
     copy_dir_recursive(&src_dir, &dest_dir)?;
+    patch_apache_license_pointers(&dest_dir)?;
 
     // Patch examples that reference external assets
     if crate_name == "gpui" {
@@ -202,6 +203,25 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<()> {
                 fs::create_dir_all(parent)?;
             }
             fs::copy(entry.path(), &target)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn patch_apache_license_pointers(crate_dir: &Path) -> Result<()> {
+    for entry in WalkDir::new(crate_dir) {
+        let entry = entry?;
+        if !entry.file_type().is_file()
+            || entry.path().file_name().and_then(|name| name.to_str()) != Some("LICENSE-APACHE")
+        {
+            continue;
+        }
+
+        let content = fs::read_to_string(entry.path())?;
+        let patched = content.replace("LICENSE-APACHE", "LICENSE");
+        if patched != content {
+            fs::write(entry.path(), patched)?;
         }
     }
 
