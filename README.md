@@ -63,9 +63,9 @@ backend dependencies used by Zed.
 MoonUI preserves upstream licensing from the projects it is built from.
 
 - GPUI-derived crates are based on Zed and carry their original Zed license
-  metadata. See `LICENSE-APACHE` and `LICENSE-GPL`.
-- `moon-zlog`, `moon-ztracing`, and `moon-ztracing-macro` are
-  `GPL-3.0-or-later`, matching their crate manifests.
+  metadata. See `LICENSE-APACHE`.
+- Zed's GPL `zlog` / `ztracing` helper crates are intentionally not extracted.
+  The remaining extracted GPUI crates in this repository are Apache-2.0.
 - Moon UI component crates are an Apache-2.0 port of Longbridge
   `gpui-component`. The component crate also keeps its upstream copyright
   notice in `crates/moon-ui-components/LICENSE-APACHE`.
