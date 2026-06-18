@@ -30,6 +30,11 @@ table_row_h = 25.0
 button_radius = 4.0
 hairline = 1.0
 
+[dark.scale]
+ui = 1.0
+font = 1.0
+font_delta = 0.0
+
 [dark.typography]
 font_family = "Inter"
 mono_font_family = "Geist Mono"
@@ -66,6 +71,11 @@ table_header_h = 26.0
 table_row_h = 25.0
 button_radius = 4.0
 hairline = 1.0
+
+[light.scale]
+ui = 1.0
+font = 1.0
+font_delta = 0.0
 
 [light.typography]
 font_family = "Inter"

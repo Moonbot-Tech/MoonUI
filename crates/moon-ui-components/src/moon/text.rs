@@ -1,7 +1,10 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
-use super::tokens::{MoonPalette, MoonRect, rgba_from};
+use super::{
+    theme::MoonTheme,
+    tokens::{MoonPalette, MoonRect, rgba_from},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct MoonTextStyle {
@@ -30,6 +33,7 @@ impl Default for MoonTextStyle {
     }
 }
 
+#[derive(IntoElement)]
 pub struct MoonText {
     bounds: Option<MoonRect>,
     text: SharedString,
@@ -95,8 +99,16 @@ impl MoonText {
         self
     }
 
-    pub fn render(self) -> Div {
+    pub fn render(self) -> Self {
+        self
+    }
+}
+
+impl RenderOnce for MoonText {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let style = self.style;
+        let tokens = MoonTheme::active_tokens(cx);
+        let text_metrics = tokens.text(style.font_size, style.line_height);
         let text = if style.uppercase {
             self.text.as_ref().to_uppercase()
         } else {
@@ -107,15 +119,15 @@ impl MoonText {
             .relative()
             .flex()
             .items_center()
-            .h(px(style.line_height))
-            .font_family(if style.mono { "Geist Mono" } else { "Inter" })
-            .text_size(px(style.font_size))
-            .line_height(px(style.line_height))
+            .h(px(text_metrics.line_height))
+            .font_family(tokens.font_family(style.mono))
+            .text_size(px(text_metrics.font_size))
+            .line_height(px(text_metrics.line_height))
             .font_weight(FontWeight(style.weight))
             .text_color(rgba_from(style.color, style.alpha))
             .whitespace_nowrap()
             .when(style.tracking.abs() > f32::EPSILON, |this| {
-                this.gap(px(style.tracking))
+                this.gap(px(tokens.ui(style.tracking)))
             });
 
         if let Some(bounds) = self.bounds {

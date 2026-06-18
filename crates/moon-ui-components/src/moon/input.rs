@@ -6,7 +6,7 @@ use crate::input::{Input, InputEvent, InputState};
 use crate::{Selectable, Sizable, Size};
 use regex::Regex;
 
-use super::tokens::{MoonRect, MoonTone};
+use super::{theme::MoonTheme, tokens::{MoonRect, MoonTone}};
 
 pub type MoonInputEvent = InputEvent;
 pub type MoonInputState = InputState;
@@ -187,6 +187,7 @@ impl MoonInput {
 
 impl RenderOnce for MoonInput {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let tokens = MoonTheme::active_tokens(cx);
         let clean_on_escape = self.clean_on_escape;
         let loading = self.loading;
         let text_align = self.text_align;
@@ -232,7 +233,7 @@ impl RenderOnce for MoonInput {
             .cleanable(self.cleanable)
             .selected(self.selected)
             .when_some(self.text_align, |this, align| this.text_align(align))
-            .when(self.mono, |this| this.font_family("Geist Mono"))
+            .when(self.mono, |this| this.font_family(tokens.font_family(true)))
             .when_some(self.prefix, |this, prefix| this.prefix(prefix))
             .when_some(self.suffix, |this, suffix| this.suffix(suffix));
         if self.mask_toggle {
@@ -249,14 +250,18 @@ impl RenderOnce for MoonInput {
         if let MoonInputSize::Custom { height, radius, font_size, line_height, pad_x, pad_y, gap } =
             self.size
         {
+            let line_height = tokens.line_height(line_height);
+            let height = tokens
+                .ui(height)
+                .max(line_height + tokens.ui(pad_y) * 2.0);
             input = input
                 .h(px(height))
-                .rounded(px(radius))
-                .text_size(px(font_size))
+                .rounded(px(tokens.ui(radius)))
+                .text_size(px(tokens.font(font_size)))
                 .line_height(px(line_height))
-                .px(px(pad_x))
-                .py(px(pad_y))
-                .gap(px(gap));
+                .px(px(tokens.ui(pad_x)))
+                .py(px(tokens.ui(pad_y)))
+                .gap(px(tokens.ui(gap)));
         }
         input
     }

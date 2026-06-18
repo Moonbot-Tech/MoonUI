@@ -3,7 +3,7 @@ use gpui::*;
 use crate::button::{Button, ButtonRounded, ButtonVariant, ButtonVariants};
 use crate::{Disableable, Icon, Selectable, Sizable};
 
-use super::tokens::{MoonRect, rgb_from};
+use super::{theme::MoonTheme, tokens::{MoonRect, rgb_from}};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonButtonVariant {
@@ -150,8 +150,9 @@ impl MoonButtonIconSlot {
         self
     }
 
-    fn icon(self) -> Icon {
-        let mut icon = Icon::default().path(self.path).size(px(self.size));
+    fn icon(self, cx: &App) -> Icon {
+        let tokens = MoonTheme::active_tokens(cx);
+        let mut icon = Icon::default().path(self.path).size(px(tokens.ui(self.size)));
         if let Some(color) = self.color {
             icon = icon.text_color(rgba_from_u32(color, self.alpha));
         }
@@ -365,7 +366,8 @@ impl MoonButton {
 }
 
 impl RenderOnce for MoonButton {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let tokens = MoonTheme::active_tokens(cx);
         let mut button = Button::new(self.id)
             .with_variant(self.variant.into())
             .with_size(size_for(self.size))
@@ -376,7 +378,7 @@ impl RenderOnce for MoonButton {
             .tab_stop(self.tab_stop);
 
         if let Some(radius) = self.radius.or_else(|| custom_radius(self.size)) {
-            button = button.rounded(ButtonRounded::Size(px(radius)));
+            button = button.rounded(ButtonRounded::Size(px(tokens.ui(radius))));
         }
         if let Some(bounds) = self.bounds {
             button = button.absolute().left(px(bounds.x)).top(px(bounds.y)).w(px(bounds.w)).h(px(bounds.h));
@@ -388,10 +390,10 @@ impl RenderOnce for MoonButton {
             button = button.w_full();
         }
         if let Some(icon) = self.leading_icon {
-            button = button.icon(icon.icon());
+            button = button.icon(icon.icon(cx));
         }
         if let Some(icon) = self.loading_icon {
-            button = button.loading_icon(icon.icon());
+            button = button.loading_icon(icon.icon(cx));
         }
         if let Some(tooltip) = self.tooltip {
             button = button.tooltip(tooltip);
@@ -417,11 +419,15 @@ impl RenderOnce for MoonButton {
                 div()
                     .flex()
                     .items_center()
-                    .gap(px(gap))
+                    .gap(px(tokens.ui(gap)))
                     .children(self.segments.into_iter().map(move |segment| {
+                        let text_metrics = tokens.text(
+                            segment.font_size.unwrap_or(font_size),
+                            segment.line_height.unwrap_or(line_height),
+                        );
                         let mut text = div()
-                            .text_size(px(segment.font_size.unwrap_or(font_size)))
-                            .line_height(px(segment.line_height.unwrap_or(line_height)))
+                            .text_size(px(text_metrics.font_size))
+                            .line_height(px(text_metrics.line_height))
                             .font_weight(FontWeight(segment.weight))
                             .child(segment.text);
                         if let Some(color) = segment.color {
@@ -431,7 +437,7 @@ impl RenderOnce for MoonButton {
                     })),
             )
         }
-        .when_some(self.trailing_icon, |this, icon| this.child(icon.icon()))
+        .when_some(self.trailing_icon, |this, icon| this.child(icon.icon(cx)))
     }
 }
 

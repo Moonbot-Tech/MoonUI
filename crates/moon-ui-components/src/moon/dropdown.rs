@@ -7,6 +7,7 @@ use super::{
     foundation::{MoonClickHandler, MoonSelectHandler},
     icons::{MOON_ICON_CHECK, moon_icon},
     text::MoonText,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
 
@@ -39,6 +40,20 @@ struct MenuMetrics {
     radius: f32,
     pad_x: f32,
     gap: f32,
+}
+
+impl MenuMetrics {
+    fn scaled(self, tokens: &MoonThemeTokens) -> Self {
+        let line_height = tokens.line_height(self.line_height);
+        Self {
+            row_height: tokens.ui(self.row_height).max(line_height + tokens.ui(4.0)),
+            font_size: self.font_size,
+            line_height: self.line_height,
+            radius: tokens.ui(self.radius),
+            pad_x: tokens.ui(self.pad_x),
+            gap: tokens.ui(self.gap),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -220,7 +235,20 @@ impl MoonPopupMenu {
     }
 
     pub fn render_with_palette(self, p: MoonPalette) -> AnyElement {
-        let metrics = self.metrics();
+        self.render_with_theme(p, MoonThemeTokens::default())
+    }
+
+    fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> AnyElement {
+        let metrics = self.metrics().scaled(&tokens);
+        self.render_with_metrics(p, metrics, tokens)
+    }
+
+    fn render_with_metrics(
+        self,
+        p: MoonPalette,
+        metrics: MenuMetrics,
+        tokens: MoonThemeTokens,
+    ) -> AnyElement {
         let id = self.id.clone();
         let mono = self.mono;
         let shadow = super::foundation::box_shadow(
@@ -235,8 +263,8 @@ impl MoonPopupMenu {
             .id(ElementId::from(self.id.clone()))
             .relative()
             .w(px(self.width))
-            .p(px(4.0))
-            .rounded(px(5.0))
+            .p(px(tokens.ui(4.0)))
+            .rounded(px(tokens.ui(5.0)))
             .border(px(1.0))
             .border_color(rgba_from(p.border, 1.0))
             .bg(rgba_from(p.shell_high, 0.98))
@@ -244,7 +272,7 @@ impl MoonPopupMenu {
             .occlude()
             .flex()
             .flex_col()
-            .gap(px(2.0));
+            .gap(px(tokens.ui(2.0)));
 
         if let Some(max_height) = self.max_height {
             menu = menu.max_h(px(max_height)).overflow_y_scroll();
@@ -256,7 +284,14 @@ impl MoonPopupMenu {
 
         for (ix, item) in self.items.into_iter().enumerate() {
             menu = menu.child(Self::render_item(
-                &id, mono, ix, item, metrics, self.width, p,
+                &id,
+                mono,
+                ix,
+                item,
+                metrics,
+                self.width,
+                p,
+                tokens.clone(),
             ));
         }
 
@@ -271,6 +306,7 @@ impl MoonPopupMenu {
         metrics: MenuMetrics,
         menu_width: f32,
         p: MoonPalette,
+        tokens: MoonThemeTokens,
     ) -> AnyElement {
         let row_id = SharedString::from(format!("{}:item:{}", menu_id, ix));
 
@@ -331,12 +367,12 @@ impl MoonPopupMenu {
                     .child(
                         div()
                             .w(px(12.0))
-                            .h(px(metrics.line_height))
+                            .h(px(tokens.line_height(metrics.line_height)))
                             .flex()
                             .items_center()
                             .justify_center()
                             .when(checked, |this| {
-                                this.child(moon_icon(MOON_ICON_CHECK, 11.0, p.blue, alpha))
+                                this.child(moon_icon(MOON_ICON_CHECK, tokens.ui(11.0), p.blue, alpha))
                             }),
                     )
                     .child(
@@ -401,16 +437,8 @@ impl MoonPopupMenu {
                             .child(
                                 MoonPopupMenu::new(format!("{menu_id}:submenu:{ix}"))
                                     .items(submenu)
-                                    .size(MoonMenuSize::Custom {
-                                        row_height: metrics.row_height,
-                                        font_size: metrics.font_size,
-                                        line_height: metrics.line_height,
-                                        radius: metrics.radius,
-                                        pad_x: metrics.pad_x,
-                                        gap: metrics.gap,
-                                    })
                                     .width(menu_width)
-                                    .render_with_palette(p),
+                                    .render_with_metrics(p, metrics, tokens.clone()),
                             ),
                     );
                 }
@@ -459,7 +487,8 @@ impl MoonPopupMenu {
 
 impl RenderOnce for MoonPopupMenu {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        self.render_with_palette(MoonPalette::active(cx))
+        let tokens = MoonTheme::active_tokens(cx);
+        self.render_with_theme(MoonPalette::active(cx), tokens)
     }
 }
 
@@ -763,6 +792,7 @@ impl RenderOnce for MoonDropdown {
             .trigger_any(trigger)
             .content(move |_, _window, cx| {
                 let p = MoonPalette::active(cx);
+                let tokens = MoonTheme::active_tokens(cx);
                 let mut menu = MoonPopupMenu::new(menu_id.clone())
                     .items(popup_items.clone())
                     .size(menu_size)
@@ -773,9 +803,9 @@ impl RenderOnce for MoonDropdown {
                 }
 
                 div()
-                    .mt(px(trigger_height + menu_offset_y))
-                    .ml(px(menu_offset_x))
-                    .child(menu.render_with_palette(p))
+                    .mt(px(tokens.ui(trigger_height) + tokens.ui(menu_offset_y)))
+                    .ml(px(tokens.ui(menu_offset_x)))
+                    .child(menu.render_with_theme(p, tokens))
             });
 
         {

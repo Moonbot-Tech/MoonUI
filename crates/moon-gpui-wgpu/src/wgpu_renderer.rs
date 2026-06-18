@@ -200,10 +200,12 @@ impl WgpuRenderer {
         let window_handle = window
             .window_handle()
             .map_err(|e| anyhow::anyhow!("Failed to get window handle: {e}"))?;
+        let display_handle = window
+            .display_handle()
+            .map_err(|e| anyhow::anyhow!("Failed to get display handle: {e}"))?;
 
         let target = wgpu::SurfaceTargetUnsafe::RawHandle {
-            // Fall back to the display handle already provided via InstanceDescriptor::display.
-            raw_display_handle: None,
+            raw_display_handle: Some(display_handle.as_raw()),
             raw_window_handle: window_handle.as_raw(),
         };
 
@@ -1879,7 +1881,7 @@ impl WgpuRenderer {
     /// different instance will cause a "Device does not exist" panic because
     /// the wgpu device is bound to its originating instance.
     #[cfg(not(target_family = "wasm"))]
-    pub fn replace_surface<W: HasWindowHandle>(
+    pub fn replace_surface<W: HasWindowHandle + HasDisplayHandle>(
         &mut self,
         window: &W,
         config: WgpuSurfaceConfig,
@@ -1888,8 +1890,11 @@ impl WgpuRenderer {
         let window_handle = window
             .window_handle()
             .map_err(|e| anyhow::anyhow!("Failed to get window handle: {e}"))?;
+        let display_handle = window
+            .display_handle()
+            .map_err(|e| anyhow::anyhow!("Failed to get display handle: {e}"))?;
 
-        let surface = create_surface(instance, window_handle.as_raw())?;
+        let surface = create_surface(instance, display_handle.as_raw(), window_handle.as_raw())?;
 
         let width = (config.size.width.0 as u32).max(1);
         let height = (config.size.height.0 as u32).max(1);
@@ -1964,6 +1969,9 @@ impl WgpuRenderer {
         let window_handle = window
             .window_handle()
             .map_err(|e| anyhow::anyhow!("Failed to get window handle: {e}"))?;
+        let display_handle = window
+            .display_handle()
+            .map_err(|e| anyhow::anyhow!("Failed to get display handle: {e}"))?;
 
         let surface = if needs_new_context {
             log::warn!("GPU device lost, recreating context...");
@@ -1979,7 +1987,8 @@ impl WgpuRenderer {
             std::thread::sleep(std::time::Duration::from_millis(350));
 
             let instance = WgpuContext::instance(Box::new(window.clone()));
-            let surface = create_surface(&instance, window_handle.as_raw())?;
+            let surface =
+                create_surface(&instance, display_handle.as_raw(), window_handle.as_raw())?;
             let new_context =
                 WgpuContext::new_rejecting_software(instance, &surface, self.compositor_gpu)?;
             *gpu_context.borrow_mut() = Some(new_context);
@@ -1987,7 +1996,7 @@ impl WgpuRenderer {
         } else {
             let ctx_ref = gpu_context.borrow();
             let instance = &ctx_ref.as_ref().unwrap().instance;
-            create_surface(instance, window_handle.as_raw())?
+            create_surface(instance, display_handle.as_raw(), window_handle.as_raw())?
         };
 
         let config = WgpuSurfaceConfig {
@@ -2024,13 +2033,13 @@ impl WgpuRenderer {
 #[cfg(not(target_family = "wasm"))]
 fn create_surface(
     instance: &wgpu::Instance,
+    raw_display_handle: raw_window_handle::RawDisplayHandle,
     raw_window_handle: raw_window_handle::RawWindowHandle,
 ) -> anyhow::Result<wgpu::Surface<'static>> {
     unsafe {
         instance
             .create_surface_unsafe(wgpu::SurfaceTargetUnsafe::RawHandle {
-                // Fall back to the display handle already provided via InstanceDescriptor::display.
-                raw_display_handle: None,
+                raw_display_handle: Some(raw_display_handle),
                 raw_window_handle,
             })
             .map_err(|e| anyhow::anyhow!("{e}"))

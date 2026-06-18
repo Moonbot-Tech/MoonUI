@@ -4,6 +4,7 @@ use gpui::*;
 use super::{
     popover::{MoonPopover, MoonPopoverPlacement},
     text::MoonText,
+    theme::MoonTheme,
     tokens::{MoonPalette, rgba_from},
 };
 
@@ -86,6 +87,7 @@ impl MoonColorPicker {
 impl RenderOnce for MoonColorPicker {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonPalette::active(cx);
+        let tokens = MoonTheme::active_tokens(cx);
         let value = self.state.read(cx).value();
         let state = self.state.clone();
         let colors = if self.colors.is_empty() {
@@ -110,9 +112,9 @@ impl RenderOnce for MoonColorPicker {
                 "{}:trigger",
                 self.id
             ))))
-            .h(px(26.0))
+            .h(px(tokens.fit_height(26.0, 13.0, 6.5)))
             .w(px(128.0))
-            .rounded(px(4.0))
+            .rounded(px(tokens.ui(4.0)))
             .border(px(1.0))
             .border_color(rgba_from(p.border, 1.0))
             .bg(rgba_from(
@@ -121,16 +123,16 @@ impl RenderOnce for MoonColorPicker {
             ))
             .flex()
             .items_center()
-            .gap(px(8.0))
-            .px(px(7.0))
+            .gap(px(tokens.ui(8.0)))
+            .px(px(tokens.ui(7.0)))
             .cursor_default()
             .when(!self.disabled, |this| {
                 this.hover(|this| this.border_color(rgba_from(0x343840, 1.0)))
             })
             .child(
                 div()
-                    .size(px(14.0))
-                    .rounded(px(3.0))
+                    .size(px(tokens.ui(14.0)))
+                    .rounded(px(tokens.ui(3.0)))
                     .border(px(1.0))
                     .border_color(rgba_from(0x000000, 0.38))
                     .bg(value),
@@ -154,7 +156,7 @@ impl RenderOnce for MoonColorPicker {
             ))))
             .grid()
             .grid_cols(5)
-            .gap(px(6.0));
+            .gap(px(tokens.ui(6.0)));
 
         for (ix, color) in colors.into_iter().enumerate() {
             let state = state.clone();
@@ -164,8 +166,8 @@ impl RenderOnce for MoonColorPicker {
                         "{}:color:{ix}",
                         self.id
                     ))))
-                    .size(px(22.0))
-                    .rounded(px(4.0))
+                    .size(px(tokens.ui(22.0)))
+                    .rounded(px(tokens.ui(4.0)))
                     .border(px(1.0))
                     .border_color(if color == value {
                         rgba_from(p.blue, 1.0)
@@ -179,7 +181,7 @@ impl RenderOnce for MoonColorPicker {
                                 super::foundation::box_shadow(
                                     px(0.0),
                                     px(0.0),
-                                    px(10.0),
+                                    px(tokens.ui(10.0)),
                                     px(0.0),
                                     rgba_from(p.blue, 0.18),
                                 ),

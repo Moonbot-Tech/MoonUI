@@ -1087,9 +1087,6 @@ pub struct Window {
     active: Rc<Cell<bool>>,
     hovered: Rc<Cell<bool>>,
     pub(crate) needs_present: Rc<Cell<bool>>,
-    /// Tracks recent input event timestamps to determine if input is arriving at a high rate.
-    /// Used to selectively enable VRR optimization only when input rate exceeds 60fps.
-    pub(crate) input_rate_tracker: Rc<RefCell<InputRateTracker>>,
     #[cfg(feature = "input-latency-histogram")]
     input_latency_tracker: InputLatencyTracker,
     last_input_modality: InputModality,
@@ -1114,51 +1111,6 @@ pub struct Window {
 struct ModifierState {
     modifiers: Modifiers,
     saw_keystroke: bool,
-}
-
-/// Tracks input event timestamps to determine if input is arriving at a high rate.
-/// Used for selective VRR (Variable Refresh Rate) optimization.
-#[derive(Clone, Debug)]
-pub(crate) struct InputRateTracker {
-    timestamps: Vec<Instant>,
-    window: Duration,
-    inputs_per_second: u32,
-    sustain_until: Instant,
-    sustain_duration: Duration,
-}
-
-impl Default for InputRateTracker {
-    fn default() -> Self {
-        Self {
-            timestamps: Vec::new(),
-            window: Duration::from_millis(100),
-            inputs_per_second: 60,
-            sustain_until: Instant::now(),
-            sustain_duration: Duration::from_secs(1),
-        }
-    }
-}
-
-impl InputRateTracker {
-    pub fn record_input(&mut self) {
-        let now = Instant::now();
-        self.timestamps.push(now);
-        self.prune_old_timestamps(now);
-
-        let min_events = self.inputs_per_second as u128 * self.window.as_millis() / 1000;
-        if self.timestamps.len() as u128 >= min_events {
-            self.sustain_until = now + self.sustain_duration;
-        }
-    }
-
-    pub fn is_high_rate(&self) -> bool {
-        Instant::now() < self.sustain_until
-    }
-
-    fn prune_old_timestamps(&mut self, now: Instant) {
-        self.timestamps
-            .retain(|&t| now.duration_since(t) <= self.window);
-    }
 }
 
 /// A point-in-time snapshot of the input-latency histograms for a window,
@@ -1399,7 +1351,6 @@ impl Window {
         let hovered = Rc::new(Cell::new(platform_window.is_hovered()));
         let needs_present = Rc::new(Cell::new(false));
         let next_frame_callbacks: Rc<RefCell<Vec<FrameCallback>>> = Default::default();
-        let input_rate_tracker = Rc::new(RefCell::new(InputRateTracker::default()));
         platform_window
             .request_decorations(window_decorations.unwrap_or(WindowDecorations::Server));
         platform_window.set_background_appearance(window_background);
@@ -1503,14 +1454,9 @@ impl Window {
         platform_window.on_request_frame(Box::new({
             let mut cx = cx.to_async();
             let invalidator = invalidator.clone();
-            let active = active.clone();
             let needs_present = needs_present.clone();
             let next_frame_callbacks = next_frame_callbacks.clone();
-            let input_rate_tracker = input_rate_tracker.clone();
             move |request_frame_options| {
-                let high_rate_input =
-                    active.get() && input_rate_tracker.borrow_mut().is_high_rate();
-
                 let next_frame_callbacks = next_frame_callbacks.take();
                 if !next_frame_callbacks.is_empty() {
                     handle
@@ -1523,12 +1469,7 @@ impl Window {
                 }
 
                 let ui_dirty = invalidator.is_dirty() || request_frame_options.force_render;
-                // Keep presenting if input was recently arriving at a high rate (>= 60fps).
-                // Once high-rate input is detected, we sustain presentation for 1 second
-                // to prevent display underclocking during active input.
-                let needs_present = request_frame_options.require_presentation
-                    || needs_present.get()
-                    || high_rate_input;
+                let needs_present = request_frame_options.require_presentation || needs_present.get();
 
                 if ui_dirty {
                     let plan = gpu_canvas_frame_plan(true, needs_present, false);
@@ -1761,7 +1702,6 @@ impl Window {
             active,
             hovered,
             needs_present,
-            input_rate_tracker,
             #[cfg(feature = "input-latency-histogram")]
             input_latency_tracker: InputLatencyTracker::new()?,
             last_input_modality: InputModality::Mouse,
@@ -4714,7 +4654,6 @@ impl Window {
         }
 
         if self.invalidator.update_count() > update_count_before {
-            self.input_rate_tracker.borrow_mut().record_input();
             #[cfg(feature = "input-latency-histogram")]
             if self.invalidator.not_drawing() {
                 self.input_latency_tracker.record_input(dispatch_time);

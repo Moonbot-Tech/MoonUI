@@ -3,7 +3,7 @@ use gpui::*;
 use crate::input::{Input, InputEvent, InputState};
 use crate::{Selectable, Sizable, Size};
 
-use super::tokens::{MoonRect, MoonTone};
+use super::{theme::MoonTheme, tokens::{MoonRect, MoonTone}};
 
 pub type MoonTextAreaEvent = InputEvent;
 pub type MoonTextAreaState = InputState;
@@ -194,6 +194,11 @@ impl MoonTextArea {
 impl RenderOnce for MoonTextArea {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let metrics = self.metrics();
+        let tokens = MoonTheme::active_tokens(cx);
+        let line_height = tokens.line_height(metrics.line_height);
+        let height = tokens
+            .ui(metrics.height)
+            .max(line_height + tokens.ui(metrics.pad_y) * 2.0);
         let rows = self.rows.unwrap_or(metrics.rows).max(1);
         let auto_grow_rows = self.auto_grow_rows;
         let submit_on_enter = self.submit_on_enter;
@@ -241,13 +246,13 @@ impl RenderOnce for MoonTextArea {
             .with_size(Size::Size(px(metrics.height)))
             .disabled(self.disabled)
             .selected(self.selected)
-            .h(px(metrics.height))
-            .rounded(px(metrics.radius))
-            .text_size(px(metrics.font_size))
-            .line_height(px(metrics.line_height))
-            .px(px(metrics.pad_x))
-            .py(px(metrics.pad_y))
-            .when(self.mono, |this| this.font_family("Geist Mono"));
+            .h(px(height))
+            .rounded(px(tokens.ui(metrics.radius)))
+            .text_size(px(tokens.font(metrics.font_size)))
+            .line_height(px(line_height))
+            .px(px(tokens.ui(metrics.pad_x)))
+            .py(px(tokens.ui(metrics.pad_y)))
+            .when(self.mono, |this| this.font_family(tokens.font_family(true)));
 
         if let Some(bounds) = self.bounds {
             input = input

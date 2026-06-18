@@ -3,7 +3,7 @@ use gpui::{
     RenderOnce, StyleRefinement, Styled, Window,
 };
 
-use crate::{h_flex, white, ActiveTheme, Icon, Sizable, Size, StyledExt};
+use crate::{h_flex, moon::MoonTheme, white, ActiveTheme, Icon, Sizable, Size, StyledExt};
 
 #[derive(Default, Clone)]
 enum BadgeVariant {
@@ -104,11 +104,12 @@ impl RenderOnce for Badge {
             BadgeVariant::Number => self.count > 0,
             BadgeVariant::Dot | BadgeVariant::Icon(_) => true,
         };
+        let tokens = MoonTheme::active_tokens(cx);
 
         let (size, text_size) = match self.size {
-            Size::Large => (px(24.), px(14.)),
-            Size::Medium | Size::Size(_) => (px(16.), px(10.)),
-            Size::Small | Size::XSmall => (px(10.), px(8.)),
+            Size::Large => (px(tokens.ui(24.0)), px(tokens.font(14.0))),
+            Size::Medium | Size::Size(_) => (px(tokens.ui(16.0)), px(tokens.font(10.0))),
+            Size::Small | Size::XSmall => (px(tokens.ui(10.0)), px(tokens.font(8.0))),
         };
 
         div()
@@ -126,7 +127,7 @@ impl RenderOnce for Badge {
                         .text_color(white())
                         .text_size(text_size)
                         .map(|this| match self.variant {
-                            BadgeVariant::Dot => this.top_0().right_0().size(px(6.)),
+                            BadgeVariant::Dot => this.top_0().right_0().size(px(tokens.ui(6.0))),
                             BadgeVariant::Number => {
                                 let count = if self.count > self.max {
                                     format!("{}+", self.max)
@@ -147,7 +148,7 @@ impl RenderOnce for Badge {
                                     .py_0p5()
                                     .px_0p5()
                                     .min_w_3p5()
-                                    .text_size(px(10.))
+                                    .text_size(px(tokens.font(10.0)))
                                     .line_height(relative(1.))
                                     .child(count)
                             }

@@ -4,6 +4,7 @@ use gpui::*;
 use super::{
     icons::moon_icon,
     text::MoonText,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
 
@@ -36,6 +37,21 @@ struct BadgeMetrics {
     line_height: f32,
     pad_x: f32,
     min_width: f32,
+}
+
+impl BadgeMetrics {
+    fn scaled(self, tokens: &MoonThemeTokens) -> Self {
+        let line_height = tokens.line_height(self.line_height);
+        let pad_y = ((self.height - self.line_height) * 0.5).max(0.0);
+        Self {
+            height: tokens.ui(self.height).max(line_height + tokens.ui(pad_y) * 2.0),
+            radius: tokens.ui(self.radius),
+            font_size: self.font_size,
+            line_height: self.line_height,
+            pad_x: tokens.ui(self.pad_x),
+            min_width: tokens.ui(self.min_width),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -199,7 +215,11 @@ impl MoonBadge {
     }
 
     pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement {
-        let metrics = self.metrics();
+        self.render_with_theme(p, MoonThemeTokens::default())
+    }
+
+    pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
+        let metrics = self.metrics().scaled(&tokens);
         let style = self.style(p);
         let disabled_scale = if self.disabled { 0.5 } else { 1.0 };
         let border_alpha = style.border_alpha * disabled_scale;
@@ -214,7 +234,7 @@ impl MoonBadge {
                 metrics.min_width
             }))
             .when(!is_dot, |this| this.px(px(metrics.pad_x)))
-            .mt(px(self.margin_top))
+            .mt(px(tokens.ui(self.margin_top)))
             .flex()
             .items_center()
             .justify_center()
@@ -267,7 +287,7 @@ impl MoonBadge {
             }
             MoonBadgeContent::Icon(path) => badge.child(moon_icon(
                 path,
-                metrics.font_size + 2.0,
+                tokens.font(metrics.font_size) + tokens.ui(2.0),
                 style.fg,
                 style.fg_alpha,
             )),
@@ -352,6 +372,7 @@ impl MoonBadge {
 
 impl RenderOnce for MoonBadge {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        self.render_with_palette(MoonPalette::active(cx))
+        let tokens = MoonTheme::active_tokens(cx);
+        self.render_with_theme(MoonPalette::active(cx), tokens)
     }
 }

@@ -183,7 +183,7 @@ impl WgpuContext {
     #[cfg(not(target_family = "wasm"))]
     pub fn instance(display: Box<dyn wgpu::wgt::WgpuHasDisplayHandle>) -> wgpu::Instance {
         wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::VULKAN | wgpu::Backends::GL,
+            backends: native_backends(),
             flags: wgpu::InstanceFlags::default(),
             backend_options: wgpu::BackendOptions::default(),
             memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
@@ -225,7 +225,7 @@ impl WgpuContext {
         bool,
         TextureFormat,
     )> {
-        let mut adapters: Vec<_> = instance.enumerate_adapters(wgpu::Backends::all()).await;
+        let mut adapters: Vec<_> = instance.enumerate_adapters(native_backends()).await;
 
         if adapters.is_empty() {
             anyhow::bail!("No GPU adapters found");
@@ -444,6 +444,24 @@ impl WgpuContext {
     pub(crate) fn device_lost_flag(&self) -> Arc<AtomicBool> {
         Arc::clone(&self.device_lost)
     }
+}
+
+#[cfg(all(
+    not(target_family = "wasm"),
+    any(target_os = "linux", target_os = "freebsd")
+))]
+fn native_backends() -> wgpu::Backends {
+    // wgpu-hal 29's GL/EGL path does not support XCB surfaces. Including GL in a
+    // Linux instance can panic during surface creation before Vulkan is selected.
+    wgpu::Backends::VULKAN
+}
+
+#[cfg(all(
+    not(target_family = "wasm"),
+    not(any(target_os = "linux", target_os = "freebsd"))
+))]
+fn native_backends() -> wgpu::Backends {
+    wgpu::Backends::VULKAN | wgpu::Backends::GL
 }
 
 #[cfg(not(target_family = "wasm"))]

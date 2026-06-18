@@ -15,6 +15,7 @@ use gpui::{
 
 use crate::{
     ActiveTheme, StyledExt as _,
+    moon::MoonTheme,
     text::{TextView, TextViewStyle},
 };
 
@@ -45,6 +46,7 @@ pub(super) fn render_markdown(
     _: &mut Window,
     cx: &mut App,
 ) -> TextView {
+    let tokens = MoonTheme::active_tokens(cx);
     TextView::markdown(id, markdown)
         .style(
             TextViewStyle::default()
@@ -58,7 +60,7 @@ pub(super) fn render_markdown(
                     StyleRefinement::default()
                         .bg(cx.theme().transparent)
                         .p_0()
-                        .text_size(px(11.)),
+                        .text_size(px(tokens.font(11.0))),
                 ),
         )
         .selectable(true)

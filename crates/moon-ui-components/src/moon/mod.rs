@@ -64,7 +64,8 @@ pub use tab::{MoonTabItem, MoonTabStrip};
 pub use text::MoonText;
 pub use text_area::{MoonTextArea, MoonTextAreaEvent, MoonTextAreaState};
 pub use theme::{
-    MoonTheme, MoonThemeConfig, MoonThemeConfigError, MoonThemeTokens, MoonTypography,
+    MoonScale, MoonTextMetrics, MoonTheme, MoonThemeConfig, MoonThemeConfigError, MoonThemeTokens,
+    MoonTypography,
 };
 pub use tokens::{MoonMetrics, MoonPalette, MoonRect, MoonTone, rgba_from};
 pub use tooltip::MoonTooltipView;

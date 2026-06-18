@@ -3,7 +3,10 @@ use std::time::Instant;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
-use super::tokens::{MoonPalette, rgba_from};
+use super::{
+    theme::MoonTheme,
+    tokens::{MoonPalette, rgba_from},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonScrollAxis {
@@ -139,6 +142,7 @@ pub fn moon_scrollbar_overlay_with_palette(
     let bounds = scroll_handle.bounds();
     let max = scroll_handle.max_offset();
     let offset = scroll_handle.offset();
+    let tokens = MoonTheme::active_tokens(cx);
     let track = rgba_from(p.panel_high, 0.34);
     let state = window.use_keyed_state(
         ElementId::from(SharedString::from(format!("{id}:state"))),
@@ -184,7 +188,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .right(px(0.0))
                 .top(px(0.0))
                 .bottom(px(0.0))
-                .w(px(8.0))
+                .w(px(tokens.ui(8.0)))
                 .cursor(CursorStyle::Arrow)
                 .on_hover(move |hovered, _window, cx| {
                     state_for_track_hover.update(cx, |state, cx| {
@@ -220,7 +224,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .absolute()
                 .right(px(2.0))
                 .top(px(top + 2.0))
-                .w(px(4.0))
+                .w(px(tokens.ui(4.0)))
                 .h(px((thumb_h - 4.0).max(12.0)))
                 .rounded_full()
                 .bg(
@@ -322,7 +326,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .left(px(0.0))
                 .right(px(0.0))
                 .bottom(px(0.0))
-                .h(px(8.0))
+                .h(px(tokens.ui(8.0)))
                 .cursor(CursorStyle::Arrow)
                 .on_hover(move |hovered, _window, cx| {
                     state_for_track_hover.update(cx, |state, cx| {
@@ -359,7 +363,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .left(px(left + 2.0))
                 .bottom(px(2.0))
                 .w(px((thumb_w - 4.0).max(12.0)))
-                .h(px(4.0))
+                .h(px(tokens.ui(4.0)))
                 .rounded_full()
                 .bg(
                     if runtime.active_axis == Some(MoonScrollbarDragAxis::Horizontal) {

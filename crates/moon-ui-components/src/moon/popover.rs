@@ -3,6 +3,7 @@ use crate::popover::Popover as CorePopover;
 
 use super::{
     background::MoonBackgroundPolicy,
+    theme::MoonTheme,
     tokens::{MoonPalette, MoonRect, rgba_from},
 };
 
@@ -156,6 +157,7 @@ impl RenderOnce for MoonPopover {
         if self.disabled {
             return root.child(trigger).into_any_element();
         }
+        let tokens = MoonTheme::active_tokens(cx);
 
         let shadow = super::foundation::box_shadow(
             px(0.0),
@@ -166,8 +168,8 @@ impl RenderOnce for MoonPopover {
         );
         let mut popup = div()
             .w(px(self.width))
-            .p(px(6.0))
-            .rounded(px(5.0))
+            .p(px(tokens.ui(6.0)))
+            .rounded(px(tokens.ui(5.0)))
             .border(px(1.0))
             .border_color(rgba_from(p.border, 1.0))
             .shadow(vec![shadow])

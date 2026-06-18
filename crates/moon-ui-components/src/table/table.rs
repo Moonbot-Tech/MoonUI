@@ -4,7 +4,7 @@ use gpui::{
 };
 
 use crate::{
-    AnyChildElement, ChildElement, Sizable, Size, StyledExt as _,
+    moon::MoonTheme, AnyChildElement, ChildElement, Sizable, Size, StyledExt as _,
     moon_skin::{MoonSkinPalette, moon_color},
 };
 
@@ -88,14 +88,15 @@ impl ChildElement for Table {
 }
 
 impl RenderOnce for Table {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonSkinPalette::TERMINAL;
+        let tokens = MoonTheme::active_tokens(cx);
         div()
             .id(("table", self.ix))
             .w_full()
             .font_family("Geist Mono")
-            .text_size(px(10.))
-            .line_height(px(13.))
+            .text_size(px(tokens.font(10.0)))
+            .line_height(px(tokens.line_height(13.0)))
             .overflow_hidden()
             .bg(moon_color(p.table_body, 1.0))
             .refine_style(&self.style)
@@ -630,17 +631,18 @@ impl Styled for TableCaption {
 }
 
 impl RenderOnce for TableCaption {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let paddings = self.size.table_cell_padding();
         let p = MoonSkinPalette::TERMINAL;
+        let tokens = MoonTheme::active_tokens(cx);
 
         div()
             .id(("table-caption", self.ix))
             .w_full()
             .px(paddings.left)
             .py(paddings.top)
-            .text_size(px(10.))
-            .line_height(px(13.))
+            .text_size(px(tokens.font(10.0)))
+            .line_height(px(tokens.line_height(13.0)))
             .text_color(moon_color(p.text_muted, 1.0))
             .text_center()
             .refine_style(&self.style)

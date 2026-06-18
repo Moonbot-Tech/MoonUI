@@ -9,6 +9,7 @@ use gpui::prelude::FluentBuilder as _;
 
 use crate::button::{Button, ButtonVariants as _};
 use crate::input::clear_button;
+use crate::moon::MoonTheme;
 use crate::moon_skin::{MoonSkinPalette, moon_color};
 use crate::native_menu::NativeMenu;
 use crate::spinner::Spinner;
@@ -40,7 +41,11 @@ struct MoonInputMetrics {
 }
 
 impl MoonInputMetrics {
-    fn for_size(size: Size) -> Self {
+    fn for_size(size: Size, cx: &App) -> Self {
+        Self::base_for_size(size).scaled(cx)
+    }
+
+    fn base_for_size(size: Size) -> Self {
         match size {
             Size::XSmall | Size::Small => Self {
                 height: px(22.),
@@ -66,6 +71,22 @@ impl MoonInputMetrics {
                 radius: px(4.),
                 gap: px(7.),
             },
+        }
+    }
+
+    fn scaled(self, cx: &App) -> Self {
+        let tokens = MoonTheme::active_tokens(cx);
+        let base_height = self.height.as_f32();
+        let base_line_height = self.line_height.as_f32();
+        let base_pad_y = ((base_height - base_line_height) * 0.5).max(0.0);
+        let line_height = tokens.line_height(base_line_height);
+        Self {
+            height: px(tokens.ui(base_height).max(line_height + tokens.ui(base_pad_y) * 2.0)),
+            font_size: px(tokens.font(self.font_size.as_f32())),
+            line_height: px(line_height),
+            pad_x: px(tokens.ui(self.pad_x.as_f32())),
+            radius: px(tokens.ui(self.radius.as_f32())),
+            gap: px(tokens.ui(self.gap.as_f32())),
         }
     }
 }
@@ -284,7 +305,7 @@ impl Styled for Input {
 impl RenderOnce for Input {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let text_align = self.style.text.text_align.unwrap_or(TextAlign::Left);
-        let metrics = MoonInputMetrics::for_size(self.size);
+        let metrics = MoonInputMetrics::for_size(self.size, cx);
         let p = MoonSkinPalette::TERMINAL;
 
         self.state.update(cx, |state, _| {
@@ -487,7 +508,7 @@ mod tests {
 
     #[test]
     fn test_moon_input_metrics_match_terminal_palette() {
-        let compact = MoonInputMetrics::for_size(Size::Small);
+        let compact = MoonInputMetrics::base_for_size(Size::Small);
         assert_eq!(compact.height, px(22.));
         assert_eq!(compact.font_size, px(10.));
         assert_eq!(compact.line_height, px(13.));
@@ -495,7 +516,7 @@ mod tests {
         assert_eq!(compact.radius, px(4.));
         assert_eq!(compact.gap, px(6.));
 
-        let normal = MoonInputMetrics::for_size(Size::Medium);
+        let normal = MoonInputMetrics::base_for_size(Size::Medium);
         assert_eq!(normal.height, px(28.));
         assert_eq!(normal.font_size, px(10.5));
         assert_eq!(normal.line_height, px(14.));

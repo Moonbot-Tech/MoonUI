@@ -5,7 +5,11 @@ use gpui::{
     Styled, StyledText, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::{StyledExt, moon_skin::{MoonSkinPalette, moon_color}};
+use crate::{
+    StyledExt,
+    moon::MoonTheme,
+    moon_skin::{MoonSkinPalette, moon_color},
+};
 
 const MASKED: &'static str = "•";
 
@@ -201,11 +205,12 @@ impl RenderOnce for Label {
         };
 
         let highlights = self.measure_highlights(text.len(), cx);
+        let tokens = MoonTheme::active_tokens(cx);
 
         div()
             .font_family("Geist Mono")
-            .text_size(px(9.))
-            .line_height(px(11.))
+            .text_size(px(tokens.font(9.0)))
+            .line_height(px(tokens.line_height(11.0)))
             .text_color(moon_color(MoonSkinPalette::TERMINAL.text_muted, 1.0))
             .refine_style(&self.style)
             .child(

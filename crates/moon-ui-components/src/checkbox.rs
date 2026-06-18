@@ -2,6 +2,7 @@ use std::{rc::Rc, time::Duration};
 
 use crate::{
     Disableable, FocusableExt, Selectable, Sizable, Size, StyledExt as _,
+    moon::MoonTheme,
     moon_skin::{MoonSkinPalette, moon_color},
     text::Text,
     tooltip::ComponentTooltip,
@@ -153,7 +154,11 @@ struct MoonCheckboxMetrics {
 }
 
 impl MoonCheckboxMetrics {
-    fn for_size(size: Size) -> Self {
+    fn for_size(size: Size, cx: &App) -> Self {
+        Self::base_for_size(size).scaled(cx)
+    }
+
+    fn base_for_size(size: Size) -> Self {
         match size {
             Size::XSmall | Size::Small => Self {
                 box_size: px(12.),
@@ -178,6 +183,21 @@ impl MoonCheckboxMetrics {
             },
         }
     }
+
+    fn scaled(self, cx: &App) -> Self {
+        let tokens = MoonTheme::active_tokens(cx);
+        let line_height = tokens.line_height(self.line_height.as_f32());
+        let box_size = tokens
+            .ui(self.box_size.as_f32())
+            .max(line_height.min(tokens.ui(self.box_size.as_f32()) + tokens.scale.font_delta.max(0.0)));
+        Self {
+            box_size: px(box_size),
+            font_size: px(tokens.font(self.font_size.as_f32())),
+            line_height: px(line_height),
+            gap: px(tokens.ui(self.gap.as_f32())),
+            radius: px(tokens.ui(self.radius.as_f32())),
+        }
+    }
 }
 
 pub(crate) fn checkbox_check_icon(
@@ -190,7 +210,7 @@ pub(crate) fn checkbox_check_icon(
 ) -> impl IntoElement {
     let toggle_state = window.use_keyed_state(id, cx, |_, _| checked);
     let p = MoonSkinPalette::TERMINAL;
-    let metrics = MoonCheckboxMetrics::for_size(size);
+    let metrics = MoonCheckboxMetrics::for_size(size, cx);
     let mark_size = px((metrics.box_size.as_f32() - 2.0).max(9.0));
     let mark_offset = (metrics.box_size - mark_size) * 0.5;
     let color = moon_color(p.blue, if disabled { 0.45 } else { 1.0 });
@@ -237,7 +257,7 @@ pub(crate) fn checkbox_check_icon(
 impl RenderOnce for Checkbox {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let checked = self.checked;
-        let metrics = MoonCheckboxMetrics::for_size(self.size);
+        let metrics = MoonCheckboxMetrics::for_size(self.size, cx);
         let p = MoonSkinPalette::TERMINAL;
         let box_alpha = if self.disabled { 0.45 } else { 1.0 };
         let label_alpha = if self.disabled { 0.45 } else { 1.0 };
@@ -350,14 +370,14 @@ mod tests {
 
     #[test]
     fn test_moon_checkbox_metrics_match_terminal_palette() {
-        let compact = MoonCheckboxMetrics::for_size(Size::XSmall);
+        let compact = MoonCheckboxMetrics::base_for_size(Size::XSmall);
         assert_eq!(compact.box_size, px(12.));
         assert_eq!(compact.font_size, px(9.5));
         assert_eq!(compact.line_height, px(12.));
         assert_eq!(compact.gap, px(6.));
         assert_eq!(compact.radius, px(3.));
 
-        let normal = MoonCheckboxMetrics::for_size(Size::Medium);
+        let normal = MoonCheckboxMetrics::base_for_size(Size::Medium);
         assert_eq!(normal.box_size, px(14.));
         assert_eq!(normal.font_size, px(10.5));
         assert_eq!(normal.line_height, px(13.));

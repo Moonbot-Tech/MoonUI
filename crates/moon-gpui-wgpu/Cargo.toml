@@ -8,6 +8,7 @@ repository = "https://github.com/Moonbot-Tech/MoonUI"
 description = "Moon standalone build of Zed's gpui_wgpu crate"
 
 [lib]
+name = "gpui_wgpu"
 path = "src/gpui_wgpu.rs"
 
 [features]

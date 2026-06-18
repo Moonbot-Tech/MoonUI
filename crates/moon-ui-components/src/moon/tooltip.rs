@@ -3,6 +3,7 @@ use gpui::*;
 use super::{
     icons::{MOON_ICON_TOOLTIP_ARROW, moon_icon},
     text::MoonText,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
 
@@ -40,6 +41,24 @@ struct TooltipMetrics {
     radius: f32,
     gap: f32,
     arrow_size: f32,
+}
+
+impl TooltipMetrics {
+    fn scaled(self, tokens: &MoonThemeTokens) -> Self {
+        let line_height = tokens.line_height(self.line_height);
+        Self {
+            min_height: tokens
+                .ui(self.min_height)
+                .max(line_height + tokens.ui(self.pad_y) * 2.0),
+            font_size: self.font_size,
+            line_height: self.line_height,
+            pad_x: tokens.ui(self.pad_x),
+            pad_y: tokens.ui(self.pad_y),
+            radius: tokens.ui(self.radius),
+            gap: tokens.ui(self.gap),
+            arrow_size: tokens.ui(self.arrow_size),
+        }
+    }
 }
 
 #[derive(IntoElement)]
@@ -237,7 +256,8 @@ impl ParentElement for MoonTooltip {
 impl RenderOnce for MoonTooltip {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonPalette::active(cx);
-        let metrics = self.metrics();
+        let tokens = MoonTheme::active_tokens(cx);
+        let metrics = self.metrics().scaled(&tokens);
         let accent = self.tone.color(p);
         let has_custom_children = !self.children.is_empty();
         let placement = self.placement;
@@ -265,9 +285,9 @@ impl RenderOnce for MoonTooltip {
             .gap(px(metrics.gap))
             .px(px(metrics.pad_x))
             .py(px(metrics.pad_y))
-            .font_family(if self.mono { "Geist Mono" } else { "Inter" })
-            .text_size(px(metrics.font_size))
-            .line_height(px(metrics.line_height))
+            .font_family(tokens.font_family(self.mono))
+            .text_size(px(tokens.font(metrics.font_size)))
+            .line_height(px(tokens.line_height(metrics.line_height)))
             .text_color(rgba_from(p.text_soft, 1.0));
 
         if let Some(bounds) = self.bounds {
@@ -286,7 +306,7 @@ impl RenderOnce for MoonTooltip {
             }
         }
 
-        let mut body = div().flex().flex_col().gap(px(1.0)).flex_1();
+        let mut body = div().flex().flex_col().gap(px(tokens.ui(1.0))).flex_1();
         if has_custom_children {
             body = body.children(self.children);
         } else {
@@ -321,12 +341,12 @@ impl RenderOnce for MoonTooltip {
             root = root.child(
                 div()
                     .flex_shrink_0()
-                    .rounded(px(3.0))
+                    .rounded(px(tokens.ui(3.0)))
                     .border(px(1.0))
                     .border_color(rgba_from(p.border, 0.9))
                     .bg(rgba_from(p.panel, 0.88))
-                    .px(px(5.0))
-                    .py(px(1.0))
+                    .px(px(tokens.ui(5.0)))
+                    .py(px(tokens.ui(1.0)))
                     .child(
                         MoonText::new(shortcut)
                             .color(p.text_muted)
@@ -341,7 +361,7 @@ impl RenderOnce for MoonTooltip {
         }
 
         if self.arrow {
-            root = root.child(Self::render_arrow(p, metrics, placement));
+            root = root.child(Self::render_arrow(p, metrics, placement, &tokens));
         }
 
         root
@@ -353,9 +373,10 @@ impl MoonTooltip {
         p: MoonPalette,
         metrics: TooltipMetrics,
         placement: MoonTooltipPlacement,
+        tokens: &MoonThemeTokens,
     ) -> Svg {
         let half = metrics.arrow_size * 0.5;
-        let offset = 18.0;
+        let offset = tokens.ui(18.0);
         let mut arrow = moon_icon(
             MOON_ICON_TOOLTIP_ARROW,
             metrics.arrow_size,

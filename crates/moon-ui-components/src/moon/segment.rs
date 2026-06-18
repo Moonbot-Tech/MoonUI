@@ -4,6 +4,7 @@ use gpui::*;
 use super::{
     foundation::MoonIndexedClickHandler,
     text::MoonText,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, rgba_from},
 };
 
@@ -122,6 +123,10 @@ impl MoonSegmentedControl {
     }
 
     pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement {
+        self.render_with_theme(p, MoonThemeTokens::default())
+    }
+
+    pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
         let accent = self.accent.color(p);
         let on_click = self.on_click.clone();
 
@@ -130,8 +135,8 @@ impl MoonSegmentedControl {
             .relative()
             .flex()
             .items_center()
-            .h(px(26.0))
-            .gap(px(self.item_gap))
+            .h(px(tokens.fit_height(26.0, 14.0, 6.0)))
+            .gap(px(tokens.ui(self.item_gap)))
             .whitespace_nowrap();
 
         if let Some(bounds) = self.bounds {
@@ -174,11 +179,11 @@ impl MoonSegmentedControl {
                 .flex()
                 .items_center()
                 .justify_center()
-                .gap(px(5.0))
+                .gap(px(tokens.ui(5.0)))
                 .w(px(item.width))
                 .h_full()
-                .px(px(11.0))
-                .rounded(px(if selected { 4.0 } else { 0.0 }))
+                .px(px(tokens.ui(11.0)))
+                .rounded(px(tokens.ui(if selected { 4.0 } else { 0.0 })))
                 .cursor_default()
                 .when(selected, |this| this.bg(selected_bg))
                 .when(!selected && !disabled, |this| {
@@ -212,7 +217,7 @@ impl MoonSegmentedControl {
                 let shadow = super::foundation::box_shadow(
                     px(0.0),
                     px(0.0),
-                    px(8.0),
+                    px(tokens.ui(8.0)),
                     px(0.0),
                     rgba_from(accent, 0.72),
                 );
@@ -220,8 +225,8 @@ impl MoonSegmentedControl {
                     .child(
                         div()
                             .absolute()
-                            .left(px(8.0))
-                            .top(px(24.0))
+                            .left(px(tokens.ui(8.0)))
+                            .top(px(tokens.ui(24.0)))
                             .w(px(underline_width * 0.5))
                             .h(px(1.0))
                             .bg(underline_left)
@@ -230,8 +235,8 @@ impl MoonSegmentedControl {
                     .child(
                         div()
                             .absolute()
-                            .left(px(8.0 + underline_width * 0.5))
-                            .top(px(24.0))
+                            .left(px(tokens.ui(8.0) + underline_width * 0.5))
+                            .top(px(tokens.ui(24.0)))
                             .w(px(underline_width * 0.5))
                             .h(px(1.0))
                             .bg(underline_right)
@@ -258,6 +263,7 @@ impl MoonSegmentedControl {
 
 impl RenderOnce for MoonSegmentedControl {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        self.render_with_palette(MoonPalette::active(cx))
+        let tokens = MoonTheme::active_tokens(cx);
+        self.render_with_theme(MoonPalette::active(cx), tokens)
     }
 }

@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     background::MoonBackgroundPolicy,
-    button::{MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant},
+    button::{MoonButton, MoonButtonSize, MoonButtonVariant},
     text::MoonText,
+    theme::MoonTheme,
     tokens::{MoonPalette, rgba_from},
 };
 use crate::event::InteractiveElementExt as _;
@@ -1292,6 +1293,7 @@ impl TabPanel {
 impl RenderOnce for TabPanel {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonPalette::active(cx);
+        let tokens = MoonTheme::active_tokens(cx);
         let state = window.use_keyed_state(
             ElementId::from(SharedString::from(format!("{}:state", self.id))),
             cx,
@@ -1336,12 +1338,12 @@ impl RenderOnce for TabPanel {
                     "{}:header",
                     self.id
                 ))))
-                .h(px(29.0))
+                .h(px(tokens.fit_height(29.0, 13.0, 8.0)))
                 .flex()
                 .flex_none()
                 .items_center()
-                .gap(px(4.0))
-                .px(px(6.0))
+                .gap(px(tokens.ui(4.0)))
+                .px(px(tokens.ui(6.0)))
                 .border_b(px(1.0))
                 .border_color(rgba_from(p.border, 1.0));
             header = self.header_background_policy.apply(header, p.panel, 1.0);
@@ -1364,25 +1366,26 @@ impl RenderOnce for TabPanel {
                         self.id
                     ))))
                     .relative()
-                    .h(px(28.0))
+                    .h(px(tokens.fit_height(28.0, 13.0, 7.5)))
                     .flex()
                     .flex_none()
                     .items_center()
-                    .px(px(8.0))
+                    .px(px(tokens.ui(8.0)))
                     .cursor_pointer()
                     .when(!selected, |this| {
                         this.hover(|h| h.bg(rgba_from(0xFFFFFF, 0.018)))
                             .active(|a| a.bg(rgba_from(0xFFFFFF, 0.012)))
                     })
                     .child(
-                        MoonText::new(tab_label)
-                            .color(if selected { p.text } else { p.text_muted })
-                            .font_size(10.0)
-                            .line_height(13.0)
-                            .weight(if selected { 600.0 } else { 400.0 })
-                            .mono(true)
-                            .render()
-                            .mt(px(2.0)),
+                        div().mt(px(tokens.ui(2.0))).child(
+                            MoonText::new(tab_label)
+                                .color(if selected { p.text } else { p.text_muted })
+                                .font_size(10.0)
+                                .line_height(13.0)
+                                .weight(if selected { 600.0 } else { 400.0 })
+                                .mono(true)
+                                .render(),
+                        ),
                     )
                     .on_click(move |_, _, cx| {
                         state.update(cx, |state, _| state.active_ix = ix);
@@ -1398,7 +1401,10 @@ impl RenderOnce for TabPanel {
                     });
                 if selected {
                     // Точный underline активной вкладки из палитры (тот же, что у верхних).
-                    tab_host = tab_host.child(super::tab::moon_active_tab_underline(p));
+                    tab_host = tab_host.child(super::tab::moon_active_tab_underline_scaled(
+                        p,
+                        tokens.clone(),
+                    ));
                 }
                 if let (Some(dock_area), Some(root)) = (self.dock_area.clone(), self.dock_root) {
                     if let Some(dock_entity) = dock_area.upgrade() {
@@ -2442,6 +2448,7 @@ impl DockArea {
     ) -> AnyElement {
         let dock = cx.entity();
         let dock_id = cx.entity_id();
+        let tokens = MoonTheme::active_tokens(cx);
         let mut zone = div()
             .id(ElementId::from(id))
             .absolute()
@@ -2449,29 +2456,29 @@ impl DockArea {
                 this.left(px(0.0))
                     .top(px(0.0))
                     .bottom(px(0.0))
-                    .w(px(42.0))
-                    .border_l(px(2.0))
+                    .w(px(tokens.ui(42.0)))
+                    .border_l(px(tokens.ui(2.0)))
             })
             .when(matches!(placement, DockSplitPlacement::Right), |this| {
                 this.right(px(0.0))
                     .top(px(0.0))
                     .bottom(px(0.0))
-                    .w(px(42.0))
-                    .border_r(px(2.0))
+                    .w(px(tokens.ui(42.0)))
+                    .border_r(px(tokens.ui(2.0)))
             })
             .when(matches!(placement, DockSplitPlacement::Top), |this| {
                 this.top(px(0.0))
-                    .left(px(42.0))
-                    .right(px(42.0))
-                    .h(px(34.0))
-                    .border_t(px(2.0))
+                    .left(px(tokens.ui(42.0)))
+                    .right(px(tokens.ui(42.0)))
+                    .h(px(tokens.ui(34.0)))
+                    .border_t(px(tokens.ui(2.0)))
             })
             .when(matches!(placement, DockSplitPlacement::Bottom), |this| {
                 this.bottom(px(0.0))
-                    .left(px(42.0))
-                    .right(px(42.0))
-                    .h(px(34.0))
-                    .border_b(px(2.0))
+                    .left(px(tokens.ui(42.0)))
+                    .right(px(tokens.ui(42.0)))
+                    .h(px(tokens.ui(34.0)))
+                    .border_b(px(tokens.ui(2.0)))
             })
             .drag_over::<DockTabDrag>(move |style, drag, _, cx| {
                 let p = MoonPalette::active(cx);
@@ -2772,6 +2779,7 @@ impl DockArea {
                 let mut ordered = items.iter().enumerate().collect::<Vec<_>>();
                 ordered
                     .sort_by_key(|(ix, _)| metas.get(*ix).map(|meta| meta.z_index).unwrap_or(*ix));
+                let tokens = MoonTheme::active_tokens(cx);
                 for (ix, panel) in ordered {
                     let meta = metas.get(ix).copied().unwrap_or(TileMeta {
                         x: 12.0 + ix as f32 * 18.0,
@@ -2832,7 +2840,7 @@ impl DockArea {
                         .w(px(meta.w))
                         .h(px(meta.h))
                         .overflow_hidden()
-                        .rounded(px(5.0))
+                        .rounded(px(tokens.ui(5.0)))
                         .border(px(1.0))
                         .border_color(rgba_from(p.border, 1.0));
                     tile = panel.background_policy(cx).apply(tile, p.shell_high, 1.0);
@@ -2858,8 +2866,8 @@ impl DockArea {
                                 .absolute()
                                 .left(px(0.0))
                                 .top(px(0.0))
-                                .right(px(42.0))
-                                .h(px(23.0))
+                                .right(px(tokens.ui(42.0)))
+                                .h(px(tokens.ui(23.0)))
                                 .cursor(CursorStyle::OpenHand)
                                 .hover(|style| style.bg(rgba_from(0xFFFFFF, 0.035)))
                                 .on_mouse_down(
@@ -2892,7 +2900,7 @@ impl DockArea {
                                 .right(px(0.0))
                                 .top(px(22.0))
                                 .bottom(px(10.0))
-                                .w(px(7.0))
+                                .w(px(tokens.ui(7.0)))
                                 .cursor(CursorStyle::ResizeLeftRight)
                                 .hover(|style| style.bg(rgba_from(p.blue, 0.16)))
                                 .on_mouse_down(
@@ -2925,7 +2933,7 @@ impl DockArea {
                                 .left(px(0.0))
                                 .right(px(10.0))
                                 .bottom(px(0.0))
-                                .h(px(7.0))
+                                .h(px(tokens.ui(7.0)))
                                 .cursor(CursorStyle::ResizeUpDown)
                                 .hover(|style| style.bg(rgba_from(p.blue, 0.16)))
                                 .on_mouse_down(

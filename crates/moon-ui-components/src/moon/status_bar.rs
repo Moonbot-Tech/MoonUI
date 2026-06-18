@@ -3,6 +3,7 @@ use crate::status_bar::StatusBar as CoreStatusBar;
 
 use super::{
     text::MoonText,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
 
@@ -192,6 +193,10 @@ impl MoonStatusBar {
     }
 
     pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement {
+        self.render_with_theme(p, MoonThemeTokens::default())
+    }
+
+    pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
         let Self {
             id,
             bounds,
@@ -208,6 +213,14 @@ impl MoonStatusBar {
             bg,
             border,
         } = self;
+        let text = tokens.text(font_size, line_height);
+        let height = tokens
+            .ui(height)
+            .max(text.line_height + tokens.ui(((height - line_height) * 0.5).max(0.0)) * 2.0);
+        let left_pad = tokens.ui(left_pad);
+        let right_offset = tokens.ui(right_offset);
+        let item_gap = tokens.ui(item_gap);
+        let indicator_gap = tokens.ui(indicator_gap);
         let bg = if bg == MoonPalette::TERMINAL.shell_high {
             p.shell_high
         } else {
@@ -241,18 +254,19 @@ impl MoonStatusBar {
             .items_center();
 
         if let Some(indicator) = indicator {
+            let indicator_size = tokens.ui(indicator.size);
             let mut dot = div()
-                .w(px(indicator.size))
-                .h(px(indicator.size))
+                .w(px(indicator_size))
+                .h(px(indicator_size))
                 .mr(px(indicator_gap))
-                .rounded(px(indicator.size * 0.5))
+                .rounded(px(indicator_size * 0.5))
                 .bg(rgba_from(indicator.color, indicator.alpha));
 
             if let Some((radius, alpha)) = indicator.glow {
                 dot = dot.shadow(vec![super::foundation::box_shadow(
                     px(0.0),
                     px(0.0),
-                    px(radius),
+                    px(tokens.ui(radius)),
                     px(0.0),
                     rgba_from(indicator.color, alpha),
                 )]);
@@ -261,7 +275,8 @@ impl MoonStatusBar {
             left_row = left_row.child(dot);
         }
 
-        let left_row = Self::render_items(left_row, items, item_gap, font_size, line_height, p);
+        let left_row =
+            Self::render_items(left_row, items, item_gap, font_size, line_height, p, &tokens);
 
         let mut status = CoreStatusBar::new()
             .left(left_row)
@@ -285,6 +300,7 @@ impl MoonStatusBar {
                 font_size,
                 line_height,
                 p,
+                &tokens,
             );
             status = status.right(right_row);
         }
@@ -299,34 +315,37 @@ impl MoonStatusBar {
         font_size: f32,
         line_height: f32,
         p: MoonPalette,
+        tokens: &MoonThemeTokens,
     ) -> Div {
         for item in items {
             let color = item
                 .color
                 .or_else(|| item.tone.map(|tone| tone.color(p)))
                 .unwrap_or(p.text_soft);
-            let gap = item.gap_after.unwrap_or(item_gap);
+            let gap = tokens.ui(item.gap_after.unwrap_or(item_gap));
             match item.kind {
                 MoonStatusItemKind::Text => {
                     row = row.child(
-                        MoonText::new(item.text)
-                            .uppercase(false)
-                            .mono(true)
-                            .color(color)
-                            .alpha(item.alpha)
-                            .font_size(font_size)
-                            .line_height(line_height)
-                            .weight(item.weight)
-                            .render()
-                            .mr(px(gap)),
+                        div().mr(px(gap)).child(
+                            MoonText::new(item.text)
+                                .uppercase(false)
+                                .mono(true)
+                                .color(color)
+                                .alpha(item.alpha)
+                                .font_size(font_size)
+                                .line_height(line_height)
+                                .weight(item.weight)
+                                .render(),
+                        ),
                     );
                 }
                 MoonStatusItemKind::Separator => {
+                    let size = tokens.ui(2.0);
                     row = row.child(
                         div()
-                            .w(px(2.0))
-                            .h(px(2.0))
-                            .rounded(px(1.0))
+                            .w(px(size))
+                            .h(px(size))
+                            .rounded(px(size * 0.5))
                             .bg(rgba_from(color, item.alpha))
                             .mr(px(gap)),
                     );
@@ -339,6 +358,7 @@ impl MoonStatusBar {
 
 impl RenderOnce for MoonStatusBar {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        self.render_with_palette(MoonPalette::active(cx))
+        let tokens = MoonTheme::active_tokens(cx);
+        self.render_with_theme(MoonPalette::active(cx), tokens)
     }
 }

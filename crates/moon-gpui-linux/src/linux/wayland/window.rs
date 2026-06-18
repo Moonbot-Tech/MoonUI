@@ -529,7 +529,7 @@ impl WaylandWindow {
         if !active {
             let mut state = self.borrow_mut();
             if let Some(token) = state.gpu_canvas_frame_timer.take() {
-                state.client.get_client().borrow().loop_handle.remove(token);
+                state.client.remove_source(token);
             }
             return;
         }
@@ -541,15 +541,11 @@ impl WaylandWindow {
 
         let refresh_interval = Self::gpu_canvas_refresh_interval(&state);
         let surface_id = state.surface.id();
-        let loop_handle = state.client.get_client().borrow().loop_handle.clone();
+        let loop_handle = state.client.loop_handle();
         let token = loop_handle
             .insert_source(Timer::from_duration(refresh_interval), {
                 move |mut instant, (), client| {
-                    let window = {
-                        let client = client.get_client();
-                        let state = client.borrow();
-                        state.windows.get(&surface_id).cloned()
-                    };
+                    let window = { client.window_for_surface(surface_id.clone()) };
                     let Some(window) = window else {
                         return TimeoutAction::Drop;
                     };
@@ -562,7 +558,7 @@ impl WaylandWindow {
                         WaylandWindow::gpu_canvas_refresh_interval(&state)
                     };
 
-                    WaylandWindow(window).frame();
+                    window.frame();
 
                     let now = std::time::Instant::now();
                     while instant < now {

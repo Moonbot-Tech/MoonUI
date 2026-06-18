@@ -9,6 +9,7 @@ use super::{
     dropdown::MoonMenuItem,
     scroll_area::{MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette},
     table::{MoonTableAlign, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle},
+    theme::MoonTheme,
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
     virtual_list::{MoonVirtualList, MoonVirtualListScrollHandle},
 };
@@ -694,6 +695,7 @@ impl MoonDataTable {
         cx: &mut App,
     ) -> impl IntoElement {
         let p = MoonPalette::active(cx);
+        let tokens = MoonTheme::active_tokens(cx);
         let state_id = state.entity_id();
         let mut header = div()
             .id(ElementId::from(SharedString::from(format!("{id}:header"))))
@@ -749,10 +751,10 @@ impl MoonDataTable {
                 .when(matches!(column.align, MoonTableAlign::Left), |this| {
                     this.justify_start()
                 })
-                .pl(px(10.0))
-                .pr(px(8.0))
-                .text_size(px(9.5))
-                .line_height(px(11.0))
+                .pl(px(tokens.ui(10.0)))
+                .pr(px(tokens.ui(8.0)))
+                .text_size(px(tokens.font(9.5)))
+                .line_height(px(tokens.line_height(11.0)))
                 .text_color(rgba_from(
                     if sorted {
                         p.text_soft
@@ -877,7 +879,7 @@ impl MoonDataTable {
                         .right(px(0.0))
                         .top(px(0.0))
                         .bottom(px(0.0))
-                        .w(px(6.0))
+                        .w(px(tokens.ui(6.0)))
                         .cursor(CursorStyle::ResizeColumn)
                         .hover(|this| this.bg(rgba_from(p.blue, 0.14)))
                         .on_drag(drag, |drag, _, _, cx| {
@@ -913,6 +915,7 @@ impl MoonDataTable {
 impl RenderOnce for MoonDataTable {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonPalette::active(cx);
+        let tokens = MoonTheme::active_tokens(cx);
         let style = self
             .style
             .unwrap_or_else(|| MoonTableStyle::for_palette(p))
@@ -925,8 +928,8 @@ impl RenderOnce for MoonDataTable {
             )
         });
         let render_row = self.render_row.clone();
-        let row_height = self.row_height;
-        let header_height = self.header_height;
+        let row_height = tokens.fit_height(self.row_height, 14.0, 5.5);
+        let header_height = tokens.fit_height(self.header_height, 11.0, 7.5);
         let id = self.id.clone();
         let state_for_rows = state.clone();
         let background_policy = self.background_policy;
@@ -934,7 +937,7 @@ impl RenderOnce for MoonDataTable {
         let column_selectable = self.column_selectable;
         let row_header = self.row_header;
         let row_header_width = if row_header {
-            self.row_header_width
+            tokens.ui(self.row_header_width)
         } else {
             0.0
         };
@@ -1110,7 +1113,7 @@ impl RenderOnce for MoonDataTable {
         let mut rows_list = MoonVirtualList::new(
             SharedString::from(format!("{id}:rows")),
             self.row_count,
-            self.row_height,
+            row_height,
             move |ix, window, cx| {
                 let mut row = (render_row)(ix, window, cx);
                 let selected_row = state_for_rows.read(cx).selected_row == Some(ix);
@@ -1257,8 +1260,8 @@ impl RenderOnce for MoonDataTable {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .text_size(px(9.0))
-                            .line_height(px(11.0))
+                            .text_size(px(tokens.font(9.0)))
+                            .line_height(px(tokens.line_height(11.0)))
                             .text_color(rgba_from(p.text_muted, 1.0))
                             .border_r(px(1.0))
                             .border_color(rgba_from(

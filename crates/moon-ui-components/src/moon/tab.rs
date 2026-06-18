@@ -5,6 +5,7 @@ use gpui::*;
 
 use super::badge::{MoonBadge, MoonBadgeSize, MoonBadgeVariant};
 use super::text::MoonText;
+use super::theme::{MoonTheme, MoonThemeTokens};
 use super::tokens::{MoonPalette, MoonRect, rgba_from};
 
 #[derive(Clone, Debug)]
@@ -127,6 +128,10 @@ impl MoonTabStrip {
     }
 
     pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement {
+        self.render_with_theme(p, MoonThemeTokens::default())
+    }
+
+    pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
         let mut root = div()
             .id(self.id)
             .relative()
@@ -165,12 +170,12 @@ impl MoonTabStrip {
                 .left(px(x))
                 .top(px(0.0))
                 .w(px(item.width))
-                .h(px(28.0))
+                .h(px(tokens.fit_height(28.0, 13.0, 7.5)))
                 .flex()
                 .items_center()
-                .pl(px(8.0))
-                .pr(px(if closable { 5.0 } else { 8.0 }))
-                .gap(px(8.0))
+                .pl(px(tokens.ui(8.0)))
+                .pr(px(tokens.ui(if closable { 5.0 } else { 8.0 })))
+                .gap(px(tokens.ui(8.0)))
                 .when(disabled, |this| this.cursor(CursorStyle::Arrow))
                 .when(!disabled, |this| this.cursor_pointer())
                 .when(!active && !disabled, |this| {
@@ -178,16 +183,17 @@ impl MoonTabStrip {
                         .active(|this| this.bg(rgba_from(0xFFFFFF, 0.012)))
                 })
                 .child(
-                    MoonText::new(item.label)
-                        .color(fg)
-                        .alpha(fg_alpha)
-                        .font_size(10.0)
-                        .line_height(13.0)
-                        .weight(if active { 600.0 } else { 400.0 })
-                        .mono(true)
-                        .uppercase(false)
-                        .render()
-                        .mt(px(2.0)),
+                    div().mt(px(tokens.ui(2.0))).child(
+                        MoonText::new(item.label)
+                            .color(fg)
+                            .alpha(fg_alpha)
+                            .font_size(10.0)
+                            .line_height(13.0)
+                            .weight(if active { 600.0 } else { 400.0 })
+                            .mono(true)
+                            .uppercase(false)
+                            .render(),
+                    ),
                 );
 
             if let Some(on_click) = self.on_click.clone()
@@ -213,7 +219,7 @@ impl MoonTabStrip {
                         .weight(600.0)
                         .margin_top(2.0)
                         .disabled(disabled)
-                        .render_with_palette(p),
+                        .render_with_theme(p, tokens.clone()),
                 );
             }
 
@@ -222,14 +228,14 @@ impl MoonTabStrip {
                 tab = tab.child(
                     div()
                         .id(("moon-tab-close", ix))
-                        .w(px(16.0))
-                        .h(px(16.0))
+                        .w(px(tokens.ui(16.0)))
+                        .h(px(tokens.ui(16.0)))
                         .flex()
                         .items_center()
                         .justify_center()
-                        .rounded(px(3.0))
-                        .text_size(px(10.0))
-                        .line_height(px(10.0))
+                        .rounded(px(tokens.ui(3.0)))
+                        .text_size(px(tokens.font(10.0)))
+                        .line_height(px(tokens.line_height(10.0)))
                         .text_color(rgba_from(p.text_muted, 0.90))
                         .hover(|this| this.bg(rgba_from(0xFFFFFF, 0.045)))
                         .child("x")
@@ -243,7 +249,7 @@ impl MoonTabStrip {
             }
 
             if active {
-                tab = tab.child(moon_active_tab_underline(p));
+                tab = tab.child(moon_active_tab_underline_scaled(p, tokens.clone()));
             }
 
             root = root.child(tab);
@@ -256,7 +262,8 @@ impl MoonTabStrip {
 
 impl RenderOnce for MoonTabStrip {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        self.render_with_palette(MoonPalette::active(cx))
+        let tokens = MoonTheme::active_tokens(cx);
+        self.render_with_theme(MoonPalette::active(cx), tokens)
     }
 }
 
@@ -265,6 +272,10 @@ impl RenderOnce for MoonTabStrip {
 /// Абсолютно позиционируется по низу родителя (родитель должен быть `relative`).
 /// Единый источник вида для верхних (MoonTabStrip) и нижних (dock TabPanel) вкладок.
 pub fn moon_active_tab_underline(p: MoonPalette) -> Div {
+    moon_active_tab_underline_scaled(p, MoonThemeTokens::default())
+}
+
+pub fn moon_active_tab_underline_scaled(p: MoonPalette, tokens: MoonThemeTokens) -> Div {
     let underline_left = linear_gradient(
         90.0,
         linear_color_stop(rgba_from(p.amber, 0.0), 0.0),
@@ -284,14 +295,14 @@ pub fn moon_active_tab_underline(p: MoonPalette) -> Div {
     );
     div()
         .absolute()
-        .left(px(5.0))
-        .right(px(5.0))
+        .left(px(tokens.ui(5.0)))
+        .right(px(tokens.ui(5.0)))
         .bottom(px(0.0))
         .h(px(1.0))
         .flex()
         .child(
             div()
-                .w(px(25.0))
+                .w(px(tokens.ui(25.0)))
                 .h_full()
                 .bg(underline_left)
                 .shadow(vec![shadow.clone()]),
@@ -305,7 +316,7 @@ pub fn moon_active_tab_underline(p: MoonPalette) -> Div {
         )
         .child(
             div()
-                .w(px(25.0))
+                .w(px(tokens.ui(25.0)))
                 .h_full()
                 .bg(underline_right)
                 .shadow(vec![shadow]),

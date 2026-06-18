@@ -9,7 +9,7 @@ use std::{
 
 use ashpd::WindowIdentifier;
 use calloop::{
-    EventLoop, LoopHandle,
+    EventLoop, LoopHandle, RegistrationToken,
     timer::{TimeoutAction, Timer},
 };
 use calloop_wayland_source::WaylandSource;
@@ -309,6 +309,18 @@ impl WaylandClientStatePtr {
         self.0
             .upgrade()
             .expect("The pointer should always be valid when dispatching in wayland")
+    }
+
+    pub(crate) fn loop_handle(&self) -> LoopHandle<'static, WaylandClientStatePtr> {
+        self.get_client().borrow().loop_handle.clone()
+    }
+
+    pub(crate) fn remove_source(&self, token: RegistrationToken) {
+        self.get_client().borrow().loop_handle.remove(token);
+    }
+
+    pub(crate) fn window_for_surface(&self, surface_id: ObjectId) -> Option<WaylandWindowStatePtr> {
+        self.get_client().borrow().windows.get(&surface_id).cloned()
     }
 
     pub fn get_serial(&self, kind: SerialKind) -> u32 {

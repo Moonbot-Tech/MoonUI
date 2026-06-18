@@ -847,7 +847,7 @@ fn patch_text_example(crate_dir: &Path) -> Result<()> {
     // Remove the font loading block
     let patched = patched.replace(
         r#"let fonts = [include_bytes!(
-            "../../../assets/fonts/lilex/Lilex-Regular.ttf"
+            "../../../assets/fonts/geist-mono/GeistMono-Regular.ttf"
         )]
         .iter()
         .map(|b| Cow::Borrowed(&b[..]))

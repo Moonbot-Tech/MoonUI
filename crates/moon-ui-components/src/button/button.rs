@@ -5,6 +5,7 @@ use crate::{
     StyledExt,
     button::ButtonIcon,
     h_flex,
+    moon::MoonTheme,
     moon_skin::{MoonSkinPalette, moon_color},
     tooltip::{ManagedTooltipExt as _, Tooltip},
 };
@@ -241,7 +242,11 @@ struct MoonButtonMetrics {
 }
 
 impl MoonButtonMetrics {
-    fn for_size(size: Size) -> Self {
+    fn for_size(size: Size, cx: &App) -> Self {
+        Self::base_for_size(size).scaled(cx)
+    }
+
+    fn base_for_size(size: Size) -> Self {
         match size {
             Size::XSmall => Self {
                 height: px(18.),
@@ -283,6 +288,22 @@ impl MoonButtonMetrics {
                 gap: px(6.),
                 pad_x: px(0.),
             },
+        }
+    }
+
+    fn scaled(self, cx: &App) -> Self {
+        let tokens = MoonTheme::active_tokens(cx);
+        let base_height = self.height.as_f32();
+        let base_line_height = self.line_height.as_f32();
+        let base_pad_y = ((base_height - base_line_height) * 0.5).max(0.0);
+        let line_height = tokens.line_height(base_line_height);
+        Self {
+            height: px(tokens.ui(base_height).max(line_height + tokens.ui(base_pad_y) * 2.0)),
+            radius: px(tokens.ui(self.radius.as_f32())),
+            font_size: px(tokens.font(self.font_size.as_f32())),
+            line_height: px(line_height),
+            gap: px(tokens.ui(self.gap.as_f32())),
+            pad_x: px(tokens.ui(self.pad_x.as_f32())),
         }
     }
 }
@@ -548,7 +569,7 @@ impl RenderOnce for Button {
         let clickable = self.clickable();
         let is_disabled = self.disabled;
         let hoverable = self.hoverable();
-        let metrics = MoonButtonMetrics::for_size(self.size);
+        let metrics = MoonButtonMetrics::for_size(self.size, cx);
         let normal_style = style.normal(self.outline, cx);
         let icon_size = Size::Size(px((metrics.font_size.as_f32() + 1.0).clamp(10.0, 14.0)));
 
@@ -1071,7 +1092,7 @@ mod tests {
 
     #[test]
     fn test_moon_button_metrics_match_terminal_palette() {
-        let micro = MoonButtonMetrics::for_size(Size::XSmall);
+        let micro = MoonButtonMetrics::base_for_size(Size::XSmall);
         assert_eq!(micro.height, px(18.));
         assert_eq!(micro.radius, px(4.));
         assert_eq!(micro.font_size, px(9.));
@@ -1079,7 +1100,7 @@ mod tests {
         assert_eq!(micro.gap, px(4.));
         assert_eq!(micro.pad_x, px(7.));
 
-        let action = MoonButtonMetrics::for_size(Size::Small);
+        let action = MoonButtonMetrics::base_for_size(Size::Small);
         assert_eq!(action.height, px(26.));
         assert_eq!(action.radius, px(4.));
         assert_eq!(action.font_size, px(10.5));
@@ -1087,11 +1108,11 @@ mod tests {
         assert_eq!(action.gap, px(6.));
         assert_eq!(action.pad_x, px(0.));
 
-        let toolbar = MoonButtonMetrics::for_size(Size::Medium);
+        let toolbar = MoonButtonMetrics::base_for_size(Size::Medium);
         assert_eq!(toolbar.height, px(28.));
         assert_eq!(toolbar.radius, px(4.));
 
-        let pill = MoonButtonMetrics::for_size(Size::Large);
+        let pill = MoonButtonMetrics::base_for_size(Size::Large);
         assert_eq!(pill.height, px(30.));
         assert_eq!(pill.radius, px(15.));
     }
