@@ -4,8 +4,13 @@ use std::{
     ptr::NonNull,
     rc::Rc,
     sync::Arc,
+    time::Duration,
 };
 
+use calloop::{
+    RegistrationToken,
+    timer::{TimeoutAction, Timer},
+};
 use collections::{FxHashSet, HashMap};
 use futures::channel::oneshot::Receiver;
 
@@ -118,6 +123,7 @@ pub struct WaylandWindowState {
     hovered: bool,
     pub(crate) force_render_after_recovery: bool,
     renderer_presented: bool,
+    gpu_canvas_frame_timer: Option<RegistrationToken>,
     in_progress_configure: Option<InProgressConfigure>,
     resize_throttle: bool,
     in_progress_window_controls: Option<WindowControls>,
@@ -396,6 +402,7 @@ impl WaylandWindowState {
             hovered: false,
             force_render_after_recovery: false,
             renderer_presented: false,
+            gpu_canvas_frame_timer: None,
             in_progress_window_controls: None,
             window_controls: WindowControls::default(),
             client_inset: None,
@@ -507,6 +514,65 @@ impl WaylandWindow {
 
     fn borrow_mut(&self) -> RefMut<'_, WaylandWindowState> {
         self.0.state.borrow_mut()
+    }
+
+    fn gpu_canvas_refresh_interval(state: &WaylandWindowState) -> Duration {
+        state
+            .outputs
+            .values()
+            .filter_map(|output| output.refresh_interval)
+            .min()
+            .unwrap_or_else(|| Duration::from_micros(16_667))
+    }
+
+    fn set_gpu_canvas_timer_active(&self, active: bool) {
+        if !active {
+            let mut state = self.borrow_mut();
+            if let Some(token) = state.gpu_canvas_frame_timer.take() {
+                state.client.get_client().borrow().loop_handle.remove(token);
+            }
+            return;
+        }
+
+        let mut state = self.borrow_mut();
+        if state.gpu_canvas_frame_timer.is_some() {
+            return;
+        }
+
+        let refresh_interval = Self::gpu_canvas_refresh_interval(&state);
+        let surface_id = state.surface.id();
+        let loop_handle = state.client.get_client().borrow().loop_handle.clone();
+        let token = loop_handle
+            .insert_source(Timer::from_duration(refresh_interval), {
+                move |mut instant, (), client| {
+                    let window = {
+                        let client = client.get_client();
+                        let state = client.borrow();
+                        state.windows.get(&surface_id).cloned()
+                    };
+                    let Some(window) = window else {
+                        return TimeoutAction::Drop;
+                    };
+
+                    let refresh_interval = {
+                        let state = window.state.borrow();
+                        if state.gpu_canvas_frame_timer.is_none() {
+                            return TimeoutAction::Drop;
+                        }
+                        WaylandWindow::gpu_canvas_refresh_interval(&state)
+                    };
+
+                    WaylandWindow(window).frame();
+
+                    let now = std::time::Instant::now();
+                    while instant < now {
+                        instant += refresh_interval;
+                    }
+                    TimeoutAction::ToInstant(instant)
+                }
+            })
+            .expect("Failed to initialize Wayland gpu_canvas frame timer");
+        state.gpu_canvas_frame_timer = Some(token);
     }
 
     pub fn new(
@@ -1433,6 +1499,10 @@ impl PlatformWindow for WaylandWindow {
         if state.renderer.needs_redraw() {
             state.force_render_after_recovery = true;
         }
+    }
+
+    fn set_gpu_canvas_active(&self, active: bool) {
+        self.set_gpu_canvas_timer_active(active);
     }
 
     fn completed_frame(&self) {

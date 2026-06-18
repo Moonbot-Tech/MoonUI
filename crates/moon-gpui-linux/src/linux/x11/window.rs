@@ -1747,11 +1747,6 @@ impl PlatformWindow for X11Window {
     fn window_decorations(&self) -> gpui::Decorations {
         let state = self.0.state.borrow();
 
-        // Client window decorations require compositor support
-        if !state.client_side_decorations_supported {
-            return Decorations::Server;
-        }
-
         match state.decorations {
             WindowDecorations::Server => Decorations::Server,
             WindowDecorations::Client => {
@@ -1820,17 +1815,25 @@ impl PlatformWindow for X11Window {
         }
     }
 
-    fn request_decorations(&self, mut decorations: gpui::WindowDecorations) {
+    fn request_decorations(&self, decorations: gpui::WindowDecorations) {
         let mut state = self.0.state.borrow_mut();
 
-        if matches!(decorations, gpui::WindowDecorations::Client)
+        // Client-side decoration metadata (_GTK_FRAME_EXTENTS/tiling) is not
+        // universally available on X11 window managers. Still honor the
+        // user's "no server titlebar" request through Motif hints, but keep
+        // GPUI's internal state server-managed when CSD protocol support is
+        // missing. That gives applications a borderless normal window without
+        // entering the compositor-dependent CSD path.
+        let state_decorations = if matches!(decorations, gpui::WindowDecorations::Client)
             && !state.client_side_decorations_supported
         {
             log::info!(
-                "x11: no compositor present, falling back to server-side window decorations"
+                "x11: client-side decoration protocol unsupported, using undecorated server-managed window"
             );
-            decorations = gpui::WindowDecorations::Server;
-        }
+            gpui::WindowDecorations::Server
+        } else {
+            decorations
+        };
 
         // https://github.com/rust-windowing/winit/blob/master/src/platform_impl/linux/x11/util/hint.rs#L53-L87
         let hints_data: [u32; 5] = match decorations {
@@ -1856,7 +1859,7 @@ impl PlatformWindow for X11Window {
             return;
         };
 
-        match decorations {
+        match state_decorations {
             WindowDecorations::Server => {
                 state.decorations = WindowDecorations::Server;
                 let is_transparent = state.is_transparent();

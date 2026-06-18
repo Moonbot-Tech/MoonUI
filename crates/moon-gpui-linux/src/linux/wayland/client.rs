@@ -186,6 +186,7 @@ pub struct InProgressOutput {
     position: Option<Point<DevicePixels>>,
     size: Option<Size<DevicePixels>>,
     subpixel: Option<wl_output::Subpixel>,
+    refresh_interval: Option<Duration>,
 }
 
 impl InProgressOutput {
@@ -197,6 +198,7 @@ impl InProgressOutput {
                 scale,
                 bounds: Bounds::new(position, size),
                 subpixel: self.subpixel,
+                refresh_interval: self.refresh_interval,
             })
         } else {
             None
@@ -210,6 +212,7 @@ pub struct Output {
     pub scale: i32,
     pub bounds: Bounds<DevicePixels>,
     pub subpixel: Option<wl_output::Subpixel>,
+    pub refresh_interval: Option<Duration>,
 }
 
 pub(crate) struct WaylandClientState {
@@ -1241,8 +1244,18 @@ impl Dispatch<wl_output::WlOutput, ()> for WaylandClientStatePtr {
                     in_progress_output.subpixel = Some(subpixel);
                 }
             }
-            wl_output::Event::Mode { width, height, .. } => {
-                in_progress_output.size = Some(size(DevicePixels(width), DevicePixels(height)))
+            wl_output::Event::Mode {
+                width,
+                height,
+                refresh,
+                ..
+            } => {
+                in_progress_output.size = Some(size(DevicePixels(width), DevicePixels(height)));
+                if refresh > 0 {
+                    let refresh_millihz = refresh as u64;
+                    let micros = 1_000_000_000u64 / refresh_millihz;
+                    in_progress_output.refresh_interval = Some(Duration::from_micros(micros));
+                }
             }
             wl_output::Event::Done => {
                 if let Some(complete) = in_progress_output.complete() {
