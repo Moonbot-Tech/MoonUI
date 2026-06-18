@@ -49,10 +49,9 @@ impl DirectXAtlas {
     pub(crate) fn get_texture_view(
         &self,
         id: AtlasTextureId,
-    ) -> [Option<ID3D11ShaderResourceView>; 1] {
+    ) -> Option<[Option<ID3D11ShaderResourceView>; 1]> {
         let lock = self.0.lock();
-        let tex = lock.texture(id);
-        tex.view.clone()
+        Some(lock.get_texture(id)?.view.clone())
     }
 
     pub(crate) fn handle_device_lost(
@@ -246,17 +245,21 @@ impl DirectXAtlasState {
     }
 
     fn texture(&self, id: AtlasTextureId) -> &DirectXAtlasTexture {
+        self.get_texture(id)
+            .expect("atlas texture id should be valid while allocating/uploading")
+    }
+
+    fn get_texture(&self, id: AtlasTextureId) -> Option<&DirectXAtlasTexture> {
         match id.kind {
-            AtlasTextureKind::Monochrome => &self.monochrome_textures[id.index as usize]
-                .as_ref()
-                .unwrap(),
-            AtlasTextureKind::Polychrome => &self.polychrome_textures[id.index as usize]
-                .as_ref()
-                .unwrap(),
-            AtlasTextureKind::Subpixel => {
-                &self.subpixel_textures[id.index as usize].as_ref().unwrap()
+            AtlasTextureKind::Monochrome => {
+                self.monochrome_textures.textures.get(id.index as usize)
             }
+            AtlasTextureKind::Polychrome => {
+                self.polychrome_textures.textures.get(id.index as usize)
+            }
+            AtlasTextureKind::Subpixel => self.subpixel_textures.textures.get(id.index as usize),
         }
+        .and_then(|texture| texture.as_ref())
     }
 }
 
