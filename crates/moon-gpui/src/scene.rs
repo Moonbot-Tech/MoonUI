@@ -5,8 +5,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AtlasTextureId, AtlasTile, Background, Bounds, ContentMask, Corners, Edges, Hsla, Pixels,
-    Point, Radians, ScaledPixels, Size, bounds_tree::BoundsTree, point,
+    AtlasTextureId, AtlasTile, Background, Bounds, ContentMask, Corners, Edges, GpuCanvasLayer,
+    Hsla, PaintGpuCanvas, Pixels, Point, Radians, ScaledPixels, Size, bounds_tree::BoundsTree,
+    point,
 };
 use std::{
     fmt::Debug,
@@ -36,6 +37,8 @@ pub struct Scene {
     pub subpixel_sprites: Vec<SubpixelSprite>,
     pub polychrome_sprites: Vec<PolychromeSprite>,
     pub surfaces: Vec<PaintSurface>,
+    pub gpu_canvases_under_scene: Vec<PaintGpuCanvas>,
+    pub gpu_canvases_over_scene: Vec<PaintGpuCanvas>,
 }
 
 #[expect(missing_docs)]
@@ -52,6 +55,8 @@ impl Scene {
         self.subpixel_sprites.clear();
         self.polychrome_sprites.clear();
         self.surfaces.clear();
+        self.gpu_canvases_under_scene.clear();
+        self.gpu_canvases_over_scene.clear();
     }
 
     pub fn len(&self) -> usize {
@@ -124,12 +129,36 @@ impl Scene {
             .push(PaintOperation::Primitive(primitive));
     }
 
+    pub fn insert_gpu_canvas(&mut self, layer: GpuCanvasLayer, mut canvas: PaintGpuCanvas) {
+        let clipped_bounds = canvas.bounds.intersect(&canvas.content_mask.bounds);
+
+        if clipped_bounds.is_empty() {
+            return;
+        }
+
+        let order = self
+            .layer_stack
+            .last()
+            .copied()
+            .unwrap_or_else(|| self.primitive_bounds.insert(clipped_bounds));
+        canvas.order = order;
+        match layer {
+            GpuCanvasLayer::UnderScene => self.gpu_canvases_under_scene.push(canvas.clone()),
+            GpuCanvasLayer::OverScene => self.gpu_canvases_over_scene.push(canvas.clone()),
+        }
+        self.paint_operations
+            .push(PaintOperation::GpuCanvas { layer, canvas });
+    }
+
     pub fn replay(&mut self, range: Range<usize>, prev_scene: &Scene) {
         for operation in &prev_scene.paint_operations[range] {
             match operation {
                 PaintOperation::Primitive(primitive) => self.insert_primitive(primitive.clone()),
                 PaintOperation::StartLayer(bounds) => self.push_layer(*bounds),
                 PaintOperation::EndLayer => self.pop_layer(),
+                PaintOperation::GpuCanvas { layer, canvas } => {
+                    self.insert_gpu_canvas(*layer, canvas.clone())
+                }
             }
         }
     }
@@ -146,6 +175,10 @@ impl Scene {
         self.polychrome_sprites
             .sort_by_key(|sprite| (sprite.order, sprite.tile.tile_id));
         self.surfaces.sort_by_key(|surface| surface.order);
+        self.gpu_canvases_under_scene
+            .sort_by_key(|canvas| canvas.order);
+        self.gpu_canvases_over_scene
+            .sort_by_key(|canvas| canvas.order);
     }
 
     #[cfg_attr(
@@ -201,6 +234,10 @@ pub(crate) enum PaintOperation {
     Primitive(Primitive),
     StartLayer(Bounds<ScaledPixels>),
     EndLayer,
+    GpuCanvas {
+        layer: GpuCanvasLayer,
+        canvas: PaintGpuCanvas,
+    },
 }
 
 #[derive(Clone)]
@@ -448,6 +485,123 @@ impl<'a> Iterator for BatchIterator<'a> {
                 Some(PrimitiveBatch::Surfaces(surfaces_start..surfaces_end))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        GpuCanvasDrawContext, GpuCanvasDriver, GpuCanvasHandle, GpuCanvasPrepareContext,
+        GpuFrameDecision, GpuFrameInfo, size,
+    };
+
+    struct NoopCanvasDriver;
+
+    impl GpuCanvasDriver for NoopCanvasDriver {
+        fn frame(&mut self, _: GpuFrameInfo) -> GpuFrameDecision {
+            GpuFrameDecision::Skip
+        }
+
+        fn prepare_gpu(&mut self, _: &mut GpuCanvasPrepareContext<'_>) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        fn draw(&mut self, _: &mut GpuCanvasDrawContext<'_>) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn spx(value: f32) -> ScaledPixels {
+        value.into()
+    }
+
+    fn rect(x: f32, y: f32, w: f32, h: f32) -> Bounds<ScaledPixels> {
+        Bounds {
+            origin: point(spx(x), spx(y)),
+            size: size(spx(w), spx(h)),
+        }
+    }
+
+    fn canvas(
+        order: DrawOrder,
+        bounds: Bounds<ScaledPixels>,
+        mask: Bounds<ScaledPixels>,
+    ) -> PaintGpuCanvas {
+        PaintGpuCanvas {
+            order,
+            bounds,
+            content_mask: ContentMask { bounds: mask },
+            driver: GpuCanvasHandle::new(NoopCanvasDriver),
+        }
+    }
+
+    #[test]
+    fn gpu_canvas_is_clipped_and_kept_out_of_primitive_batches() {
+        let mut scene = Scene::default();
+        scene.insert_gpu_canvas(
+            GpuCanvasLayer::UnderScene,
+            canvas(0, rect(0., 0., 10., 10.), rect(100., 100., 10., 10.)),
+        );
+
+        assert!(scene.gpu_canvases_under_scene.is_empty());
+        assert!(scene.paint_operations.is_empty());
+
+        scene.insert_gpu_canvas(
+            GpuCanvasLayer::UnderScene,
+            canvas(0, rect(0., 0., 10., 10.), rect(5., 0., 10., 10.)),
+        );
+
+        assert_eq!(scene.gpu_canvases_under_scene.len(), 1);
+        assert!(scene.batches().next().is_none());
+    }
+
+    #[test]
+    fn gpu_canvas_replay_uses_insert_path_and_recomputes_order() {
+        let mut prev = Scene::default();
+        prev.push_layer(rect(0., 0., 100., 100.));
+        prev.insert_gpu_canvas(
+            GpuCanvasLayer::UnderScene,
+            canvas(0, rect(10., 10., 20., 20.), rect(0., 0., 100., 100.)),
+        );
+        prev.pop_layer();
+
+        let PaintOperation::GpuCanvas { canvas, .. } = &mut prev.paint_operations[1] else {
+            panic!("expected gpu canvas paint operation");
+        };
+        canvas.order = DrawOrder::MAX;
+        prev.gpu_canvases_under_scene[0].order = DrawOrder::MAX;
+
+        let mut replayed = Scene::default();
+        replayed.replay(0..prev.len(), &prev);
+
+        assert_eq!(replayed.gpu_canvases_under_scene.len(), 1);
+        assert_ne!(replayed.gpu_canvases_under_scene[0].order, DrawOrder::MAX);
+        assert_eq!(replayed.paint_operations.len(), 3);
+    }
+
+    #[test]
+    fn gpu_canvas_finish_sorts_phase_lists() {
+        let mut scene = Scene::default();
+        scene
+            .gpu_canvases_under_scene
+            .push(canvas(20, rect(0., 0., 1., 1.), rect(0., 0., 1., 1.)));
+        scene
+            .gpu_canvases_under_scene
+            .push(canvas(10, rect(0., 0., 1., 1.), rect(0., 0., 1., 1.)));
+        scene
+            .gpu_canvases_over_scene
+            .push(canvas(40, rect(0., 0., 1., 1.), rect(0., 0., 1., 1.)));
+        scene
+            .gpu_canvases_over_scene
+            .push(canvas(30, rect(0., 0., 1., 1.), rect(0., 0., 1., 1.)));
+
+        scene.finish();
+
+        assert_eq!(scene.gpu_canvases_under_scene[0].order, 10);
+        assert_eq!(scene.gpu_canvases_under_scene[1].order, 20);
+        assert_eq!(scene.gpu_canvases_over_scene[0].order, 30);
+        assert_eq!(scene.gpu_canvases_over_scene[1].order, 40);
     }
 }
 

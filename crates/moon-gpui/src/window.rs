@@ -5,20 +5,20 @@ use crate::{
     AsyncWindowContext, AvailableSpace, Background, BorderStyle, Bounds, BoxShadow, Capslock,
     Context, Corners, CursorHideMode, CursorStyle, Decorations, DevicePixels,
     DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Edges, Effect, Entity,
-    EntityId, EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId, GpuSpecs,
-    Hsla, InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke,
-    KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite,
-    MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, Pixels, PlatformAtlas,
-    PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point, PolychromeSprite,
-    Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage,
-    RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR,
-    SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size,
-    StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab,
-    SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle,
-    TextStyleRefinement, ThermalState, TransformationMatrix, Underline, UnderlineStyle,
-    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations,
-    WindowOptions, WindowParams, WindowTextSystem, point, prelude::*, profiler, px, rems, size,
-    transparent_black,
+    EntityId, EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId,
+    GpuCanvasHandle, GpuCanvasLayer, GpuFrameInfo, GpuSpecs, Hsla, InputHandler, IsZero,
+    KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId,
+    LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent,
+    MouseMoveEvent, MouseUpEvent, PaintGpuCanvas, Path, Pixels, PlatformAtlas, PlatformDisplay,
+    PlatformInput, PlatformInputHandler, PlatformWindow, Point, PolychromeSprite, Priority,
+    PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams,
+    RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X,
+    SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size, StrikethroughStyle,
+    Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController,
+    TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement,
+    TransformationMatrix, Underline, UnderlineStyle, WindowAppearance,
+    WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions,
+    WindowParams, WindowTextSystem, point, prelude::*, profiler, px, rems, size, transparent_black,
 };
 
 use anyhow::{Context as _, Result, anyhow};
@@ -80,6 +80,62 @@ pub const DEFAULT_ADDITIONAL_WINDOW_SIZE: Size<Pixels> = Size {
     width: Pixels(900.),
     height: Pixels(750.),
 };
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct GpuCanvasFramePlan {
+    draw_ui: bool,
+    run_gpu_canvases: bool,
+    present: bool,
+}
+
+fn gpu_canvas_frame_plan(
+    ui_dirty: bool,
+    needs_present: bool,
+    gpu_wants_present: bool,
+) -> GpuCanvasFramePlan {
+    GpuCanvasFramePlan {
+        draw_ui: ui_dirty,
+        run_gpu_canvases: true,
+        present: ui_dirty || needs_present || gpu_wants_present,
+    }
+}
+
+#[cfg(test)]
+mod gpu_canvas_frame_plan_tests {
+    use super::*;
+
+    #[test]
+    fn gpu_only_skip_does_not_present() {
+        let plan = gpu_canvas_frame_plan(false, false, false);
+        assert!(!plan.draw_ui);
+        assert!(plan.run_gpu_canvases);
+        assert!(!plan.present);
+    }
+
+    #[test]
+    fn gpu_only_request_presents_same_tick() {
+        let plan = gpu_canvas_frame_plan(false, false, true);
+        assert!(!plan.draw_ui);
+        assert!(plan.run_gpu_canvases);
+        assert!(plan.present);
+    }
+
+    #[test]
+    fn ui_dirty_frame_runs_canvas_and_presents_even_if_canvas_skips() {
+        let plan = gpu_canvas_frame_plan(true, false, false);
+        assert!(plan.draw_ui);
+        assert!(plan.run_gpu_canvases);
+        assert!(plan.present);
+    }
+
+    #[test]
+    fn explicit_present_reason_presents_even_if_canvas_skips() {
+        let plan = gpu_canvas_frame_plan(false, true, false);
+        assert!(!plan.draw_ui);
+        assert!(plan.run_gpu_canvases);
+        assert!(plan.present);
+    }
+}
 
 /// Represents the two different phases when dispatching events.
 #[derive(Default, Copy, Clone, Debug, Eq, PartialEq)]
@@ -1344,8 +1400,6 @@ impl Window {
         let needs_present = Rc::new(Cell::new(false));
         let next_frame_callbacks: Rc<RefCell<Vec<FrameCallback>>> = Default::default();
         let input_rate_tracker = Rc::new(RefCell::new(InputRateTracker::default()));
-        let last_frame_time = Rc::new(Cell::new(None));
-
         platform_window
             .request_decorations(window_decorations.unwrap_or(WindowDecorations::Server));
         platform_window.set_background_appearance(window_background);
@@ -1454,42 +1508,8 @@ impl Window {
             let next_frame_callbacks = next_frame_callbacks.clone();
             let input_rate_tracker = input_rate_tracker.clone();
             move |request_frame_options| {
-                let thermal_state = handle
-                    .update(&mut cx, |_, _, cx| cx.thermal_state())
-                    .log_err();
-
-                // Throttle frame rate based on conditions:
-                // - Thermal pressure (Serious/Critical): cap to ~60fps
-                // - Inactive window (not focused): cap to ~30fps to save energy
-                let min_frame_interval = if !request_frame_options.force_render
-                    && !request_frame_options.require_presentation
-                    && next_frame_callbacks.borrow().is_empty()
-                {
-                    None
-                } else if !active.get() {
-                    Some(Duration::from_micros(33333))
-                } else if let Some(ThermalState::Critical | ThermalState::Serious) = thermal_state {
-                    Some(Duration::from_micros(16667))
-                } else {
-                    None
-                };
-
-                let now = Instant::now();
-                if let Some(min_interval) = min_frame_interval {
-                    if let Some(last_frame) = last_frame_time.get()
-                        && now.duration_since(last_frame) < min_interval
-                    {
-                        // Must still complete the frame on platforms that require it.
-                        // On Wayland, `surface.frame()` was already called to request the
-                        // next frame callback, so we must call `surface.commit()` (via
-                        // `complete_frame`) or the compositor won't send another callback.
-                        handle
-                            .update(&mut cx, |_, window, _| window.complete_frame())
-                            .log_err();
-                        return;
-                    }
-                }
-                last_frame_time.set(Some(now));
+                let high_rate_input =
+                    active.get() && input_rate_tracker.borrow_mut().is_high_rate();
 
                 let next_frame_callbacks = next_frame_callbacks.take();
                 if !next_frame_callbacks.is_empty() {
@@ -1502,31 +1522,45 @@ impl Window {
                         .log_err();
                 }
 
+                let ui_dirty = invalidator.is_dirty() || request_frame_options.force_render;
                 // Keep presenting if input was recently arriving at a high rate (>= 60fps).
                 // Once high-rate input is detected, we sustain presentation for 1 second
                 // to prevent display underclocking during active input.
                 let needs_present = request_frame_options.require_presentation
                     || needs_present.get()
-                    || (active.get() && input_rate_tracker.borrow_mut().is_high_rate());
+                    || high_rate_input;
 
-                if invalidator.is_dirty() || request_frame_options.force_render {
+                if ui_dirty {
+                    let plan = gpu_canvas_frame_plan(true, needs_present, false);
                     measure("frame duration", || {
                         handle
                             .update(&mut cx, |_, window, cx| {
-                                if request_frame_options.force_render {
+                                if plan.draw_ui && request_frame_options.force_render {
                                     // Bypass cached view reuse so we don't replay stale
                                     // atlas tile references after a GPU device recovery.
                                     window.refresh();
                                 }
                                 let arena_clear_needed = window.draw(cx);
-                                window.present();
+                                if plan.run_gpu_canvases {
+                                    window.frame_gpu_canvases();
+                                }
+                                if plan.present {
+                                    window.present();
+                                }
                                 arena_clear_needed.clear();
                             })
                             .log_err();
                     })
-                } else if needs_present {
+                } else {
                     handle
-                        .update(&mut cx, |_, window, _| window.present())
+                        .update(&mut cx, |_, window, _| {
+                            let gpu_wants_present = window.frame_gpu_canvases();
+                            let plan =
+                                gpu_canvas_frame_plan(false, needs_present, gpu_wants_present);
+                            if plan.present {
+                                window.present();
+                            }
+                        })
                         .log_err();
                 }
 
@@ -2594,7 +2628,59 @@ impl Window {
     }
 
     fn complete_frame(&self) {
+        self.platform_window
+            .set_gpu_canvas_active(self.has_gpu_canvases());
         self.platform_window.completed_frame();
+    }
+
+    fn has_gpu_canvases(&self) -> bool {
+        !self
+            .rendered_frame
+            .scene
+            .gpu_canvases_under_scene
+            .is_empty()
+            || !self.rendered_frame.scene.gpu_canvases_over_scene.is_empty()
+    }
+
+    fn frame_gpu_canvases(&mut self) -> bool {
+        if self.rendered_frame.scene.gpu_canvases_under_scene.is_empty()
+            && self.rendered_frame.scene.gpu_canvases_over_scene.is_empty()
+        {
+            return false;
+        }
+
+        let now = Instant::now();
+        let scale_factor = self.scale_factor();
+        let presentable = self.platform_window.can_present();
+        let mut request_present = false;
+
+        for canvas in self
+            .rendered_frame
+            .scene
+            .gpu_canvases_under_scene
+            .iter()
+            .chain(self.rendered_frame.scene.gpu_canvases_over_scene.iter())
+        {
+            let bounds = Bounds {
+                origin: point(
+                    px(canvas.bounds.origin.x.0 / scale_factor),
+                    px(canvas.bounds.origin.y.0 / scale_factor),
+                ),
+                size: size(
+                    px(canvas.bounds.size.width.0 / scale_factor),
+                    px(canvas.bounds.size.height.0 / scale_factor),
+                ),
+            };
+            let info = GpuFrameInfo {
+                now,
+                bounds,
+                scale_factor,
+                presentable,
+            };
+            request_present |= canvas.driver.frame(info).requests_present();
+        }
+
+        request_present
     }
 
     /// Produces a new frame and assigns it to `rendered_frame`. To actually show
@@ -3727,6 +3813,25 @@ impl Window {
             border_widths: snapped_border_widths,
             border_style: quad.border_style,
         });
+    }
+
+    pub(crate) fn paint_gpu_canvas(
+        &mut self,
+        layer: GpuCanvasLayer,
+        bounds: Bounds<Pixels>,
+        driver: GpuCanvasHandle,
+    ) {
+        self.invalidator.debug_assert_paint();
+
+        self.next_frame.scene.insert_gpu_canvas(
+            layer,
+            PaintGpuCanvas {
+                order: 0,
+                bounds: self.cover_bounds(bounds),
+                content_mask: self.snapped_content_mask(),
+                driver,
+            },
+        );
     }
 
     /// Paint the given `Path` into the scene for the next frame at the current z-index.
