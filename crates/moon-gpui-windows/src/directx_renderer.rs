@@ -290,6 +290,9 @@ struct DirectXRenderPipelines {
     mono_sprites: PipelineState<MonochromeSprite>,
     subpixel_sprites: PipelineState<SubpixelSprite>,
     poly_sprites: PipelineState<PolychromeSprite>,
+    gpu_canvas_mono_sprites: PipelineState<MonochromeSprite>,
+    gpu_canvas_subpixel_sprites: PipelineState<SubpixelSprite>,
+    gpu_canvas_poly_sprites: PipelineState<PolychromeSprite>,
 }
 
 struct DirectXGlobalElements {
@@ -344,14 +347,8 @@ impl DirectXRenderer {
             .context("Creating DirectX devices")?;
         let atlas = Arc::new(DirectXAtlas::new(&devices.device, &devices.device_context));
 
-        let resources = DirectXResources::new(
-            &devices,
-            1,
-            1,
-            hwnd,
-            disable_direct_composition,
-        )
-        .context("Creating DirectX resources")?;
+        let resources = DirectXResources::new(&devices, 1, 1, hwnd, disable_direct_composition)
+            .context("Creating DirectX resources")?;
         let globals = DirectXGlobalElements::new(&devices.device)
             .context("Creating DirectX global elements")?;
         let pipelines = DirectXRenderPipelines::new(&devices.device)
@@ -638,6 +635,7 @@ impl DirectXRenderer {
         self.upload_scene_buffers(scene)?;
 
         self.run_gpu_canvas_draw(&scene.gpu_canvases_under_scene, GpuCanvasLayer::UnderScene);
+        self.draw_gpu_canvas_text(&scene.gpu_canvas_text_under_scene)?;
 
         for batch in scene.batches() {
             match batch {
@@ -674,6 +672,7 @@ impl DirectXRenderer {
             ))?;
         }
         self.run_gpu_canvas_draw(&scene.gpu_canvases_over_scene, GpuCanvasLayer::OverScene);
+        self.draw_gpu_canvas_text(&scene.gpu_canvas_text_over_scene)?;
         self.present()
     }
 
@@ -947,6 +946,125 @@ impl DirectXRenderer {
         )
     }
 
+    fn draw_gpu_canvas_text(&mut self, frame: &GpuCanvasTextFrame) -> Result<()> {
+        if frame.is_empty() {
+            return Ok(());
+        }
+
+        let devices = self.devices.as_ref().context("devices missing")?.clone();
+        let viewport = self
+            .resources
+            .as_ref()
+            .context("resources missing")?
+            .viewport;
+        let global_params = [self.globals.global_params_buffer.clone()];
+        let sampler = [self.globals.sampler.clone()];
+
+        if !frame.monochrome_sprites.is_empty() {
+            self.pipelines.gpu_canvas_mono_sprites.update_buffer(
+                &devices.device,
+                &devices.device_context,
+                &frame.monochrome_sprites,
+            )?;
+
+            let mut start = 0;
+            while start < frame.monochrome_sprites.len() {
+                let texture_id = frame.monochrome_sprites[start].tile.texture_id;
+                let mut end = start + 1;
+                while end < frame.monochrome_sprites.len()
+                    && frame.monochrome_sprites[end].tile.texture_id == texture_id
+                {
+                    end += 1;
+                }
+                if let Some(texture_view) = self.atlas.get_texture_view(texture_id) {
+                    self.pipelines
+                        .gpu_canvas_mono_sprites
+                        .draw_range_with_texture(
+                            &devices.device,
+                            &devices.device_context,
+                            &texture_view,
+                            slice::from_ref(&viewport),
+                            &global_params,
+                            &sampler,
+                            start as u32,
+                            (end - start) as u32,
+                        )?;
+                }
+                start = end;
+            }
+        }
+
+        if !frame.subpixel_sprites.is_empty() {
+            self.pipelines.gpu_canvas_subpixel_sprites.update_buffer(
+                &devices.device,
+                &devices.device_context,
+                &frame.subpixel_sprites,
+            )?;
+
+            let mut start = 0;
+            while start < frame.subpixel_sprites.len() {
+                let texture_id = frame.subpixel_sprites[start].tile.texture_id;
+                let mut end = start + 1;
+                while end < frame.subpixel_sprites.len()
+                    && frame.subpixel_sprites[end].tile.texture_id == texture_id
+                {
+                    end += 1;
+                }
+                if let Some(texture_view) = self.atlas.get_texture_view(texture_id) {
+                    self.pipelines
+                        .gpu_canvas_subpixel_sprites
+                        .draw_range_with_texture(
+                            &devices.device,
+                            &devices.device_context,
+                            &texture_view,
+                            slice::from_ref(&viewport),
+                            &global_params,
+                            &sampler,
+                            start as u32,
+                            (end - start) as u32,
+                        )?;
+                }
+                start = end;
+            }
+        }
+
+        if !frame.polychrome_sprites.is_empty() {
+            self.pipelines.gpu_canvas_poly_sprites.update_buffer(
+                &devices.device,
+                &devices.device_context,
+                &frame.polychrome_sprites,
+            )?;
+
+            let mut start = 0;
+            while start < frame.polychrome_sprites.len() {
+                let texture_id = frame.polychrome_sprites[start].tile.texture_id;
+                let mut end = start + 1;
+                while end < frame.polychrome_sprites.len()
+                    && frame.polychrome_sprites[end].tile.texture_id == texture_id
+                {
+                    end += 1;
+                }
+                if let Some(texture_view) = self.atlas.get_texture_view(texture_id) {
+                    self.pipelines
+                        .gpu_canvas_poly_sprites
+                        .draw_range_with_texture(
+                            &devices.device,
+                            &devices.device_context,
+                            &texture_view,
+                            slice::from_ref(&viewport),
+                            &global_params,
+                            &sampler,
+                            start as u32,
+                            (end - start) as u32,
+                        )?;
+                }
+                start = end;
+            }
+        }
+
+        Ok(())
+    }
+
     fn draw_monochrome_sprites(
         &mut self,
         texture_id: AtlasTextureId,
@@ -1209,6 +1327,27 @@ impl DirectXRenderPipelines {
             16,
             create_blend_state(device)?,
         )?;
+        let gpu_canvas_mono_sprites = PipelineState::new(
+            device,
+            "gpu_canvas_monochrome_sprite_pipeline",
+            ShaderModule::MonochromeSprite,
+            64,
+            create_blend_state(device)?,
+        )?;
+        let gpu_canvas_subpixel_sprites = PipelineState::new(
+            device,
+            "gpu_canvas_subpixel_sprite_pipeline",
+            ShaderModule::SubpixelSprite,
+            64,
+            create_blend_state_for_subpixel_rendering(device)?,
+        )?;
+        let gpu_canvas_poly_sprites = PipelineState::new(
+            device,
+            "gpu_canvas_polychrome_sprite_pipeline",
+            ShaderModule::PolychromeSprite,
+            16,
+            create_blend_state(device)?,
+        )?;
 
         Ok(Self {
             shadow_pipeline,
@@ -1219,6 +1358,9 @@ impl DirectXRenderPipelines {
             mono_sprites,
             subpixel_sprites,
             poly_sprites,
+            gpu_canvas_mono_sprites,
+            gpu_canvas_subpixel_sprites,
+            gpu_canvas_poly_sprites,
         })
     }
 }

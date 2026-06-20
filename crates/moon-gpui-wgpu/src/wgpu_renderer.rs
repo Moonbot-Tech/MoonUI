@@ -2,8 +2,8 @@ use crate::{CompositorGpuHint, WgpuAtlas, WgpuContext};
 use bytemuck::{Pod, Zeroable};
 use gpui::{
     AtlasTextureId, Background, Bounds, DevicePixels, GpuCanvasDrawContext, GpuCanvasLayer,
-    GpuCanvasPrepareContext, GpuSpecs, MonochromeSprite, PaintGpuCanvas, Path, Point,
-    PolychromeSprite, PrimitiveBatch, Quad, RawGpuAccess, ScaledPixels, Scene, Shadow, Size,
+    GpuCanvasPrepareContext, GpuCanvasTextFrame, GpuSpecs, MonochromeSprite, PaintGpuCanvas, Path,
+    Point, PolychromeSprite, PrimitiveBatch, Quad, RawGpuAccess, ScaledPixels, Scene, Shadow, Size,
     SubpixelSprite, Underline, WgpuRawAccess, get_gamma_correction_ratios,
 };
 use log::warn;
@@ -1143,13 +1143,15 @@ impl WgpuRenderer {
     fn run_gpu_canvas_draw(
         &self,
         canvases: &[PaintGpuCanvas],
+        text_frame: &GpuCanvasTextFrame,
         layer: GpuCanvasLayer,
         encoder_ptr: *mut c_void,
         pass: &mut wgpu::RenderPass<'_>,
         frame_view: &wgpu::TextureView,
-    ) {
-        if canvases.is_empty() {
-            return;
+        instance_offset: &mut u64,
+    ) -> bool {
+        if canvases.is_empty() && text_frame.is_empty() {
+            return true;
         }
 
         let raw = self.raw_gpu_access(
@@ -1184,6 +1186,9 @@ impl WgpuRenderer {
                 log::error!("failed to draw {layer:?} gpu canvas: {error:?}");
             }
         }
+
+        pass.set_scissor_rect(0, 0, self.surface_config.width, self.surface_config.height);
+        self.draw_gpu_canvas_text(text_frame, instance_offset, pass)
     }
 
     pub fn draw(&mut self, scene: &Scene) -> bool {
@@ -1330,7 +1335,9 @@ impl WgpuRenderer {
                 &frame_view,
             );
 
-            let scene_load = if scene.gpu_canvases_under_scene.is_empty() {
+            let scene_load = if scene.gpu_canvases_under_scene.is_empty()
+                && scene.gpu_canvas_text_under_scene.is_empty()
+            {
                 wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT)
             } else {
                 {
@@ -1348,13 +1355,30 @@ impl WgpuRenderer {
                         depth_stencil_attachment: None,
                         ..Default::default()
                     });
-                    self.run_gpu_canvas_draw(
+                    if !self.run_gpu_canvas_draw(
                         &scene.gpu_canvases_under_scene,
+                        &scene.gpu_canvas_text_under_scene,
                         GpuCanvasLayer::UnderScene,
                         encoder_ptr,
                         &mut pass,
                         &frame_view,
-                    );
+                        &mut instance_offset,
+                    ) {
+                        overflow = true;
+                    }
+                }
+                if overflow {
+                    drop(encoder);
+                    if self.instance_buffer_capacity >= self.max_buffer_size {
+                        log::error!(
+                            "instance buffer size grew too large: {}",
+                            self.instance_buffer_capacity
+                        );
+                        frame.present();
+                        return true;
+                    }
+                    self.grow_instance_buffer();
+                    continue;
                 }
                 wgpu::LoadOp::Load
             };
@@ -1477,7 +1501,9 @@ impl WgpuRenderer {
                 continue;
             }
 
-            if !scene.gpu_canvases_over_scene.is_empty() {
+            if !scene.gpu_canvases_over_scene.is_empty()
+                || !scene.gpu_canvas_text_over_scene.is_empty()
+            {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("gpu_canvas_over_pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1492,13 +1518,31 @@ impl WgpuRenderer {
                     depth_stencil_attachment: None,
                     ..Default::default()
                 });
-                self.run_gpu_canvas_draw(
+                if !self.run_gpu_canvas_draw(
                     &scene.gpu_canvases_over_scene,
+                    &scene.gpu_canvas_text_over_scene,
                     GpuCanvasLayer::OverScene,
                     encoder_ptr,
                     &mut pass,
                     &frame_view,
-                );
+                    &mut instance_offset,
+                ) {
+                    overflow = true;
+                }
+            }
+
+            if overflow {
+                drop(encoder);
+                if self.instance_buffer_capacity >= self.max_buffer_size {
+                    log::error!(
+                        "instance buffer size grew too large: {}",
+                        self.instance_buffer_capacity
+                    );
+                    frame.present();
+                    return true;
+                }
+                self.grow_instance_buffer();
+                continue;
             }
 
             self.resources()
@@ -1557,6 +1601,79 @@ impl WgpuRenderer {
         )
     }
 
+    fn draw_gpu_canvas_text(
+        &self,
+        frame: &GpuCanvasTextFrame,
+        instance_offset: &mut u64,
+        pass: &mut wgpu::RenderPass<'_>,
+    ) -> bool {
+        if frame.is_empty() {
+            return true;
+        }
+
+        let mut start = 0;
+        while start < frame.monochrome_sprites.len() {
+            let texture_id = frame.monochrome_sprites[start].tile.texture_id;
+            let mut end = start + 1;
+            while end < frame.monochrome_sprites.len()
+                && frame.monochrome_sprites[end].tile.texture_id == texture_id
+            {
+                end += 1;
+            }
+            if !self.draw_monochrome_sprites(
+                &frame.monochrome_sprites[start..end],
+                texture_id,
+                instance_offset,
+                pass,
+            ) {
+                return false;
+            }
+            start = end;
+        }
+
+        let mut start = 0;
+        while start < frame.subpixel_sprites.len() {
+            let texture_id = frame.subpixel_sprites[start].tile.texture_id;
+            let mut end = start + 1;
+            while end < frame.subpixel_sprites.len()
+                && frame.subpixel_sprites[end].tile.texture_id == texture_id
+            {
+                end += 1;
+            }
+            if !self.draw_subpixel_sprites(
+                &frame.subpixel_sprites[start..end],
+                texture_id,
+                instance_offset,
+                pass,
+            ) {
+                return false;
+            }
+            start = end;
+        }
+
+        let mut start = 0;
+        while start < frame.polychrome_sprites.len() {
+            let texture_id = frame.polychrome_sprites[start].tile.texture_id;
+            let mut end = start + 1;
+            while end < frame.polychrome_sprites.len()
+                && frame.polychrome_sprites[end].tile.texture_id == texture_id
+            {
+                end += 1;
+            }
+            if !self.draw_polychrome_sprites(
+                &frame.polychrome_sprites[start..end],
+                texture_id,
+                instance_offset,
+                pass,
+            ) {
+                return false;
+            }
+            start = end;
+        }
+
+        true
+    }
+
     fn draw_monochrome_sprites(
         &self,
         sprites: &[MonochromeSprite],
@@ -1564,7 +1681,9 @@ impl WgpuRenderer {
         instance_offset: &mut u64,
         pass: &mut wgpu::RenderPass<'_>,
     ) -> bool {
-        let tex_info = self.atlas.get_texture_info(texture_id);
+        let Some(tex_info) = self.atlas.get_texture_info(texture_id) else {
+            return true;
+        };
         let data = unsafe { Self::instance_bytes(sprites) };
         self.draw_instances_with_texture(
             data,
@@ -1583,7 +1702,9 @@ impl WgpuRenderer {
         instance_offset: &mut u64,
         pass: &mut wgpu::RenderPass<'_>,
     ) -> bool {
-        let tex_info = self.atlas.get_texture_info(texture_id);
+        let Some(tex_info) = self.atlas.get_texture_info(texture_id) else {
+            return true;
+        };
         let data = unsafe { Self::instance_bytes(sprites) };
         let resources = self.resources();
         let pipeline = resources
@@ -1608,7 +1729,9 @@ impl WgpuRenderer {
         instance_offset: &mut u64,
         pass: &mut wgpu::RenderPass<'_>,
     ) -> bool {
-        let tex_info = self.atlas.get_texture_info(texture_id);
+        let Some(tex_info) = self.atlas.get_texture_info(texture_id) else {
+            return true;
+        };
         let data = unsafe { Self::instance_bytes(sprites) };
         self.draw_instances_with_texture(
             data,

@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AtlasTextureId, AtlasTile, Background, Bounds, ContentMask, Corners, Edges, GpuCanvasLayer,
-    Hsla, PaintGpuCanvas, Pixels, Point, Radians, ScaledPixels, Size, bounds_tree::BoundsTree,
-    point,
+    GpuCanvasTextFrame, Hsla, PaintGpuCanvas, Pixels, Point, Radians, ScaledPixels, Size,
+    bounds_tree::BoundsTree, point,
 };
 use std::{
     fmt::Debug,
@@ -39,6 +39,8 @@ pub struct Scene {
     pub surfaces: Vec<PaintSurface>,
     pub gpu_canvases_under_scene: Vec<PaintGpuCanvas>,
     pub gpu_canvases_over_scene: Vec<PaintGpuCanvas>,
+    pub gpu_canvas_text_under_scene: GpuCanvasTextFrame,
+    pub gpu_canvas_text_over_scene: GpuCanvasTextFrame,
 }
 
 #[expect(missing_docs)]
@@ -57,6 +59,8 @@ impl Scene {
         self.surfaces.clear();
         self.gpu_canvases_under_scene.clear();
         self.gpu_canvases_over_scene.clear();
+        self.gpu_canvas_text_under_scene.clear();
+        self.gpu_canvas_text_over_scene.clear();
     }
 
     pub fn len(&self) -> usize {
@@ -532,6 +536,7 @@ mod tests {
             order,
             bounds,
             content_mask: ContentMask { bounds: mask },
+            text_layer: GpuCanvasLayer::UnderScene,
             driver: GpuCanvasHandle::new(NoopCanvasDriver),
         }
     }

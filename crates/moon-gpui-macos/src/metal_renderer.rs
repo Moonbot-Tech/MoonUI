@@ -7,10 +7,10 @@ use cocoa::{
     quartzcore::AutoresizingMask,
 };
 use gpui::{
-    point, size, AtlasTextureId, Background, Bounds, ContentMask, DevicePixels,
-    GpuCanvasDrawContext, GpuCanvasLayer, GpuCanvasPrepareContext, MetalRawAccess,
-    MonochromeSprite, PaintGpuCanvas, PaintSurface, Path, Point, PolychromeSprite, PrimitiveBatch,
-    Quad, RawGpuAccess, ScaledPixels, Scene, Shadow, Size, Surface, Underline,
+    AtlasTextureId, Background, Bounds, ContentMask, DevicePixels, GpuCanvasDrawContext,
+    GpuCanvasLayer, GpuCanvasPrepareContext, GpuCanvasTextFrame, MetalRawAccess, MonochromeSprite,
+    PaintGpuCanvas, PaintSurface, Path, Point, PolychromeSprite, PrimitiveBatch, Quad,
+    RawGpuAccess, ScaledPixels, Scene, Shadow, Size, Surface, Underline, point, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -35,8 +35,8 @@ use std::{
     mem,
     ptr::{self, NonNull},
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -883,15 +883,18 @@ impl MetalRenderer {
     fn run_gpu_canvas_draw(
         &self,
         canvases: &[PaintGpuCanvas],
+        text_frame: &GpuCanvasTextFrame,
         layer: GpuCanvasLayer,
         command_buffer: &metal::CommandBufferRef,
         texture: &metal::TextureRef,
         viewport_size: Size<DevicePixels>,
         load_action: metal::MTLLoadAction,
         clear_alpha: f64,
-    ) {
-        if canvases.is_empty() {
-            return;
+        instance_buffer: &mut InstanceBuffer,
+        instance_offset: &mut usize,
+    ) -> bool {
+        if canvases.is_empty() && text_frame.is_empty() {
+            return true;
         }
 
         let command_encoder =
@@ -936,7 +939,21 @@ impl MetalRenderer {
             }
         }
 
+        command_encoder.set_scissor_rect(metal::MTLScissorRect {
+            x: 0,
+            y: 0,
+            width: i32::from(viewport_size.width).max(0) as u64,
+            height: i32::from(viewport_size.height).max(0) as u64,
+        });
+        let ok = self.draw_gpu_canvas_text(
+            text_frame,
+            instance_buffer,
+            instance_offset,
+            viewport_size,
+            command_encoder,
+        );
         command_encoder.end_encoding();
+        ok
     }
 
     fn draw_primitives(
@@ -976,18 +993,30 @@ impl MetalRenderer {
             viewport_size,
         );
 
-        let scene_load_action = if scene.gpu_canvases_under_scene.is_empty() {
+        let scene_load_action = if scene.gpu_canvases_under_scene.is_empty()
+            && scene.gpu_canvas_text_under_scene.is_empty()
+        {
             metal::MTLLoadAction::Clear
         } else {
-            self.run_gpu_canvas_draw(
+            let ok = self.run_gpu_canvas_draw(
                 &scene.gpu_canvases_under_scene,
+                &scene.gpu_canvas_text_under_scene,
                 GpuCanvasLayer::UnderScene,
                 command_buffer,
                 texture,
                 viewport_size,
                 metal::MTLLoadAction::Clear,
                 alpha,
+                instance_buffer,
+                &mut instance_offset,
             );
+            if !ok {
+                anyhow::bail!(
+                    "gpu canvas text too large: {} mono, {} poly",
+                    scene.gpu_canvas_text_under_scene.monochrome_sprites.len(),
+                    scene.gpu_canvas_text_under_scene.polychrome_sprites.len(),
+                );
+            }
             metal::MTLLoadAction::Load
         };
 
@@ -1102,15 +1131,25 @@ impl MetalRenderer {
         }
 
         command_encoder.end_encoding();
-        self.run_gpu_canvas_draw(
+        let ok = self.run_gpu_canvas_draw(
             &scene.gpu_canvases_over_scene,
+            &scene.gpu_canvas_text_over_scene,
             GpuCanvasLayer::OverScene,
             command_buffer,
             texture,
             viewport_size,
             metal::MTLLoadAction::Load,
             alpha,
+            instance_buffer,
+            &mut instance_offset,
         );
+        if !ok {
+            anyhow::bail!(
+                "gpu canvas text too large: {} mono, {} poly",
+                scene.gpu_canvas_text_over_scene.monochrome_sprites.len(),
+                scene.gpu_canvas_text_over_scene.polychrome_sprites.len(),
+            );
+        }
 
         if !self.is_unified_memory {
             // Sync the instance buffer to the GPU
@@ -1507,7 +1546,9 @@ impl MetalRenderer {
             return false;
         }
 
-        let texture = self.sprite_atlas.metal_texture(texture_id);
+        let Some(texture) = self.sprite_atlas.metal_texture(texture_id) else {
+            return true;
+        };
         let texture_size = size(
             DevicePixels(texture.width() as i32),
             DevicePixels(texture.height() as i32),
@@ -1558,6 +1599,72 @@ impl MetalRenderer {
         true
     }
 
+    fn draw_gpu_canvas_text(
+        &self,
+        frame: &GpuCanvasTextFrame,
+        instance_buffer: &mut InstanceBuffer,
+        instance_offset: &mut usize,
+        viewport_size: Size<DevicePixels>,
+        command_encoder: &metal::RenderCommandEncoderRef,
+    ) -> bool {
+        if frame.is_empty() {
+            return true;
+        }
+
+        let mut start = 0;
+        while start < frame.monochrome_sprites.len() {
+            let texture_id = frame.monochrome_sprites[start].tile.texture_id;
+            let mut end = start + 1;
+            while end < frame.monochrome_sprites.len()
+                && frame.monochrome_sprites[end].tile.texture_id == texture_id
+            {
+                end += 1;
+            }
+            if !self.draw_monochrome_sprites(
+                texture_id,
+                &frame.monochrome_sprites[start..end],
+                instance_buffer,
+                instance_offset,
+                viewport_size,
+                command_encoder,
+            ) {
+                return false;
+            }
+            start = end;
+        }
+
+        if !frame.subpixel_sprites.is_empty() {
+            log::warn!(
+                "subpixel gpu canvas text is not supported on the Metal renderer; skipping {} sprites",
+                frame.subpixel_sprites.len()
+            );
+        }
+
+        let mut start = 0;
+        while start < frame.polychrome_sprites.len() {
+            let texture_id = frame.polychrome_sprites[start].tile.texture_id;
+            let mut end = start + 1;
+            while end < frame.polychrome_sprites.len()
+                && frame.polychrome_sprites[end].tile.texture_id == texture_id
+            {
+                end += 1;
+            }
+            if !self.draw_polychrome_sprites(
+                texture_id,
+                &frame.polychrome_sprites[start..end],
+                instance_buffer,
+                instance_offset,
+                viewport_size,
+                command_encoder,
+            ) {
+                return false;
+            }
+            start = end;
+        }
+
+        true
+    }
+
     fn draw_polychrome_sprites(
         &self,
         texture_id: AtlasTextureId,
@@ -1572,7 +1679,9 @@ impl MetalRenderer {
         }
         align_offset(instance_offset);
 
-        let texture = self.sprite_atlas.metal_texture(texture_id);
+        let Some(texture) = self.sprite_atlas.metal_texture(texture_id) else {
+            return true;
+        };
         let texture_size = size(
             DevicePixels(texture.width() as i32),
             DevicePixels(texture.height() as i32),

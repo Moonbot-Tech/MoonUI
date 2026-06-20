@@ -6,17 +6,17 @@ use crate::{
     Context, Corners, CursorHideMode, CursorStyle, Decorations, DevicePixels,
     DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Edges, Effect, Entity,
     EntityId, EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId,
-    GpuCanvasHandle, GpuCanvasLayer, GpuFrameInfo, GpuSpecs, Hsla, InputHandler, IsZero,
-    KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId,
-    LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent,
-    MouseMoveEvent, MouseUpEvent, PaintGpuCanvas, Path, Pixels, PlatformAtlas, PlatformDisplay,
-    PlatformInput, PlatformInputHandler, PlatformWindow, Point, PolychromeSprite, Priority,
-    PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams,
-    RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X,
-    SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size, StrikethroughStyle,
-    Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController,
-    TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement,
-    TransformationMatrix, Underline, UnderlineStyle, WindowAppearance,
+    GpuCanvasHandle, GpuCanvasLayer, GpuCanvasTextContext, GpuCanvasTextFrame, GpuFrameInfo,
+    GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent, KeyEvent,
+    Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent,
+    MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, PaintGpuCanvas, Path,
+    Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow,
+    Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams,
+    RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR,
+    SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size,
+    StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab,
+    SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle,
+    TextStyleRefinement, TransformationMatrix, Underline, UnderlineStyle, WindowAppearance,
     WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions,
     WindowParams, WindowTextSystem, point, prelude::*, profiler, px, rems, size, transparent_black,
 };
@@ -100,6 +100,10 @@ fn gpu_canvas_frame_plan(
     }
 }
 
+fn gpu_canvas_prepare_text(force_present: bool, gpu_wants_present: bool) -> bool {
+    force_present || gpu_wants_present
+}
+
 #[cfg(test)]
 mod gpu_canvas_frame_plan_tests {
     use super::*;
@@ -134,6 +138,21 @@ mod gpu_canvas_frame_plan_tests {
         assert!(!plan.draw_ui);
         assert!(plan.run_gpu_canvases);
         assert!(plan.present);
+    }
+
+    #[test]
+    fn gpu_only_skip_does_not_prepare_text() {
+        assert!(!gpu_canvas_prepare_text(false, false));
+    }
+
+    #[test]
+    fn explicit_present_prepares_text_even_if_canvases_skip() {
+        assert!(gpu_canvas_prepare_text(true, false));
+    }
+
+    #[test]
+    fn any_canvas_present_request_prepares_the_window_text_frame() {
+        assert!(gpu_canvas_prepare_text(false, true));
     }
 }
 
@@ -1473,7 +1492,8 @@ impl Window {
                 }
 
                 let ui_dirty = invalidator.is_dirty() || request_frame_options.force_render;
-                let needs_present = request_frame_options.require_presentation || needs_present.get();
+                let needs_present =
+                    request_frame_options.require_presentation || needs_present.get();
 
                 if ui_dirty {
                     let plan = gpu_canvas_frame_plan(true, needs_present, false);
@@ -1487,7 +1507,7 @@ impl Window {
                                 }
                                 let arena_clear_needed = window.draw(cx);
                                 if plan.run_gpu_canvases {
-                                    window.frame_gpu_canvases();
+                                    window.frame_gpu_canvases(plan.present);
                                 }
                                 if plan.present {
                                     window.present();
@@ -1499,7 +1519,7 @@ impl Window {
                 } else {
                     handle
                         .update(&mut cx, |_, window, _| {
-                            let gpu_wants_present = window.frame_gpu_canvases();
+                            let gpu_wants_present = window.frame_gpu_canvases(needs_present);
                             let plan =
                                 gpu_canvas_frame_plan(false, needs_present, gpu_wants_present);
                             if plan.present {
@@ -2586,24 +2606,45 @@ impl Window {
             || !self.rendered_frame.scene.gpu_canvases_over_scene.is_empty()
     }
 
-    fn frame_gpu_canvases(&mut self) -> bool {
-        if self.rendered_frame.scene.gpu_canvases_under_scene.is_empty()
+    fn frame_gpu_canvases(&mut self, force_present: bool) -> bool {
+        if self
+            .rendered_frame
+            .scene
+            .gpu_canvases_under_scene
+            .is_empty()
             && self.rendered_frame.scene.gpu_canvases_over_scene.is_empty()
         {
             return false;
         }
 
+        let under_scene_canvases = self.rendered_frame.scene.gpu_canvases_under_scene.clone();
+        let over_scene_canvases = self.rendered_frame.scene.gpu_canvases_over_scene.clone();
+        self.rendered_frame
+            .scene
+            .gpu_canvas_text_under_scene
+            .clear();
+        self.rendered_frame.scene.gpu_canvas_text_over_scene.clear();
+
         let now = Instant::now();
         let scale_factor = self.scale_factor();
         let presentable = self.platform_window.can_present();
+        let text_system = self.text_system.clone();
+        let sprite_atlas = self.sprite_atlas.clone();
+        let background_appearance = self.platform_window.background_appearance();
+        let subpixel_rendering_supported = self.platform_window.is_subpixel_rendering_supported();
+        let text_rendering_mode = self.text_rendering_mode.get();
         let mut request_present = false;
+        let mut canvases =
+            Vec::with_capacity(under_scene_canvases.len() + over_scene_canvases.len());
 
-        for canvas in self
-            .rendered_frame
-            .scene
-            .gpu_canvases_under_scene
-            .iter()
-            .chain(self.rendered_frame.scene.gpu_canvases_over_scene.iter())
+        for (layer, canvas) in under_scene_canvases
+            .into_iter()
+            .map(|canvas| (GpuCanvasLayer::UnderScene, canvas))
+            .chain(
+                over_scene_canvases
+                    .into_iter()
+                    .map(|canvas| (GpuCanvasLayer::OverScene, canvas)),
+            )
         {
             let bounds = Bounds {
                 origin: point(
@@ -2621,9 +2662,56 @@ impl Window {
                 scale_factor,
                 presentable,
             };
-            request_present |= canvas.driver.frame(info).requests_present();
+            let wants_present = canvas.driver.frame(info).requests_present();
+            request_present |= wants_present;
+            canvases.push((layer, canvas, bounds));
         }
 
+        if gpu_canvas_prepare_text(force_present, request_present) {
+            for (layer, canvas, bounds) in canvases {
+                let mut canvas_text_frame = GpuCanvasTextFrame::default();
+                let content_mask = ContentMask {
+                    bounds: canvas.bounds.intersect(&canvas.content_mask.bounds),
+                };
+                let mut text_context = GpuCanvasTextContext::new(
+                    text_system.clone(),
+                    sprite_atlas.clone(),
+                    bounds,
+                    scale_factor,
+                    content_mask,
+                    background_appearance,
+                    subpixel_rendering_supported,
+                    text_rendering_mode,
+                    canvas.order,
+                    layer,
+                    canvas.text_layer,
+                    &mut canvas_text_frame,
+                );
+                match canvas.driver.prepare_text(&mut text_context) {
+                    Ok(()) => {
+                        let text_frame = match canvas.text_layer {
+                            GpuCanvasLayer::UnderScene => {
+                                &mut self.rendered_frame.scene.gpu_canvas_text_under_scene
+                            }
+                            GpuCanvasLayer::OverScene => {
+                                &mut self.rendered_frame.scene.gpu_canvas_text_over_scene
+                            }
+                        };
+                        text_frame.append(canvas_text_frame);
+                    }
+                    Err(error) => log::error!("failed to prepare gpu canvas text: {error}"),
+                }
+            }
+        }
+
+        self.rendered_frame
+            .scene
+            .gpu_canvas_text_under_scene
+            .finish();
+        self.rendered_frame
+            .scene
+            .gpu_canvas_text_over_scene
+            .finish();
         request_present
     }
 
@@ -3762,6 +3850,7 @@ impl Window {
     pub(crate) fn paint_gpu_canvas(
         &mut self,
         layer: GpuCanvasLayer,
+        text_layer: GpuCanvasLayer,
         bounds: Bounds<Pixels>,
         driver: GpuCanvasHandle,
     ) {
@@ -3773,6 +3862,7 @@ impl Window {
                 order: 0,
                 bounds: self.cover_bounds(bounds),
                 content_mask: self.snapped_content_mask(),
+                text_layer,
                 driver,
             },
         );
