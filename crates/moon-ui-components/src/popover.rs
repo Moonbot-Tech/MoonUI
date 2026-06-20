@@ -452,7 +452,7 @@ impl RenderOnce for Popover {
                     });
                     // On the very first bounds capture, request a new frame so the popover
                     // renders at the correct position (outside the current paint cycle).
-                    if first_capture {
+                    if first_capture && open {
                         window.request_animation_frame();
                     }
                 }
