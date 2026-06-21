@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "migrations": [
+    {
+      "concept": "notification",
+      "from": "Pending",
+      "to": "Mirror",
+      "reason": "MoonNotification now wraps the Longbridge Notification entry type, applications import it from moon_ui, and direct moon_ui::components::notification use was removed from MoonTerminal."
+    },
+    {
+      "concept": "dialog",
+      "from": "Pending",
+      "to": "Mirror",
+      "reason": "MoonDialog now wraps the Longbridge Dialog builder, application dialogs use MoonWindowExt::open_moon_dialog/open_unique_moon_dialog, and raw moon_ui::components::dialog was removed from the public facade."
+    },
+    {
+      "concept": "list",
+      "from": "Pending",
+      "to": "Mirror",
+      "reason": "MoonList now exposes the Longbridge List/ListState delegate engine through the moon_ui facade, preserving focus, keyboard navigation, virtual rows, search hooks and selection while gallery exercises the Moon-facing path."
+    },
+    {
+      "concept": "tree",
+      "from": "Pending",
+      "to": "Mirror",
+      "reason": "MoonTree now exposes the Longbridge Tree/TreeState engine through the moon_ui facade, preserving expand/collapse events, keyboard navigation, virtual rendering and context menu lifecycle while gallery exercises the Moon-facing path."
+    },
+    {
+      "concept": "menu",
+      "from": "Pending",
+      "to": "Mirror",
+      "reason": "The raw menu escape hatch was replaced by the explicit MoonNativeMenu facade. In-window overlays stay on MoonContextMenu/MoonPopupMenu; OS-native popup behavior is exposed only as moon_ui::MoonNativeMenu."
+    }
+  ]
+}

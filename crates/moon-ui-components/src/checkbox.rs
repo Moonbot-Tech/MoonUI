@@ -2,8 +2,8 @@ use std::{rc::Rc, time::Duration};
 
 use crate::{
     Disableable, FocusableExt, Selectable, Sizable, Size, StyledExt as _,
-    moon::MoonTheme,
-    moon_skin::{MoonSkinPalette, moon_color},
+    moon::MoonTone,
+    moon::{MoonPalette, MoonTheme, rgba_from},
     text::Text,
     tooltip::ComponentTooltip,
     v_flex,
@@ -25,6 +25,8 @@ pub struct Checkbox {
     checked: bool,
     disabled: bool,
     size: Size,
+    tone: Option<MoonTone>,
+    mono: bool,
     tab_stop: bool,
     tab_index: isize,
     on_click: Option<Rc<dyn Fn(&bool, &mut Window, &mut App) + 'static>>,
@@ -43,6 +45,8 @@ impl Checkbox {
             checked: false,
             disabled: false,
             size: Size::default(),
+            tone: None,
+            mono: false,
             on_click: None,
             tab_stop: true,
             tab_index: 0,
@@ -65,6 +69,18 @@ impl Checkbox {
     /// Set the checked state for the checkbox.
     pub fn checked(mut self, checked: bool) -> Self {
         self.checked = checked;
+        self
+    }
+
+    /// Set the Moon tone used for the checked mark and box.
+    pub fn tone(mut self, tone: MoonTone) -> Self {
+        self.tone = Some(tone);
+        self
+    }
+
+    /// Render checkbox text with the Moon mono font.
+    pub fn mono(mut self, mono: bool) -> Self {
+        self.mono = mono;
         self
     }
 
@@ -205,15 +221,15 @@ pub(crate) fn checkbox_check_icon(
     size: Size,
     checked: bool,
     disabled: bool,
+    checked_color: u32,
     window: &mut Window,
     cx: &mut App,
 ) -> impl IntoElement {
     let toggle_state = window.use_keyed_state(id, cx, |_, _| checked);
-    let p = MoonSkinPalette::TERMINAL;
     let metrics = MoonCheckboxMetrics::for_size(size, cx);
     let mark_size = px((metrics.box_size.as_f32() - 2.0).max(9.0));
     let mark_offset = (metrics.box_size - mark_size) * 0.5;
-    let color = moon_color(p.blue, if disabled { 0.45 } else { 1.0 });
+    let color = rgba_from(checked_color, if disabled { 0.45 } else { 1.0 });
 
     svg()
         .absolute()
@@ -258,7 +274,8 @@ impl RenderOnce for Checkbox {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let checked = self.checked;
         let metrics = MoonCheckboxMetrics::for_size(self.size, cx);
-        let p = MoonSkinPalette::TERMINAL;
+        let p = MoonPalette::active(cx);
+        let checked_tone = self.tone.unwrap_or(MoonTone::Info).color(p);
         let box_alpha = if self.disabled { 0.45 } else { 1.0 };
         let label_alpha = if self.disabled { 0.45 } else { 1.0 };
 
@@ -268,12 +285,12 @@ impl RenderOnce for Checkbox {
             .clone();
         let is_focused = focus_handle.is_focused(window);
 
-        let border_color = moon_color(
-            if checked { p.blue } else { p.border },
+        let border_color = rgba_from(
+            if checked { checked_tone } else { p.border },
             if checked { 0.75 * box_alpha } else { box_alpha },
         );
-        let bg_color = moon_color(
-            if checked { p.blue } else { p.shell_high },
+        let bg_color = rgba_from(
+            if checked { checked_tone } else { p.shell_high },
             if checked {
                 0.22 * box_alpha
             } else {
@@ -281,9 +298,9 @@ impl RenderOnce for Checkbox {
             },
         );
         let label_color = if self.disabled {
-            moon_color(p.text_muted, label_alpha)
+            rgba_from(p.text_muted, label_alpha)
         } else {
-            moon_color(p.text_soft, label_alpha)
+            rgba_from(p.text_soft, label_alpha)
         };
 
         div().child(
@@ -302,10 +319,13 @@ impl RenderOnce for Checkbox {
                 .line_height(metrics.line_height)
                 .text_size(metrics.font_size)
                 .text_color(label_color)
+                .when(self.mono, |this| {
+                    this.font_family(MoonTheme::active_tokens(cx).font_family(true))
+                })
                 .rounded(px(4.))
                 .when(!self.disabled, |this| {
-                    this.hover(|this| this.bg(moon_color(0xFFFFFF, 0.025)))
-                        .active(|this| this.bg(moon_color(0xFFFFFF, 0.015)))
+                    this.hover(|this| this.bg(rgba_from(p.overlay, 0.025)))
+                        .active(|this| this.bg(rgba_from(p.overlay, 0.015)))
                 })
                 .focus_ring(is_focused, px(2.), window, cx)
                 .refine_style(&self.style)
@@ -323,6 +343,7 @@ impl RenderOnce for Checkbox {
                             self.size,
                             checked,
                             self.disabled,
+                            checked_tone,
                             window,
                             cx,
                         )),
@@ -371,6 +392,7 @@ impl RenderOnce for Checkbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{cell::RefCell, rc::Rc};
 
     #[test]
     fn test_moon_checkbox_metrics_match_terminal_palette() {
@@ -404,5 +426,23 @@ mod tests {
         assert_eq!(checkbox.tab_index, 3);
         assert!(!checkbox.tab_stop);
         assert!(!checkbox.disabled);
+    }
+
+    #[gpui::test]
+    fn test_checkbox_handle_click_toggles_and_calls_handler(cx: &mut gpui::TestAppContext) {
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let window = cx.add_empty_window();
+
+        window.update(|window, cx| {
+            let on_click: Option<Rc<dyn Fn(&bool, &mut Window, &mut App)>> = Some(Rc::new({
+                let seen = seen.clone();
+                move |checked, _, _| seen.borrow_mut().push(*checked)
+            }));
+
+            Checkbox::handle_click(&on_click, false, window, cx);
+            Checkbox::handle_click(&on_click, true, window, cx);
+        });
+
+        assert_eq!(&*seen.borrow(), &[true, false]);
     }
 }

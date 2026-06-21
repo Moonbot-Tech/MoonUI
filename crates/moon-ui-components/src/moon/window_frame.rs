@@ -272,10 +272,10 @@ impl MoonWindowFrame {
                     .window_control_area(button.control_area())
                     .hover(move |s| match button {
                         FrameButton::Close => {
-                            s.bg(rgba_from(p.red, 0.78)).text_color(rgb(0xFFFFFF))
+                            s.bg(rgba_from(p.red, 0.78)).text_color(rgb(p.on_accent))
                         }
                         FrameButton::Minimize | FrameButton::Maximize => {
-                            s.bg(rgba_from(0xFFFFFF, 0.055)).text_color(rgb(p.text))
+                            s.bg(rgba_from(p.overlay, 0.055)).text_color(rgb(p.text))
                         }
                     })
                     .when(cfg!(not(target_os = "windows")), move |this| {

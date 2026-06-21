@@ -1,7 +1,11 @@
+mod component_api;
+mod component_audit;
+mod component_mirror;
 mod transform;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -34,6 +38,67 @@ enum Commands {
 
     /// List crates in extraction order.
     ListCrates,
+
+    /// Audit MoonUI component architecture and compare against a baseline.
+    ComponentAudit {
+        /// Baseline JSON path.
+        #[arg(long, default_value = "docs/component-audit-baseline.json")]
+        baseline: PathBuf,
+
+        /// Write the current audit report as the new baseline.
+        #[arg(long)]
+        update_baseline: bool,
+
+        /// Compare the current audit report with the baseline.
+        #[arg(long)]
+        check_baseline: bool,
+
+        /// Print the full audit report as JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Snapshot Moon-facing public component API and compare against a baseline.
+    ComponentApi {
+        /// Baseline JSON path.
+        #[arg(long, default_value = "docs/component-api-baseline.json")]
+        baseline: PathBuf,
+
+        /// Write the current API snapshot as the new baseline.
+        #[arg(long)]
+        update_baseline: bool,
+
+        /// Compare the current API snapshot with the baseline.
+        #[arg(long)]
+        check_baseline: bool,
+
+        /// Print the full API snapshot as JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Track Mirror components against their Longbridge source paths.
+    ComponentMirror {
+        /// Baseline JSON path.
+        #[arg(long, default_value = "docs/component-mirror-baseline.json")]
+        baseline: PathBuf,
+
+        /// Optional Longbridge donor src root, for example vendor/gpui-component/crates/ui/src.
+        #[arg(long)]
+        donor_root: Option<PathBuf>,
+
+        /// Write the current mirror report as the new baseline.
+        #[arg(long)]
+        update_baseline: bool,
+
+        /// Compare the current mirror report with the baseline.
+        #[arg(long)]
+        check_baseline: bool,
+
+        /// Print the full mirror report as JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -52,5 +117,40 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
+        Commands::ComponentAudit {
+            baseline,
+            update_baseline,
+            check_baseline,
+            json,
+        } => component_audit::run(component_audit::AuditOptions {
+            baseline,
+            update_baseline,
+            check_baseline,
+            json,
+        }),
+        Commands::ComponentApi {
+            baseline,
+            update_baseline,
+            check_baseline,
+            json,
+        } => component_api::run(component_api::ApiOptions {
+            baseline,
+            update_baseline,
+            check_baseline,
+            json,
+        }),
+        Commands::ComponentMirror {
+            baseline,
+            donor_root,
+            update_baseline,
+            check_baseline,
+            json,
+        } => component_mirror::run(component_mirror::MirrorOptions {
+            baseline,
+            donor_root,
+            update_baseline,
+            check_baseline,
+            json,
+        }),
     }
 }

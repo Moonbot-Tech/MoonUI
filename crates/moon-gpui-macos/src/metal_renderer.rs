@@ -8,9 +8,10 @@ use cocoa::{
 };
 use gpui::{
     AtlasTextureId, Background, Bounds, ContentMask, DevicePixels, GpuCanvasDrawContext,
-    GpuCanvasLayer, GpuCanvasPrepareContext, GpuCanvasTextFrame, MetalRawAccess, MonochromeSprite,
-    PaintGpuCanvas, PaintSurface, Path, Point, PolychromeSprite, PrimitiveBatch, Quad,
-    RawGpuAccess, Rgba, ScaledPixels, Scene, Shadow, Size, Surface, Underline, point, size,
+    GpuCanvasLayer, GpuCanvasPrepareContext, GpuCanvasRetainedTextDraw, GpuCanvasTextFrame,
+    GpuCanvasTextTransform, MetalRawAccess, MonochromeSprite, PaintGpuCanvas, PaintSurface, Path,
+    Point, PolychromeSprite, PrimitiveBatch, Quad, RawGpuAccess, Rgba, ScaledPixels, Scene, Shadow,
+    Size, Surface, Underline, point, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -29,13 +30,14 @@ use objc::{self, msg_send, sel, sel_impl};
 use parking_lot::Mutex;
 
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
+    collections::HashMap,
     ffi::c_void,
     marker::PhantomData,
     mem,
     ptr::{self, NonNull},
     sync::{
-        Arc,
+        Arc, Weak,
         atomic::{AtomicU64, Ordering},
     },
 };
@@ -84,6 +86,47 @@ pub(crate) struct InstanceBuffer {
     size: usize,
 }
 
+struct MetalRetainedGpuCanvasTextCache {
+    data: Weak<gpui::GpuCanvasRetainedTextData>,
+    mono: Option<MetalRetainedSpriteBuffer<MonochromeSprite>>,
+    poly: Option<MetalRetainedSpriteBuffer<PolychromeSprite>>,
+}
+
+struct MetalRetainedSpriteBuffer<T> {
+    buffer: metal::Buffer,
+    len: usize,
+    _marker: PhantomData<T>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct RetainedTextParams {
+    enabled: u32,
+    _pad: [u32; 3],
+    transform_x: [f32; 4],
+    transform_y: [f32; 4],
+}
+
+impl RetainedTextParams {
+    fn disabled() -> Self {
+        Self {
+            enabled: 0,
+            _pad: [0; 3],
+            transform_x: GpuCanvasTextTransform::identity().row_x,
+            transform_y: GpuCanvasTextTransform::identity().row_y,
+        }
+    }
+
+    fn enabled(transform: GpuCanvasTextTransform) -> Self {
+        Self {
+            enabled: 1,
+            _pad: [0; 3],
+            transform_x: transform.row_x,
+            transform_y: transform.row_y,
+        }
+    }
+}
+
 impl InstanceBufferPool {
     pub(crate) fn reset(&mut self, buffer_size: usize) {
         self.buffer_size = buffer_size;
@@ -120,6 +163,30 @@ impl InstanceBufferPool {
     }
 }
 
+impl<T> MetalRetainedSpriteBuffer<T> {
+    fn new(device: &metal::Device, unified_memory: bool, instances: &[T]) -> Self {
+        let bytes_len = mem::size_of_val(instances);
+        let options = if unified_memory {
+            MTLResourceOptions::StorageModeShared
+        } else {
+            MTLResourceOptions::StorageModeManaged
+        };
+        let buffer = device.new_buffer_with_data(
+            instances.as_ptr() as *const c_void,
+            bytes_len as u64,
+            options,
+        );
+        if !unified_memory {
+            buffer.did_modify_range(NSRange::new(0, bytes_len as u64));
+        }
+        Self {
+            buffer,
+            len: instances.len(),
+            _marker: PhantomData,
+        }
+    }
+}
+
 pub(crate) struct MetalRenderer {
     device: metal::Device,
     layer: Option<metal::MetalLayer>,
@@ -141,6 +208,7 @@ pub(crate) struct MetalRenderer {
     unit_vertices: metal::Buffer,
     #[allow(clippy::arc_with_non_send_sync)]
     instance_buffer_pool: Arc<Mutex<InstanceBufferPool>>,
+    retained_gpu_canvas_text: RefCell<HashMap<usize, MetalRetainedGpuCanvasTextCache>>,
     sprite_atlas: Arc<MetalAtlas>,
     core_video_texture_cache: core_video::metal_texture_cache::CVMetalTextureCache,
     path_intermediate_texture: Option<metal::Texture>,
@@ -366,6 +434,7 @@ impl MetalRenderer {
             surfaces_pipeline_state,
             unit_vertices,
             instance_buffer_pool,
+            retained_gpu_canvas_text: RefCell::new(HashMap::new()),
             sprite_atlas,
             core_video_texture_cache,
             path_intermediate_texture: None,
@@ -1578,6 +1647,7 @@ impl MetalRenderer {
             DevicePixels(texture.width() as i32),
             DevicePixels(texture.height() as i32),
         );
+        let retained_text_params = RetainedTextParams::disabled();
         command_encoder.set_render_pipeline_state(&self.monochrome_sprites_pipeline_state);
         command_encoder.set_vertex_buffer(
             SpriteInputIndex::Vertices as u64,
@@ -1599,10 +1669,20 @@ impl MetalRenderer {
             mem::size_of_val(&texture_size) as u64,
             &texture_size as *const Size<DevicePixels> as *const _,
         );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::RetainedTextParams as u64,
+            mem::size_of_val(&retained_text_params) as u64,
+            &retained_text_params as *const RetainedTextParams as *const _,
+        );
         command_encoder.set_fragment_buffer(
             SpriteInputIndex::Sprites as u64,
             Some(&instance_buffer.metal_buffer),
             *instance_offset as u64,
+        );
+        command_encoder.set_fragment_bytes(
+            SpriteInputIndex::RetainedTextParams as u64,
+            mem::size_of_val(&retained_text_params) as u64,
+            &retained_text_params as *const RetainedTextParams as *const _,
         );
         command_encoder.set_fragment_texture(SpriteInputIndex::AtlasTexture as u64, Some(&texture));
 
@@ -1687,6 +1767,251 @@ impl MetalRenderer {
             start = end;
         }
 
+        for retained in &frame.retained_layers {
+            if !self.draw_retained_gpu_canvas_text(retained, viewport_size, command_encoder) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn draw_retained_gpu_canvas_text(
+        &self,
+        draw: &GpuCanvasRetainedTextDraw,
+        viewport_size: Size<DevicePixels>,
+        command_encoder: &metal::RenderCommandEncoderRef,
+    ) -> bool {
+        let cache_id = Arc::as_ptr(&draw.data) as usize;
+        self.retained_gpu_canvas_text
+            .borrow_mut()
+            .retain(|_, cache| cache.data.upgrade().is_some());
+        if !self
+            .retained_gpu_canvas_text
+            .borrow()
+            .contains_key(&cache_id)
+        {
+            let frame = &draw.data.frame;
+            self.retained_gpu_canvas_text.borrow_mut().insert(
+                cache_id,
+                MetalRetainedGpuCanvasTextCache {
+                    data: Arc::downgrade(&draw.data),
+                    mono: (!frame.monochrome_sprites.is_empty()).then(|| {
+                        MetalRetainedSpriteBuffer::new(
+                            &self.device,
+                            self.is_unified_memory,
+                            &frame.monochrome_sprites,
+                        )
+                    }),
+                    poly: (!frame.polychrome_sprites.is_empty()).then(|| {
+                        MetalRetainedSpriteBuffer::new(
+                            &self.device,
+                            self.is_unified_memory,
+                            &frame.polychrome_sprites,
+                        )
+                    }),
+                },
+            );
+        }
+
+        let cache = self.retained_gpu_canvas_text.borrow();
+        let Some(cache) = cache.get(&cache_id) else {
+            return true;
+        };
+
+        if let Some(buffer) = &cache.mono {
+            for range in &draw.data.monochrome_ranges {
+                let Some((start, len)) = range.visible_subrange(
+                    &draw.data.frame.monochrome_sprites,
+                    &draw.visible_labels,
+                    |sprite| sprite.pad,
+                ) else {
+                    continue;
+                };
+                if !self.draw_retained_monochrome_sprites(
+                    range.texture_id,
+                    buffer,
+                    start as usize,
+                    len as usize,
+                    viewport_size,
+                    draw.transform,
+                    command_encoder,
+                ) {
+                    return false;
+                }
+            }
+        }
+
+        if !draw.data.frame.subpixel_sprites.is_empty() {
+            log::warn!(
+                "subpixel retained gpu canvas text is not supported on the Metal renderer; skipping {} sprites",
+                draw.data.frame.subpixel_sprites.len()
+            );
+        }
+
+        if let Some(buffer) = &cache.poly {
+            for range in &draw.data.polychrome_ranges {
+                let Some((start, len)) = range.visible_subrange(
+                    &draw.data.frame.polychrome_sprites,
+                    &draw.visible_labels,
+                    |sprite| sprite.pad,
+                ) else {
+                    continue;
+                };
+                if !self.draw_retained_polychrome_sprites(
+                    range.texture_id,
+                    buffer,
+                    start as usize,
+                    len as usize,
+                    viewport_size,
+                    draw.transform,
+                    command_encoder,
+                ) {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
+    fn draw_retained_monochrome_sprites(
+        &self,
+        texture_id: AtlasTextureId,
+        sprites: &MetalRetainedSpriteBuffer<MonochromeSprite>,
+        start: usize,
+        len: usize,
+        viewport_size: Size<DevicePixels>,
+        transform: GpuCanvasTextTransform,
+        command_encoder: &metal::RenderCommandEncoderRef,
+    ) -> bool {
+        let len = len.min(sprites.len.saturating_sub(start));
+        if len == 0 {
+            return true;
+        }
+
+        let Some(texture) = self.sprite_atlas.metal_texture(texture_id) else {
+            return true;
+        };
+        let texture_size = size(
+            DevicePixels(texture.width() as i32),
+            DevicePixels(texture.height() as i32),
+        );
+        let retained_text_params = RetainedTextParams::enabled(transform);
+        let offset = (start * mem::size_of::<MonochromeSprite>()) as u64;
+        command_encoder.set_render_pipeline_state(&self.monochrome_sprites_pipeline_state);
+        command_encoder.set_vertex_buffer(
+            SpriteInputIndex::Vertices as u64,
+            Some(&self.unit_vertices),
+            0,
+        );
+        command_encoder.set_vertex_buffer(
+            SpriteInputIndex::Sprites as u64,
+            Some(&sprites.buffer),
+            offset,
+        );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::ViewportSize as u64,
+            mem::size_of_val(&viewport_size) as u64,
+            &viewport_size as *const Size<DevicePixels> as *const _,
+        );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::AtlasTextureSize as u64,
+            mem::size_of_val(&texture_size) as u64,
+            &texture_size as *const Size<DevicePixels> as *const _,
+        );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::RetainedTextParams as u64,
+            mem::size_of_val(&retained_text_params) as u64,
+            &retained_text_params as *const RetainedTextParams as *const _,
+        );
+        command_encoder.set_fragment_buffer(
+            SpriteInputIndex::Sprites as u64,
+            Some(&sprites.buffer),
+            offset,
+        );
+        command_encoder.set_fragment_bytes(
+            SpriteInputIndex::RetainedTextParams as u64,
+            mem::size_of_val(&retained_text_params) as u64,
+            &retained_text_params as *const RetainedTextParams as *const _,
+        );
+        command_encoder.set_fragment_texture(SpriteInputIndex::AtlasTexture as u64, Some(&texture));
+        command_encoder.draw_primitives_instanced(
+            metal::MTLPrimitiveType::Triangle,
+            0,
+            6,
+            len as u64,
+        );
+        true
+    }
+
+    fn draw_retained_polychrome_sprites(
+        &self,
+        texture_id: AtlasTextureId,
+        sprites: &MetalRetainedSpriteBuffer<PolychromeSprite>,
+        start: usize,
+        len: usize,
+        viewport_size: Size<DevicePixels>,
+        transform: GpuCanvasTextTransform,
+        command_encoder: &metal::RenderCommandEncoderRef,
+    ) -> bool {
+        let len = len.min(sprites.len.saturating_sub(start));
+        if len == 0 {
+            return true;
+        }
+
+        let Some(texture) = self.sprite_atlas.metal_texture(texture_id) else {
+            return true;
+        };
+        let texture_size = size(
+            DevicePixels(texture.width() as i32),
+            DevicePixels(texture.height() as i32),
+        );
+        let retained_text_params = RetainedTextParams::enabled(transform);
+        let offset = (start * mem::size_of::<PolychromeSprite>()) as u64;
+        command_encoder.set_render_pipeline_state(&self.polychrome_sprites_pipeline_state);
+        command_encoder.set_vertex_buffer(
+            SpriteInputIndex::Vertices as u64,
+            Some(&self.unit_vertices),
+            0,
+        );
+        command_encoder.set_vertex_buffer(
+            SpriteInputIndex::Sprites as u64,
+            Some(&sprites.buffer),
+            offset,
+        );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::ViewportSize as u64,
+            mem::size_of_val(&viewport_size) as u64,
+            &viewport_size as *const Size<DevicePixels> as *const _,
+        );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::AtlasTextureSize as u64,
+            mem::size_of_val(&texture_size) as u64,
+            &texture_size as *const Size<DevicePixels> as *const _,
+        );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::RetainedTextParams as u64,
+            mem::size_of_val(&retained_text_params) as u64,
+            &retained_text_params as *const RetainedTextParams as *const _,
+        );
+        command_encoder.set_fragment_buffer(
+            SpriteInputIndex::Sprites as u64,
+            Some(&sprites.buffer),
+            offset,
+        );
+        command_encoder.set_fragment_bytes(
+            SpriteInputIndex::RetainedTextParams as u64,
+            mem::size_of_val(&retained_text_params) as u64,
+            &retained_text_params as *const RetainedTextParams as *const _,
+        );
+        command_encoder.set_fragment_texture(SpriteInputIndex::AtlasTexture as u64, Some(&texture));
+        command_encoder.draw_primitives_instanced(
+            metal::MTLPrimitiveType::Triangle,
+            0,
+            6,
+            len as u64,
+        );
         true
     }
 
@@ -1711,6 +2036,7 @@ impl MetalRenderer {
             DevicePixels(texture.width() as i32),
             DevicePixels(texture.height() as i32),
         );
+        let retained_text_params = RetainedTextParams::disabled();
         command_encoder.set_render_pipeline_state(&self.polychrome_sprites_pipeline_state);
         command_encoder.set_vertex_buffer(
             SpriteInputIndex::Vertices as u64,
@@ -1732,10 +2058,20 @@ impl MetalRenderer {
             mem::size_of_val(&texture_size) as u64,
             &texture_size as *const Size<DevicePixels> as *const _,
         );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::RetainedTextParams as u64,
+            mem::size_of_val(&retained_text_params) as u64,
+            &retained_text_params as *const RetainedTextParams as *const _,
+        );
         command_encoder.set_fragment_buffer(
             SpriteInputIndex::Sprites as u64,
             Some(&instance_buffer.metal_buffer),
             *instance_offset as u64,
+        );
+        command_encoder.set_fragment_bytes(
+            SpriteInputIndex::RetainedTextParams as u64,
+            mem::size_of_val(&retained_text_params) as u64,
+            &retained_text_params as *const RetainedTextParams as *const _,
         );
         command_encoder.set_fragment_texture(SpriteInputIndex::AtlasTexture as u64, Some(&texture));
 
@@ -2033,6 +2369,7 @@ enum SpriteInputIndex {
     ViewportSize = 2,
     AtlasTextureSize = 3,
     AtlasTexture = 4,
+    RetainedTextParams = 5,
 }
 
 #[repr(C)]

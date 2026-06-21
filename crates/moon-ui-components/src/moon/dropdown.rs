@@ -256,7 +256,7 @@ impl MoonPopupMenu {
             px(8.0),
             px(18.0),
             px(0.0),
-            rgba_from(0x000000, 0.46),
+            rgba_from(p.shadow, 0.46),
         );
 
         let mut menu = div()
@@ -361,8 +361,8 @@ impl MoonPopupMenu {
                     .cursor_default()
                     .when(selected, |this| this.bg(rgba_from(p.blue, 0.12)))
                     .when(!disabled, |this| {
-                        this.hover(|this| this.bg(rgba_from(0xFFFFFF, 0.055)))
-                            .active(|this| this.bg(rgba_from(0xFFFFFF, 0.032)))
+                        this.hover(move |this| this.bg(rgba_from(p.overlay, 0.055)))
+                            .active(move |this| this.bg(rgba_from(p.overlay, 0.032)))
                     })
                     .child(
                         div()

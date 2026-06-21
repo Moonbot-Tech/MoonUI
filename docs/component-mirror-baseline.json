@@ -1,0 +1,1887 @@
+{
+  "version": 1,
+  "donor_root_provided": true,
+  "entries": [
+    {
+      "concept": "accordion",
+      "public_path": "moon_ui::MoonAccordion",
+      "upstream_ref": "Longbridge::accordion@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "accordion.rs"
+      ],
+      "local_hash": "0818ff63bcd7eb86",
+      "local_files": [
+        {
+          "path": "accordion.rs",
+          "hash": "5f849983e2d979a6",
+          "bytes": 11011
+        }
+      ],
+      "donor_hash": "0818ff63bcd7eb86",
+      "donor_files": [
+        {
+          "path": "accordion.rs",
+          "hash": "5f849983e2d979a6",
+          "bytes": 11011
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "alert",
+      "public_path": "moon_ui::MoonAlert",
+      "upstream_ref": "Longbridge::alert@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "alert.rs"
+      ],
+      "local_hash": "405b07a85599e764",
+      "local_files": [
+        {
+          "path": "alert.rs",
+          "hash": "8e92b2b19a21b817",
+          "bytes": 8713
+        }
+      ],
+      "donor_hash": "405b07a85599e764",
+      "donor_files": [
+        {
+          "path": "alert.rs",
+          "hash": "8e92b2b19a21b817",
+          "bytes": 8713
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "button",
+      "public_path": "moon_ui::MoonButton",
+      "upstream_ref": "Longbridge::button@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "button"
+      ],
+      "local_hash": "7cc17787e57ac07b",
+      "local_files": [
+        {
+          "path": "button/button.rs",
+          "hash": "3d62590d27df934e",
+          "bytes": 39274
+        },
+        {
+          "path": "button/button_group.rs",
+          "hash": "79f119361bc033de",
+          "bytes": 10486
+        },
+        {
+          "path": "button/button_icon.rs",
+          "hash": "cade7a8ba115f492",
+          "bytes": 4914
+        },
+        {
+          "path": "button/dropdown_button.rs",
+          "hash": "cecbafe3388aedbd",
+          "bytes": 7794
+        },
+        {
+          "path": "button/mod.rs",
+          "hash": "ccd515c986d6b0a6",
+          "bytes": 214
+        },
+        {
+          "path": "button/toggle.rs",
+          "hash": "fad6513018d69eef",
+          "bytes": 13997
+        }
+      ],
+      "donor_hash": "61e2590a7c7d388f",
+      "donor_files": [
+        {
+          "path": "button/button.rs",
+          "hash": "a77a316e8d02be9f",
+          "bytes": 35943
+        },
+        {
+          "path": "button/button_group.rs",
+          "hash": "79f119361bc033de",
+          "bytes": 10486
+        },
+        {
+          "path": "button/button_icon.rs",
+          "hash": "cade7a8ba115f492",
+          "bytes": 4914
+        },
+        {
+          "path": "button/dropdown_button.rs",
+          "hash": "efd354387cf64fb3",
+          "bytes": 8048
+        },
+        {
+          "path": "button/mod.rs",
+          "hash": "ccd515c986d6b0a6",
+          "bytes": 214
+        },
+        {
+          "path": "button/toggle.rs",
+          "hash": "fad6513018d69eef",
+          "bytes": 13997
+        }
+      ],
+      "donor_changed_files": [
+        "button/button.rs",
+        "button/dropdown_button.rs"
+      ]
+    },
+    {
+      "concept": "calendar",
+      "public_path": "moon_ui::MoonCalendar",
+      "upstream_ref": "Longbridge::time::calendar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "time/calendar.rs"
+      ],
+      "local_hash": "424b876518dde75b",
+      "local_files": [
+        {
+          "path": "time/calendar.rs",
+          "hash": "9e1364d60420fdc9",
+          "bytes": 34779
+        }
+      ],
+      "donor_hash": "424b876518dde75b",
+      "donor_files": [
+        {
+          "path": "time/calendar.rs",
+          "hash": "9e1364d60420fdc9",
+          "bytes": 34779
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "checkbox",
+      "public_path": "moon_ui::MoonCheckbox",
+      "upstream_ref": "Longbridge::checkbox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "checkbox.rs"
+      ],
+      "local_hash": "7a1bf6cbbdf05892",
+      "local_files": [
+        {
+          "path": "checkbox.rs",
+          "hash": "b329dc7f764cfeac",
+          "bytes": 14709
+        }
+      ],
+      "donor_hash": "ab91ecef3fcb9007",
+      "donor_files": [
+        {
+          "path": "checkbox.rs",
+          "hash": "cbee4762b51bdb98",
+          "bytes": 10937
+        }
+      ],
+      "donor_changed_files": [
+        "checkbox.rs"
+      ]
+    },
+    {
+      "concept": "color_picker",
+      "public_path": "moon_ui::MoonColorPicker",
+      "upstream_ref": "Longbridge::color_picker@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "color_picker.rs"
+      ],
+      "local_hash": "d17b952b2932453b",
+      "local_files": [
+        {
+          "path": "color_picker.rs",
+          "hash": "c02e79556c585138",
+          "bytes": 29415
+        }
+      ],
+      "donor_hash": "d17b952b2932453b",
+      "donor_files": [
+        {
+          "path": "color_picker.rs",
+          "hash": "c02e79556c585138",
+          "bytes": 29415
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "combobox",
+      "public_path": "moon_ui::MoonCombobox",
+      "upstream_ref": "Longbridge::combobox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "combobox.rs"
+      ],
+      "local_hash": "50fe2ba4a6a790cd",
+      "local_files": [
+        {
+          "path": "combobox.rs",
+          "hash": "426caf2a1ba46acf",
+          "bytes": 46767
+        }
+      ],
+      "donor_hash": "50fe2ba4a6a790cd",
+      "donor_files": [
+        {
+          "path": "combobox.rs",
+          "hash": "426caf2a1ba46acf",
+          "bytes": 46767
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "date_picker",
+      "public_path": "moon_ui::MoonDatePicker",
+      "upstream_ref": "Longbridge::time::date_picker@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "time/date_picker.rs"
+      ],
+      "local_hash": "1fe225f6d5114a6a",
+      "local_files": [
+        {
+          "path": "time/date_picker.rs",
+          "hash": "90f8bfc262a89d6b",
+          "bytes": 19293
+        }
+      ],
+      "donor_hash": "1fe225f6d5114a6a",
+      "donor_files": [
+        {
+          "path": "time/date_picker.rs",
+          "hash": "90f8bfc262a89d6b",
+          "bytes": 19293
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "description_list",
+      "public_path": "moon_ui::MoonDescriptionList",
+      "upstream_ref": "Longbridge::description_list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "description_list.rs"
+      ],
+      "local_hash": "2c353e7341cd0816",
+      "local_files": [
+        {
+          "path": "description_list.rs",
+          "hash": "96c148bfccda1d5f",
+          "bytes": 13123
+        }
+      ],
+      "donor_hash": "2c353e7341cd0816",
+      "donor_files": [
+        {
+          "path": "description_list.rs",
+          "hash": "96c148bfccda1d5f",
+          "bytes": 13123
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "dialog",
+      "public_path": "moon_ui::MoonDialog",
+      "upstream_ref": "Longbridge::dialog@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "dialog"
+      ],
+      "local_hash": "5b366f8562d57d9d",
+      "local_files": [
+        {
+          "path": "dialog/alert_dialog.rs",
+          "hash": "5aebe27f473108fa",
+          "bytes": 13627
+        },
+        {
+          "path": "dialog/content.rs",
+          "hash": "63868bc9b72bc9a4",
+          "bytes": 1051
+        },
+        {
+          "path": "dialog/description.rs",
+          "hash": "eb4c312e8573bd35",
+          "bytes": 1317
+        },
+        {
+          "path": "dialog/dialog.rs",
+          "hash": "c015a6afaa62bfa9",
+          "bytes": 27429
+        },
+        {
+          "path": "dialog/footer.rs",
+          "hash": "62e2be578ef87302",
+          "bytes": 2950
+        },
+        {
+          "path": "dialog/header.rs",
+          "hash": "f545b3e528f3fdef",
+          "bytes": 1219
+        },
+        {
+          "path": "dialog/mod.rs",
+          "hash": "9037c87a16b9fc64",
+          "bytes": 304
+        },
+        {
+          "path": "dialog/title.rs",
+          "hash": "979bb031c24a940c",
+          "bytes": 1136
+        }
+      ],
+      "donor_hash": "112b00008ab254d7",
+      "donor_files": [
+        {
+          "path": "dialog/alert_dialog.rs",
+          "hash": "5aebe27f473108fa",
+          "bytes": 13627
+        },
+        {
+          "path": "dialog/content.rs",
+          "hash": "4e16bdd92f141801",
+          "bytes": 1059
+        },
+        {
+          "path": "dialog/description.rs",
+          "hash": "090fbd7b526687df",
+          "bytes": 1334
+        },
+        {
+          "path": "dialog/dialog.rs",
+          "hash": "67399b9c9d25ba77",
+          "bytes": 27440
+        },
+        {
+          "path": "dialog/footer.rs",
+          "hash": "9610af320bee2d1d",
+          "bytes": 2994
+        },
+        {
+          "path": "dialog/header.rs",
+          "hash": "a41bc905e6b51cc5",
+          "bytes": 1191
+        },
+        {
+          "path": "dialog/mod.rs",
+          "hash": "9037c87a16b9fc64",
+          "bytes": 304
+        },
+        {
+          "path": "dialog/title.rs",
+          "hash": "979bb031c24a940c",
+          "bytes": 1136
+        }
+      ],
+      "donor_changed_files": [
+        "dialog/content.rs",
+        "dialog/description.rs",
+        "dialog/dialog.rs",
+        "dialog/footer.rs",
+        "dialog/header.rs"
+      ]
+    },
+    {
+      "concept": "hover_card",
+      "public_path": "moon_ui::MoonHoverCard",
+      "upstream_ref": "Longbridge::hover_card@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "hover_card.rs"
+      ],
+      "local_hash": "49dc822b5c2da61e",
+      "local_files": [
+        {
+          "path": "hover_card.rs",
+          "hash": "659aca563022cc4c",
+          "bytes": 10425
+        }
+      ],
+      "donor_hash": "d60118df47e22236",
+      "donor_files": [
+        {
+          "path": "hover_card.rs",
+          "hash": "18a0e28e684866f6",
+          "bytes": 10409
+        }
+      ],
+      "donor_changed_files": [
+        "hover_card.rs"
+      ]
+    },
+    {
+      "concept": "input",
+      "public_path": "moon_ui::MoonInput",
+      "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "input"
+      ],
+      "local_hash": "77a8b81881721016",
+      "local_files": [
+        {
+          "path": "input/blink_cursor.rs",
+          "hash": "99933916cec88d02",
+          "bytes": 2666
+        },
+        {
+          "path": "input/change.rs",
+          "hash": "acab7cd61a3135e0",
+          "bytes": 916
+        },
+        {
+          "path": "input/clear_button.rs",
+          "hash": "a50915448d8363e9",
+          "bytes": 377
+        },
+        {
+          "path": "input/cursor.rs",
+          "hash": "1b08c633d4690d05",
+          "bytes": 1657
+        },
+        {
+          "path": "input/display_map/README.md",
+          "hash": "60e9f63f10a25155",
+          "bytes": 1769
+        },
+        {
+          "path": "input/display_map/display_map.rs",
+          "hash": "2725840f4d221113",
+          "bytes": 11780
+        },
+        {
+          "path": "input/display_map/fold_map.rs",
+          "hash": "0d26ab572e9e5e86",
+          "bytes": 12714
+        },
+        {
+          "path": "input/display_map/folding.rs",
+          "hash": "f73d3b68c0357988",
+          "bytes": 5638
+        },
+        {
+          "path": "input/display_map/mod.rs",
+          "hash": "55e0ae2e3cc54210",
+          "bytes": 1971
+        },
+        {
+          "path": "input/display_map/text_wrapper.rs",
+          "hash": "1c35b415e288aabc",
+          "bytes": 31761
+        },
+        {
+          "path": "input/display_map/wrap_map.rs",
+          "hash": "b143ce888769ee24",
+          "bytes": 7852
+        },
+        {
+          "path": "input/element.rs",
+          "hash": "16e487aa9173ee45",
+          "bytes": 98833
+        },
+        {
+          "path": "input/indent.rs",
+          "hash": "87ce1a959d4f8039",
+          "bytes": 13834
+        },
+        {
+          "path": "input/input.rs",
+          "hash": "3d13606af19dd4fe",
+          "bytes": 21567
+        },
+        {
+          "path": "input/lsp/code_actions.rs",
+          "hash": "66ebc66318abf24a",
+          "bytes": 4416
+        },
+        {
+          "path": "input/lsp/completions.rs",
+          "hash": "0cc23009fab18817",
+          "bytes": 10634
+        },
+        {
+          "path": "input/lsp/definitions.rs",
+          "hash": "51e53ed1d998a324",
+          "bytes": 6918
+        },
+        {
+          "path": "input/lsp/document_colors.rs",
+          "hash": "f9f78dab418931e9",
+          "bytes": 3386
+        },
+        {
+          "path": "input/lsp/hover.rs",
+          "hash": "a1afbce1ff71d947",
+          "bytes": 2488
+        },
+        {
+          "path": "input/lsp/mod.rs",
+          "hash": "9efc7d2450968cc8",
+          "bytes": 5586
+        },
+        {
+          "path": "input/lsp/semantic_tokens.rs",
+          "hash": "8138a65b96ac9078",
+          "bytes": 12382
+        },
+        {
+          "path": "input/mask_pattern.rs",
+          "hash": "e8b67c4e98741592",
+          "bytes": 25091
+        },
+        {
+          "path": "input/mod.rs",
+          "hash": "0fd608057a9db01f",
+          "bytes": 922
+        },
+        {
+          "path": "input/mode.rs",
+          "hash": "f17cede60ea60f9d",
+          "bytes": 14897
+        },
+        {
+          "path": "input/movement.rs",
+          "hash": "f171d2a3dfd677ca",
+          "bytes": 9426
+        },
+        {
+          "path": "input/number_input.rs",
+          "hash": "86b865d1a1d24e62",
+          "bytes": 16285
+        },
+        {
+          "path": "input/otp_input.rs",
+          "hash": "d6d6f91fe8b48785",
+          "bytes": 12986
+        },
+        {
+          "path": "input/popovers/code_action_menu.rs",
+          "hash": "60de6e9ce5e8c236",
+          "bytes": 9817
+        },
+        {
+          "path": "input/popovers/completion_menu.rs",
+          "hash": "06806ce046d0d060",
+          "bytes": 15212
+        },
+        {
+          "path": "input/popovers/diagnostic_popover.rs",
+          "hash": "085f80fa24f1a450",
+          "bytes": 2394
+        },
+        {
+          "path": "input/popovers/hover_popover.rs",
+          "hash": "e6586ea75d4512d9",
+          "bytes": 9106
+        },
+        {
+          "path": "input/popovers/mod.rs",
+          "hash": "ef4e51a78ad8306d",
+          "bytes": 2173
+        },
+        {
+          "path": "input/rope_ext.rs",
+          "hash": "0a938e3f8343d733",
+          "bytes": 25090
+        },
+        {
+          "path": "input/search.rs",
+          "hash": "2afaad5d4fc70264",
+          "bytes": 25660
+        },
+        {
+          "path": "input/selection.rs",
+          "hash": "344cf9d3fdd19f8a",
+          "bytes": 4567
+        },
+        {
+          "path": "input/state.rs",
+          "hash": "448808cf0a56cf83",
+          "bytes": 135316
+        }
+      ],
+      "donor_hash": "ce28b7730707df2e",
+      "donor_files": [
+        {
+          "path": "input/blink_cursor.rs",
+          "hash": "41677eb1082ce983",
+          "bytes": 2761
+        },
+        {
+          "path": "input/change.rs",
+          "hash": "acab7cd61a3135e0",
+          "bytes": 916
+        },
+        {
+          "path": "input/clear_button.rs",
+          "hash": "0992882adf8ef3f1",
+          "bytes": 393
+        },
+        {
+          "path": "input/cursor.rs",
+          "hash": "1b08c633d4690d05",
+          "bytes": 1657
+        },
+        {
+          "path": "input/display_map/README.md",
+          "hash": "60e9f63f10a25155",
+          "bytes": 1769
+        },
+        {
+          "path": "input/display_map/display_map.rs",
+          "hash": "13247dc7d3360fbb",
+          "bytes": 12139
+        },
+        {
+          "path": "input/display_map/fold_map.rs",
+          "hash": "0d26ab572e9e5e86",
+          "bytes": 12714
+        },
+        {
+          "path": "input/display_map/folding.rs",
+          "hash": "f73d3b68c0357988",
+          "bytes": 5638
+        },
+        {
+          "path": "input/display_map/mod.rs",
+          "hash": "55e0ae2e3cc54210",
+          "bytes": 1971
+        },
+        {
+          "path": "input/display_map/text_wrapper.rs",
+          "hash": "1dd85f44435cf7f6",
+          "bytes": 32695
+        },
+        {
+          "path": "input/display_map/wrap_map.rs",
+          "hash": "b143ce888769ee24",
+          "bytes": 7852
+        },
+        {
+          "path": "input/element.rs",
+          "hash": "e714a579c087be5f",
+          "bytes": 97940
+        },
+        {
+          "path": "input/indent.rs",
+          "hash": "87ce1a959d4f8039",
+          "bytes": 13834
+        },
+        {
+          "path": "input/input.rs",
+          "hash": "f1e1892ab55cff0d",
+          "bytes": 17151
+        },
+        {
+          "path": "input/lsp/code_actions.rs",
+          "hash": "66ebc66318abf24a",
+          "bytes": 4416
+        },
+        {
+          "path": "input/lsp/completions.rs",
+          "hash": "0cc23009fab18817",
+          "bytes": 10634
+        },
+        {
+          "path": "input/lsp/definitions.rs",
+          "hash": "51e53ed1d998a324",
+          "bytes": 6918
+        },
+        {
+          "path": "input/lsp/document_colors.rs",
+          "hash": "9772b5ae791c3f03",
+          "bytes": 3488
+        },
+        {
+          "path": "input/lsp/hover.rs",
+          "hash": "ff6e6dae3d870565",
+          "bytes": 2566
+        },
+        {
+          "path": "input/lsp/mod.rs",
+          "hash": "9efc7d2450968cc8",
+          "bytes": 5586
+        },
+        {
+          "path": "input/lsp/semantic_tokens.rs",
+          "hash": "5297d82f49663d39",
+          "bytes": 12663
+        },
+        {
+          "path": "input/mask_pattern.rs",
+          "hash": "b6a3b9e6171ed76e",
+          "bytes": 21883
+        },
+        {
+          "path": "input/mod.rs",
+          "hash": "73c3c2e442c73a22",
+          "bytes": 910
+        },
+        {
+          "path": "input/mode.rs",
+          "hash": "f17cede60ea60f9d",
+          "bytes": 14897
+        },
+        {
+          "path": "input/movement.rs",
+          "hash": "f171d2a3dfd677ca",
+          "bytes": 9426
+        },
+        {
+          "path": "input/number_input.rs",
+          "hash": "fca7d2e7bd688e00",
+          "bytes": 7587
+        },
+        {
+          "path": "input/otp_input.rs",
+          "hash": "d6d6f91fe8b48785",
+          "bytes": 12986
+        },
+        {
+          "path": "input/popovers/code_action_menu.rs",
+          "hash": "60de6e9ce5e8c236",
+          "bytes": 9817
+        },
+        {
+          "path": "input/popovers/completion_menu.rs",
+          "hash": "06806ce046d0d060",
+          "bytes": 15212
+        },
+        {
+          "path": "input/popovers/diagnostic_popover.rs",
+          "hash": "fb205e9c515136fd",
+          "bytes": 2489
+        },
+        {
+          "path": "input/popovers/hover_popover.rs",
+          "hash": "e6586ea75d4512d9",
+          "bytes": 9106
+        },
+        {
+          "path": "input/popovers/mod.rs",
+          "hash": "6c3835c3972aa562",
+          "bytes": 2167
+        },
+        {
+          "path": "input/rope_ext.rs",
+          "hash": "0a938e3f8343d733",
+          "bytes": 25090
+        },
+        {
+          "path": "input/search.rs",
+          "hash": "035d9707c84f1f69",
+          "bytes": 26417
+        },
+        {
+          "path": "input/selection.rs",
+          "hash": "344cf9d3fdd19f8a",
+          "bytes": 4567
+        },
+        {
+          "path": "input/state.rs",
+          "hash": "b1d9d07a55b95fd8",
+          "bytes": 112632
+        }
+      ],
+      "donor_changed_files": [
+        "input/blink_cursor.rs",
+        "input/clear_button.rs",
+        "input/display_map/display_map.rs",
+        "input/display_map/text_wrapper.rs",
+        "input/element.rs",
+        "input/input.rs",
+        "input/lsp/document_colors.rs",
+        "input/lsp/hover.rs",
+        "input/lsp/semantic_tokens.rs",
+        "input/mask_pattern.rs",
+        "input/mod.rs",
+        "input/number_input.rs",
+        "input/popovers/diagnostic_popover.rs",
+        "input/popovers/mod.rs",
+        "input/search.rs",
+        "input/state.rs"
+      ]
+    },
+    {
+      "concept": "list",
+      "public_path": "moon_ui::MoonList",
+      "upstream_ref": "Longbridge::list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "list"
+      ],
+      "local_hash": "7f9facdc80503eb8",
+      "local_files": [
+        {
+          "path": "list/cache.rs",
+          "hash": "54c6d9593f0fc9c2",
+          "bytes": 12284
+        },
+        {
+          "path": "list/delegate.rs",
+          "hash": "be7747eae0c15172",
+          "bytes": 5388
+        },
+        {
+          "path": "list/list.rs",
+          "hash": "f9a00c5ef35e6b0c",
+          "bytes": 26520
+        },
+        {
+          "path": "list/list_item.rs",
+          "hash": "f157c2f458af2d96",
+          "bytes": 8500
+        },
+        {
+          "path": "list/loading.rs",
+          "hash": "34ff6b03469c2834",
+          "bytes": 961
+        },
+        {
+          "path": "list/mod.rs",
+          "hash": "08f8b1975bd19c55",
+          "bytes": 613
+        },
+        {
+          "path": "list/separator_item.rs",
+          "hash": "0f13a31d0d9bd47b",
+          "bytes": 1024
+        }
+      ],
+      "donor_hash": "91486bf6f9959f43",
+      "donor_files": [
+        {
+          "path": "list/cache.rs",
+          "hash": "54c6d9593f0fc9c2",
+          "bytes": 12284
+        },
+        {
+          "path": "list/delegate.rs",
+          "hash": "be7747eae0c15172",
+          "bytes": 5388
+        },
+        {
+          "path": "list/list.rs",
+          "hash": "f9a00c5ef35e6b0c",
+          "bytes": 26520
+        },
+        {
+          "path": "list/list_item.rs",
+          "hash": "f157c2f458af2d96",
+          "bytes": 8500
+        },
+        {
+          "path": "list/loading.rs",
+          "hash": "34ff6b03469c2834",
+          "bytes": 961
+        },
+        {
+          "path": "list/mod.rs",
+          "hash": "08f8b1975bd19c55",
+          "bytes": 613
+        },
+        {
+          "path": "list/separator_item.rs",
+          "hash": "5d6511347bec6b2c",
+          "bytes": 1076
+        }
+      ],
+      "donor_changed_files": [
+        "list/separator_item.rs"
+      ]
+    },
+    {
+      "concept": "menu",
+      "public_path": "moon_ui::MoonNativeMenu",
+      "upstream_ref": "Longbridge::native_menu@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "native_menu"
+      ],
+      "local_hash": "220e727519aab7a7",
+      "local_files": [
+        {
+          "path": "native_menu/fallback.rs",
+          "hash": "ca4beeae7b3c113f",
+          "bytes": 4341
+        },
+        {
+          "path": "native_menu/macos.rs",
+          "hash": "23bb8960a123a8d7",
+          "bytes": 6413
+        },
+        {
+          "path": "native_menu/mod.rs",
+          "hash": "0bcc49687c27728d",
+          "bytes": 6597
+        },
+        {
+          "path": "native_menu/windows.rs",
+          "hash": "9913fab0e84b4ba0",
+          "bytes": 6183
+        }
+      ],
+      "donor_hash": "e023c04cb87a1ae6",
+      "donor_files": [
+        {
+          "path": "native_menu/fallback.rs",
+          "hash": "84eb3a5ec69c31eb",
+          "bytes": 4473
+        },
+        {
+          "path": "native_menu/macos.rs",
+          "hash": "23bb8960a123a8d7",
+          "bytes": 6413
+        },
+        {
+          "path": "native_menu/mod.rs",
+          "hash": "88fe94d41368c9a7",
+          "bytes": 6028
+        },
+        {
+          "path": "native_menu/windows.rs",
+          "hash": "1979590d34cef48d",
+          "bytes": 6332
+        }
+      ],
+      "donor_changed_files": [
+        "native_menu/fallback.rs",
+        "native_menu/mod.rs",
+        "native_menu/windows.rs"
+      ]
+    },
+    {
+      "concept": "notification",
+      "public_path": "moon_ui::MoonNotification",
+      "upstream_ref": "Longbridge::notification@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "notification.rs"
+      ],
+      "local_hash": "1cb2e6f8df5aaf66",
+      "local_files": [
+        {
+          "path": "notification.rs",
+          "hash": "841fa288511e5b7a",
+          "bytes": 26373
+        }
+      ],
+      "donor_hash": "1cb2e6f8df5aaf66",
+      "donor_files": [
+        {
+          "path": "notification.rs",
+          "hash": "841fa288511e5b7a",
+          "bytes": 26373
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "pagination",
+      "public_path": "moon_ui::MoonPagination",
+      "upstream_ref": "Longbridge::pagination@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "pagination.rs"
+      ],
+      "local_hash": "19393f9169246b8d",
+      "local_files": [
+        {
+          "path": "pagination.rs",
+          "hash": "f31ba745aa4ffb1e",
+          "bytes": 10826
+        }
+      ],
+      "donor_hash": "19393f9169246b8d",
+      "donor_files": [
+        {
+          "path": "pagination.rs",
+          "hash": "f31ba745aa4ffb1e",
+          "bytes": 10826
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "popover",
+      "public_path": "moon_ui::MoonPopover",
+      "upstream_ref": "Longbridge::popover@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "popover.rs"
+      ],
+      "local_hash": "a093d5695368acfa",
+      "local_files": [
+        {
+          "path": "popover.rs",
+          "hash": "0748ec8e32a87a00",
+          "bytes": 19758
+        }
+      ],
+      "donor_hash": "06f87f7fbb343a9e",
+      "donor_files": [
+        {
+          "path": "popover.rs",
+          "hash": "c915aba7d658dbaf",
+          "bytes": 18682
+        }
+      ],
+      "donor_changed_files": [
+        "popover.rs"
+      ]
+    },
+    {
+      "concept": "progress",
+      "public_path": "moon_ui::MoonProgress",
+      "upstream_ref": "Longbridge::progress@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "progress"
+      ],
+      "local_hash": "5241b422493371ab",
+      "local_files": [
+        {
+          "path": "progress/mod.rs",
+          "hash": "8a29f376e6e3b62f",
+          "bytes": 1077
+        },
+        {
+          "path": "progress/progress.rs",
+          "hash": "54fb8e3a08df63ff",
+          "bytes": 5809
+        },
+        {
+          "path": "progress/progress_circle.rs",
+          "hash": "a042141f47a7c43c",
+          "bytes": 7709
+        }
+      ],
+      "donor_hash": "0d54530d88209feb",
+      "donor_files": [
+        {
+          "path": "progress/mod.rs",
+          "hash": "8a29f376e6e3b62f",
+          "bytes": 1077
+        },
+        {
+          "path": "progress/progress.rs",
+          "hash": "54fb8e3a08df63ff",
+          "bytes": 5809
+        },
+        {
+          "path": "progress/progress_circle.rs",
+          "hash": "7ac2d3e550a8a50f",
+          "bytes": 7944
+        }
+      ],
+      "donor_changed_files": [
+        "progress/progress_circle.rs"
+      ]
+    },
+    {
+      "concept": "progress_circle",
+      "public_path": "moon_ui::MoonProgressCircle",
+      "upstream_ref": "Longbridge::progress::ProgressCircle@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "progress"
+      ],
+      "local_hash": "5241b422493371ab",
+      "local_files": [
+        {
+          "path": "progress/mod.rs",
+          "hash": "8a29f376e6e3b62f",
+          "bytes": 1077
+        },
+        {
+          "path": "progress/progress.rs",
+          "hash": "54fb8e3a08df63ff",
+          "bytes": 5809
+        },
+        {
+          "path": "progress/progress_circle.rs",
+          "hash": "a042141f47a7c43c",
+          "bytes": 7709
+        }
+      ],
+      "donor_hash": "0d54530d88209feb",
+      "donor_files": [
+        {
+          "path": "progress/mod.rs",
+          "hash": "8a29f376e6e3b62f",
+          "bytes": 1077
+        },
+        {
+          "path": "progress/progress.rs",
+          "hash": "54fb8e3a08df63ff",
+          "bytes": 5809
+        },
+        {
+          "path": "progress/progress_circle.rs",
+          "hash": "7ac2d3e550a8a50f",
+          "bytes": 7944
+        }
+      ],
+      "donor_changed_files": [
+        "progress/progress_circle.rs"
+      ]
+    },
+    {
+      "concept": "resizable",
+      "public_path": "moon_ui::MoonResizablePanelGroup",
+      "upstream_ref": "Longbridge::resizable@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "resizable"
+      ],
+      "local_hash": "c3c6baba5c5e5320",
+      "local_files": [
+        {
+          "path": "resizable/mod.rs",
+          "hash": "9c2f9adc9046cd81",
+          "bytes": 11014
+        },
+        {
+          "path": "resizable/panel.rs",
+          "hash": "dd5fb00c3c44043f",
+          "bytes": 15599
+        },
+        {
+          "path": "resizable/resize_handle.rs",
+          "hash": "e66103acb043d332",
+          "bytes": 7057
+        }
+      ],
+      "donor_hash": "a592583f553603a0",
+      "donor_files": [
+        {
+          "path": "resizable/mod.rs",
+          "hash": "9c2f9adc9046cd81",
+          "bytes": 11014
+        },
+        {
+          "path": "resizable/panel.rs",
+          "hash": "86890b1388e68fda",
+          "bytes": 15625
+        },
+        {
+          "path": "resizable/resize_handle.rs",
+          "hash": "a6f9617e0b5edf6e",
+          "bytes": 7277
+        }
+      ],
+      "donor_changed_files": [
+        "resizable/panel.rs",
+        "resizable/resize_handle.rs"
+      ]
+    },
+    {
+      "concept": "select",
+      "public_path": "moon_ui::MoonSelect",
+      "upstream_ref": "Longbridge::select@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "select.rs"
+      ],
+      "local_hash": "59d0c05b4ab849d3",
+      "local_files": [
+        {
+          "path": "select.rs",
+          "hash": "14ef5eaa26fe2139",
+          "bytes": 31301
+        }
+      ],
+      "donor_hash": "81d5ecf842445cff",
+      "donor_files": [
+        {
+          "path": "select.rs",
+          "hash": "b3d9bc34ff997cc9",
+          "bytes": 29535
+        }
+      ],
+      "donor_changed_files": [
+        "select.rs"
+      ]
+    },
+    {
+      "concept": "settings",
+      "public_path": "moon_ui::MoonSettings",
+      "upstream_ref": "Longbridge::setting@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "setting"
+      ],
+      "local_hash": "a47c2caca8e5897d",
+      "local_files": [
+        {
+          "path": "setting/fields/bool.rs",
+          "hash": "1f57e06d3e78ad2f",
+          "bytes": 1709
+        },
+        {
+          "path": "setting/fields/dropdown.rs",
+          "hash": "e65bbd77800297bb",
+          "bytes": 2991
+        },
+        {
+          "path": "setting/fields/element.rs",
+          "hash": "6cac66e10141d732",
+          "bytes": 2247
+        },
+        {
+          "path": "setting/fields/mod.rs",
+          "hash": "172fd049078a8a05",
+          "bytes": 12166
+        },
+        {
+          "path": "setting/fields/number.rs",
+          "hash": "f1ff8fa2c646bd88",
+          "bytes": 6510
+        },
+        {
+          "path": "setting/fields/string.rs",
+          "hash": "539aa17757f879d4",
+          "bytes": 3077
+        },
+        {
+          "path": "setting/group.rs",
+          "hash": "1ad0c2bf351a4fc4",
+          "bytes": 3714
+        },
+        {
+          "path": "setting/item.rs",
+          "hash": "d28e7cc98f510e4c",
+          "bytes": 12251
+        },
+        {
+          "path": "setting/mod.rs",
+          "hash": "85e7c5b54b45f768",
+          "bytes": 161
+        },
+        {
+          "path": "setting/page.rs",
+          "hash": "a0c499986f7c2394",
+          "bytes": 7360
+        },
+        {
+          "path": "setting/settings.rs",
+          "hash": "5f46243d979af11a",
+          "bytes": 10759
+        }
+      ],
+      "donor_hash": "ea80b64488ae1230",
+      "donor_files": [
+        {
+          "path": "setting/fields/bool.rs",
+          "hash": "1ca2cd800e11cf12",
+          "bytes": 1768
+        },
+        {
+          "path": "setting/fields/dropdown.rs",
+          "hash": "e65bbd77800297bb",
+          "bytes": 2991
+        },
+        {
+          "path": "setting/fields/element.rs",
+          "hash": "595c1a19055c9d3a",
+          "bytes": 2339
+        },
+        {
+          "path": "setting/fields/mod.rs",
+          "hash": "172fd049078a8a05",
+          "bytes": 12166
+        },
+        {
+          "path": "setting/fields/number.rs",
+          "hash": "f1ff8fa2c646bd88",
+          "bytes": 6510
+        },
+        {
+          "path": "setting/fields/string.rs",
+          "hash": "539aa17757f879d4",
+          "bytes": 3077
+        },
+        {
+          "path": "setting/group.rs",
+          "hash": "1ad0c2bf351a4fc4",
+          "bytes": 3714
+        },
+        {
+          "path": "setting/item.rs",
+          "hash": "d28e7cc98f510e4c",
+          "bytes": 12251
+        },
+        {
+          "path": "setting/mod.rs",
+          "hash": "85e7c5b54b45f768",
+          "bytes": 161
+        },
+        {
+          "path": "setting/page.rs",
+          "hash": "a0c499986f7c2394",
+          "bytes": 7360
+        },
+        {
+          "path": "setting/settings.rs",
+          "hash": "5f46243d979af11a",
+          "bytes": 10759
+        }
+      ],
+      "donor_changed_files": [
+        "setting/fields/bool.rs",
+        "setting/fields/element.rs"
+      ]
+    },
+    {
+      "concept": "sheet",
+      "public_path": "moon_ui::MoonSheet",
+      "upstream_ref": "Longbridge::sheet@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "sheet.rs"
+      ],
+      "local_hash": "933535db22900c74",
+      "local_files": [
+        {
+          "path": "sheet.rs",
+          "hash": "966730aea2b98e74",
+          "bytes": 11843
+        }
+      ],
+      "donor_hash": "933535db22900c74",
+      "donor_files": [
+        {
+          "path": "sheet.rs",
+          "hash": "966730aea2b98e74",
+          "bytes": 11843
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "sidebar",
+      "public_path": "moon_ui::MoonSidebar",
+      "upstream_ref": "Longbridge::sidebar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "sidebar"
+      ],
+      "local_hash": "a6bac0a64ce4cfe5",
+      "local_files": [
+        {
+          "path": "sidebar/footer.rs",
+          "hash": "3647e3c67cf54885",
+          "bytes": 2265
+        },
+        {
+          "path": "sidebar/group.rs",
+          "hash": "68f712d7d25b01fa",
+          "bytes": 2599
+        },
+        {
+          "path": "sidebar/header.rs",
+          "hash": "6141b58a152c6de2",
+          "bytes": 2593
+        },
+        {
+          "path": "sidebar/menu.rs",
+          "hash": "20e6c73b6cac219c",
+          "bytes": 13731
+        },
+        {
+          "path": "sidebar/mod.rs",
+          "hash": "1024324cdc1a4f4f",
+          "bytes": 25935
+        }
+      ],
+      "donor_hash": "a6bac0a64ce4cfe5",
+      "donor_files": [
+        {
+          "path": "sidebar/footer.rs",
+          "hash": "3647e3c67cf54885",
+          "bytes": 2265
+        },
+        {
+          "path": "sidebar/group.rs",
+          "hash": "68f712d7d25b01fa",
+          "bytes": 2599
+        },
+        {
+          "path": "sidebar/header.rs",
+          "hash": "6141b58a152c6de2",
+          "bytes": 2593
+        },
+        {
+          "path": "sidebar/menu.rs",
+          "hash": "20e6c73b6cac219c",
+          "bytes": 13731
+        },
+        {
+          "path": "sidebar/mod.rs",
+          "hash": "1024324cdc1a4f4f",
+          "bytes": 25935
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "slider",
+      "public_path": "moon_ui::MoonSlider",
+      "upstream_ref": "Longbridge::slider@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "slider.rs"
+      ],
+      "local_hash": "248ee874d7544629",
+      "local_files": [
+        {
+          "path": "slider.rs",
+          "hash": "0e2e5d012a1132cb",
+          "bytes": 25724
+        }
+      ],
+      "donor_hash": "8c2333055cd5b576",
+      "donor_files": [
+        {
+          "path": "slider.rs",
+          "hash": "b706cf98268ad7c9",
+          "bytes": 24377
+        }
+      ],
+      "donor_changed_files": [
+        "slider.rs"
+      ]
+    },
+    {
+      "concept": "switch",
+      "public_path": "moon_ui::MoonSwitch",
+      "upstream_ref": "Longbridge::switch@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "switch.rs"
+      ],
+      "local_hash": "f800f37bd19b4c5f",
+      "local_files": [
+        {
+          "path": "switch.rs",
+          "hash": "bf98dee47ae48628",
+          "bytes": 8367
+        }
+      ],
+      "donor_hash": "f800f37bd19b4c5f",
+      "donor_files": [
+        {
+          "path": "switch.rs",
+          "hash": "bf98dee47ae48628",
+          "bytes": 8367
+        }
+      ],
+      "donor_changed_files": []
+    },
+    {
+      "concept": "text_area",
+      "public_path": "moon_ui::MoonTextArea",
+      "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "input"
+      ],
+      "local_hash": "77a8b81881721016",
+      "local_files": [
+        {
+          "path": "input/blink_cursor.rs",
+          "hash": "99933916cec88d02",
+          "bytes": 2666
+        },
+        {
+          "path": "input/change.rs",
+          "hash": "acab7cd61a3135e0",
+          "bytes": 916
+        },
+        {
+          "path": "input/clear_button.rs",
+          "hash": "a50915448d8363e9",
+          "bytes": 377
+        },
+        {
+          "path": "input/cursor.rs",
+          "hash": "1b08c633d4690d05",
+          "bytes": 1657
+        },
+        {
+          "path": "input/display_map/README.md",
+          "hash": "60e9f63f10a25155",
+          "bytes": 1769
+        },
+        {
+          "path": "input/display_map/display_map.rs",
+          "hash": "2725840f4d221113",
+          "bytes": 11780
+        },
+        {
+          "path": "input/display_map/fold_map.rs",
+          "hash": "0d26ab572e9e5e86",
+          "bytes": 12714
+        },
+        {
+          "path": "input/display_map/folding.rs",
+          "hash": "f73d3b68c0357988",
+          "bytes": 5638
+        },
+        {
+          "path": "input/display_map/mod.rs",
+          "hash": "55e0ae2e3cc54210",
+          "bytes": 1971
+        },
+        {
+          "path": "input/display_map/text_wrapper.rs",
+          "hash": "1c35b415e288aabc",
+          "bytes": 31761
+        },
+        {
+          "path": "input/display_map/wrap_map.rs",
+          "hash": "b143ce888769ee24",
+          "bytes": 7852
+        },
+        {
+          "path": "input/element.rs",
+          "hash": "16e487aa9173ee45",
+          "bytes": 98833
+        },
+        {
+          "path": "input/indent.rs",
+          "hash": "87ce1a959d4f8039",
+          "bytes": 13834
+        },
+        {
+          "path": "input/input.rs",
+          "hash": "3d13606af19dd4fe",
+          "bytes": 21567
+        },
+        {
+          "path": "input/lsp/code_actions.rs",
+          "hash": "66ebc66318abf24a",
+          "bytes": 4416
+        },
+        {
+          "path": "input/lsp/completions.rs",
+          "hash": "0cc23009fab18817",
+          "bytes": 10634
+        },
+        {
+          "path": "input/lsp/definitions.rs",
+          "hash": "51e53ed1d998a324",
+          "bytes": 6918
+        },
+        {
+          "path": "input/lsp/document_colors.rs",
+          "hash": "f9f78dab418931e9",
+          "bytes": 3386
+        },
+        {
+          "path": "input/lsp/hover.rs",
+          "hash": "a1afbce1ff71d947",
+          "bytes": 2488
+        },
+        {
+          "path": "input/lsp/mod.rs",
+          "hash": "9efc7d2450968cc8",
+          "bytes": 5586
+        },
+        {
+          "path": "input/lsp/semantic_tokens.rs",
+          "hash": "8138a65b96ac9078",
+          "bytes": 12382
+        },
+        {
+          "path": "input/mask_pattern.rs",
+          "hash": "e8b67c4e98741592",
+          "bytes": 25091
+        },
+        {
+          "path": "input/mod.rs",
+          "hash": "0fd608057a9db01f",
+          "bytes": 922
+        },
+        {
+          "path": "input/mode.rs",
+          "hash": "f17cede60ea60f9d",
+          "bytes": 14897
+        },
+        {
+          "path": "input/movement.rs",
+          "hash": "f171d2a3dfd677ca",
+          "bytes": 9426
+        },
+        {
+          "path": "input/number_input.rs",
+          "hash": "86b865d1a1d24e62",
+          "bytes": 16285
+        },
+        {
+          "path": "input/otp_input.rs",
+          "hash": "d6d6f91fe8b48785",
+          "bytes": 12986
+        },
+        {
+          "path": "input/popovers/code_action_menu.rs",
+          "hash": "60de6e9ce5e8c236",
+          "bytes": 9817
+        },
+        {
+          "path": "input/popovers/completion_menu.rs",
+          "hash": "06806ce046d0d060",
+          "bytes": 15212
+        },
+        {
+          "path": "input/popovers/diagnostic_popover.rs",
+          "hash": "085f80fa24f1a450",
+          "bytes": 2394
+        },
+        {
+          "path": "input/popovers/hover_popover.rs",
+          "hash": "e6586ea75d4512d9",
+          "bytes": 9106
+        },
+        {
+          "path": "input/popovers/mod.rs",
+          "hash": "ef4e51a78ad8306d",
+          "bytes": 2173
+        },
+        {
+          "path": "input/rope_ext.rs",
+          "hash": "0a938e3f8343d733",
+          "bytes": 25090
+        },
+        {
+          "path": "input/search.rs",
+          "hash": "2afaad5d4fc70264",
+          "bytes": 25660
+        },
+        {
+          "path": "input/selection.rs",
+          "hash": "344cf9d3fdd19f8a",
+          "bytes": 4567
+        },
+        {
+          "path": "input/state.rs",
+          "hash": "448808cf0a56cf83",
+          "bytes": 135316
+        }
+      ],
+      "donor_hash": "ce28b7730707df2e",
+      "donor_files": [
+        {
+          "path": "input/blink_cursor.rs",
+          "hash": "41677eb1082ce983",
+          "bytes": 2761
+        },
+        {
+          "path": "input/change.rs",
+          "hash": "acab7cd61a3135e0",
+          "bytes": 916
+        },
+        {
+          "path": "input/clear_button.rs",
+          "hash": "0992882adf8ef3f1",
+          "bytes": 393
+        },
+        {
+          "path": "input/cursor.rs",
+          "hash": "1b08c633d4690d05",
+          "bytes": 1657
+        },
+        {
+          "path": "input/display_map/README.md",
+          "hash": "60e9f63f10a25155",
+          "bytes": 1769
+        },
+        {
+          "path": "input/display_map/display_map.rs",
+          "hash": "13247dc7d3360fbb",
+          "bytes": 12139
+        },
+        {
+          "path": "input/display_map/fold_map.rs",
+          "hash": "0d26ab572e9e5e86",
+          "bytes": 12714
+        },
+        {
+          "path": "input/display_map/folding.rs",
+          "hash": "f73d3b68c0357988",
+          "bytes": 5638
+        },
+        {
+          "path": "input/display_map/mod.rs",
+          "hash": "55e0ae2e3cc54210",
+          "bytes": 1971
+        },
+        {
+          "path": "input/display_map/text_wrapper.rs",
+          "hash": "1dd85f44435cf7f6",
+          "bytes": 32695
+        },
+        {
+          "path": "input/display_map/wrap_map.rs",
+          "hash": "b143ce888769ee24",
+          "bytes": 7852
+        },
+        {
+          "path": "input/element.rs",
+          "hash": "e714a579c087be5f",
+          "bytes": 97940
+        },
+        {
+          "path": "input/indent.rs",
+          "hash": "87ce1a959d4f8039",
+          "bytes": 13834
+        },
+        {
+          "path": "input/input.rs",
+          "hash": "f1e1892ab55cff0d",
+          "bytes": 17151
+        },
+        {
+          "path": "input/lsp/code_actions.rs",
+          "hash": "66ebc66318abf24a",
+          "bytes": 4416
+        },
+        {
+          "path": "input/lsp/completions.rs",
+          "hash": "0cc23009fab18817",
+          "bytes": 10634
+        },
+        {
+          "path": "input/lsp/definitions.rs",
+          "hash": "51e53ed1d998a324",
+          "bytes": 6918
+        },
+        {
+          "path": "input/lsp/document_colors.rs",
+          "hash": "9772b5ae791c3f03",
+          "bytes": 3488
+        },
+        {
+          "path": "input/lsp/hover.rs",
+          "hash": "ff6e6dae3d870565",
+          "bytes": 2566
+        },
+        {
+          "path": "input/lsp/mod.rs",
+          "hash": "9efc7d2450968cc8",
+          "bytes": 5586
+        },
+        {
+          "path": "input/lsp/semantic_tokens.rs",
+          "hash": "5297d82f49663d39",
+          "bytes": 12663
+        },
+        {
+          "path": "input/mask_pattern.rs",
+          "hash": "b6a3b9e6171ed76e",
+          "bytes": 21883
+        },
+        {
+          "path": "input/mod.rs",
+          "hash": "73c3c2e442c73a22",
+          "bytes": 910
+        },
+        {
+          "path": "input/mode.rs",
+          "hash": "f17cede60ea60f9d",
+          "bytes": 14897
+        },
+        {
+          "path": "input/movement.rs",
+          "hash": "f171d2a3dfd677ca",
+          "bytes": 9426
+        },
+        {
+          "path": "input/number_input.rs",
+          "hash": "fca7d2e7bd688e00",
+          "bytes": 7587
+        },
+        {
+          "path": "input/otp_input.rs",
+          "hash": "d6d6f91fe8b48785",
+          "bytes": 12986
+        },
+        {
+          "path": "input/popovers/code_action_menu.rs",
+          "hash": "60de6e9ce5e8c236",
+          "bytes": 9817
+        },
+        {
+          "path": "input/popovers/completion_menu.rs",
+          "hash": "06806ce046d0d060",
+          "bytes": 15212
+        },
+        {
+          "path": "input/popovers/diagnostic_popover.rs",
+          "hash": "fb205e9c515136fd",
+          "bytes": 2489
+        },
+        {
+          "path": "input/popovers/hover_popover.rs",
+          "hash": "e6586ea75d4512d9",
+          "bytes": 9106
+        },
+        {
+          "path": "input/popovers/mod.rs",
+          "hash": "6c3835c3972aa562",
+          "bytes": 2167
+        },
+        {
+          "path": "input/rope_ext.rs",
+          "hash": "0a938e3f8343d733",
+          "bytes": 25090
+        },
+        {
+          "path": "input/search.rs",
+          "hash": "035d9707c84f1f69",
+          "bytes": 26417
+        },
+        {
+          "path": "input/selection.rs",
+          "hash": "344cf9d3fdd19f8a",
+          "bytes": 4567
+        },
+        {
+          "path": "input/state.rs",
+          "hash": "b1d9d07a55b95fd8",
+          "bytes": 112632
+        }
+      ],
+      "donor_changed_files": [
+        "input/blink_cursor.rs",
+        "input/clear_button.rs",
+        "input/display_map/display_map.rs",
+        "input/display_map/text_wrapper.rs",
+        "input/element.rs",
+        "input/input.rs",
+        "input/lsp/document_colors.rs",
+        "input/lsp/hover.rs",
+        "input/lsp/semantic_tokens.rs",
+        "input/mask_pattern.rs",
+        "input/mod.rs",
+        "input/number_input.rs",
+        "input/popovers/diagnostic_popover.rs",
+        "input/popovers/mod.rs",
+        "input/search.rs",
+        "input/state.rs"
+      ]
+    },
+    {
+      "concept": "tree",
+      "public_path": "moon_ui::MoonTree",
+      "upstream_ref": "Longbridge::tree@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "local_paths": [
+        "tree.rs"
+      ],
+      "local_hash": "2d3939e02fd68580",
+      "local_files": [
+        {
+          "path": "tree.rs",
+          "hash": "9b131b41b3faa1f7",
+          "bytes": 28430
+        }
+      ],
+      "donor_hash": "5db0391a3e48cd6c",
+      "donor_files": [
+        {
+          "path": "tree.rs",
+          "hash": "f33a31209e1d8342",
+          "bytes": 28187
+        }
+      ],
+      "donor_changed_files": [
+        "tree.rs"
+      ]
+    }
+  ]
+}

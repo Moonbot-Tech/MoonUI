@@ -267,7 +267,7 @@ impl RenderOnce for MoonTooltip {
             px(8.0),
             px(18.0),
             px(0.0),
-            rgba_from(0x000000, 0.46),
+            rgba_from(p.shadow, 0.46),
         );
 
         let mut root = div()

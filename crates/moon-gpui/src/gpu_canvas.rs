@@ -1,5 +1,6 @@
 use std::{
-    borrow::Cow, cell::RefCell, ffi::c_void, marker::PhantomData, ptr::NonNull, rc::Rc, sync::Arc,
+    borrow::Cow, cell::RefCell, ffi::c_void, marker::PhantomData, ops::Range, ptr::NonNull, rc::Rc,
+    sync::Arc,
 };
 
 use refineable::Refineable as _;
@@ -76,6 +77,105 @@ pub struct GpuCanvasTextMetrics {
     pub width: Pixels,
     /// Caller-provided line height in logical pixels.
     pub line_height: Pixels,
+}
+
+/// Device-pixel transform for a retained GPU canvas text layer.
+///
+/// Retained glyph instances are baked in device coordinates. Use
+/// [`Self::translate_logical`] when the desired motion is described in logical
+/// pixels; the context will convert the translation to device pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GpuCanvasTextTransform {
+    /// First transform row: `x' = m00 * x + m01 * y + tx`.
+    pub row_x: [f32; 4],
+    /// Second transform row: `y' = m10 * x + m11 * y + ty`.
+    pub row_y: [f32; 4],
+}
+
+impl GpuCanvasTextTransform {
+    /// Identity transform.
+    pub const fn identity() -> Self {
+        Self {
+            row_x: [1.0, 0.0, 0.0, 0.0],
+            row_y: [0.0, 1.0, 0.0, 0.0],
+        }
+    }
+
+    /// Translation expressed in logical pixels.
+    pub fn translate_logical(offset: Point<Pixels>) -> Self {
+        Self {
+            row_x: [1.0, 0.0, offset.x.0, 0.0],
+            row_y: [0.0, 1.0, offset.y.0, 0.0],
+        }
+    }
+
+    /// Translation expressed in device/scaled pixels.
+    pub fn translate_device(offset: Point<ScaledPixels>) -> Self {
+        Self {
+            row_x: [1.0, 0.0, offset.x.0, 0.0],
+            row_y: [0.0, 1.0, offset.y.0, 0.0],
+        }
+    }
+
+    pub(crate) fn into_device(self, scale_factor: f32) -> Self {
+        Self {
+            row_x: [
+                self.row_x[0],
+                self.row_x[1],
+                self.row_x[2] * scale_factor,
+                self.row_x[3],
+            ],
+            row_y: [
+                self.row_y[0],
+                self.row_y[1],
+                self.row_y[2] * scale_factor,
+                self.row_y[3],
+            ],
+        }
+    }
+}
+
+impl Default for GpuCanvasTextTransform {
+    fn default() -> Self {
+        Self::identity()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct GpuCanvasRetainedTextCacheKey {
+    key: u64,
+    revision: u64,
+    bounds: Bounds<Pixels>,
+    content_mask: ContentMask<ScaledPixels>,
+    scale_factor_bits: u32,
+    background_appearance: WindowBackgroundAppearance,
+    subpixel_rendering_supported: bool,
+    text_rendering_mode: TextRenderingMode,
+}
+
+/// Caller-owned cache for a large stable GPU canvas text layer.
+///
+/// Keep this object next to the data that owns the labels. The build closure
+/// passed to [`GpuCanvasTextContext::draw_retained_text_layer`] runs only when
+/// the retained key/revision or rendering environment changes; steady-state
+/// frames reuse the baked glyph instances.
+#[derive(Clone, Debug, Default)]
+pub struct GpuCanvasRetainedTextLayer {
+    cache_key: Option<GpuCanvasRetainedTextCacheKey>,
+    data: Option<Arc<GpuCanvasRetainedTextData>>,
+}
+
+impl GpuCanvasRetainedTextLayer {
+    /// Drop the baked glyph instances. The next retained draw will rebuild.
+    pub fn clear(&mut self) {
+        self.cache_key = None;
+        self.data = None;
+    }
+
+    /// Returns true when this layer currently has baked glyph instances.
+    pub fn is_cached(&self) -> bool {
+        self.data.is_some()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -217,6 +317,8 @@ pub struct GpuCanvasTextFrame {
     pub subpixel_sprites: Vec<SubpixelSprite>,
     /// Emoji/color glyph sprites.
     pub polychrome_sprites: Vec<PolychromeSprite>,
+    /// Retained text layers drawn from already-baked glyph instance buffers.
+    pub retained_layers: Vec<GpuCanvasRetainedTextDraw>,
 }
 
 impl GpuCanvasTextFrame {
@@ -225,6 +327,7 @@ impl GpuCanvasTextFrame {
         self.monochrome_sprites.clear();
         self.subpixel_sprites.clear();
         self.polychrome_sprites.clear();
+        self.retained_layers.clear();
     }
 
     /// Returns true when no text sprites were queued.
@@ -232,6 +335,7 @@ impl GpuCanvasTextFrame {
         self.monochrome_sprites.is_empty()
             && self.subpixel_sprites.is_empty()
             && self.polychrome_sprites.is_empty()
+            && self.retained_layers.is_empty()
     }
 
     pub(crate) fn finish(&mut self) {
@@ -264,7 +368,149 @@ impl GpuCanvasTextFrame {
         self.subpixel_sprites.append(&mut other.subpixel_sprites);
         self.polychrome_sprites
             .append(&mut other.polychrome_sprites);
+        self.retained_layers.append(&mut other.retained_layers);
     }
+
+    fn finish_retained(&mut self) {
+        self.monochrome_sprites.sort_by_key(|sprite| {
+            (
+                atlas_texture_sort_key(sprite.tile.texture_id),
+                sprite.pad,
+                sprite.tile.tile_id,
+            )
+        });
+        self.subpixel_sprites.sort_by_key(|sprite| {
+            (
+                atlas_texture_sort_key(sprite.tile.texture_id),
+                sprite.pad,
+                sprite.tile.tile_id,
+            )
+        });
+        self.polychrome_sprites.sort_by_key(|sprite| {
+            (
+                atlas_texture_sort_key(sprite.tile.texture_id),
+                sprite.pad,
+                sprite.tile.tile_id,
+            )
+        });
+    }
+}
+
+/// One retained text draw submitted for the current GPU frame.
+#[derive(Clone, Debug)]
+pub struct GpuCanvasRetainedTextDraw {
+    /// Baked glyph instance data.
+    pub data: Arc<GpuCanvasRetainedTextData>,
+    /// Device-pixel transform applied by the renderer.
+    pub transform: GpuCanvasTextTransform,
+    /// Visible label id interval. Renderer may use it to avoid drawing
+    /// off-screen retained labels.
+    pub visible_labels: Range<u32>,
+}
+
+/// A contiguous retained sprite range sharing one atlas texture.
+#[derive(Clone, Copy, Debug)]
+pub struct GpuCanvasRetainedSpriteRange {
+    /// Atlas texture shared by all sprites in this range.
+    pub texture_id: crate::AtlasTextureId,
+    /// First sprite instance in the baked retained frame.
+    pub start: u32,
+    /// Number of sprite instances in this range.
+    pub len: u32,
+    /// Lowest label id contained in this range.
+    pub first_label: u32,
+    /// Exclusive upper label id bound contained in this range.
+    pub last_label_exclusive: u32,
+}
+
+impl GpuCanvasRetainedSpriteRange {
+    /// Intersect this texture range with a visible label interval.
+    pub fn visible_subrange<T>(
+        &self,
+        sprites: &[T],
+        visible: &Range<u32>,
+        label_id: impl Fn(&T) -> u32,
+    ) -> Option<(u32, u32)> {
+        if visible.start >= self.last_label_exclusive || visible.end <= self.first_label {
+            return None;
+        }
+        let start = self.start as usize;
+        let end = start + self.len as usize;
+        let slice = &sprites[start..end];
+        let rel_start = slice.partition_point(|sprite| label_id(sprite) < visible.start);
+        let rel_end = slice.partition_point(|sprite| label_id(sprite) < visible.end);
+        if rel_start >= rel_end {
+            None
+        } else {
+            Some((self.start + rel_start as u32, (rel_end - rel_start) as u32))
+        }
+    }
+}
+
+/// Baked glyph instances for a retained GPU canvas text layer.
+#[derive(Clone, Debug)]
+pub struct GpuCanvasRetainedTextData {
+    /// Baked glyph sprite frame. Renderer backends may upload this once and
+    /// reuse it until the retained data object changes.
+    pub frame: GpuCanvasTextFrame,
+    /// Monochrome sprite ranges grouped by atlas texture and ordered by label id.
+    pub monochrome_ranges: Vec<GpuCanvasRetainedSpriteRange>,
+    /// Subpixel sprite ranges grouped by atlas texture and ordered by label id.
+    pub subpixel_ranges: Vec<GpuCanvasRetainedSpriteRange>,
+    /// Emoji/color sprite ranges grouped by atlas texture and ordered by label id.
+    pub polychrome_ranges: Vec<GpuCanvasRetainedSpriteRange>,
+}
+
+fn retained_mono_ranges(sprites: &[MonochromeSprite]) -> Vec<GpuCanvasRetainedSpriteRange> {
+    retained_ranges(
+        sprites,
+        |sprite| sprite.tile.texture_id,
+        |sprite| sprite.pad,
+    )
+}
+
+fn retained_subpixel_ranges(sprites: &[SubpixelSprite]) -> Vec<GpuCanvasRetainedSpriteRange> {
+    retained_ranges(
+        sprites,
+        |sprite| sprite.tile.texture_id,
+        |sprite| sprite.pad,
+    )
+}
+
+fn retained_poly_ranges(sprites: &[PolychromeSprite]) -> Vec<GpuCanvasRetainedSpriteRange> {
+    retained_ranges(
+        sprites,
+        |sprite| sprite.tile.texture_id,
+        |sprite| sprite.pad,
+    )
+}
+
+fn retained_ranges<T>(
+    sprites: &[T],
+    texture_id: impl Fn(&T) -> crate::AtlasTextureId,
+    label_id: impl Fn(&T) -> u32,
+) -> Vec<GpuCanvasRetainedSpriteRange> {
+    let mut ranges = Vec::new();
+    let mut start = 0usize;
+    while start < sprites.len() {
+        let texture = texture_id(&sprites[start]);
+        let first_label = label_id(&sprites[start]);
+        let mut last_label = first_label;
+        let mut end = start + 1;
+        while end < sprites.len() && texture_id(&sprites[end]) == texture {
+            last_label = label_id(&sprites[end]);
+            end += 1;
+        }
+        ranges.push(GpuCanvasRetainedSpriteRange {
+            texture_id: texture,
+            start: start as u32,
+            len: (end - start) as u32,
+            first_label,
+            last_label_exclusive: last_label.saturating_add(1),
+        });
+        start = end;
+    }
+    ranges
 }
 
 fn atlas_texture_sort_key(id: crate::AtlasTextureId) -> (u32, u32) {
@@ -290,6 +536,7 @@ pub struct GpuCanvasTextContext<'a> {
     pub(crate) canvas_layer: GpuCanvasLayer,
     pub(crate) text_layer: GpuCanvasLayer,
     pub(crate) frame: &'a mut GpuCanvasTextFrame,
+    retained_label_id: u32,
 }
 
 impl<'a> GpuCanvasTextContext<'a> {
@@ -320,6 +567,7 @@ impl<'a> GpuCanvasTextContext<'a> {
             canvas_layer,
             text_layer,
             frame,
+            retained_label_id: 0,
         }
     }
 
@@ -346,6 +594,78 @@ impl<'a> GpuCanvasTextContext<'a> {
     /// The layer where text emitted through this context will be composited.
     pub fn text_layer(&self) -> GpuCanvasLayer {
         self.text_layer
+    }
+
+    fn set_retained_label_id(&mut self, label_id: u32) {
+        self.retained_label_id = label_id;
+    }
+
+    /// Submit a large retained text layer.
+    ///
+    /// `build` is called only when `layer` is missing or when the key/revision
+    /// or rendering environment changed. In steady state this method submits a
+    /// cheap draw reference plus transform/visible label range; it does not walk
+    /// caller labels, rebuild glyph sprites, or re-upload instance data.
+    pub fn draw_retained_text_layer(
+        &mut self,
+        layer: &mut GpuCanvasRetainedTextLayer,
+        key: u64,
+        revision: u64,
+        transform: GpuCanvasTextTransform,
+        visible_labels: Range<u32>,
+        build: impl FnOnce(&mut GpuCanvasRetainedTextBuilder<'_>) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
+        let cache_key = GpuCanvasRetainedTextCacheKey {
+            key,
+            revision,
+            bounds: self.bounds,
+            content_mask: self.content_mask,
+            scale_factor_bits: self.scale_factor.to_bits(),
+            background_appearance: self.background_appearance,
+            subpixel_rendering_supported: self.subpixel_rendering_supported,
+            text_rendering_mode: self.text_rendering_mode,
+        };
+        if layer.cache_key.as_ref() != Some(&cache_key) {
+            let mut retained_frame = GpuCanvasTextFrame::default();
+            let retained_data = {
+                let mut retained_context = GpuCanvasTextContext::new(
+                    self.text_system.clone(),
+                    self.sprite_atlas.clone(),
+                    self.bounds,
+                    self.scale_factor,
+                    self.content_mask,
+                    self.background_appearance,
+                    self.subpixel_rendering_supported,
+                    self.text_rendering_mode,
+                    self.order,
+                    self.canvas_layer,
+                    self.text_layer,
+                    &mut retained_frame,
+                );
+                let mut builder = GpuCanvasRetainedTextBuilder {
+                    context: &mut retained_context,
+                };
+                build(&mut builder)?;
+                retained_frame.finish_retained();
+                GpuCanvasRetainedTextData {
+                    monochrome_ranges: retained_mono_ranges(&retained_frame.monochrome_sprites),
+                    subpixel_ranges: retained_subpixel_ranges(&retained_frame.subpixel_sprites),
+                    polychrome_ranges: retained_poly_ranges(&retained_frame.polychrome_sprites),
+                    frame: retained_frame,
+                }
+            };
+            layer.cache_key = Some(cache_key);
+            layer.data = Some(Arc::new(retained_data));
+        }
+
+        if let Some(data) = &layer.data {
+            self.frame.retained_layers.push(GpuCanvasRetainedTextDraw {
+                data: data.clone(),
+                transform: transform.into_device(self.scale_factor),
+                visible_labels,
+            });
+        }
+        Ok(())
     }
 
     /// Draw a single-line text run at `origin`, where `origin` is the top-left
@@ -569,7 +889,7 @@ impl<'a> GpuCanvasTextContext<'a> {
         if subpixel_rendering {
             self.frame.subpixel_sprites.push(SubpixelSprite {
                 order: self.order,
-                pad: 0,
+                pad: self.retained_label_id,
                 bounds,
                 content_mask: self.content_mask,
                 color,
@@ -579,7 +899,7 @@ impl<'a> GpuCanvasTextContext<'a> {
         } else {
             self.frame.monochrome_sprites.push(MonochromeSprite {
                 order: self.order,
-                pad: 0,
+                pad: self.retained_label_id,
                 bounds,
                 content_mask: self.content_mask,
                 color,
@@ -625,7 +945,7 @@ impl<'a> GpuCanvasTextContext<'a> {
 
         self.frame.polychrome_sprites.push(PolychromeSprite {
             order: self.order,
-            pad: 0,
+            pad: self.retained_label_id,
             grayscale: false,
             bounds: Bounds {
                 origin: integer_origin + raster_bounds.origin.map(Into::into),
@@ -653,6 +973,27 @@ impl<'a> GpuCanvasTextContext<'a> {
             mode => mode,
         };
         mode == TextRenderingMode::Subpixel
+    }
+}
+
+/// Builder used only when a retained text layer needs to be baked or rebuilt.
+pub struct GpuCanvasRetainedTextBuilder<'a> {
+    context: &'a mut GpuCanvasTextContext<'a>,
+}
+
+impl<'a> GpuCanvasRetainedTextBuilder<'a> {
+    /// Assign the logical label id for subsequently emitted glyphs.
+    ///
+    /// The renderer uses this id for visible-range culling and optional dynamic
+    /// per-label channels. Callers should emit labels in ascending id order for
+    /// best culling.
+    pub fn set_label_id(&mut self, label_id: u32) {
+        self.context.set_retained_label_id(label_id);
+    }
+
+    /// Access the normal GPU canvas text context while building the layer.
+    pub fn context(&mut self) -> &mut GpuCanvasTextContext<'a> {
+        self.context
     }
 }
 

@@ -10,10 +10,12 @@ use crate::{
     ActiveTheme, Disableable, ElementExt as _, Icon, IconName, IndexPath, Sizable, Size,
     StyleSized, StyledExt,
     actions::{Cancel, Confirm, SelectDown, SelectUp},
+    button::ButtonVariant,
     global_state::GlobalState,
     h_flex,
     input::{clear_button, input_style},
     list::List,
+    moon::{MoonPalette, rgba_from},
     searchable_list::{
         SearchableListChange, SearchableListDelegate, SearchableListItem, SearchableListState,
     },
@@ -71,6 +73,7 @@ struct SelectOptions {
     menu_max_h: Length,
     disabled: bool,
     appearance: bool,
+    trigger_variant: Option<ButtonVariant>,
 }
 
 impl Default for SelectOptions {
@@ -87,6 +90,7 @@ impl Default for SelectOptions {
             disabled: false,
             appearance: true,
             search_placeholder: None,
+            trigger_variant: None,
         }
     }
 }
@@ -104,6 +108,7 @@ where
     searchable: bool,
     icon: Option<Icon>,
     title_prefix: Option<SharedString>,
+    trigger_variant: Option<ButtonVariant>,
 }
 
 /// A Select element.
@@ -241,6 +246,7 @@ where
             searchable: false,
             icon: None,
             title_prefix: None,
+            trigger_variant: None,
         }
     }
 
@@ -491,6 +497,18 @@ where
         let popup_radius = cx.theme().radius.min(px(8.));
 
         let (bg, fg) = input_style(self.state.disabled, cx);
+        let trigger_style = self
+            .trigger_variant
+            .and_then(|variant| variant.moon_style(MoonPalette::active(cx), false, false));
+        let trigger_bg = trigger_style
+            .map(|style| rgba_from(style.bg, style.bg_alpha))
+            .unwrap_or(bg);
+        let trigger_fg = trigger_style
+            .map(|style| rgba_from(style.fg, style.fg_alpha))
+            .unwrap_or(fg);
+        let trigger_border = trigger_style
+            .map(|style| rgba_from(style.border, style.border_alpha))
+            .unwrap_or_else(|| cx.theme().input);
 
         self.state.list.update(cx, |list, cx| {
             list.set_searchable(searchable, cx);
@@ -510,10 +528,10 @@ where
                     .border_1()
                     .border_color(cx.theme().transparent)
                     .when(self.state.appearance, |this| {
-                        this.bg(bg)
-                            .text_color(fg)
+                        this.bg(trigger_bg)
+                            .text_color(trigger_fg)
                             .when(self.state.disabled, |this| this.opacity(0.5))
-                            .border_color(cx.theme().input)
+                            .border_color(trigger_border)
                             .rounded(cx.theme().radius)
                             .when(cx.theme().shadow, |this| this.shadow_xs())
                     })
@@ -528,6 +546,21 @@ where
                     .input_size(self.state.size)
                     .input_text_size(self.state.size)
                     .refine_style(&self.state.style)
+                    .when(!self.state.disabled, |this| {
+                        this.when_some(trigger_style, |this, style| {
+                            this.hover(move |this| {
+                                this.bg(rgba_from(style.bg, style.hover_bg_alpha))
+                                    .border_color(rgba_from(style.border, style.hover_border_alpha))
+                            })
+                            .active(move |this| {
+                                this.bg(rgba_from(style.bg, style.active_bg_alpha))
+                                    .border_color(rgba_from(
+                                        style.border,
+                                        style.active_border_alpha,
+                                    ))
+                            })
+                        })
+                    })
                     .when(outline_visible, |this| this.focused_border(cx))
                     .when(allow_open, |this| {
                         this.on_click(cx.listener(Self::toggle_menu))
@@ -694,6 +727,12 @@ where
         self.options.appearance = appearance;
         self
     }
+
+    /// Use a Moon button variant for the select trigger shell.
+    pub fn trigger_variant(mut self, variant: ButtonVariant) -> Self {
+        self.options.trigger_variant = Some(variant);
+        self
+    }
 }
 
 impl<D> Sizable for Select<D>
@@ -768,6 +807,7 @@ where
             this.state.appearance = opts.appearance;
             this.icon = opts.icon;
             this.title_prefix = opts.title_prefix;
+            this.trigger_variant = opts.trigger_variant;
 
             if let Some(empty) = empty {
                 this.state.empty = Some(empty);

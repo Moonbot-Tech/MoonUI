@@ -1,1 +1,1 @@
-pub type MoonRoot = crate::Root;
+pub use crate::MoonRoot;

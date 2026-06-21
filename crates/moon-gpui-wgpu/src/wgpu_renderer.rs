@@ -2,20 +2,22 @@ use crate::{CompositorGpuHint, WgpuAtlas, WgpuContext};
 use bytemuck::{Pod, Zeroable};
 use gpui::{
     AtlasTextureId, Background, Bounds, DevicePixels, GpuCanvasDrawContext, GpuCanvasLayer,
-    GpuCanvasPrepareContext, GpuCanvasTextFrame, GpuSpecs, MonochromeSprite, PaintGpuCanvas, Path,
-    Point, PolychromeSprite, PrimitiveBatch, Quad, RawGpuAccess, Rgba, ScaledPixels, Scene, Shadow,
-    Size, SubpixelSprite, Underline, WgpuRawAccess, get_gamma_correction_ratios,
+    GpuCanvasPrepareContext, GpuCanvasRetainedTextDraw, GpuCanvasTextFrame, GpuCanvasTextTransform,
+    GpuSpecs, MonochromeSprite, PaintGpuCanvas, Path, Point, PolychromeSprite, PrimitiveBatch,
+    Quad, RawGpuAccess, Rgba, ScaledPixels, Scene, Shadow, Size, SubpixelSprite, Underline,
+    WgpuRawAccess, get_gamma_correction_ratios,
 };
 use log::warn;
 #[cfg(not(target_family = "wasm"))]
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ptr::NonNull;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -56,6 +58,35 @@ struct GammaParams {
     subpixel_enhanced_contrast: f32,
     is_bgr: u32,
     _pad: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct RetainedTextParams {
+    enabled: u32,
+    _pad: [u32; 3],
+    transform_x: [f32; 4],
+    transform_y: [f32; 4],
+}
+
+impl RetainedTextParams {
+    fn disabled() -> Self {
+        Self {
+            enabled: 0,
+            _pad: [0; 3],
+            transform_x: GpuCanvasTextTransform::identity().row_x,
+            transform_y: GpuCanvasTextTransform::identity().row_y,
+        }
+    }
+
+    fn enabled(transform: GpuCanvasTextTransform) -> Self {
+        Self {
+            enabled: 1,
+            _pad: [0; 3],
+            transform_x: transform.row_x,
+            transform_y: transform.row_y,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -117,6 +148,7 @@ struct WgpuResources {
     bind_group_layouts: WgpuBindGroupLayouts,
     atlas_sampler: wgpu::Sampler,
     globals_buffer: wgpu::Buffer,
+    retained_text_identity_buffer: wgpu::Buffer,
     globals_bind_group: wgpu::BindGroup,
     path_globals_bind_group: wgpu::BindGroup,
     instance_buffer: wgpu::Buffer,
@@ -143,6 +175,7 @@ pub struct WgpuRenderer {
     #[allow(dead_code)]
     compositor_gpu: Option<CompositorGpuHint>,
     resources: Option<WgpuResources>,
+    retained_gpu_canvas_text: RefCell<HashMap<usize, WgpuRetainedGpuCanvasTextCache>>,
     surface_config: wgpu::SurfaceConfiguration,
     atlas: Arc<WgpuAtlas>,
     path_globals_offset: u64,
@@ -150,6 +183,7 @@ pub struct WgpuRenderer {
     instance_buffer_capacity: u64,
     max_buffer_size: u64,
     storage_buffer_alignment: u64,
+    uniform_buffer_alignment: u64,
     rendering_params: RenderingParameters,
     is_bgr: bool,
     dual_source_blending: bool,
@@ -164,6 +198,19 @@ pub struct WgpuRenderer {
     surface_configured: bool,
     needs_redraw: bool,
     clear_color: wgpu::Color,
+}
+
+struct WgpuRetainedGpuCanvasTextCache {
+    data: Weak<gpui::GpuCanvasRetainedTextData>,
+    mono: Option<WgpuRetainedSpriteBuffer<MonochromeSprite>>,
+    subpixel: Option<WgpuRetainedSpriteBuffer<SubpixelSprite>>,
+    poly: Option<WgpuRetainedSpriteBuffer<PolychromeSprite>>,
+}
+
+struct WgpuRetainedSpriteBuffer<T> {
+    buffer: wgpu::Buffer,
+    len: usize,
+    _marker: PhantomData<T>,
 }
 
 impl WgpuRenderer {
@@ -388,14 +435,30 @@ impl WgpuRenderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        let retained_text_identity_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("retained_text_identity_buffer"),
+            size: std::mem::size_of::<RetainedTextParams>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: true,
+        });
+        {
+            let mut mapped = retained_text_identity_buffer
+                .slice(..)
+                .get_mapped_range_mut();
+            mapped.copy_from_slice(bytemuck::bytes_of(&RetainedTextParams::disabled()));
+        }
+        retained_text_identity_buffer.unmap();
 
         let max_buffer_size = device.limits().max_buffer_size;
         let storage_buffer_alignment = device.limits().min_storage_buffer_offset_alignment as u64;
+        let uniform_buffer_alignment = device.limits().min_uniform_buffer_offset_alignment as u64;
         let initial_instance_buffer_capacity = 2 * 1024 * 1024;
         let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("instance_buffer"),
             size: initial_instance_buffer_capacity,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::UNIFORM
+                | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
@@ -462,6 +525,7 @@ impl WgpuRenderer {
             bind_group_layouts,
             atlas_sampler,
             globals_buffer,
+            retained_text_identity_buffer,
             globals_bind_group,
             path_globals_bind_group,
             instance_buffer,
@@ -477,6 +541,7 @@ impl WgpuRenderer {
             context: gpu_context,
             compositor_gpu,
             resources: Some(resources),
+            retained_gpu_canvas_text: RefCell::new(HashMap::new()),
             surface_config,
             atlas,
             path_globals_offset,
@@ -484,6 +549,7 @@ impl WgpuRenderer {
             instance_buffer_capacity: initial_instance_buffer_capacity,
             max_buffer_size,
             storage_buffer_alignment,
+            uniform_buffer_alignment,
             rendering_params,
             is_bgr: false,
             dual_source_blending,
@@ -568,6 +634,18 @@ impl WgpuRenderer {
                         binding: 2,
                         visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new(
+                                std::mem::size_of::<RetainedTextParams>() as u64,
+                            ),
+                        },
                         count: None,
                     },
                 ],
@@ -1686,6 +1764,12 @@ impl WgpuRenderer {
             start = end;
         }
 
+        for retained in &frame.retained_layers {
+            if !self.draw_retained_gpu_canvas_text(retained, instance_offset, pass) {
+                return false;
+            }
+        }
+
         true
     }
 
@@ -1758,6 +1842,148 @@ impl WgpuRenderer {
         )
     }
 
+    fn draw_retained_gpu_canvas_text(
+        &self,
+        draw: &GpuCanvasRetainedTextDraw,
+        instance_offset: &mut u64,
+        pass: &mut wgpu::RenderPass<'_>,
+    ) -> bool {
+        let cache_id = Arc::as_ptr(&draw.data) as usize;
+        self.retained_gpu_canvas_text
+            .borrow_mut()
+            .retain(|_, cache| cache.data.upgrade().is_some());
+        if !self
+            .retained_gpu_canvas_text
+            .borrow()
+            .contains_key(&cache_id)
+        {
+            let data = &draw.data.frame;
+            let mut cache = self.retained_gpu_canvas_text.borrow_mut();
+            let resources = self.resources();
+            cache.insert(
+                cache_id,
+                WgpuRetainedGpuCanvasTextCache {
+                    data: Arc::downgrade(&draw.data),
+                    mono: (!data.monochrome_sprites.is_empty()).then(|| {
+                        WgpuRetainedSpriteBuffer::new(
+                            &resources.device,
+                            "retained_gpu_canvas_mono_text",
+                            &data.monochrome_sprites,
+                        )
+                    }),
+                    subpixel: (!data.subpixel_sprites.is_empty()).then(|| {
+                        WgpuRetainedSpriteBuffer::new(
+                            &resources.device,
+                            "retained_gpu_canvas_subpixel_text",
+                            &data.subpixel_sprites,
+                        )
+                    }),
+                    poly: (!data.polychrome_sprites.is_empty()).then(|| {
+                        WgpuRetainedSpriteBuffer::new(
+                            &resources.device,
+                            "retained_gpu_canvas_poly_text",
+                            &data.polychrome_sprites,
+                        )
+                    }),
+                },
+            );
+        }
+
+        let cache = self.retained_gpu_canvas_text.borrow();
+        let Some(cache) = cache.get(&cache_id) else {
+            return true;
+        };
+
+        if let Some(buffer) = &cache.mono {
+            for range in &draw.data.monochrome_ranges {
+                let Some((start, len)) = range.visible_subrange(
+                    &draw.data.frame.monochrome_sprites,
+                    &draw.visible_labels,
+                    |sprite| sprite.pad,
+                ) else {
+                    continue;
+                };
+                let Some(tex_info) = self.atlas.get_texture_info(range.texture_id) else {
+                    continue;
+                };
+                if !self.draw_instances_with_texture_retained(
+                    buffer,
+                    start as usize,
+                    len as usize,
+                    &tex_info.view,
+                    &self.resources().pipelines.mono_sprites,
+                    draw.transform,
+                    instance_offset,
+                    pass,
+                ) {
+                    return false;
+                }
+            }
+        }
+
+        if let Some(buffer) = &cache.subpixel {
+            let resources = self.resources();
+            let pipeline = resources
+                .pipelines
+                .subpixel_sprites
+                .as_ref()
+                .unwrap_or(&resources.pipelines.mono_sprites);
+            for range in &draw.data.subpixel_ranges {
+                let Some((start, len)) = range.visible_subrange(
+                    &draw.data.frame.subpixel_sprites,
+                    &draw.visible_labels,
+                    |sprite| sprite.pad,
+                ) else {
+                    continue;
+                };
+                let Some(tex_info) = self.atlas.get_texture_info(range.texture_id) else {
+                    continue;
+                };
+                if !self.draw_instances_with_texture_retained(
+                    buffer,
+                    start as usize,
+                    len as usize,
+                    &tex_info.view,
+                    pipeline,
+                    draw.transform,
+                    instance_offset,
+                    pass,
+                ) {
+                    return false;
+                }
+            }
+        }
+
+        if let Some(buffer) = &cache.poly {
+            for range in &draw.data.polychrome_ranges {
+                let Some((start, len)) = range.visible_subrange(
+                    &draw.data.frame.polychrome_sprites,
+                    &draw.visible_labels,
+                    |sprite| sprite.pad,
+                ) else {
+                    continue;
+                };
+                let Some(tex_info) = self.atlas.get_texture_info(range.texture_id) else {
+                    continue;
+                };
+                if !self.draw_instances_with_texture_retained(
+                    buffer,
+                    start as usize,
+                    len as usize,
+                    &tex_info.view,
+                    &self.resources().pipelines.poly_sprites,
+                    draw.transform,
+                    instance_offset,
+                    pass,
+                ) {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
     fn draw_instances(
         &self,
         data: &[u8],
@@ -1824,12 +2050,90 @@ impl WgpuRenderer {
                         binding: 2,
                         resource: wgpu::BindingResource::Sampler(&resources.atlas_sampler),
                     },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: &resources.retained_text_identity_buffer,
+                            offset: 0,
+                            size: Some(
+                                NonZeroU64::new(std::mem::size_of::<RetainedTextParams>() as u64)
+                                    .unwrap(),
+                            ),
+                        }),
+                    },
                 ],
             });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &resources.globals_bind_group, &[]);
         pass.set_bind_group(1, &bind_group, &[]);
         pass.draw(0..4, 0..instance_count);
+        true
+    }
+
+    fn draw_instances_with_texture_retained<T>(
+        &self,
+        instances: &WgpuRetainedSpriteBuffer<T>,
+        start: usize,
+        len: usize,
+        texture_view: &wgpu::TextureView,
+        pipeline: &wgpu::RenderPipeline,
+        transform: GpuCanvasTextTransform,
+        instance_offset: &mut u64,
+        pass: &mut wgpu::RenderPass<'_>,
+    ) -> bool {
+        if len == 0 || start >= instances.len {
+            return true;
+        }
+
+        let len = len.min(instances.len - start);
+        let byte_offset = (start * std::mem::size_of::<T>()) as u64;
+        let byte_size = (len * std::mem::size_of::<T>()) as u64;
+        let params = [RetainedTextParams::enabled(transform)];
+        let Some((params_offset, params_size)) = self.write_to_instance_buffer_aligned(
+            instance_offset,
+            bytemuck::bytes_of(&params[0]),
+            self.uniform_buffer_alignment,
+        ) else {
+            return false;
+        };
+
+        let resources = self.resources();
+        let bind_group = resources
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("retained_gpu_canvas_text_bind_group"),
+                layout: &resources.bind_group_layouts.instances_with_texture,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: &instances.buffer,
+                            offset: byte_offset,
+                            size: Some(NonZeroU64::new(byte_size.max(16)).unwrap()),
+                        }),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::Sampler(&resources.atlas_sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: &resources.instance_buffer,
+                            offset: params_offset,
+                            size: Some(params_size),
+                        }),
+                    },
+                ],
+            });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &resources.globals_bind_group, &[]);
+        pass.set_bind_group(1, &bind_group, &[]);
+        pass.draw(0..4, 0..len as u32);
         true
     }
 
@@ -1963,7 +2267,9 @@ impl WgpuRenderer {
         resources.instance_buffer = resources.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("instance_buffer"),
             size: new_capacity,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::UNIFORM
+                | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
         self.instance_buffer_capacity = new_capacity;
@@ -1974,7 +2280,17 @@ impl WgpuRenderer {
         instance_offset: &mut u64,
         data: &[u8],
     ) -> Option<(u64, NonZeroU64)> {
-        let offset = (*instance_offset).next_multiple_of(self.storage_buffer_alignment);
+        self.write_to_instance_buffer_aligned(instance_offset, data, self.storage_buffer_alignment)
+    }
+
+    fn write_to_instance_buffer_aligned(
+        &self,
+        instance_offset: &mut u64,
+        data: &[u8],
+        alignment: u64,
+    ) -> Option<(u64, NonZeroU64)> {
+        let alignment = alignment.max(1);
+        let offset = (*instance_offset).next_multiple_of(alignment);
         let size = (data.len() as u64).max(16);
         if offset + size > self.instance_buffer_capacity {
             return None;
@@ -2165,6 +2481,28 @@ impl WgpuRenderer {
 
         log::info!("GPU recovery complete");
         Ok(())
+    }
+}
+
+impl<T> WgpuRetainedSpriteBuffer<T> {
+    fn new(device: &wgpu::Device, label: &'static str, instances: &[T]) -> Self {
+        let bytes = unsafe { WgpuRenderer::instance_bytes(instances) };
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(label),
+            size: bytes.len() as u64,
+            usage: wgpu::BufferUsages::STORAGE,
+            mapped_at_creation: true,
+        });
+        {
+            let mut mapped = buffer.slice(..).get_mapped_range_mut();
+            mapped.copy_from_slice(bytes);
+        }
+        buffer.unmap();
+        Self {
+            buffer,
+            len: instances.len(),
+            _marker: PhantomData,
+        }
     }
 }
 

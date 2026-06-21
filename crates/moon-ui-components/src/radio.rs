@@ -2,7 +2,8 @@ use std::rc::Rc;
 
 use crate::{
     ActiveTheme, AxisExt, FocusableExt as _, Sizable, Size, StyledExt,
-    checkbox::checkbox_check_icon, h_flex, text::Text, tooltip::ComponentTooltip, v_flex,
+    checkbox::checkbox_check_icon, h_flex, moon::MoonPalette, text::Text,
+    tooltip::ComponentTooltip, v_flex,
 };
 use gpui::{
     AnyElement, App, Axis, Div, ElementId, InteractiveElement, IntoElement, ParentElement,
@@ -141,6 +142,7 @@ impl RenderOnce for Radio {
             .clone();
         let is_focused = focus_handle.is_focused(window);
         let disabled = self.disabled;
+        let p = MoonPalette::active(cx);
 
         let (border_color, bg) = if checked {
             (cx.theme().primary, cx.theme().primary)
@@ -199,7 +201,7 @@ impl RenderOnce for Radio {
                             _ => this.bg(bg),
                         })
                         .child(checkbox_check_icon(
-                            self.id, self.size, checked, disabled, window, cx,
+                            self.id, self.size, checked, disabled, p.blue, window, cx,
                         )),
                 )
                 .when(!self.children.is_empty() || self.label.is_some(), |this| {

@@ -1,0 +1,2705 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "file": "crates/moon-ui-components/src/moon/background.rs",
+      "signature": "pub type MoonBackgroundPolicy = crate::BackgroundPolicy;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub enum MoonBadgeContent"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub enum MoonBadgeSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub enum MoonBadgeVariant"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn bg_alpha(mut self, alpha: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn bg_color(mut self, bg: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn border_alpha(mut self, alpha: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn border_color(mut self, border: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn content(mut self, content: MoonBadgeContent) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn count(mut self, value: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn count_max(mut self, value: usize, max: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn dot(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn icon(mut self, path: &'static str) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn margin_top(mut self, margin_top: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn mono(mut self, mono: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn new(label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn render(self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn size(mut self, size: MoonBadgeSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn text_alpha(mut self, alpha: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn text_color(mut self, fg: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn variant(mut self, variant: MoonBadgeVariant) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub fn weight(mut self, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub struct MoonBadge"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub enum MoonButtonSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub enum MoonButtonVariant"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn alpha(mut self, alpha: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn color(mut self, color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn danger(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn font_size(mut self, font_size: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn full_width(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn ghost(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn icon(self, path: &'static str) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn label(mut self, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn leading_icon(mut self, icon: MoonButtonIconSlot) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn line_height(mut self, line_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn loading(mut self, loading: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn loading_icon(self, path: &'static str) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn loading_icon_slot(mut self, icon: MoonButtonIconSlot) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn medium(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn mono(mut self, mono: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn new(id: impl Into<ElementId>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn new(path: &'static str) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn new(text: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn on_click( mut self, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn on_hover(mut self, handler: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn outline(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn primary(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn render(self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn rounded(mut self, radius: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn segment(mut self, segment: MoonButtonSegment) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn size(mut self, size: MoonButtonSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn size(mut self, size: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn small(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn success(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn tab_index(mut self, tab_index: isize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn tab_stop(mut self, tab_stop: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn text_segment(mut self, text: impl Into<SharedString>, color: u32, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn tracking(mut self, tracking: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn trailing_icon(mut self, icon: MoonButtonIconSlot) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn variant(mut self, variant: MoonButtonVariant) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn warning(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn weight(mut self, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn xsmall(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub struct MoonButton"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub struct MoonButtonIconSlot"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub struct MoonButtonSegment"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub enum MoonCheckboxSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn checked(mut self, checked: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn default_checked(mut self, checked: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn indeterminate(mut self, indeterminate: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn label(mut self, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn mono(mut self, mono: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn on_change(mut self, handler: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn size(mut self, size: MoonCheckboxSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub struct MoonCheckbox"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub enum MoonColorPickerEvent"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn colors(mut self, colors: impl IntoIterator<Item = Hsla>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn default_value(mut self, value: Hsla) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn id(mut self, id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn new(state: &Entity<MoonColorPickerState>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn value(&self) -> Hsla"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub struct MoonColorPicker"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub struct MoonColorPickerState"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn item(mut self, item: MoonMenuItem) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn items(mut self, items: impl IntoIterator<Item = MoonMenuItem>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn max_height(mut self, max_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn open(mut self, open: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn position(mut self, position: Point<Pixels>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub struct MoonContextMenu"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub struct MoonContextMenuOverlay"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub enum MoonDataTableContextTarget"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub enum MoonDataTableEvent"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn apply_selection_delta( &mut self, row_delta: isize, column_delta: isize, rows: usize, columns: usize, ) -> Option<(usize, usize)>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn background_policy(mut self, policy: MoonBackgroundPolicy) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn cell_selectable(mut self, selectable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn close_context_menu(&mut self)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn column_selectable(mut self, selectable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn columns(mut self, columns: impl IntoIterator<Item = MoonDataTableColumn>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn context_menu( mut self, builder: impl Fn(&MoonDataTableContextTarget, &mut Window, &mut App) -> Vec<MoonMenuItem> + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn element(element: impl IntoElement + 'static) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn fill(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn fixed_left(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn font_size(mut self, font_size: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn header_height(mut self, header_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn horizontal_scroll_handle(&self) -> ScrollHandle"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn line_height(mut self, line_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn move_column_before( &mut self, source: &SharedString, target: &SharedString, all_columns: impl IntoIterator<Item = SharedString>, ) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn move_selection( &mut self, row_delta: isize, column_delta: isize, rows: usize, columns: usize, cx: &mut Context<Self>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn new( id: impl Into<SharedString>, row_count: usize, render_row: impl Fn(usize, &mut Window, &mut App) -> MoonDataRow + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn new() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn new(cells: impl IntoIterator<Item = MoonDataCell>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn new(key: impl Into<SharedString>, title: impl Into<SharedString>, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_double_click_cell( mut self, handler: impl Fn(usize, usize, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_double_click_row( mut self, handler: impl Fn(usize, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_right_click_cell( mut self, handler: impl Fn(usize, usize, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_right_click_column( mut self, handler: impl Fn(usize, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_right_click_row( mut self, handler: impl Fn(usize, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_select_cell( mut self, handler: impl Fn(usize, usize, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_select_column( mut self, handler: impl Fn(usize, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_select_row( mut self, handler: impl Fn(usize, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_sort( mut self, handler: impl Fn(&SharedString, bool, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn open_context_menu( &mut self, target: MoonDataTableContextTarget, position: Point<Pixels>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn right(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn row_header(mut self, row_header: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn row_header_width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn row_height(mut self, row_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn select_cell(&mut self, row: usize, column: usize, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn select_column(&mut self, column: Option<usize>, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn select_row(&mut self, row: Option<usize>, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn set_column_order(&mut self, order: impl IntoIterator<Item = SharedString>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn set_column_width(&mut self, key: impl Into<String>, width: f32)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn set_sort(&mut self, column: impl Into<SharedString>, ascending: bool)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn set_viewport_width(&mut self, width: f32) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn sortable(mut self, sortable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn state(mut self, state: &Entity<MoonDataTableState>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn style(mut self, style: MoonTableStyle) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn text(text: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn text_color(mut self, color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn toggle_sort(&mut self, column: impl Into<SharedString>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn track_scroll(mut self, handle: &MoonVirtualListScrollHandle) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn viewport_width(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn weight(mut self, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub struct MoonDataCell"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub struct MoonDataRow"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub struct MoonDataTable"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub struct MoonDataTableColumn"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub struct MoonDataTableContext"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub struct MoonDataTableState"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub enum DockEvent"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub enum DockItem"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub enum DockPlacement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub enum DockSplitPlacement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub enum PanelEvent"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub enum PanelInfo"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn active_index(&self) -> Option<usize>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn active_index(mut self, active_ix: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn add_panel( &mut self, panel: Rc<dyn PanelView>, placement: DockPlacement, size: Option<f32>, window: &mut Window, cx: &mut Context<Self>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn background_policy(mut self, policy: MoonBackgroundPolicy) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn child(mut self, child: PanelState) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn clear_zoom(&mut self, window: &mut Window, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn closable(mut self, closable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn content_background_policy(mut self, policy: MoonBackgroundPolicy) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn detachable(mut self, detachable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn dump(&self, cx: &App) -> DockAreaState"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn empty() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn enable_split_drop(mut self, enable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn from_state( id: impl Into<SharedString>, state: DockAreaState, window: &mut Window, cx: &mut Context<Self>, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn h_split( items: Vec<DockItem>, dock_area: &WeakEntity<DockArea>, window: &mut Window, cx: &mut App, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn header_background_policy(mut self, policy: MoonBackgroundPolicy) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn info(mut self, info: PanelInfo) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn insert_panel_into_home_tabs( &mut self, panel: Rc<dyn PanelView>, ix: usize, sibling_names: &[&str], window: &mut Window, cx: &mut Context<Self>, ) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn load( &mut self, state: DockAreaState, window: &mut Window, cx: &mut Context<Self>, ) -> Result<(), String>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn new( id: impl Into<SharedString>, version: Option<usize>, _window: &mut Window, _cx: &mut Context<Self>, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn new( panel_name: impl Into<SharedString>, title: impl Into<SharedString>, render: impl Fn(&mut Window, &mut App) -> AnyElement + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>, items: Vec<Rc<dyn PanelView>>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn new(panel_name: impl Into<String>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn panel(info: serde_json::Value) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn panel(panel: Rc<dyn PanelView>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn register_panel<F>(cx: &mut App, panel_name: &str, factory: F) where F: Fn(&PanelState, &PanelInfo, &mut Window, &mut App) -> Rc<dyn PanelView> + 'static,"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn remove_panel_by_name( &mut self, panel_name: &str, window: &mut Window, cx: &mut Context<Self>, ) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn set_center(&mut self, item: DockItem, window: &mut Window, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn set_dock_open( &mut self, placement: DockPlacement, open: bool, cx: &mut Context<Self>, ) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn show_dock_header(mut self, show_dock_header: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn show_header(mut self, show_header: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn show_panel_controls(mut self, show_panel_controls: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn split(horizontal: bool, items: Vec<DockItem>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn split_with_sizes( axis: Axis, items: Vec<DockItem>, sizes: Vec<Option<Pixels>>, _dock_area: &WeakEntity<DockArea>, _window: &mut Window, _cx: &mut App, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn stack(sizes: Vec<f32>, horizontal: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn tab<T>( panel: Entity<T>, dock_area: &WeakEntity<DockArea>, window: &mut Window, cx: &mut App, ) -> Self where T: Panel,"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn tab_background_policy(mut self, policy: MoonBackgroundPolicy) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn tabs( items: Vec<Rc<dyn PanelView>>, dock_area: &WeakEntity<DockArea>, window: &mut Window, cx: &mut App, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn tabs(active_index: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn tiles(items: Vec<Rc<dyn PanelView>>, metas: Vec<TileMeta>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn to_item<C>(&self, window: &mut Window, cx: &mut C) -> DockItem where C: BorrowMut<App>,"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn toggle_dock(&mut self, placement: DockPlacement, cx: &mut Context<Self>) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn toggle_zoom_panel( &mut self, panel_name: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn v_split( items: Vec<DockItem>, dock_area: &WeakEntity<DockArea>, window: &mut Window, cx: &mut App, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn visible(mut self, visible: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn zoomable(mut self, zoomable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct DockArea"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct DockAreaState"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct DockState"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct MoonDockPanel"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct PanelState"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct TabPanel"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct TileMeta"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub enum MoonMenuItemKind"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub enum MoonMenuSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn checked(mut self, checked: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn close_on_select(mut self, close_on_select: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn default_open(mut self, default_open: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn has_submenu(&self) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn header(mut self, header: impl IntoElement) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn item(mut self, item: MoonMenuItem) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn items(mut self, items: impl IntoIterator<Item = MoonMenuItem>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn key(&self) -> &SharedString"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn label(label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn label(mut self, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn max_height(mut self, max_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn menu_max_height(mut self, max_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn menu_offset(mut self, x: f32, y: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn menu_width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn mono(mut self, mono: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn new(label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn on_click( mut self, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn on_open_change( mut self, handler: impl Fn(bool, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn on_select( mut self, handler: impl Fn(&SharedString, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn open(mut self, open: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn render(self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn render_with_palette(self, p: MoonPalette) -> AnyElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn right_label(mut self, right_label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn segment(mut self, segment: MoonButtonSegment) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn separator() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn size(mut self, size: MoonMenuSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn submenu(mut self, items: impl IntoIterator<Item = MoonMenuItem>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_size(mut self, size: MoonButtonSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_variant(mut self, variant: MoonButtonVariant) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn with_key(key: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub struct MoonDropdown"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub struct MoonMenuItem"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub struct MoonPopupMenu"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub enum MoonSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub enum ThemeMode"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn box_shadow( x: impl Into<Pixels>, y: impl Into<Pixels>, blur: impl Into<Pixels>, spread: impl Into<Pixels>, color: Hsla, ) -> BoxShadow"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn h_flex() -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn init(cx: &mut App)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn v_flex() -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub struct Theme"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub type MoonBoolChangeHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub type MoonClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub type MoonF32ChangeHandler = Rc<dyn Fn(f32, &mut Window, &mut App)>;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub type MoonIndexedClickHandler = Rc<dyn Fn(usize, &ClickEvent, &mut Window, &mut App)>;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub type MoonSelectHandler = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub type Size = MoonSize;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/icons.rs",
+      "signature": "pub const MOON_ICON_CARET_DOWN: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/assets/moon-caret-down.svg\");"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/icons.rs",
+      "signature": "pub const MOON_ICON_CHECK: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/assets/moon-check.svg\");"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/icons.rs",
+      "signature": "pub const MOON_ICON_TOOLTIP_ARROW: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/assets/moon-tooltip-arrow.svg\");"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/icons.rs",
+      "signature": "pub fn moon_icon(path: &'static str, size: f32, color: u32, alpha: f32) -> Svg"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/index_path.rs",
+      "signature": "pub fn column(mut self, column: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/index_path.rs",
+      "signature": "pub fn eq_row(self, index: IndexPath) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/index_path.rs",
+      "signature": "pub fn new(row: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/index_path.rs",
+      "signature": "pub fn row(mut self, row: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/index_path.rs",
+      "signature": "pub fn section(mut self, section: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/index_path.rs",
+      "signature": "pub struct IndexPath"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub enum MoonInputSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn bind_moon_input_keys(_cx: &mut App) {}"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn clean_on_escape(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn clean_on_escape_enabled(mut self, clean_on_escape: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn cleanable(mut self, cleanable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn default_value(mut self, value: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn loading(mut self, loading: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn mask_toggle(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn mono(mut self, mono: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn normal(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn pattern(mut self, pattern: Regex) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn prefix(mut self, prefix: impl IntoElement) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn size(mut self, size: MoonInputSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn small(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn state(mut self, state: &Entity<MoonInputState>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn suffix(mut self, suffix: impl IntoElement) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn text_align(mut self, align: TextAlign) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub fn validate( mut self, validator: impl Fn(&str, &mut Context<MoonInputState>) -> bool + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub struct MoonInput"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub type MoonInputEvent = InputEvent;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub type MoonInputState = InputState;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input.rs",
+      "signature": "pub type MoonInputValidator = Rc<dyn Fn(&str, &mut Context<MoonInputState>) -> bool + 'static>;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub enum MoonInputMaskPattern"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub enum MoonInputMaskToken"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn is_match(&self, ch: char) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn is_none(&self) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn is_separator(&self) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn is_valid(&self, masked_text: &str) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn is_valid_at(&self, ch: char, pos: usize) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn mask(&self, text: &str) -> SharedString"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn new(pattern: &str) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn number(separator: Option<char>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn number_with_fraction(separator: Option<char>, fraction: Option<usize>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn placeholder(&self) -> Option<SharedString>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn placeholder(&self) -> char"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/input_mask.rs",
+      "signature": "pub fn unmask(&self, masked_text: &str) -> String"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub mod foundation;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use background::{MoonBackgroundPolicy, MoonBackgroundPolicyExt};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use badge::{MoonBadge, MoonBadgeSize, MoonBadgeVariant};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use button::{ MoonButton, MoonButtonIconSlot, MoonButtonSegment, MoonButtonSize, MoonButtonVariant, };"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use checkbox::{MoonCheckbox, MoonCheckboxSize};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use context_menu::{MoonContextMenu, MoonContextMenuOverlay, MoonContextMenuWindowExt};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use data_table::{ MoonDataCell, MoonDataRow, MoonDataTable, MoonDataTableColumn, MoonDataTableState, };"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use dock::{ DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, MoonDockPanel, Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel, };"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use dropdown::{MoonDropdown, MoonMenuItem, MoonMenuSize, MoonPopupMenu};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use foundation::{StyledExt, ThemeMode, h_flex, init, v_flex};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use icons::{MOON_ICON_CARET_DOWN, MOON_ICON_CHECK};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use index_path::IndexPath;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use input::{MoonInput, MoonInputEvent, MoonInputState, MoonInputValidator};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use input_mask::{MoonInputMaskPattern, MoonInputMaskToken};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use popover::{MoonPopover, MoonPopoverPlacement};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use root::{MoonRoot, MoonRoot as Root};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use scroll_area::{MoonScrollAxis, MoonScrollbarVisibility};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use segment::{MoonAccent, MoonSegmentItem, MoonSegmentedControl};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use select::{MoonSelect, MoonSelectEvent, MoonSelectItem, MoonSelectState};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use slider::{MoonSlider, MoonSliderEvent, MoonSliderState};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use status_bar::{MoonStatusBar, MoonStatusIndicator, MoonStatusItem};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use tab::{ MoonTabItem, MoonTabStrip, moon_active_tab_underline, moon_active_tab_underline_scaled, };"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use table::{MoonTableAlign, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use text::MoonText;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use text_area::{MoonTextArea, MoonTextAreaEvent, MoonTextAreaState};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use theme::{ MoonScale, MoonTextMetrics, MoonTheme, MoonThemeConfig, MoonThemeConfigError, MoonThemeTokens, MoonTypography, };"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use tokens::{MoonMetrics, MoonPalette, MoonRect, MoonTone, rgba_from};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use tooltip::{MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use virtual_list::{MoonVirtualList, MoonVirtualListScrollHandle};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use window_frame::{ MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, MoonWindowFrameKind, };"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub enum MoonPopoverPlacement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn background_policy(mut self, policy: MoonBackgroundPolicy) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn close_on_content_click(mut self, close: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn content(mut self, content: impl IntoElement) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn default_open(mut self, open: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn offset(mut self, x: f32, y: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn on_open_change( mut self, handler: impl Fn(bool, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn open(mut self, open: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn placement(mut self, placement: MoonPopoverPlacement) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn trigger(mut self, trigger: impl IntoElement) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub struct MoonPopover"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/root.rs",
+      "signature": "pub type MoonRoot = crate::Root;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/scroll_area.rs",
+      "signature": "pub enum MoonScrollAxis"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/scroll_area.rs",
+      "signature": "pub enum MoonScrollbarVisibility"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/scroll_area.rs",
+      "signature": "pub fn moon_scrollbar_overlay_with_palette( id: impl Into<SharedString>, scroll_handle: &ScrollHandle, axis: MoonScrollAxis, visibility: MoonScrollbarVisibility, p: MoonPalette, window: &mut Window, cx: &mut App, ) -> Option<AnyElement>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub enum MoonAccent"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn accent(mut self, accent: MoonAccent) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn item(mut self, item: MoonSegmentItem) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn item_gap(mut self, item_gap: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn items(mut self, items: impl IntoIterator<Item = MoonSegmentItem>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn new(hotkey: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn new(id: impl Into<ElementId>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn on_click( mut self, handler: impl Fn(usize, &ClickEvent, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn render(self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub struct MoonSegmentItem"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub struct MoonSegmentedControl"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub enum MoonSelectEvent<T>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn active_index(&self) -> Option<IndexPath>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn appearance(mut self, appearance: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn cleanable(mut self, cleanable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn clear_selection(&mut self)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn focus(&self, window: &mut Window, cx: &mut App)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn id(mut self, id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn items(&self) -> &[MoonSelectItem<T>]"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn menu_max_height(mut self, height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn menu_width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn new( items: impl IntoIterator<Item = MoonSelectItem<T>>, selected_index: Option<IndexPath>, window: &mut Window, cx: &mut Context<Self>, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn new(state: &Entity<MoonSelectState<T>>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn new(value: T, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn search_placeholder(mut self, placeholder: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn searchable(mut self, searchable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn selected_index(&self) -> Option<IndexPath>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn selected_label(&self) -> Option<SharedString>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn selected_value(&self) -> Option<&T>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn set_items( &mut self, items: impl IntoIterator<Item = MoonSelectItem<T>>, cx: &mut Context<Self>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn set_open(&mut self, open: bool)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn set_selected_index(&mut self, index: Option<IndexPath>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn set_selected_value(&mut self, value: &T) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn title_prefix(mut self, prefix: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn trigger_size(mut self, size: MoonButtonSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn trigger_variant(mut self, variant: MoonButtonVariant) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub struct MoonSelect<T> where T: Clone + PartialEq + 'static,"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub struct MoonSelectItem<T>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub struct MoonSelectState<T> where T: Clone + PartialEq + 'static,"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/slider.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/slider.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/slider.rs",
+      "signature": "pub fn height(mut self, height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/slider.rs",
+      "signature": "pub fn id(self, _id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/slider.rs",
+      "signature": "pub fn new(state: &Entity<MoonSliderState>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/slider.rs",
+      "signature": "pub struct MoonSlider"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/slider.rs",
+      "signature": "pub type MoonSliderEvent = SliderEvent;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/slider.rs",
+      "signature": "pub type MoonSliderState = SliderState;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn alpha(mut self, alpha: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn color(mut self, color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn gap_after(mut self, gap_after: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn glow(mut self, radius: f32, alpha: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn indicator(mut self, indicator: MoonStatusIndicator) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn item(mut self, item: MoonStatusItem) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn item_gap(mut self, item_gap: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn items(mut self, items: impl IntoIterator<Item = MoonStatusItem>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn new(color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn new(id: impl Into<ElementId>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn new(text: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn render(self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn right_item(mut self, item: MoonStatusItem) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn right_items(mut self, items: impl IntoIterator<Item = MoonStatusItem>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn right_offset(mut self, right_offset: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn separator() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn size(mut self, size: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn weight(mut self, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub struct MoonStatusBar"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub struct MoonStatusIndicator"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub struct MoonStatusItem"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn badge(mut self, badge: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn closable(mut self, closable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn gap(mut self, gap: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn item(mut self, item: MoonTabItem) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn items(mut self, items: impl IntoIterator<Item = MoonTabItem>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn moon_active_tab_underline(p: MoonPalette) -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn moon_active_tab_underline_scaled(p: MoonPalette, tokens: MoonThemeTokens) -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn new(id: impl Into<ElementId>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn new(label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn on_click( mut self, handler: impl Fn(usize, &ClickEvent, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn on_close( mut self, handler: impl Fn(usize, &ClickEvent, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn padding_left(mut self, padding_left: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn render(self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub struct MoonTabItem"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub struct MoonTabStrip"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub enum MoonTableAlign"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn align(mut self, align: MoonTableAlign) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn cell(mut self, cell: MoonTableCell) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn cell_padding(mut self, left: f32, right: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn cells(mut self, cells: impl IntoIterator<Item = MoonTableCell>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn element(element: impl IntoElement + 'static) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn fill(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn font_size(mut self, font_size: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn for_palette(p: MoonPalette) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn header_padding(mut self, left: f32, right: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn line_height(mut self, line_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn new() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn new(_title: impl Into<SharedString>, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn right(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn text(text: impl Into<SharedString>, tone: MoonTone, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn text_alpha(mut self, text_alpha: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn text_color(mut self, color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn themed(self, p: MoonPalette) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn weight(mut self, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub struct MoonTableCell"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub struct MoonTableColumn"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub struct MoonTableRow"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub struct MoonTableStyle"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn alpha(mut self, alpha: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn color(mut self, color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn font_size(mut self, font_size: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn line_height(mut self, line_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn mono(mut self, mono: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn new(text: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn render(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn style(mut self, style: MoonTextStyle) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn tracking(mut self, tracking: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn uppercase(mut self, uppercase: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn weight(mut self, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn wrap(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub struct MoonText"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub struct MoonTextStyle"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub enum MoonTextAreaSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn auto_grow(mut self, min_rows: usize, max_rows: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn clean_on_escape(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn clean_on_escape_enabled(mut self, clean_on_escape: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn default_value(mut self, value: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn formula(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn mono(mut self, mono: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn rows(mut self, rows: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn size(mut self, size: MoonTextAreaSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn state(mut self, state: &Entity<MoonTextAreaState>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn submit_on_enter(mut self, submit: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub struct MoonTextArea"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub type MoonTextAreaEvent = InputEvent;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text_area.rs",
+      "signature": "pub type MoonTextAreaState = InputState;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub enum MoonThemeConfigError"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn active_tokens(cx: &App) -> MoonThemeTokens"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn base_font_size(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn base_mono_font_size(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn fit_height(&self, base_height: f32, base_line_height: f32, base_pad_y: f32) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn font(&self, value: f32) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn font_family(&self, mono: bool) -> SharedString"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn from_config(config: MoonThemeConfig) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn global(cx: &App) -> Option<&Self>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn global_mut(cx: &mut App) -> &mut Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn install(cx: &mut App)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn install_config(config: MoonThemeConfig, cx: &mut App)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn install_toml(path: impl AsRef<Path>, cx: &mut App) -> Result<(), MoonThemeConfigError>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn line_height(&self, value: f32) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn load_toml(path: impl AsRef<Path>) -> Result<MoonThemeConfig, MoonThemeConfigError>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn moon_light() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn moon_terminal() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn set_font_delta(&mut self, font_delta: f32)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn set_mode(mode: ThemeMode, cx: &mut App)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn set_ui_scale(&mut self, ui_scale: f32)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn text(&self, font_size: f32, line_height: f32) -> MoonTextMetrics"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn ui(&self, value: f32) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn with_font_delta(mut self, font_delta: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn with_ui_scale(mut self, ui_scale: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub struct MoonScale"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub struct MoonTextMetrics"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub struct MoonTheme"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub struct MoonThemeConfig"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub struct MoonThemeTokens"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub struct MoonTypography"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub const LIGHT: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub const TERMINAL: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub const fn new(x: f32, y: f32, w: f32, h: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub enum MoonTone"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub fn active(cx: &App) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub fn color(self, palette: MoonPalette) -> u32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub fn rgb_from(rgb_hex: u32) -> Hsla"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub fn rgba_from(rgb_hex: u32, alpha: f32) -> Hsla"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub struct MoonMetrics"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub struct MoonPalette"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub struct MoonRect"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub enum MoonTooltipPlacement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub enum MoonTooltipSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn arrow(mut self, arrow: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn detail(mut self, detail: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn empty(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn max_width(mut self, max_width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn mono(mut self, mono: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn new(text: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn placement(mut self, placement: MoonTooltipPlacement) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn shortcut(mut self, shortcut: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn size(mut self, size: MoonTooltipSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub fn with_id(id: impl Into<SharedString>, text: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub struct MoonTooltip"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tooltip.rs",
+      "signature": "pub struct MoonTooltipView"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn background_policy(mut self, policy: MoonBackgroundPolicy) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn border(mut self, border: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn new<R>( id: impl Into<SharedString>, item_count: usize, item_height: f32, render_item: impl 'static + Fn(usize, &mut Window, &mut App) -> R, ) -> Self where R: IntoElement,"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn padding(mut self, padding: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn radius(mut self, radius: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn scrollbar_visibility(mut self, visibility: MoonScrollbarVisibility) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn surface(mut self, surface: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn tail_fill_color(mut self, color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn track_scroll(mut self, scroll_handle: &MoonVirtualListScrollHandle) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn y_flipped(mut self, y_flipped: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub struct MoonVirtualList"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub type MoonVirtualListScrollHandle = UniformListScrollHandle;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub enum MoonWindowFrameBrand"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub enum MoonWindowFrameControls"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub enum MoonWindowFrameKind"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn brand(mut self, brand: MoonWindowFrameBrand) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn brand_cluster(&self, cx: &App) -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn button_height(mut self, height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn button_width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn controls(mut self, controls: MoonWindowFrameControls) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn controls_width(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn debug(id: impl Into<SharedString>, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn detached_chart(id: impl Into<SharedString>, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn detached_panel(id: impl Into<SharedString>, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn drag_handle(&self) -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn drag_width(mut self, width: Option<f32>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn header_height(mut self, header_h: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn hit_overlay(&self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn kind(&self) -> MoonWindowFrameKind"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn leading_inset(mut self, inset: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn leading_inset_value(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn main(id: impl Into<SharedString>, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>, kind: MoonWindowFrameKind, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn popup(id: impl Into<SharedString>, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn right_inset(mut self, inset: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn show_controls(mut self, show: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn title_cluster(&self, title: impl Into<SharedString>, cx: &App) -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn tool(id: impl Into<SharedString>, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn visual_brand(&self, cx: &App) -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub fn visual_controls(&self, cx: &App) -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/window_frame.rs",
+      "signature": "pub struct MoonWindowFrame"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod accordion"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod alert"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod components"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod dialog"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod foundation"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod menu"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod notification"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod popover"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod progress"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod scroll"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod tag"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod theme"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::accordion::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::alert::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::dialog::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::menu::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::moon::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::moon::foundation::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::notification::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::popover::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::progress::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::scroll::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::tag::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::theme::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::{ Disableable, GlobalState, InteractiveElementExt, StyledExt, Theme, ThemeMode, WindowExt, init, locale, measure, measure_if, set_locale, };"
+    }
+  ]
+}

@@ -2,7 +2,10 @@ use crate::checkbox::Checkbox;
 use crate::{Disableable, Sizable};
 use gpui::*;
 
-use super::tokens::{MoonRect, MoonTone};
+use super::{
+    theme::MoonTheme,
+    tokens::{MoonRect, MoonTone},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonCheckboxSize {
@@ -33,6 +36,7 @@ pub struct MoonCheckbox {
     indeterminate: bool,
     size: MoonCheckboxSize,
     tone: MoonTone,
+    mono: bool,
     on_change: Option<std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
 }
 
@@ -48,6 +52,7 @@ impl MoonCheckbox {
             indeterminate: false,
             size: MoonCheckboxSize::Normal,
             tone: MoonTone::Info,
+            mono: false,
             on_change: None,
         }
     }
@@ -92,7 +97,8 @@ impl MoonCheckbox {
         self
     }
 
-    pub fn mono(self, _mono: bool) -> Self {
+    pub fn mono(mut self, mono: bool) -> Self {
+        self.mono = mono;
         self
     }
 
@@ -116,6 +122,8 @@ impl RenderOnce for MoonCheckbox {
         let mut checkbox = Checkbox::new(state_id)
             .checked(checked)
             .disabled(self.disabled)
+            .tone(self.tone)
+            .mono(self.mono)
             .with_size(size_for(self.size))
             .on_click(move |value, window, cx| {
                 if !controlled {
@@ -140,7 +148,17 @@ impl RenderOnce for MoonCheckbox {
                 .w(px(bounds.w))
                 .h(px(bounds.h));
         }
-        let _ = self.tone;
+        if let MoonCheckboxSize::Custom {
+            font_size,
+            line_height,
+            ..
+        } = self.size
+        {
+            let tokens = MoonTheme::active_tokens(cx);
+            checkbox = checkbox
+                .text_size(px(tokens.font(font_size)))
+                .line_height(px(tokens.line_height(line_height)));
+        }
         checkbox
     }
 }

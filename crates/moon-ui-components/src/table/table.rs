@@ -5,8 +5,7 @@ use gpui::{
 
 use crate::{
     AnyChildElement, ChildElement, Sizable, Size, StyledExt as _,
-    moon::MoonTheme,
-    moon_skin::{MoonSkinPalette, moon_color},
+    moon::{MoonPalette, MoonTheme, rgba_from},
 };
 
 const MIN_CELL_WIDTH: Pixels = px(100.);
@@ -90,7 +89,7 @@ impl ChildElement for Table {
 
 impl RenderOnce for Table {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let p = MoonSkinPalette::TERMINAL;
+        let p = MoonPalette::active(cx);
         let tokens = MoonTheme::active_tokens(cx);
         div()
             .id(("table", self.ix))
@@ -99,7 +98,7 @@ impl RenderOnce for Table {
             .text_size(px(tokens.font(10.0)))
             .line_height(px(tokens.line_height(13.0)))
             .overflow_hidden()
-            .bg(moon_color(p.table_body, 1.0))
+            .bg(rgba_from(p.table_body, 1.0))
             .refine_style(&self.style)
             .children(
                 self.children
@@ -165,16 +164,16 @@ impl Sizable for TableHeader {
 }
 
 impl RenderOnce for TableHeader {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let p = MoonSkinPalette::TERMINAL;
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
         div()
             .id(("table-header", self.ix))
             .w_full()
-            .bg(moon_color(p.table_head, 1.0))
-            .text_color(moon_color(p.text_muted, 1.0))
+            .bg(rgba_from(p.table_head, 1.0))
+            .text_color(rgba_from(p.text_muted, 1.0))
             .refine_style(&self.style)
             .border_b_1()
-            .border_color(moon_color(p.border, 1.0))
+            .border_color(rgba_from(p.border, 1.0))
             .children(
                 self.children
                     .into_iter()
@@ -308,15 +307,15 @@ impl ChildElement for TableFooter {
 }
 
 impl RenderOnce for TableFooter {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let p = MoonSkinPalette::TERMINAL;
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
         div()
             .id(("table-footer", self.ix))
             .w_full()
-            .bg(moon_color(p.table_head, 1.0))
-            .text_color(moon_color(p.text_muted, 1.0))
+            .bg(rgba_from(p.table_head, 1.0))
+            .text_color(rgba_from(p.text_muted, 1.0))
             .border_t_1()
-            .border_color(moon_color(p.border, 1.0))
+            .border_color(rgba_from(p.border, 1.0))
             .refine_style(&self.style)
             .children(
                 self.children
@@ -382,15 +381,15 @@ impl ChildElement for TableRow {
 }
 
 impl RenderOnce for TableRow {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let p = MoonSkinPalette::TERMINAL;
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
         div()
             .id(("table-row", self.ix))
             .w_full()
             .flex()
             .flex_row()
             .refine_style(&self.style)
-            .border_color(moon_color(p.border, 1.0))
+            .border_color(rgba_from(p.border, 1.0))
             .when(self.ix > 0, |this| this.border_t_1())
             .children(
                 self.children
@@ -634,7 +633,7 @@ impl Styled for TableCaption {
 impl RenderOnce for TableCaption {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let paddings = self.size.table_cell_padding();
-        let p = MoonSkinPalette::TERMINAL;
+        let p = MoonPalette::active(cx);
         let tokens = MoonTheme::active_tokens(cx);
 
         div()
@@ -644,7 +643,7 @@ impl RenderOnce for TableCaption {
             .py(paddings.top)
             .text_size(px(tokens.font(10.0)))
             .line_height(px(tokens.line_height(13.0)))
-            .text_color(moon_color(p.text_muted, 1.0))
+            .text_color(rgba_from(p.text_muted, 1.0))
             .text_center()
             .refine_style(&self.style)
             .children(self.children)

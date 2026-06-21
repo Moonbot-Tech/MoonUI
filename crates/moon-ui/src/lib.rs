@@ -11,8 +11,4 @@ pub mod foundation {
     pub use gpui_component::moon::foundation::*;
 }
 
-pub mod components {
-    pub use gpui_component::*;
-}
-
 pub use gpui_component::moon::*;

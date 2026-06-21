@@ -1,0 +1,1152 @@
+{
+  "version": 1,
+  "components": [
+    {
+      "concept": "accordion",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Accordion",
+      "theme_source": "MoonTheme tokens through theme bridge / MoonAccordion wrapper",
+      "public_path": "moon_ui::MoonAccordion",
+      "upstream_ref": "Longbridge::accordion@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "alert",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Alert",
+      "theme_source": "MoonTheme bridge through MoonAlert wrapper",
+      "public_path": "moon_ui::MoonAlert",
+      "upstream_ref": "Longbridge::alert@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "avatar",
+      "class": "Forged",
+      "behavior_source": "Moon avatar renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonAvatar",
+      "upstream_ref": "Longbridge::avatar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": "Longbridge avatar behavior is small; MoonBot visual needs dense terminal initials/avatar styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "avatar_group",
+      "class": "Forged",
+      "behavior_source": "Moon avatar group renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonAvatarGroup",
+      "upstream_ref": "Longbridge::avatar::AvatarGroup@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": "MoonBot overlap and terminal avatar styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "background_policy",
+      "class": "Internal",
+      "behavior_source": "Moon background policy type",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonBackgroundPolicy",
+      "upstream_ref": null,
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "badge",
+      "class": "Forged",
+      "behavior_source": "Moon badge wrapper",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonBadge",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot density, tones, and status styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "breadcrumb",
+      "class": "Forged",
+      "behavior_source": "Moon breadcrumb renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonBreadcrumb",
+      "upstream_ref": "Longbridge::breadcrumb@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": "MoonBot compact mono breadcrumb styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "button",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Button",
+      "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
+      "public_path": "moon_ui::MoonButton",
+      "upstream_ref": "Longbridge::button@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "button.click",
+        "button.width_api",
+        "button.mono_font",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "button_icon_slot",
+      "class": "Internal",
+      "behavior_source": "Moon button icon adapter",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonButtonIconSlot",
+      "upstream_ref": null,
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "button_segment",
+      "class": "Internal",
+      "behavior_source": "Moon button rich text segment",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonButtonSegment",
+      "upstream_ref": null,
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "calendar",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Calendar",
+      "theme_source": "MoonTheme bridge through MoonCalendar facade",
+      "public_path": "moon_ui::MoonCalendar",
+      "upstream_ref": "Longbridge::time::calendar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "chart",
+      "class": "Forbidden",
+      "behavior_source": "charts are raw GPU/chartdx, not UI palette components",
+      "theme_source": "n/a",
+      "public_path": null,
+      "upstream_ref": null,
+      "fork_reason": "charts are raw GPU/chartdx, not UI palette components",
+      "contracts": []
+    },
+    {
+      "concept": "checkbox",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Checkbox",
+      "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
+      "public_path": "moon_ui::MoonCheckbox",
+      "upstream_ref": "Longbridge::checkbox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "checkbox.checked_glyph.asset",
+        "checkbox.click_toggles",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "collapsible",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand collapsible section renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonCollapsible",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot dense expandable panel styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "color_picker",
+      "class": "Mirror",
+      "behavior_source": "Longbridge ColorPicker",
+      "theme_source": "MoonTheme tokens through Moon wrapper",
+      "public_path": "moon_ui::MoonColorPicker",
+      "upstream_ref": "Longbridge::color_picker@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "combobox",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Combobox/SearchableList",
+      "theme_source": "MoonTheme bridge through MoonCombobox facade",
+      "public_path": "moon_ui::MoonCombobox",
+      "upstream_ref": "Longbridge::combobox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "context_menu",
+      "class": "Forged",
+      "behavior_source": "Moon root/window overlay",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonContextMenu",
+      "upstream_ref": null,
+      "fork_reason": "Moon overlay z-order and root ownership",
+      "contracts": [
+        "context_menu.root_owned",
+        "context_menu.edge_clamp",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "data_table",
+      "class": "Forged",
+      "behavior_source": "Moon immediate-mode data table",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonDataTable",
+      "upstream_ref": null,
+      "fork_reason": "terminal buffers rows by callback, not retained row entities",
+      "contracts": [
+        "data_table.text_clipping",
+        "data_table.scroll_axis",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "date_picker",
+      "class": "Mirror",
+      "behavior_source": "Longbridge DatePicker",
+      "theme_source": "MoonTheme bridge through MoonDatePicker facade",
+      "public_path": "moon_ui::MoonDatePicker",
+      "upstream_ref": "Longbridge::time::date_picker@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "description_list",
+      "class": "Mirror",
+      "behavior_source": "Longbridge DescriptionList",
+      "theme_source": "MoonTheme bridge through MoonDescriptionList wrapper",
+      "public_path": "moon_ui::MoonDescriptionList",
+      "upstream_ref": "Longbridge::description_list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "dialog",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Dialog",
+      "theme_source": "MoonTheme bridge through MoonDialog wrapper",
+      "public_path": "moon_ui::MoonDialog",
+      "upstream_ref": "Longbridge::dialog@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "dock",
+      "class": "Forged",
+      "behavior_source": "Moon custom dock engine",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::DockArea",
+      "upstream_ref": null,
+      "fork_reason": "chart host, detach, split/drop, background policy",
+      "contracts": [
+        "dock.behavior_contracts",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "dock_panel",
+      "class": "Forged",
+      "behavior_source": "Moon dock panel view adapter",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonDockPanel",
+      "upstream_ref": null,
+      "fork_reason": "chart host and terminal panel semantics",
+      "contracts": [
+        "dock.behavior_contracts",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "dropdown",
+      "class": "Forged",
+      "behavior_source": "Moon dropdown",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonDropdown",
+      "upstream_ref": null,
+      "fork_reason": "Moon popup styling and density",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "form_row",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand form row primitive",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonFormRow",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot form layout metrics and typography",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "group_box",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand group box primitive",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonGroupBox",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot grouped settings panel styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "hover_card",
+      "class": "Mirror",
+      "behavior_source": "Longbridge HoverCard",
+      "theme_source": "MoonTheme bridge through MoonHoverCard facade",
+      "public_path": "moon_ui::MoonHoverCard",
+      "upstream_ref": "Longbridge::hover_card@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "input",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Input",
+      "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
+      "public_path": "moon_ui::MoonInput",
+      "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "input.utf8_boundary_clamp",
+        "input.mask_contract",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "input_mask_pattern",
+      "class": "Internal",
+      "behavior_source": "Moon input mask pattern",
+      "theme_source": "n/a",
+      "public_path": "moon_ui::MoonInputMaskPattern",
+      "upstream_ref": null,
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "kbd",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand keyboard tag renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonKbd",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot dense keyboard shortcut styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "label",
+      "class": "Forged",
+      "behavior_source": "Moon text primitive alias for form labels",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonLabel",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot label semantics over MoonText",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "link",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand link renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonLink",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot compact link styling and hover/active state",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "list",
+      "class": "Mirror",
+      "behavior_source": "Longbridge List/ListState",
+      "theme_source": "MoonTheme bridge through MoonList facade",
+      "public_path": "moon_ui::MoonList",
+      "upstream_ref": "Longbridge::list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "longbridge_dock_legacy",
+      "class": "Internal",
+      "behavior_source": "Longbridge dock implementation retained inside moon-ui-components",
+      "theme_source": "n/a",
+      "public_path": null,
+      "upstream_ref": "Longbridge::dock@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": "retained as implementation/upstream reference only; Moon applications use moon_ui::DockArea",
+      "contracts": [
+        "legacy_dock.internal_only"
+      ]
+    },
+    {
+      "concept": "menu",
+      "class": "Mirror",
+      "behavior_source": "Longbridge NativeMenu",
+      "theme_source": "OS-native menu surface with Moon explicit facade",
+      "public_path": "moon_ui::MoonNativeMenu",
+      "upstream_ref": "Longbridge::native_menu@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "menu_item",
+      "class": "Internal",
+      "behavior_source": "Moon menu item model",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonMenuItem",
+      "upstream_ref": null,
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "notification",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Notification",
+      "theme_source": "MoonTheme bridge through Root notification list",
+      "public_path": "moon_ui::MoonNotification",
+      "upstream_ref": "Longbridge::notification@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "orders_panel",
+      "class": "Domain",
+      "behavior_source": "MoonTerminal panels/orders",
+      "theme_source": "MoonUI primitives consumed by app",
+      "public_path": null,
+      "upstream_ref": null,
+      "fork_reason": "application-specific behavior",
+      "contracts": []
+    },
+    {
+      "concept": "pagination",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Pagination",
+      "theme_source": "MoonTheme bridge through MoonPagination wrapper",
+      "public_path": "moon_ui::MoonPagination",
+      "upstream_ref": "Longbridge::pagination@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "palette",
+      "class": "Internal",
+      "behavior_source": "Moon palette tokens",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonPalette",
+      "upstream_ref": null,
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "plot",
+      "class": "Forbidden",
+      "behavior_source": "plots are raw GPU/chartdx, not UI palette components",
+      "theme_source": "n/a",
+      "public_path": null,
+      "upstream_ref": null,
+      "fork_reason": "plots are raw GPU/chartdx, not UI palette components",
+      "contracts": []
+    },
+    {
+      "concept": "popover",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Popover",
+      "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
+      "public_path": "moon_ui::MoonPopover",
+      "upstream_ref": "Longbridge::popover@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "popover.open_close_lifecycle",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "popup_menu",
+      "class": "Forged",
+      "behavior_source": "Moon popup menu",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonPopupMenu",
+      "upstream_ref": null,
+      "fork_reason": "Moon popup styling and density",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "preset_strip",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand preset strip renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonPresetStrip",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot toolbar preset hotkey styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "progress",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Progress",
+      "theme_source": "MoonTheme tokens through MoonProgress wrapper",
+      "public_path": "moon_ui::MoonProgress",
+      "upstream_ref": "Longbridge::progress@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "progress_circle",
+      "class": "Mirror",
+      "behavior_source": "Longbridge ProgressCircle",
+      "theme_source": "MoonTheme bridge through MoonProgressCircle wrapper",
+      "public_path": "moon_ui::MoonProgressCircle",
+      "upstream_ref": "Longbridge::progress::ProgressCircle@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "radio",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand radio renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonRadio",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot compact radio metrics and visual state",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "rating",
+      "class": "Forged",
+      "behavior_source": "Moon rating renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonRating",
+      "upstream_ref": "Longbridge::rating@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": "Longbridge rating icon rendering was not visually reliable in the Moon terminal palette",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "resizable",
+      "class": "Mirror",
+      "behavior_source": "Longbridge ResizablePanelGroup/ResizablePanel",
+      "theme_source": "MoonTheme bridge through resize handles",
+      "public_path": "moon_ui::MoonResizablePanelGroup",
+      "upstream_ref": "Longbridge::resizable@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "root",
+      "class": "Forged",
+      "behavior_source": "Moon root wrapper",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonRoot",
+      "upstream_ref": null,
+      "fork_reason": "Moon background policy and app shell ownership",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "segmented_control",
+      "class": "Forged",
+      "behavior_source": "Moon segmented control",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSegmentedControl",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot toolbar/page control styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "select",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Select",
+      "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
+      "public_path": "moon_ui::MoonSelect",
+      "upstream_ref": "Longbridge::select@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "select.open_select_lifecycle",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "selector_pill",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand selector pill renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSelectorPill",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot header market/account selector styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "separator",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand separator renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSeparator",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot hairline separator styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "settings",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Settings/SettingPage/SettingGroup/SettingItem",
+      "theme_source": "MoonTheme bridge through MoonSettings facade",
+      "public_path": "moon_ui::MoonSettings",
+      "upstream_ref": "Longbridge::setting@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "sheet",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Sheet owned by Root",
+      "theme_source": "MoonTheme bridge through MoonSheet facade",
+      "public_path": "moon_ui::MoonSheet",
+      "upstream_ref": "Longbridge::sheet@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "sidebar",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Sidebar",
+      "theme_source": "MoonTheme bridge through MoonSidebar facade",
+      "public_path": "moon_ui::MoonSidebar",
+      "upstream_ref": "Longbridge::sidebar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "skeleton",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand skeleton renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSkeleton",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot loading placeholder styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "slider",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Slider",
+      "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
+      "public_path": "moon_ui::MoonSlider",
+      "upstream_ref": "Longbridge::slider@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "slider.diffused_visual_state",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "spinner",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand static spinner renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSpinner",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot compact loading indicator styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "status_bar",
+      "class": "Forged",
+      "behavior_source": "Moon status bar",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonStatusBar",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot terminal status density",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "stepper",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand numeric stepper renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonStepper",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot compact numeric [-] value [+] control",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "strategy_tree",
+      "class": "Domain",
+      "behavior_source": "MoonTerminal strategies/tree_ui.rs",
+      "theme_source": "MoonUI primitives consumed by app",
+      "public_path": null,
+      "upstream_ref": null,
+      "fork_reason": "application-specific behavior",
+      "contracts": []
+    },
+    {
+      "concept": "surface",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand surface primitive",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSurface",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot reusable panel/card/sidebar surface styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "switch",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Switch",
+      "theme_source": "MoonTheme bridge through MoonSwitch facade",
+      "public_path": "moon_ui::MoonSwitch",
+      "upstream_ref": "Longbridge::switch@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "tab_panel",
+      "class": "Forged",
+      "behavior_source": "Moon tab panel adapter",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::TabPanel",
+      "upstream_ref": null,
+      "fork_reason": "Moon dock tab behavior and background policy",
+      "contracts": [
+        "dock.behavior_contracts",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "tab_strip",
+      "class": "Forged",
+      "behavior_source": "Moon tab strip",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonTabStrip",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot terminal tab styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "table_primitives",
+      "class": "Forged",
+      "behavior_source": "Moon simple table primitives",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonTableCell",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot static table styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "tag",
+      "class": "Forged",
+      "behavior_source": "Moon tag primitive",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonTag",
+      "upstream_ref": null,
+      "fork_reason": "Moon density, typography, tone, and status-pill styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "text",
+      "class": "Forged",
+      "behavior_source": "Moon text primitive",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonText",
+      "upstream_ref": null,
+      "fork_reason": "Moon typography tokens and wrapping API",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "text_area",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Input multiline mode",
+      "theme_source": "MoonTheme tokens through Moon wrapper",
+      "public_path": "moon_ui::MoonTextArea",
+      "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "toggle",
+      "class": "Forged",
+      "behavior_source": "Moon designer-stand toggle renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonToggle",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot compact toggle metrics and visual state",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "tooltip",
+      "class": "Forged",
+      "behavior_source": "Moon tooltip wrapper",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonTooltip",
+      "upstream_ref": null,
+      "fork_reason": "Moon tooltip styling, wrapping, and density",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "tooltip_view",
+      "class": "Forged",
+      "behavior_source": "Moon tooltip view entity",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonTooltipView",
+      "upstream_ref": null,
+      "fork_reason": "Moon tooltip entity API",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "tree",
+      "class": "Mirror",
+      "behavior_source": "Longbridge Tree",
+      "theme_source": "MoonTheme bridge through MoonTree facade",
+      "public_path": "moon_ui::MoonTree",
+      "upstream_ref": "Longbridge::tree@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
+      "fork_reason": null,
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "virtual_list",
+      "class": "Forged",
+      "behavior_source": "GPUI UniformList-backed Moon virtual list",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonVirtualList",
+      "upstream_ref": null,
+      "fork_reason": "Moon virtualized terminal list styling",
+      "contracts": [
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "window_frame",
+      "class": "Forged",
+      "behavior_source": "Moon custom window frame",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonWindowFrame",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot chrome/window taxonomy",
+      "contracts": [
+        "window_frame.visual_types",
+        "gallery.visual_coverage"
+      ]
+    }
+  ],
+  "source_metrics": [
+    {
+      "id": "facade_components_escape_hatch",
+      "count": 0,
+      "policy": "MustNotIncrease",
+      "hits": []
+    },
+    {
+      "id": "facade_public_component_slurp",
+      "count": 0,
+      "policy": "MustNotIncrease",
+      "hits": []
+    },
+    {
+      "id": "facade_raw_gpui_exports",
+      "count": 0,
+      "policy": "MustNotIncrease",
+      "hits": []
+    },
+    {
+      "id": "moon_color_usages",
+      "count": 0,
+      "policy": "MustNotIncrease",
+      "hits": []
+    },
+    {
+      "id": "moon_skin_palette_usages",
+      "count": 0,
+      "policy": "MustNotIncrease",
+      "hits": []
+    },
+    {
+      "id": "noop_public_api_markers",
+      "count": 0,
+      "policy": "MustNotIncrease",
+      "hits": []
+    },
+    {
+      "id": "raw_hex_in_moon_base_runtime",
+      "count": 0,
+      "policy": "MustNotIncrease",
+      "hits": []
+    },
+    {
+      "id": "raw_hex_in_moon_runtime",
+      "count": 0,
+      "policy": "MustNotIncrease",
+      "hits": []
+    }
+  ],
+  "contracts": [
+    {
+      "id": "button.click",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "BehavioralTest",
+      "details": "button clickability must be covered by a Rust behavior test; covered by Rust test(s): test_button_clickable_logic"
+    },
+    {
+      "id": "button.mono_font",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "VisualGolden",
+      "details": "MoonButton::mono must affect rendered text font family"
+    },
+    {
+      "id": "button.width_api",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "StructuralSource",
+      "details": "MoonButton width/full_width builders must preserve layout intent"
+    },
+    {
+      "id": "checkbox.checked_glyph.asset",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "VisualGolden",
+      "details": "checked checkbox must render the Moon check SVG asset, not a text glyph"
+    },
+    {
+      "id": "checkbox.click_toggles",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "BehavioralTest",
+      "details": "checkbox click path must toggle state and call Moon on_change; covered by Rust test(s): test_checkbox_handle_click_toggles_and_calls_handler"
+    },
+    {
+      "id": "context_menu.edge_clamp",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "context menu origin must clamp to the viewport edges and honor max-height; covered by Rust test(s): context_menu_origin_clamps_to_viewport_edges, context_menu_requested_max_height_limits_vertical_clamp"
+    },
+    {
+      "id": "context_menu.root_owned",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "StructuralSource",
+      "details": "context menu must be rooted in Moon overlay/window ownership"
+    },
+    {
+      "id": "data_table.scroll_axis",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "StructuralSource",
+      "details": "data table x-scroll layer must opt into GPUI axis restriction; GPUI scroll behavior is covered by scroll tests"
+    },
+    {
+      "id": "data_table.text_clipping",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "VisualGolden",
+      "details": "data table cells must clip text inside their column"
+    },
+    {
+      "id": "dock.behavior_contracts",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "dock must preserve panel flags, tab creation, tab-move target resolution, self-drop guards, tile clamping, and cached panel embedding; covered by Rust test(s): moon_dock_panel_builder_flags_are_observable, dock_item_add_panel_creates_tabs_and_activates_new_panel, dock_clamps_tile_meta_inside_root_bounds, move_panel_to_tabs_resolves_target_after_take, move_panel_to_tabs_ignores_self_drop_before_take"
+    },
+    {
+      "id": "gallery.manifest_coverage",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "StructuralSource",
+      "details": "gallery coverage must include every public manifest component"
+    },
+    {
+      "id": "gallery.visual_coverage",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "VisualGolden",
+      "details": "gallery dark/light golden snapshots must be committed for every gallery page"
+    },
+    {
+      "id": "input.mask_contract",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "BehavioralTest",
+      "details": "input mask and number mask behavior must be covered by Rust tests; covered by Rust test(s): test_mask_pattern1, test_mask_pattern2, test_number_input_undo_with_mask"
+    },
+    {
+      "id": "input.tone_accent",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "BehavioralTest",
+      "details": "MoonInput and MoonTextArea tone must affect input selected/focus accent; covered by Rust test(s): test_input_tone_builder_sets_accent_tone"
+    },
+    {
+      "id": "input.utf8_boundary_clamp",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "BehavioralTest",
+      "details": "input text slicing must clamp to UTF-8 char boundaries; covered by Rust test(s): test_clamp_to_char_boundary_never_returns_middle_of_utf8_codepoint"
+    },
+    {
+      "id": "legacy_dock.internal_only",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "StructuralSource",
+      "details": "legacy Longbridge dock must stay manifest-owned as Internal and must not be exported through the public moon_ui facade"
+    },
+    {
+      "id": "manifest.contracts_have_verifiers",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "StructuralSource",
+      "details": "every contract named by the component manifest has an audit verifier"
+    },
+    {
+      "id": "popover.open_close_lifecycle",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "popover open/close builder lifecycle must stay covered by Rust tests; covered by Rust test(s): test_popover_builder_chaining"
+    },
+    {
+      "id": "root.moon_owned_type",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "StructuralSource",
+      "details": "MoonRoot must be the real root type; Root may remain only as a compatibility alias"
+    },
+    {
+      "id": "select.open_select_lifecycle",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "select open/select lifecycle must keep initial selection and cursor state covered; covered by Rust test(s): test_select_initial_selection_seeds_cursor, test_select_initial_grouped_selection_seeds_cursor"
+    },
+    {
+      "id": "slider.diffused_visual_state",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "VisualGolden",
+      "details": "MoonSlider diffused visual state must be covered by committed gallery golden snapshots"
+    },
+    {
+      "id": "visual_snapshots",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "VisualGolden",
+      "details": "gallery must own page switching, light/dark theme switching, committed golden PNGs, and visual diff comparison"
+    },
+    {
+      "id": "window_frame.visual_types",
+      "status": "Pass",
+      "severity": "Critical",
+      "verifier": "VisualGolden",
+      "details": "MoonWindowFrame visual chrome types must be covered by committed gallery golden snapshots"
+    }
+  ]
+}

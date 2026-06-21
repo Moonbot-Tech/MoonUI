@@ -4343,9 +4343,13 @@ dependencies = [
 name = "moon-ui-gallery"
 version = "0.1.0"
 dependencies = [
+ "image",
  "moon-gpui",
  "moon-gpui-platform",
  "moon-ui",
+ "serde",
+ "serde_json",
+ "windows 0.61.3",
 ]
 
 [[package]]
@@ -9437,6 +9441,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "serde",
  "serde_json",
  "tempfile",
  "toml_edit 0.25.12+spec-1.1.0",

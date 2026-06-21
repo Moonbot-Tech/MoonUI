@@ -206,11 +206,7 @@ impl RenderOnce for MoonContextMenu {
         let viewport = window.viewport_size();
         let viewport_w = f32::from(viewport.width);
         let viewport_h = f32::from(viewport.height);
-        let margin = 6.0;
-        let max_height = self
-            .max_height
-            .unwrap_or((viewport_h - margin * 2.0).max(80.0));
-        let estimated_height = context_menu_estimated_height(self.items.len()).min(max_height);
+        let max_height = context_menu_max_height(viewport_h, self.max_height);
         let mut root = div()
             .id(ElementId::from(self.id.clone()))
             .absolute()
@@ -221,22 +217,26 @@ impl RenderOnce for MoonContextMenu {
                 cx.stop_propagation();
             });
         if let Some(position) = self.position {
-            let x = f32::from(position.x)
-                .max(margin)
-                .min((viewport_w - self.width - margin).max(margin));
-            let y = f32::from(position.y)
-                .max(margin)
-                .min((viewport_h - estimated_height - margin).max(margin));
+            let (x, y) = context_menu_clamped_origin(
+                viewport_w,
+                viewport_h,
+                f32::from(position.x),
+                f32::from(position.y),
+                self.width,
+                max_height,
+                self.items.len(),
+            );
             root = root.left(px(x)).top(px(y));
         } else if let Some(bounds) = self.bounds {
-            let x = bounds
-                .x
-                .max(margin)
-                .min((viewport_w - self.width - margin).max(margin));
-            let y = bounds
-                .y
-                .max(margin)
-                .min((viewport_h - estimated_height - margin).max(margin));
+            let (x, y) = context_menu_clamped_origin(
+                viewport_w,
+                viewport_h,
+                bounds.x,
+                bounds.y,
+                self.width,
+                max_height,
+                self.items.len(),
+            );
             root = root.left(px(x)).top(px(y));
         }
         if self.open {
@@ -250,6 +250,31 @@ impl RenderOnce for MoonContextMenu {
         }
         root
     }
+}
+
+fn context_menu_max_height(viewport_h: f32, requested_max_height: Option<f32>) -> f32 {
+    let margin = 6.0;
+    requested_max_height.unwrap_or((viewport_h - margin * 2.0).max(80.0))
+}
+
+fn context_menu_clamped_origin(
+    viewport_w: f32,
+    viewport_h: f32,
+    requested_x: f32,
+    requested_y: f32,
+    width: f32,
+    max_height: f32,
+    items: usize,
+) -> (f32, f32) {
+    let margin = 6.0;
+    let estimated_height = context_menu_estimated_height(items).min(max_height);
+    let x = requested_x
+        .max(margin)
+        .min((viewport_w - width - margin).max(margin));
+    let y = requested_y
+        .max(margin)
+        .min((viewport_h - estimated_height - margin).max(margin));
+    (x, y)
 }
 
 fn context_menu_estimated_height(items: usize) -> f32 {
@@ -320,5 +345,32 @@ impl RenderOnce for MoonContextMenuOverlay {
                 }
             });
         root
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{context_menu_clamped_origin, context_menu_max_height};
+
+    #[test]
+    fn context_menu_origin_clamps_to_viewport_edges() {
+        assert_eq!(
+            context_menu_clamped_origin(320.0, 240.0, -40.0, -20.0, 140.0, 200.0, 3),
+            (6.0, 6.0)
+        );
+
+        assert_eq!(
+            context_menu_clamped_origin(320.0, 240.0, 500.0, 500.0, 140.0, 200.0, 6),
+            (174.0, 72.0)
+        );
+    }
+
+    #[test]
+    fn context_menu_requested_max_height_limits_vertical_clamp() {
+        assert_eq!(context_menu_max_height(240.0, Some(80.0)), 80.0);
+        assert_eq!(
+            context_menu_clamped_origin(320.0, 240.0, 200.0, 500.0, 140.0, 80.0, 20),
+            (174.0, 154.0)
+        );
     }
 }

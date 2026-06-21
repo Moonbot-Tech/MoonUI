@@ -179,8 +179,8 @@ impl MoonTabStrip {
                 .when(disabled, |this| this.cursor(CursorStyle::Arrow))
                 .when(!disabled, |this| this.cursor_pointer())
                 .when(!active && !disabled, |this| {
-                    this.hover(|this| this.bg(rgba_from(0xFFFFFF, 0.018)))
-                        .active(|this| this.bg(rgba_from(0xFFFFFF, 0.012)))
+                    this.hover(move |this| this.bg(rgba_from(p.overlay, 0.018)))
+                        .active(move |this| this.bg(rgba_from(p.overlay, 0.012)))
                 })
                 .child(
                     div().mt(px(tokens.ui(2.0))).child(
@@ -213,7 +213,7 @@ impl MoonTabStrip {
                         } else {
                             MoonBadgeVariant::Soft
                         })
-                        .bg_color(if active { p.amber } else { 0xFFFFFF })
+                        .bg_color(if active { p.amber } else { p.overlay })
                         .bg_alpha(if active { 0.80 } else { 0.06 })
                         .text_color(if active { p.shell } else { p.text_soft })
                         .weight(600.0)
@@ -237,7 +237,7 @@ impl MoonTabStrip {
                         .text_size(px(tokens.font(10.0)))
                         .line_height(px(tokens.line_height(10.0)))
                         .text_color(rgba_from(p.text_muted, 0.90))
-                        .hover(|this| this.bg(rgba_from(0xFFFFFF, 0.045)))
+                        .hover(move |this| this.bg(rgba_from(p.overlay, 0.045)))
                         .child("x")
                         .on_click(move |event, window, cx| {
                             if let Some(on_close) = &on_close {

@@ -249,6 +249,7 @@ impl RenderOnce for MoonTextArea {
             .with_size(Size::Size(px(metrics.height)))
             .disabled(self.disabled)
             .selected(self.selected)
+            .tone(self.tone)
             .h(px(height))
             .rounded(px(tokens.ui(metrics.radius)))
             .text_size(px(tokens.font(metrics.font_size)))
@@ -266,7 +267,6 @@ impl RenderOnce for MoonTextArea {
                 .h(px(bounds.h));
         }
 
-        let _tone = self.tone;
         input
     }
 }

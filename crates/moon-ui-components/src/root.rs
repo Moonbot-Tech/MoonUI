@@ -3,6 +3,7 @@ use crate::{
     dialog::{ANIMATION_DURATION, Dialog},
     focus_trap::FocusTrapManager,
     input::{Copy, InputState},
+    moon::MoonDialog,
     native_menu::FallbackMenuOverlay,
     notification::{Notification, NotificationList},
     sheet::Sheet,
@@ -66,10 +67,10 @@ impl BackgroundPolicy {
     }
 }
 
-/// Root is a view for the App window for as the top level view (Must be the first view in the window).
+/// MoonRoot is a view for the App window for as the top level view (Must be the first view in the window).
 ///
 /// It is used to manage the Sheet, Dialog, and Notification.
-pub struct Root {
+pub struct MoonRoot {
     style: StyleRefinement,
     view: AnyView,
     pub(crate) active_sheet: Option<ActiveSheet>,
@@ -95,6 +96,9 @@ pub struct Root {
     text_color: Option<Hsla>,
     font_family: Option<SharedString>,
 }
+
+/// Backward-compatible alias for applications that still import `Root`.
+pub type Root = MoonRoot;
 
 #[derive(Clone)]
 pub(crate) struct ActiveSheet {
@@ -143,7 +147,7 @@ impl ActiveDialog {
     }
 }
 
-impl Root {
+impl MoonRoot {
     /// Create a new Root view.
     pub fn new(view: impl Into<AnyView>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         Self {
@@ -355,14 +359,51 @@ impl Root {
         Some((active_context_menu.builder)(window, cx))
     }
 
-    pub fn open_dialog<F>(&mut self, build: F, window: &mut Window, cx: &mut Context<'_, Root>)
+    pub fn open_moon_dialog<F>(&mut self, build: F, window: &mut Window, cx: &mut Context<'_, Root>)
     where
+        F: Fn(MoonDialog, &mut Window, &mut App) -> MoonDialog + 'static,
+    {
+        self.open_dialog_internal(
+            None,
+            move |dialog, window, cx| {
+                build(MoonDialog::from_inner(dialog), window, cx).into_inner()
+            },
+            window,
+            cx,
+        );
+    }
+
+    pub fn open_unique_moon_dialog<F>(
+        &mut self,
+        id: impl Into<SharedString>,
+        build: F,
+        window: &mut Window,
+        cx: &mut Context<'_, Root>,
+    ) where
+        F: Fn(MoonDialog, &mut Window, &mut App) -> MoonDialog + 'static,
+    {
+        self.open_dialog_internal(
+            Some(id.into()),
+            move |dialog, window, cx| {
+                build(MoonDialog::from_inner(dialog), window, cx).into_inner()
+            },
+            window,
+            cx,
+        );
+    }
+
+    pub(crate) fn open_dialog<F>(
+        &mut self,
+        build: F,
+        window: &mut Window,
+        cx: &mut Context<'_, Root>,
+    ) where
         F: Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static,
     {
         self.open_dialog_internal(None, build, window, cx);
     }
 
-    pub fn open_unique_dialog<F>(
+    pub(crate) fn open_unique_dialog<F>(
         &mut self,
         id: impl Into<SharedString>,
         build: F,
@@ -679,13 +720,13 @@ impl Root {
     }
 }
 
-impl Styled for Root {
+impl Styled for MoonRoot {
     fn style(&mut self) -> &mut StyleRefinement {
         &mut self.style
     }
 }
 
-impl Render for Root {
+impl Render for MoonRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(cx.theme().font_size);
 
@@ -809,8 +850,9 @@ mod tests {
         assert!(
             source.contains("pub fn open_context_menu<F>(")
                 && source.contains("pub fn close_context_menu(")
-                && source.contains("pub fn open_unique_dialog<F>("),
-            "Root must expose window-level context menu and singleton dialog APIs instead of forcing apps to render overlays as panel children"
+                && source.contains("pub fn open_unique_moon_dialog<F>(")
+                && source.contains("pub(crate) fn open_unique_dialog<F>("),
+            "Root must expose Moon-facing window-level context menu and singleton dialog APIs instead of forcing apps to render overlays as panel children"
         );
     }
 }

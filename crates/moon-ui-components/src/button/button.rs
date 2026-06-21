@@ -5,8 +5,7 @@ use crate::{
     StyledExt,
     button::ButtonIcon,
     h_flex,
-    moon::MoonTheme,
-    moon_skin::{MoonSkinPalette, moon_color},
+    moon::{MoonPalette, MoonTheme, rgba_from},
     tooltip::{ManagedTooltipExt as _, Tooltip},
 };
 use gpui::{
@@ -763,18 +762,18 @@ struct ButtonVariantStyle {
 }
 
 #[derive(Clone, Copy)]
-struct MoonButtonStyle {
-    bg: u32,
-    bg_alpha: f32,
-    border: u32,
-    border_alpha: f32,
-    fg: u32,
-    fg_alpha: f32,
-    hover_bg_alpha: f32,
-    active_bg_alpha: f32,
-    hover_border_alpha: f32,
-    active_border_alpha: f32,
-    shadow: bool,
+pub(crate) struct MoonButtonStyle {
+    pub(crate) bg: u32,
+    pub(crate) bg_alpha: f32,
+    pub(crate) border: u32,
+    pub(crate) border_alpha: f32,
+    pub(crate) fg: u32,
+    pub(crate) fg_alpha: f32,
+    pub(crate) hover_bg_alpha: f32,
+    pub(crate) active_bg_alpha: f32,
+    pub(crate) hover_border_alpha: f32,
+    pub(crate) active_border_alpha: f32,
+    pub(crate) shadow: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -791,8 +790,12 @@ impl ButtonVariant {
         matches!(self, Self::Link)
     }
 
-    fn moon_style(&self, outline: bool, selected: bool) -> Option<MoonButtonStyle> {
-        let p = MoonSkinPalette::TERMINAL;
+    pub(crate) fn moon_style(
+        &self,
+        p: MoonPalette,
+        outline: bool,
+        selected: bool,
+    ) -> Option<MoonButtonStyle> {
         let selected_boost = if selected { 0.08 } else { 0.0 };
 
         match self {
@@ -1018,19 +1021,20 @@ impl ButtonVariant {
         }
 
         if matches!(state, ButtonVisualState::Disabled) {
-            let p = MoonSkinPalette::TERMINAL;
+            let p = MoonPalette::active(cx);
             return ButtonVariantStyle {
-                bg: moon_color(p.panel, 0.32),
-                border: moon_color(p.border, 0.42),
-                fg: moon_color(p.text_muted, 0.54),
+                bg: rgba_from(p.panel, 0.32),
+                border: rgba_from(p.border, 0.42),
+                fg: rgba_from(p.text_muted, 0.54),
                 underline: self.underline(cx),
                 shadow: false,
             };
         }
 
         let selected = matches!(state, ButtonVisualState::Selected);
+        let p = MoonPalette::active(cx);
         let style = self
-            .moon_style(outline, selected)
+            .moon_style(p, outline, selected)
             .unwrap_or_else(|| unreachable!("custom variants are resolved above"));
 
         let (bg_alpha, border_alpha) = match state {
@@ -1043,9 +1047,9 @@ impl ButtonVariant {
         };
 
         ButtonVariantStyle {
-            bg: moon_color(style.bg, bg_alpha),
-            border: moon_color(style.border, border_alpha),
-            fg: moon_color(style.fg, style.fg_alpha),
+            bg: rgba_from(style.bg, bg_alpha),
+            border: rgba_from(style.border, border_alpha),
+            fg: rgba_from(style.fg, style.fg_alpha),
             underline: self.underline(cx),
             shadow: style.shadow,
         }
@@ -1147,8 +1151,8 @@ mod tests {
             let selected_style = variant.selected(true, cx);
 
             assert_eq!(selected_style.bg.a, 0.0);
-            assert_eq!(selected_style.border, moon_color(0xFF4A4A, 0.40));
-            assert_eq!(selected_style.fg, moon_color(0xFF4A4A, 1.0));
+            assert_eq!(selected_style.border, rgba_from(0xFF4A4A, 0.40));
+            assert_eq!(selected_style.fg, rgba_from(0xFF4A4A, 1.0));
             assert_ne!(selected_style.bg, active_style.bg);
         });
     }
@@ -1182,22 +1186,25 @@ mod tests {
 
     #[test]
     fn test_moon_button_variant_tokens_match_terminal_palette() {
-        let blue = ButtonVariant::Blue.moon_style(false, false).unwrap();
-        assert_eq!(blue.bg, MoonSkinPalette::TERMINAL.blue);
+        let p = MoonPalette::TERMINAL;
+        let blue = ButtonVariant::Blue.moon_style(p, false, false).unwrap();
+        assert_eq!(blue.bg, p.blue);
         assert_eq!(blue.bg_alpha, 0.10);
         assert_eq!(blue.border_alpha, 0.22);
         assert_eq!(blue.hover_bg_alpha, 0.18);
 
-        let selected_blue = ButtonVariant::Blue.moon_style(false, true).unwrap();
+        let selected_blue = ButtonVariant::Blue.moon_style(p, false, true).unwrap();
         assert_eq!(selected_blue.bg_alpha, 0.18);
         assert_eq!(selected_blue.border_alpha, 0.38);
 
-        let outline_red = ButtonVariant::OutlineRed.moon_style(false, false).unwrap();
+        let outline_red = ButtonVariant::OutlineRed
+            .moon_style(p, false, false)
+            .unwrap();
         assert_eq!(outline_red.bg_alpha, 0.0);
-        assert_eq!(outline_red.border, MoonSkinPalette::TERMINAL.red);
-        assert_eq!(outline_red.fg, MoonSkinPalette::TERMINAL.red);
+        assert_eq!(outline_red.border, p.red);
+        assert_eq!(outline_red.fg, p.red);
 
-        let soft = ButtonVariant::Soft.moon_style(false, false).unwrap();
+        let soft = ButtonVariant::Soft.moon_style(p, false, false).unwrap();
         assert_eq!(soft.bg, 0xFFFFFF);
         assert_eq!(soft.bg_alpha, 0.02);
         assert_eq!(soft.hover_bg_alpha, 0.055);

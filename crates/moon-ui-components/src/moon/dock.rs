@@ -485,6 +485,7 @@ pub struct MoonDockPanel {
     closable: bool,
     zoomable: bool,
     detachable: bool,
+    show_dock_header: bool,
     visible: bool,
 }
 
@@ -504,6 +505,7 @@ impl MoonDockPanel {
             closable: true,
             zoomable: true,
             detachable: false,
+            show_dock_header: false,
             visible: true,
         }
     }
@@ -525,6 +527,11 @@ impl MoonDockPanel {
 
     pub fn detachable(mut self, detachable: bool) -> Self {
         self.detachable = detachable;
+        self
+    }
+
+    pub fn show_dock_header(mut self, show_dock_header: bool) -> Self {
+        self.show_dock_header = show_dock_header;
         self
     }
 
@@ -585,7 +592,7 @@ impl PanelView for MoonDockPanel {
     }
 
     fn show_dock_header(&self, _cx: &App) -> bool {
-        false
+        self.show_dock_header
     }
 
     fn visible(&self, _cx: &App) -> bool {
@@ -1376,8 +1383,8 @@ impl RenderOnce for TabPanel {
                     .px(px(tokens.ui(8.0)))
                     .cursor_pointer()
                     .when(!selected, |this| {
-                        this.hover(|h| h.bg(rgba_from(0xFFFFFF, 0.018)))
-                            .active(|a| a.bg(rgba_from(0xFFFFFF, 0.012)))
+                        this.hover(move |h| h.bg(rgba_from(p.overlay, 0.018)))
+                            .active(move |a| a.bg(rgba_from(p.overlay, 0.012)))
                     })
                     .child(
                         div().mt(px(tokens.ui(2.0))).child(
@@ -1637,6 +1644,28 @@ impl DockArea {
             id: id.into(),
             version,
             center: DockItem::Empty,
+            left: None,
+            right: None,
+            bottom: None,
+            zoomed_panel: None,
+            background_policy: MoonBackgroundPolicy::Opaque,
+            tab_background_policy: MoonBackgroundPolicy::Opaque,
+            content_background_policy: None,
+            root_bounds: Bounds::default(),
+            row_bounds: Bounds::default(),
+            split_bounds: HashMap::new(),
+            tile_bounds: HashMap::new(),
+            tile_drag_start: None,
+            enable_split_drop: true,
+        }
+    }
+
+    #[cfg(test)]
+    fn test_with_center(center: DockItem) -> Self {
+        Self {
+            id: "test-dock".into(),
+            version: None,
+            center,
             left: None,
             right: None,
             bottom: None,
@@ -2207,14 +2236,38 @@ impl DockArea {
         target_ix: usize,
         cx: &App,
     ) -> bool {
+        let anchor = self
+            .root_item_mut(root)
+            .and_then(|it| Self::item_at_path_mut(it, path))
+            .and_then(|it| it.first_panel_name_excluding(panel_name, cx));
+        if anchor.is_none() {
+            return false;
+        }
         let Some(panel) = self.take_panel_named_for_move(panel_name, cx) else {
             return false;
         };
-        if self.insert_panel_into_tabs(root, path, target_ix, panel.clone()) {
+        let target_path = anchor
+            .as_deref()
+            .and_then(|a| {
+                self.root_item_mut(root)
+                    .and_then(|it| it.find_panel_path(a, cx))
+            })
+            .unwrap_or_else(|| path.to_vec());
+        if self.insert_panel_into_tabs(root, &target_path, target_ix, panel.clone()) {
             true
         } else {
-            self.center =
-                std::mem::replace(&mut self.center, DockItem::Empty).with_panel_added(panel);
+            let pushed = self
+                .root_item_mut(root)
+                .map(|it| it.try_push_into_first_tabs(panel.clone()))
+                .unwrap_or(false);
+            if !pushed {
+                let existing = std::mem::replace(&mut self.center, DockItem::Empty);
+                self.center = DockItem::Split {
+                    horizontal: false,
+                    items: vec![existing, DockItem::Panel(panel)],
+                    sizes: Vec::new(),
+                };
+            }
             false
         }
     }
@@ -2872,7 +2925,7 @@ impl DockArea {
                                 .right(px(tokens.ui(42.0)))
                                 .h(px(tokens.ui(23.0)))
                                 .cursor(CursorStyle::OpenHand)
-                                .hover(|style| style.bg(rgba_from(0xFFFFFF, 0.035)))
+                                .hover(move |style| style.bg(rgba_from(p.overlay, 0.035)))
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     start_tile_drag(
@@ -3217,5 +3270,137 @@ impl Render for DockArea {
         }
 
         root
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        DOCK_TILE_MIN_H, DockArea, DockItem, DockRoot, MoonDockPanel, PanelView, TileMeta,
+    };
+    use crate::moon::MoonBackgroundPolicy;
+    use gpui::{Bounds, IntoElement as _, div, point, px, size};
+    use std::rc::Rc;
+
+    fn panel(name: &'static str) -> Rc<dyn PanelView> {
+        Rc::new(MoonDockPanel::new(name, name, |_, _| {
+            div().into_any_element()
+        }))
+    }
+
+    #[test]
+    fn moon_dock_panel_builder_flags_are_observable() {
+        let panel = MoonDockPanel::new("orders", "Orders", |_, _| div().into_any_element())
+            .background_policy(MoonBackgroundPolicy::NoFill)
+            .closable(false)
+            .zoomable(false)
+            .detachable(true)
+            .show_dock_header(true)
+            .visible(false);
+
+        assert_eq!(panel.background_policy, MoonBackgroundPolicy::NoFill);
+        assert!(!panel.closable);
+        assert!(!panel.zoomable);
+        assert!(panel.detachable);
+        assert!(panel.show_dock_header);
+        assert!(!panel.visible);
+    }
+
+    #[test]
+    fn dock_item_add_panel_creates_tabs_and_activates_new_panel() {
+        let first = panel("first");
+        let second = panel("second");
+
+        let item = DockItem::Panel(first.clone()).with_panel_added(second.clone());
+
+        let DockItem::Tabs { items, active_ix } = item else {
+            panic!("expected adding a panel to a panel to create a tab set");
+        };
+        assert_eq!(active_ix, 1);
+        assert_eq!(items.len(), 2);
+        assert!(Rc::ptr_eq(&items[0], &first));
+        assert!(Rc::ptr_eq(&items[1], &second));
+    }
+
+    #[test]
+    fn dock_clamps_tile_meta_inside_root_bounds() {
+        let bounds = Bounds::new(point(px(0.0), px(0.0)), size(px(300.0), px(200.0)));
+        let clamped = DockArea::clamp_tile_meta(
+            TileMeta {
+                x: -50.0,
+                y: 500.0,
+                w: 900.0,
+                h: 20.0,
+                z_index: 7,
+            },
+            bounds,
+        );
+
+        assert_eq!(clamped.x, 0.0);
+        assert_eq!(clamped.y, 104.0);
+        assert_eq!(clamped.w, 300.0);
+        assert_eq!(clamped.h, DOCK_TILE_MIN_H);
+        assert_eq!(clamped.z_index, 7);
+    }
+
+    #[gpui::test]
+    fn move_panel_to_tabs_resolves_target_after_take(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            let first = panel("first");
+            let moved = panel("moved");
+            let target_a = panel("target_a");
+            let target_b = panel("target_b");
+            let mut dock = DockArea::test_with_center(DockItem::Split {
+                horizontal: true,
+                sizes: Vec::new(),
+                items: vec![
+                    DockItem::Tabs {
+                        items: vec![first.clone(), moved.clone()],
+                        active_ix: 1,
+                    },
+                    DockItem::Tabs {
+                        items: vec![target_a.clone(), target_b.clone()],
+                        active_ix: 0,
+                    },
+                ],
+            });
+
+            assert!(dock.move_panel_to_tabs("moved", DockRoot::Center, &[1], 1, cx));
+
+            let DockItem::Split { items, .. } = &dock.center else {
+                panic!("expected root split to survive tab move");
+            };
+            assert_eq!(items.len(), 2);
+
+            let DockItem::Panel(panel) = &items[0] else {
+                panic!("source tab strip should collapse to its remaining panel");
+            };
+            assert_eq!(panel.panel_name(cx).as_ref(), "first");
+
+            let DockItem::Tabs { items, active_ix } = &items[1] else {
+                panic!("target tab strip should stay the target");
+            };
+            let names = items
+                .iter()
+                .map(|panel| panel.panel_name(cx).to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(names, vec!["target_a", "moved", "target_b"]);
+            assert_eq!(*active_ix, 1);
+        });
+    }
+
+    #[gpui::test]
+    fn move_panel_to_tabs_ignores_self_drop_before_take(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            let only = panel("only");
+            let mut dock = DockArea::test_with_center(DockItem::Panel(only.clone()));
+
+            assert!(!dock.move_panel_to_tabs("only", DockRoot::Center, &[], 0, cx));
+
+            let DockItem::Panel(panel) = &dock.center else {
+                panic!("self-drop must leave the original panel in place");
+            };
+            assert_eq!(panel.panel_name(cx).as_ref(), "only");
+        });
     }
 }

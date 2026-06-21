@@ -162,7 +162,7 @@ impl RenderOnce for MoonPopover {
             px(10.0),
             px(22.0),
             px(0.0),
-            rgba_from(0x000000, 0.48),
+            rgba_from(p.shadow, 0.48),
         );
         let mut popup = div()
             .w(px(self.width))

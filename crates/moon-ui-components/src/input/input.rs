@@ -10,8 +10,7 @@ use gpui::{
 use crate::Sizable;
 use crate::button::{Button, ButtonVariants as _};
 use crate::input::clear_button;
-use crate::moon::MoonTheme;
-use crate::moon_skin::{MoonSkinPalette, moon_color};
+use crate::moon::{MoonPalette, MoonTheme, MoonTone, rgba_from};
 use crate::native_menu::NativeMenu;
 use crate::spinner::Spinner;
 use crate::{ActiveTheme, v_flex};
@@ -21,12 +20,12 @@ use crate::{Selectable, StyledExt, h_flex};
 use super::{InputState, element::EditorScrollbar};
 
 /// Returns `(background, foreground)` colors for input-like components.
-pub(crate) fn input_style(disabled: bool, _cx: &App) -> (Hsla, Hsla) {
-    let p = MoonSkinPalette::TERMINAL;
+pub(crate) fn input_style(disabled: bool, cx: &App) -> (Hsla, Hsla) {
+    let p = MoonPalette::active(cx);
     if disabled {
-        (moon_color(p.panel, 0.55), moon_color(p.text_muted, 0.45))
+        (rgba_from(p.panel, 0.55), rgba_from(p.text_muted, 0.45))
     } else {
-        (moon_color(p.shell_high, 1.0), moon_color(p.text_soft, 1.0))
+        (rgba_from(p.shell_high, 1.0), rgba_from(p.text_soft, 1.0))
     }
 }
 
@@ -110,6 +109,7 @@ pub struct Input {
     focus_bordered: bool,
     tab_index: isize,
     selected: bool,
+    tone: Option<MoonTone>,
 
     /// An optional context menu builder to allow a custom context menu on the input.
     ///
@@ -153,6 +153,7 @@ impl Input {
             focus_bordered: true,
             tab_index: 0,
             selected: false,
+            tone: None,
             context_menu_builder: None,
         }
     }
@@ -212,6 +213,12 @@ impl Input {
     /// Set to disable the input field.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    /// Set the Moon accent tone used for selected and focused borders.
+    pub fn tone(mut self, tone: MoonTone) -> Self {
+        self.tone = Some(tone);
         self
     }
 
@@ -308,7 +315,7 @@ impl RenderOnce for Input {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let text_align = self.style.text.text_align.unwrap_or(TextAlign::Left);
         let metrics = MoonInputMetrics::for_size(self.size, cx);
-        let p = MoonSkinPalette::TERMINAL;
+        let p = MoonPalette::active(cx);
 
         self.state.update(cx, |state, _| {
             state.context_menu_builder = self.context_menu_builder.clone();
@@ -324,6 +331,7 @@ impl RenderOnce for Input {
         let state = self.state.read(cx);
         let focused = state.focus_handle.is_focused(window) && !state.disabled;
         let gap_x = metrics.gap;
+        let accent = self.tone.unwrap_or(MoonTone::Info).color(p);
 
         let (bg, _) = input_style(state.disabled, cx);
         let bg = if state.mode.is_code_editor() {
@@ -432,7 +440,7 @@ impl RenderOnce for Input {
             .h(metrics.height)
             .text_size(metrics.font_size)
             .font_family("Geist Mono")
-            .text_color(moon_color(
+            .text_color(rgba_from(
                 if state.disabled {
                     p.text_muted
                 } else {
@@ -450,19 +458,23 @@ impl RenderOnce for Input {
                 this.bg(bg)
                     .rounded(metrics.radius)
                     .when(self.bordered, |this| {
-                        this.border_color(moon_color(
-                            if self.selected { p.blue } else { p.border },
+                        this.border_color(rgba_from(
+                            if self.selected { accent } else { p.border },
                             if self.selected { 0.78 } else { 1.0 },
                         ))
                         .border_1()
                         .when(focused && self.focus_bordered, |this| {
-                            this.border_color(moon_color(p.blue, 0.92))
+                            this.border_color(rgba_from(accent, 0.92))
                         })
                     })
                     .when(!state.disabled, |this| {
                         this.hover(|this| {
-                            this.bg(moon_color(0x1D2025, 1.0)).border_color(moon_color(
-                                if self.selected { p.blue } else { 0x343840 },
+                            this.bg(rgba_from(p.panel, 1.0)).border_color(rgba_from(
+                                if self.selected {
+                                    accent
+                                } else {
+                                    p.border_hover
+                                },
                                 if self.selected { 0.82 } else { 1.0 },
                             ))
                         })
@@ -511,6 +523,7 @@ impl RenderOnce for Input {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::AppContext;
 
     #[test]
     fn test_moon_input_metrics_match_terminal_palette() {
@@ -536,15 +549,26 @@ mod tests {
         cx.update(crate::init);
         let window = cx.add_empty_window();
         window.update(|_, cx| {
-            let p = MoonSkinPalette::TERMINAL;
+            let p = MoonPalette::active(cx);
             assert_eq!(
                 input_style(false, cx),
-                (moon_color(p.shell_high, 1.0), moon_color(p.text_soft, 1.0))
+                (rgba_from(p.shell_high, 1.0), rgba_from(p.text_soft, 1.0))
             );
             assert_eq!(
                 input_style(true, cx),
-                (moon_color(p.panel, 0.55), moon_color(p.text_muted, 0.45))
+                (rgba_from(p.panel, 0.55), rgba_from(p.text_muted, 0.45))
             );
+        });
+    }
+
+    #[gpui::test]
+    fn test_input_tone_builder_sets_accent_tone(cx: &mut gpui::TestAppContext) {
+        cx.update(crate::init);
+        let window = cx.add_empty_window();
+        window.update(|window, cx| {
+            let state = cx.new(|cx| InputState::new(window, cx));
+            let input = Input::new(&state).tone(MoonTone::Danger);
+            assert_eq!(input.tone, Some(MoonTone::Danger));
         });
     }
 }

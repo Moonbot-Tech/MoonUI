@@ -1,0 +1,39 @@
+name: MoonUI Guardrails
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  component-guardrails:
+    name: Component guardrails
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: Gallery check
+        run: cargo check -p moon-ui-gallery
+
+      - name: Component tests
+        run: cargo test -p moon-ui-components
+
+      - name: Gallery tests
+        run: cargo test -p moon-ui-gallery
+
+      - name: Component audit
+        run: cargo xtask component-audit --check-baseline
+
+      - name: Component API
+        run: cargo xtask component-api --check-baseline
+
+      - name: Component mirror
+        run: cargo xtask component-mirror --donor-root vendor/longbridge-gpui-component-ui-src --check-baseline

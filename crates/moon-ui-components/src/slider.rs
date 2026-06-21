@@ -2,12 +2,12 @@ use std::ops::Range;
 
 use crate::{
     AxisExt, ElementExt, StyledExt, box_shadow, h_flex,
-    moon_skin::{MoonSkinPalette, moon_color},
+    moon::{MoonPalette, rgba_from},
 };
 use gpui::{
     Along, App, AppContext as _, Axis, Bounds, Context, Corners, DefiniteLength, DragMoveEvent,
-    Empty, Entity, EntityId, EventEmitter, Hsla, InteractiveElement, IntoElement, MouseButton,
-    MouseDownEvent, ParentElement as _, Pixels, Point, Render, RenderOnce,
+    ElementId, Empty, Entity, EntityId, EventEmitter, Hsla, InteractiveElement, IntoElement,
+    MouseButton, MouseDownEvent, ParentElement as _, Pixels, Point, Render, RenderOnce,
     StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div, linear_color_stop,
     linear_gradient, prelude::FluentBuilder as _, px, relative,
 };
@@ -404,6 +404,7 @@ impl EventEmitter<SliderEvent> for SliderState {}
 #[derive(IntoElement)]
 pub struct Slider {
     state: Entity<SliderState>,
+    id: Option<ElementId>,
     axis: Axis,
     style: StyleRefinement,
     disabled: bool,
@@ -415,9 +416,16 @@ impl Slider {
         Self {
             axis: Axis::Horizontal,
             state: state.clone(),
+            id: None,
             style: StyleRefinement::default(),
             disabled: false,
         }
+    }
+
+    /// Override the root element id. Defaults to the bound state entity id.
+    pub fn id(mut self, id: impl Into<ElementId>) -> Self {
+        self.id = Some(id.into());
+        self
     }
 
     /// As a horizontal slider.
@@ -521,14 +529,18 @@ impl RenderOnce for Slider {
     fn render(self, window: &mut Window, cx: &mut gpui::App) -> impl IntoElement {
         let axis = self.axis;
         let entity_id = self.state.entity_id();
+        let root_id = self
+            .id
+            .clone()
+            .unwrap_or_else(|| ("slider", self.state.entity_id()).into());
         let state = self.state.read(cx);
         let is_range = state.value().is_range();
         let percentage = state.percentage.clone();
         let bar_start = relative(percentage.start);
         let bar_end = relative(1. - percentage.end);
         let rem_size = window.rem_size();
-        let p = MoonSkinPalette::TERMINAL;
-        let accent = moon_color(p.accent, 1.0);
+        let p = MoonPalette::active(cx);
+        let accent = rgba_from(p.accent, 1.0);
         let fill_alpha = if self.disabled { 0.24 } else { 0.88 };
 
         let thumb_color = self.style.text.color.unwrap_or(accent);
@@ -554,7 +566,7 @@ impl RenderOnce for Slider {
         };
 
         div()
-            .id(("slider", self.state.entity_id()))
+            .id(root_id)
             .flex()
             .flex_1()
             .items_center()
@@ -562,8 +574,8 @@ impl RenderOnce for Slider {
             .when(axis.is_vertical(), |this| this.h(px(120.)))
             .when(axis.is_horizontal(), |this| this.w_full())
             .refine_style(&self.style)
-            .bg(moon_color(p.shell, 0.0))
-            .text_color(moon_color(p.text, 1.0))
+            .bg(rgba_from(p.shell, 0.0))
+            .text_color(rgba_from(p.text, 1.0))
             .when(!self.disabled, |this| {
                 this.on_mouse_up(
                     MouseButton::Left,
@@ -650,8 +662,8 @@ impl RenderOnce for Slider {
                             .when(axis.is_vertical(), |this| {
                                 this.h_full().w(MOON_SLIDER_TRACK_HEIGHT)
                             })
-                            .bg(moon_color(
-                                0xFFFFFF,
+                            .bg(rgba_from(
+                                p.overlay,
                                 if self.disabled { 0.03 } else { 0.05 },
                             ))
                             .corner_radii(radius)

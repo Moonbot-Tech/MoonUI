@@ -143,6 +143,16 @@ impl TreeItem {
         }
     }
 
+    /// Unique identifier supplied when the item was created.
+    pub fn id(&self) -> &SharedString {
+        &self.id
+    }
+
+    /// Visible label supplied when the item was created.
+    pub fn label(&self) -> &SharedString {
+        &self.label
+    }
+
     /// Add a child item to this tree item.
     pub fn child(mut self, child: TreeItem) -> Self {
         self.children.push(child);

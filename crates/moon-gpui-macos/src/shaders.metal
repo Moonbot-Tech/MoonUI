@@ -10,12 +10,21 @@ float4 srgb_to_oklab(float4 color);
 float4 oklab_to_srgb(float4 color);
 float4 to_device_position(float2 unit_vertex, Bounds_ScaledPixels bounds,
                           constant Size_DevicePixels *viewport_size);
+float4 to_device_position_from_pixel(float2 position,
+                          constant Size_DevicePixels *viewport_size);
 float4 to_device_position_transformed(float2 unit_vertex, Bounds_ScaledPixels bounds,
                           TransformationMatrix transformation,
                           constant Size_DevicePixels *input_viewport_size);
+float2 sprite_position(float2 unit_vertex, Bounds_ScaledPixels bounds);
+float2 sprite_position_transformed(float2 unit_vertex, Bounds_ScaledPixels bounds,
+                          TransformationMatrix transformation);
+float2 apply_retained_text_transform(float2 position,
+                          constant RetainedTextParams *retained_text);
 
 float2 to_tile_position(float2 unit_vertex, AtlasTile tile,
                         constant Size_DevicePixels *atlas_size);
+float4 distance_from_clip_rect_impl(float2 position,
+                               Bounds_ScaledPixels clip_bounds);
 float4 distance_from_clip_rect(float2 unit_vertex, Bounds_ScaledPixels bounds,
                                Bounds_ScaledPixels clip_bounds);
 float4 distance_from_clip_rect_transformed(float2 unit_vertex, Bounds_ScaledPixels bounds,
@@ -639,13 +648,16 @@ vertex MonochromeSpriteVertexOutput monochrome_sprite_vertex(
     constant Size_DevicePixels *viewport_size
     [[buffer(SpriteInputIndex_ViewportSize)]],
     constant Size_DevicePixels *atlas_size
-    [[buffer(SpriteInputIndex_AtlasTextureSize)]]) {
+    [[buffer(SpriteInputIndex_AtlasTextureSize)]],
+    constant RetainedTextParams *retained_text
+    [[buffer(SpriteInputIndex_RetainedTextParams)]]) {
   float2 unit_vertex = unit_vertices[unit_vertex_id];
   MonochromeSprite sprite = sprites[sprite_id];
-  float4 device_position =
-      to_device_position_transformed(unit_vertex, sprite.bounds, sprite.transformation, viewport_size);
-  float4 clip_distance = distance_from_clip_rect_transformed(unit_vertex, sprite.bounds,
-                                                 sprite.content_mask.bounds, sprite.transformation);
+  float2 transformed = apply_retained_text_transform(
+      sprite_position_transformed(unit_vertex, sprite.bounds, sprite.transformation),
+      retained_text);
+  float4 device_position = to_device_position_from_pixel(transformed, viewport_size);
+  float4 clip_distance = distance_from_clip_rect_impl(transformed, sprite.content_mask.bounds);
   float2 tile_position = to_tile_position(unit_vertex, sprite.tile, atlas_size);
   float4 color = hsla_to_rgba(sprite.color);
   return MonochromeSpriteVertexOutput{
@@ -692,14 +704,17 @@ vertex PolychromeSpriteVertexOutput polychrome_sprite_vertex(
     constant Size_DevicePixels *viewport_size
     [[buffer(SpriteInputIndex_ViewportSize)]],
     constant Size_DevicePixels *atlas_size
-    [[buffer(SpriteInputIndex_AtlasTextureSize)]]) {
+    [[buffer(SpriteInputIndex_AtlasTextureSize)]],
+    constant RetainedTextParams *retained_text
+    [[buffer(SpriteInputIndex_RetainedTextParams)]]) {
 
   float2 unit_vertex = unit_vertices[unit_vertex_id];
   PolychromeSprite sprite = sprites[sprite_id];
-  float4 device_position =
-      to_device_position(unit_vertex, sprite.bounds, viewport_size);
-  float4 clip_distance = distance_from_clip_rect(unit_vertex, sprite.bounds,
-                                                 sprite.content_mask.bounds);
+  float2 transformed = apply_retained_text_transform(
+      sprite_position(unit_vertex, sprite.bounds),
+      retained_text);
+  float4 device_position = to_device_position_from_pixel(transformed, viewport_size);
+  float4 clip_distance = distance_from_clip_rect_impl(transformed, sprite.content_mask.bounds);
   float2 tile_position = to_tile_position(unit_vertex, sprite.tile, atlas_size);
   return PolychromeSpriteVertexOutput{
       device_position,
@@ -711,14 +726,22 @@ vertex PolychromeSpriteVertexOutput polychrome_sprite_vertex(
 fragment float4 polychrome_sprite_fragment(
     PolychromeSpriteFragmentInput input [[stage_in]],
     constant PolychromeSprite *sprites [[buffer(SpriteInputIndex_Sprites)]],
+    constant RetainedTextParams *retained_text
+    [[buffer(SpriteInputIndex_RetainedTextParams)]],
     texture2d<float> atlas_texture [[texture(SpriteInputIndex_AtlasTexture)]]) {
   PolychromeSprite sprite = sprites[input.sprite_id];
   constexpr sampler atlas_texture_sampler(mag_filter::linear,
                                           min_filter::linear);
   float4 sample =
       atlas_texture.sample(atlas_texture_sampler, input.tile_position);
+  Bounds_ScaledPixels bounds = sprite.bounds;
+  float2 transformed_origin = apply_retained_text_transform(
+      float2(bounds.origin.x, bounds.origin.y),
+      retained_text);
+  bounds.origin.x = transformed_origin.x;
+  bounds.origin.y = transformed_origin.y;
   float distance =
-      quad_sdf(input.position.xy, sprite.bounds, sprite.corner_radii);
+      quad_sdf(input.position.xy, bounds, sprite.corner_radii);
 
   float4 color = sample;
   if (sprite.grayscale) {
@@ -999,9 +1022,12 @@ float4 oklab_to_srgb(float4 color) {
 
 float4 to_device_position(float2 unit_vertex, Bounds_ScaledPixels bounds,
                           constant Size_DevicePixels *input_viewport_size) {
-  float2 position =
-      unit_vertex * float2(bounds.size.width, bounds.size.height) +
-      float2(bounds.origin.x, bounds.origin.y);
+  float2 position = sprite_position(unit_vertex, bounds);
+  return to_device_position_from_pixel(position, input_viewport_size);
+}
+
+float4 to_device_position_from_pixel(float2 position,
+                          constant Size_DevicePixels *input_viewport_size) {
   float2 viewport_size = float2((float)input_viewport_size->width,
                                 (float)input_viewport_size->height);
   float2 device_position =
@@ -1012,10 +1038,18 @@ float4 to_device_position(float2 unit_vertex, Bounds_ScaledPixels bounds,
 float4 to_device_position_transformed(float2 unit_vertex, Bounds_ScaledPixels bounds,
                           TransformationMatrix transformation,
                           constant Size_DevicePixels *input_viewport_size) {
-  float2 position =
-      unit_vertex * float2(bounds.size.width, bounds.size.height) +
-      float2(bounds.origin.x, bounds.origin.y);
+  float2 transformed_position = sprite_position_transformed(unit_vertex, bounds, transformation);
+  return to_device_position_from_pixel(transformed_position, input_viewport_size);
+}
 
+float2 sprite_position(float2 unit_vertex, Bounds_ScaledPixels bounds) {
+  return unit_vertex * float2(bounds.size.width, bounds.size.height) +
+      float2(bounds.origin.x, bounds.origin.y);
+}
+
+float2 sprite_position_transformed(float2 unit_vertex, Bounds_ScaledPixels bounds,
+                          TransformationMatrix transformation) {
+  float2 position = sprite_position(unit_vertex, bounds);
   // Apply the transformation matrix to the position via matrix multiplication.
   float2 transformed_position = float2(0, 0);
   transformed_position[0] = position[0] * transformation.rotation_scale[0][0] + position[1] * transformation.rotation_scale[0][1];
@@ -1025,13 +1059,18 @@ float4 to_device_position_transformed(float2 unit_vertex, Bounds_ScaledPixels bo
   transformed_position[0] += transformation.translation[0];
   transformed_position[1] += transformation.translation[1];
 
-  float2 viewport_size = float2((float)input_viewport_size->width,
-                                (float)input_viewport_size->height);
-  float2 device_position =
-      transformed_position / viewport_size * float2(2., -2.) + float2(-1., 1.);
-  return float4(device_position, 0., 1.);
+  return transformed_position;
 }
 
+float2 apply_retained_text_transform(float2 position,
+                          constant RetainedTextParams *retained_text) {
+  if (retained_text->enabled == 0u) {
+    return position;
+  }
+  float3 p = float3(position, 1.0);
+  return float2(dot(retained_text->transform_x.xyz, p),
+                dot(retained_text->transform_y.xyz, p));
+}
 
 float2 to_tile_position(float2 unit_vertex, AtlasTile tile,
                         constant Size_DevicePixels *atlas_size) {
@@ -1115,9 +1154,12 @@ float blur_along_x(float x, float y, float sigma, float corner,
 
 float4 distance_from_clip_rect(float2 unit_vertex, Bounds_ScaledPixels bounds,
                                Bounds_ScaledPixels clip_bounds) {
-  float2 position =
-      unit_vertex * float2(bounds.size.width, bounds.size.height) +
-      float2(bounds.origin.x, bounds.origin.y);
+  float2 position = sprite_position(unit_vertex, bounds);
+  return distance_from_clip_rect_impl(position, clip_bounds);
+}
+
+float4 distance_from_clip_rect_impl(float2 position,
+                               Bounds_ScaledPixels clip_bounds) {
   return float4(position.x - clip_bounds.origin.x,
                 clip_bounds.origin.x + clip_bounds.size.width - position.x,
                 position.y - clip_bounds.origin.y,
@@ -1126,14 +1168,7 @@ float4 distance_from_clip_rect(float2 unit_vertex, Bounds_ScaledPixels bounds,
 
 float4 distance_from_clip_rect_transformed(float2 unit_vertex, Bounds_ScaledPixels bounds,
                                Bounds_ScaledPixels clip_bounds, TransformationMatrix transformation) {
-  float2 position =
-      unit_vertex * float2(bounds.size.width, bounds.size.height) +
-      float2(bounds.origin.x, bounds.origin.y);
-  float2 transformed_position = float2(0, 0);
-  transformed_position[0] = position[0] * transformation.rotation_scale[0][0] + position[1] * transformation.rotation_scale[0][1];
-  transformed_position[1] = position[0] * transformation.rotation_scale[1][0] + position[1] * transformation.rotation_scale[1][1];
-  transformed_position[0] += transformation.translation[0];
-  transformed_position[1] += transformation.translation[1];
+  float2 transformed_position = sprite_position_transformed(unit_vertex, bounds, transformation);
 
   return float4(transformed_position.x - clip_bounds.origin.x,
                 clip_bounds.origin.x + clip_bounds.size.width - transformed_position.x,

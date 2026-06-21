@@ -258,7 +258,7 @@ where
     searchable: bool,
     search_placeholder: SharedString,
     appearance: bool,
-    trigger_variant: MoonButtonVariant,
+    trigger_variant: Option<MoonButtonVariant>,
     trigger_size: MoonButtonSize,
     menu_width: f32,
     menu_max_height: Option<f32>,
@@ -281,7 +281,7 @@ where
             searchable: false,
             search_placeholder: SharedString::from("Search..."),
             appearance: true,
-            trigger_variant: MoonButtonVariant::Neutral,
+            trigger_variant: None,
             trigger_size: MoonButtonSize::Toolbar,
             menu_width: 180.0,
             menu_max_height: None,
@@ -335,7 +335,7 @@ where
     }
 
     pub fn trigger_variant(mut self, variant: MoonButtonVariant) -> Self {
-        self.trigger_variant = variant;
+        self.trigger_variant = Some(variant);
         self
     }
 
@@ -379,6 +379,10 @@ where
             .menu_width(px(self.menu_width))
             .with_size(size_for(self.trigger_size, self.menu_size));
 
+        if let Some(trigger_variant) = self.trigger_variant {
+            select = select.trigger_variant(trigger_variant.into());
+        }
+
         if let Some(prefix) = self.title_prefix {
             select = select.title_prefix(prefix);
         }
@@ -400,7 +404,6 @@ where
                 .h(px(bounds.h));
         }
 
-        let _variant = self.trigger_variant;
         root
     }
 }

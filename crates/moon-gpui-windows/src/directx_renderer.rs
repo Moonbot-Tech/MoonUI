@@ -1,8 +1,9 @@
 use std::{
+    collections::HashMap,
     marker::PhantomData,
     ptr::NonNull,
     slice,
-    sync::{Arc, OnceLock},
+    sync::{Arc, OnceLock, Weak},
 };
 
 use anyhow::{Context, Result};
@@ -29,8 +30,8 @@ pub(crate) const DISABLE_DIRECT_COMPOSITION: &str = "GPUI_DISABLE_DIRECT_COMPOSI
 const RENDER_TARGET_FORMAT: DXGI_FORMAT = DXGI_FORMAT_B8G8R8A8_UNORM;
 // This configuration is used for MSAA rendering on paths only, and it's guaranteed to be supported by DirectX 11.
 const PATH_MULTISAMPLE_COUNT: u32 = 4;
-const GPU_CANVAS_SHADER_RESOURCE_SLOTS: usize = 2;
-const GPU_CANVAS_CONSTANT_BUFFER_SLOTS: usize = 1;
+const GPU_CANVAS_SHADER_RESOURCE_SLOTS: usize = 3;
+const GPU_CANVAS_CONSTANT_BUFFER_SLOTS: usize = 2;
 const GPU_CANVAS_SAMPLER_SLOTS: usize = 1;
 const GPU_CANVAS_VERTEX_BUFFER_SLOTS: usize = 1;
 
@@ -61,6 +62,7 @@ pub(crate) struct DirectXRenderer {
     skip_draws: bool,
     presentable: bool,
     device_generation: u64,
+    retained_gpu_canvas_text: HashMap<usize, RetainedGpuCanvasTextCache>,
 }
 
 struct D3d11StateGuard {
@@ -297,7 +299,20 @@ struct DirectXRenderPipelines {
 
 struct DirectXGlobalElements {
     global_params_buffer: Option<ID3D11Buffer>,
+    retained_text_params_buffer: Option<ID3D11Buffer>,
     sampler: Option<ID3D11SamplerState>,
+}
+
+struct RetainedGpuCanvasTextCache {
+    data: Weak<GpuCanvasRetainedTextData>,
+    mono: Option<RetainedSpriteBuffer<MonochromeSprite>>,
+    subpixel: Option<RetainedSpriteBuffer<SubpixelSprite>>,
+    poly: Option<RetainedSpriteBuffer<PolychromeSprite>>,
+}
+
+struct RetainedSpriteBuffer<T> {
+    buffer: ID3D11Buffer,
+    _marker: PhantomData<T>,
 }
 
 struct DirectComposition {
@@ -379,6 +394,7 @@ impl DirectXRenderer {
             skip_draws: false,
             presentable: true,
             device_generation: 0,
+            retained_gpu_canvas_text: HashMap::new(),
         })
     }
 
@@ -606,6 +622,7 @@ impl DirectXRenderer {
         self.globals = globals;
         self.pipelines = pipelines;
         self.direct_composition = direct_composition;
+        self.retained_gpu_canvas_text.clear();
         self.skip_draws = true;
         self.presentable = true;
         self.device_generation = self.device_generation.wrapping_add(1);
@@ -962,6 +979,7 @@ impl DirectXRenderer {
             .viewport;
         let global_params = [self.globals.global_params_buffer.clone()];
         let sampler = [self.globals.sampler.clone()];
+        self.set_retained_text_params(false, GpuCanvasTextTransform::identity())?;
 
         if !frame.monochrome_sprites.is_empty() {
             self.pipelines.gpu_canvas_mono_sprites.update_buffer(
@@ -1065,7 +1083,172 @@ impl DirectXRenderer {
             }
         }
 
+        for retained in &frame.retained_layers {
+            self.draw_retained_gpu_canvas_text(retained)?;
+        }
+        self.set_retained_text_params(false, GpuCanvasTextTransform::identity())?;
         Ok(())
+    }
+
+    fn draw_retained_gpu_canvas_text(&mut self, draw: &GpuCanvasRetainedTextDraw) -> Result<()> {
+        let cache_id = Arc::as_ptr(&draw.data) as usize;
+        self.retained_gpu_canvas_text
+            .retain(|_, cache| cache.data.upgrade().is_some());
+        if !self.retained_gpu_canvas_text.contains_key(&cache_id) {
+            let devices = self.devices.as_ref().context("devices missing")?.clone();
+            let frame = &draw.data.frame;
+            self.retained_gpu_canvas_text.insert(
+                cache_id,
+                RetainedGpuCanvasTextCache {
+                    data: Arc::downgrade(&draw.data),
+                    mono: (!frame.monochrome_sprites.is_empty())
+                        .then(|| {
+                            RetainedSpriteBuffer::new(
+                                &devices.device,
+                                &devices.device_context,
+                                &frame.monochrome_sprites,
+                            )
+                        })
+                        .transpose()?,
+                    subpixel: (!frame.subpixel_sprites.is_empty())
+                        .then(|| {
+                            RetainedSpriteBuffer::new(
+                                &devices.device,
+                                &devices.device_context,
+                                &frame.subpixel_sprites,
+                            )
+                        })
+                        .transpose()?,
+                    poly: (!frame.polychrome_sprites.is_empty())
+                        .then(|| {
+                            RetainedSpriteBuffer::new(
+                                &devices.device,
+                                &devices.device_context,
+                                &frame.polychrome_sprites,
+                            )
+                        })
+                        .transpose()?,
+                },
+            );
+        }
+
+        let devices = self.devices.as_ref().context("devices missing")?.clone();
+        let viewport = self
+            .resources
+            .as_ref()
+            .context("resources missing")?
+            .viewport;
+        let global_params = [self.globals.global_params_buffer.clone()];
+        let retained_params = [self.globals.retained_text_params_buffer.clone()];
+        let sampler = [self.globals.sampler.clone()];
+        self.set_retained_text_params(true, draw.transform)?;
+        let cache = self
+            .retained_gpu_canvas_text
+            .get(&cache_id)
+            .context("retained gpu canvas text cache missing")?;
+
+        if let Some(buffer) = &cache.mono {
+            for range in &draw.data.monochrome_ranges {
+                let Some((start, len)) = range.visible_subrange(
+                    &draw.data.frame.monochrome_sprites,
+                    &draw.visible_labels,
+                    |sprite| sprite.pad,
+                ) else {
+                    continue;
+                };
+                if let Some(texture_view) = self.atlas.get_texture_view(range.texture_id) {
+                    self.pipelines
+                        .gpu_canvas_mono_sprites
+                        .draw_range_with_texture_retained(
+                            &devices.device,
+                            &devices.device_context,
+                            &buffer.buffer,
+                            &texture_view,
+                            slice::from_ref(&viewport),
+                            &global_params,
+                            &retained_params,
+                            &sampler,
+                            start,
+                            len,
+                        )?;
+                }
+            }
+        }
+
+        if let Some(buffer) = &cache.subpixel {
+            for range in &draw.data.subpixel_ranges {
+                let Some((start, len)) = range.visible_subrange(
+                    &draw.data.frame.subpixel_sprites,
+                    &draw.visible_labels,
+                    |sprite| sprite.pad,
+                ) else {
+                    continue;
+                };
+                if let Some(texture_view) = self.atlas.get_texture_view(range.texture_id) {
+                    self.pipelines
+                        .gpu_canvas_subpixel_sprites
+                        .draw_range_with_texture_retained(
+                            &devices.device,
+                            &devices.device_context,
+                            &buffer.buffer,
+                            &texture_view,
+                            slice::from_ref(&viewport),
+                            &global_params,
+                            &retained_params,
+                            &sampler,
+                            start,
+                            len,
+                        )?;
+                }
+            }
+        }
+
+        if let Some(buffer) = &cache.poly {
+            for range in &draw.data.polychrome_ranges {
+                let Some((start, len)) = range.visible_subrange(
+                    &draw.data.frame.polychrome_sprites,
+                    &draw.visible_labels,
+                    |sprite| sprite.pad,
+                ) else {
+                    continue;
+                };
+                if let Some(texture_view) = self.atlas.get_texture_view(range.texture_id) {
+                    self.pipelines
+                        .gpu_canvas_poly_sprites
+                        .draw_range_with_texture_retained(
+                            &devices.device,
+                            &devices.device_context,
+                            &buffer.buffer,
+                            &texture_view,
+                            slice::from_ref(&viewport),
+                            &global_params,
+                            &retained_params,
+                            &sampler,
+                            start,
+                            len,
+                        )?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn set_retained_text_params(
+        &self,
+        enabled: bool,
+        transform: GpuCanvasTextTransform,
+    ) -> Result<()> {
+        let devices = self.devices.as_ref().context("devices missing")?;
+        update_buffer(
+            &devices.device_context,
+            self.globals.retained_text_params_buffer.as_ref().unwrap(),
+            &[RetainedTextParams {
+                enabled: enabled as u32,
+                _pad: [0; 3],
+                transform_x: transform.row_x,
+                transform_y: transform.row_y,
+            }],
+        )
     }
 
     fn draw_monochrome_sprites(
@@ -1405,6 +1588,18 @@ impl DirectXGlobalElements {
             device.CreateBuffer(&desc, None, Some(&mut buffer))?;
             buffer
         };
+        let retained_text_params_buffer = unsafe {
+            let desc = D3D11_BUFFER_DESC {
+                ByteWidth: std::mem::size_of::<RetainedTextParams>() as u32,
+                Usage: D3D11_USAGE_DYNAMIC,
+                BindFlags: D3D11_BIND_CONSTANT_BUFFER.0 as u32,
+                CPUAccessFlags: D3D11_CPU_ACCESS_WRITE.0 as u32,
+                ..Default::default()
+            };
+            let mut buffer = None;
+            device.CreateBuffer(&desc, None, Some(&mut buffer))?;
+            buffer
+        };
 
         let sampler = unsafe {
             let desc = D3D11_SAMPLER_DESC {
@@ -1426,6 +1621,7 @@ impl DirectXGlobalElements {
 
         Ok(Self {
             global_params_buffer,
+            retained_text_params_buffer,
             sampler,
         })
     }
@@ -1440,6 +1636,15 @@ struct GlobalParams {
     subpixel_enhanced_contrast: f32,
     is_bgr: u32,
     _pad: [u32; 3],
+}
+
+#[derive(Debug, Default)]
+#[repr(C)]
+struct RetainedTextParams {
+    enabled: u32,
+    _pad: [u32; 3],
+    transform_x: [f32; 4],
+    transform_y: [f32; 4],
 }
 
 struct PipelineState<T> {
@@ -1617,6 +1822,57 @@ impl<T> PipelineState<T> {
             device_context.DrawInstanced(4, instance_count, 0, 0);
         }
         Ok(())
+    }
+
+    fn draw_range_with_texture_retained(
+        &self,
+        device: &ID3D11Device,
+        device_context: &ID3D11DeviceContext,
+        buffer: &ID3D11Buffer,
+        texture: &[Option<ID3D11ShaderResourceView>],
+        viewport: &[D3D11_VIEWPORT],
+        global_params: &[Option<ID3D11Buffer>],
+        retained_params: &[Option<ID3D11Buffer>],
+        sampler: &[Option<ID3D11SamplerState>],
+        first_instance: u32,
+        instance_count: u32,
+    ) -> Result<()> {
+        let view = create_buffer_view_range(device, buffer, first_instance, instance_count)?;
+        set_pipeline_state(
+            device_context,
+            slice::from_ref(&view),
+            D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+            viewport,
+            &self.vertex,
+            &self.fragment,
+            global_params,
+            &self.blend_state,
+        );
+        unsafe {
+            device_context.VSSetConstantBuffers(1, Some(retained_params));
+            device_context.PSSetSamplers(0, Some(sampler));
+            device_context.VSSetShaderResources(0, Some(texture));
+            device_context.PSSetShaderResources(0, Some(texture));
+            device_context.DrawInstanced(4, instance_count, 0, 0);
+        }
+        Ok(())
+    }
+}
+
+impl<T> RetainedSpriteBuffer<T> {
+    fn new(
+        device: &ID3D11Device,
+        device_context: &ID3D11DeviceContext,
+        data: &[T],
+    ) -> Result<Self> {
+        let buffer = create_buffer(device, std::mem::size_of::<T>(), data.len().max(1))?;
+        if !data.is_empty() {
+            update_buffer(device_context, &buffer, data)?;
+        }
+        Ok(Self {
+            buffer,
+            _marker: PhantomData,
+        })
     }
 }
 

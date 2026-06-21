@@ -182,6 +182,7 @@ pub struct MoonButton {
     loading: bool,
     radius: Option<f32>,
     tooltip: Option<SharedString>,
+    mono: Option<bool>,
     on_hover: Option<std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
     on_click: Option<std::rc::Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>>,
     tab_index: isize,
@@ -206,6 +207,7 @@ impl MoonButton {
             loading: false,
             radius: None,
             tooltip: None,
+            mono: None,
             on_hover: None,
             on_click: None,
             tab_index: 0,
@@ -338,7 +340,8 @@ impl MoonButton {
         self
     }
 
-    pub fn mono(self, _mono: bool) -> Self {
+    pub fn mono(mut self, mono: bool) -> Self {
+        self.mono = Some(mono);
         self
     }
 
@@ -416,12 +419,14 @@ impl RenderOnce for MoonButton {
         }
 
         let (font_size, line_height, gap) = metrics_for(self.size);
+        let button_mono = self.mono;
         if self.segments.len() == 1
             && self.segments[0].color.is_none()
             && self.segments[0].font_size.is_none()
             && self.segments[0].line_height.is_none()
             && self.segments[0].tracking.is_none()
             && self.segments[0].mono.is_none()
+            && button_mono.is_none()
         {
             button.label(self.segments[0].text.clone())
         } else {
@@ -431,6 +436,7 @@ impl RenderOnce for MoonButton {
                     .items_center()
                     .gap(px(tokens.ui(gap)))
                     .children(self.segments.into_iter().map(move |segment| {
+                        let mono = segment.mono.or(button_mono).unwrap_or(false);
                         let text_metrics = tokens.text(
                             segment.font_size.unwrap_or(font_size),
                             segment.line_height.unwrap_or(line_height),
@@ -439,6 +445,7 @@ impl RenderOnce for MoonButton {
                             .text_size(px(text_metrics.font_size))
                             .line_height(px(text_metrics.line_height))
                             .font_weight(FontWeight(segment.weight))
+                            .when(mono, |this| this.font_family(tokens.font_family(true)))
                             .child(segment.text);
                         if let Some(color) = segment.color {
                             text = text.text_color(rgba_from_u32(color, segment.alpha));

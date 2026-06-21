@@ -12,7 +12,6 @@ mod index_path;
 #[cfg(any(feature = "inspector", debug_assertions))]
 mod inspector;
 pub mod moon;
-mod moon_skin;
 mod root;
 mod styled;
 mod time;
@@ -92,7 +91,7 @@ pub use index_path::IndexPath;
 pub use input::{Rope, RopeExt, RopeLines};
 #[cfg(any(feature = "inspector", debug_assertions))]
 pub use inspector::*;
-pub use root::{BackgroundPolicy, Root};
+pub use root::{BackgroundPolicy, MoonRoot, Root};
 pub use styled::*;
 pub use theme::*;
 pub use time::{calendar, date_picker};

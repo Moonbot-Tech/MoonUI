@@ -187,8 +187,8 @@ impl MoonSegmentedControl {
                 .cursor_default()
                 .when(selected, |this| this.bg(selected_bg))
                 .when(!selected && !disabled, |this| {
-                    this.hover(|this| this.bg(rgba_from(0xFFFFFF, 0.025)))
-                        .active(|this| this.bg(rgba_from(0xFFFFFF, 0.016)))
+                    this.hover(move |this| this.bg(rgba_from(p.overlay, 0.025)))
+                        .active(move |this| this.bg(rgba_from(p.overlay, 0.016)))
                 })
                 .child(
                     MoonText::new(item.hotkey)

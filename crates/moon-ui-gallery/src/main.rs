@@ -1,77 +1,170 @@
-use std::rc::Rc;
+use std::{
+    cell::{Cell, RefCell},
+    path::PathBuf,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use gpui::prelude::*;
 use gpui::{
-    App, Bounds, Context, Entity, IntoElement, ParentElement, Render, SharedString, Window,
-    WindowBounds, WindowOptions, div, point, px, rgb, rgba, size,
+    App, Bounds, Context, Entity, IntoElement, NoAction, ParentElement, Render, SharedString, Task,
+    TitlebarOptions, Window, WindowBounds, WindowOptions, div, point, px, rgb, rgba, size,
 };
 use gpui_platform::application;
-use moon_ui::components::scroll::ScrollableElement;
 use moon_ui::{
-    DockArea, DockItem, IndexPath, MoonAccent, MoonBackgroundPolicy, MoonBadge, MoonBadgeSize,
-    MoonBadgeVariant, MoonButton, MoonButtonIconSlot, MoonButtonSegment, MoonButtonSize,
-    MoonButtonVariant, MoonCheckbox, MoonCheckboxSize, MoonColorPicker, MoonColorPickerState,
-    MoonContextMenu, MoonDataCell, MoonDataRow, MoonDataTable, MoonDataTableColumn,
-    MoonDataTableState, MoonDockPanel, MoonDropdown, MoonInput, MoonInputMaskPattern, MoonMenuItem,
-    MoonMenuSize, MoonPalette, MoonPopover, MoonPopoverPlacement, MoonPopupMenu,
-    MoonScrollbarVisibility, MoonSegmentItem, MoonSegmentedControl, MoonSelect, MoonSelectItem,
-    MoonSelectState, MoonSlider, MoonSliderState, MoonStatusBar, MoonStatusIndicator,
-    MoonStatusItem, MoonTabItem, MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow,
-    MoonTableStyle, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonTone, MoonTooltip,
-    MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonVirtualList,
-    MoonVirtualListScrollHandle, MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls,
-    PanelView, Root, TabPanel, h_flex, rgba_from, v_flex,
+    DockArea, DockEvent, DockItem, IndexPath, MoonAccent, MoonAccordion, MoonAlert, MoonAvatar,
+    MoonAvatarGroup, MoonAvatarSize, MoonBackgroundPolicy, MoonBadge, MoonBadgeSize,
+    MoonBadgeVariant, MoonBreadcrumb, MoonBreadcrumbItem, MoonButton, MoonButtonIconSlot,
+    MoonButtonSegment, MoonButtonSize, MoonButtonVariant, MoonCalendar, MoonCalendarState,
+    MoonCheckbox, MoonCheckboxSize, MoonCollapsible, MoonColorPicker, MoonColorPickerState,
+    MoonCombobox, MoonComboboxState, MoonComponentIndexPath, MoonContextMenu, MoonDataCell,
+    MoonDataRow, MoonDataTable, MoonDataTableColumn, MoonDataTableState, MoonDatePicker,
+    MoonDatePickerState, MoonDescriptionList, MoonDockPanel, MoonDropdown, MoonFormRow,
+    MoonGroupBox, MoonHoverCard, MoonInput, MoonInputMaskPattern, MoonKbd, MoonLabel, MoonLink,
+    MoonList, MoonListDelegate, MoonListItem, MoonListState, MoonMenuItem, MoonMenuSize,
+    MoonNativeMenu, MoonNotification, MoonNumberFieldOptions, MoonPagination, MoonPalette,
+    MoonPlacement, MoonPopover, MoonPopoverPlacement, MoonPopupMenu, MoonPresetItem,
+    MoonPresetStrip, MoonProgress, MoonProgressCircle, MoonProgressCircleSize, MoonRadio,
+    MoonRating, MoonResizablePanelGroup, MoonScrollableElement, MoonScrollbarVisibility,
+    MoonSearchableVec, MoonSegmentItem, MoonSegmentedControl, MoonSelect, MoonSelectItem,
+    MoonSelectState, MoonSelectorPill, MoonSelectorSegment, MoonSeparator, MoonSettingField,
+    MoonSettingGroup, MoonSettingItem, MoonSettingPage, MoonSettings, MoonSidebar,
+    MoonSidebarGroup, MoonSidebarMenu, MoonSidebarMenuItem, MoonSidebarToggleButton, MoonSkeleton,
+    MoonSlider, MoonSliderState, MoonSpinner, MoonStatusBar, MoonStatusIndicator, MoonStatusItem,
+    MoonStepper, MoonSurface, MoonSurfaceVariant, MoonSwitch, MoonTabItem, MoonTabStrip,
+    MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle, MoonTag, MoonText, MoonTextArea,
+    MoonTheme, MoonThemeConfig, MoonToggle, MoonToggleSize, MoonTone, MoonTooltip,
+    MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem, MoonTreeState,
+    MoonVirtualList, MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame,
+    MoonWindowFrameBrand, MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex,
+    moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
 };
 
 const COMPONENT_COVERAGE: &[&str] = &[
     "MoonRoot",
     "MoonBackgroundPolicy",
+    "MoonAccordion",
+    "MoonAlert",
+    "MoonAvatar",
+    "MoonAvatarGroup",
     "MoonButton",
     "MoonButtonSegment",
     "MoonButtonIconSlot",
     "MoonBadge",
+    "MoonBreadcrumb",
     "MoonCheckbox",
+    "MoonCollapsible",
     "MoonColorPicker",
+    "MoonCombobox",
     "MoonContextMenu",
     "MoonDataTable",
+    "MoonCalendar",
+    "MoonDatePicker",
+    "MoonDescriptionList",
+    "MoonDialog",
     "MoonDockPanel",
     "DockArea",
     "TabPanel",
     "MoonDropdown",
+    "MoonFormRow",
+    "MoonGroupBox",
+    "MoonHoverCard",
     "MoonPopupMenu",
     "MoonMenuItem",
     "MoonInput",
     "MoonInputMaskPattern",
+    "MoonKbd",
+    "MoonLabel",
+    "MoonLink",
+    "MoonList",
+    "MoonNotification",
+    "MoonPagination",
+    "MoonPlacement",
     "MoonPopover",
+    "MoonPresetStrip",
+    "MoonProgress",
+    "MoonProgressCircle",
+    "MoonRadio",
+    "MoonRating",
+    "MoonResizablePanel",
+    "MoonResizablePanelGroup",
     "MoonSegmentedControl",
+    "MoonSelectorPill",
     "MoonSelect",
+    "MoonSeparator",
+    "MoonSettingField",
+    "MoonSettingGroup",
+    "MoonSettingItem",
+    "MoonSettingPage",
+    "MoonSettings",
+    "MoonSheet",
+    "MoonSidebar",
+    "MoonSkeleton",
     "MoonSlider",
+    "MoonSpinner",
     "MoonStatusBar",
+    "MoonStepper",
+    "MoonSurface",
+    "MoonSwitch",
     "MoonTabStrip",
-    "MoonTable primitives",
+    "MoonTag",
+    "MoonTableCell",
+    "MoonTableColumn",
+    "MoonTableRow",
     "MoonText",
     "MoonTextArea",
     "MoonTooltip",
     "MoonTooltipView",
+    "MoonToggle",
+    "MoonTree",
     "MoonVirtualList",
     "MoonWindowFrame",
+    "MoonNativeMenu",
     "MoonPalette",
 ];
 
-const GALLERY_PAGES: &[&str] = &["Controls", "Inputs", "Data", "Overlays", "Layout"];
+const GALLERY_PAGES: &[&str] = &[
+    "Controls",
+    "Inputs",
+    "Data",
+    "Overlays",
+    "Layout",
+    "NewControls",
+    "Composites",
+    "Stateful",
+];
 
 struct Gallery {
     active_page: usize,
+    theme_mode: ThemeMode,
+    snapshot: Option<SnapshotRun>,
     button_clicks: usize,
     alerts_enabled: bool,
     compact_checked: bool,
+    new_toggle_checked: bool,
+    new_radio_index: usize,
+    new_stepper_value: f32,
+    new_switch_checked: bool,
+    new_rating_value: usize,
+    new_pagination_page: usize,
+    new_sidebar_collapsed: bool,
+    settings_enabled: Rc<Cell<bool>>,
+    settings_symbol: Rc<RefCell<SharedString>>,
+    settings_mode: Rc<RefCell<SharedString>>,
+    settings_risk: Rc<Cell<f64>>,
     segment_index: usize,
     tab_index: usize,
     dropdown_value: SharedString,
     popover_open: bool,
     context_menu_open: bool,
     event_log: Vec<SharedString>,
+    pending_detach: Vec<SharedString>,
     select_state: Entity<MoonSelectState<SharedString>>,
+    combobox_state: Entity<MoonComboboxState<MoonSearchableVec<&'static str>>>,
+    date_picker_state: Entity<MoonDatePickerState>,
+    calendar_state: Entity<MoonCalendarState>,
+    list_state: Entity<MoonListState<GalleryListDelegate>>,
+    tree_state: Entity<MoonTreeState>,
     slider_state: Entity<MoonSliderState>,
     range_slider_state: Entity<MoonSliderState>,
     color_state: Entity<MoonColorPickerState>,
@@ -81,8 +174,108 @@ struct Gallery {
     dock: Entity<DockArea>,
 }
 
+#[cfg_attr(not(feature = "snapshot"), allow(dead_code))]
+struct SnapshotRun {
+    dir: PathBuf,
+    page_ix: usize,
+    capture_scheduled: bool,
+    settle_frames: usize,
+    next_capture_at: Instant,
+    cleaned_dir: bool,
+}
+
+struct GalleryListDelegate {
+    items: Vec<SharedString>,
+    visible: Vec<usize>,
+    selected: Option<MoonComponentIndexPath>,
+}
+
+impl GalleryListDelegate {
+    fn new() -> Self {
+        let items = [
+            "Longbridge behavior",
+            "Moon theme bridge",
+            "Keyboard selection",
+            "Virtualized rows",
+            "Context-ready state",
+            "Search delegate",
+        ]
+        .into_iter()
+        .map(SharedString::from)
+        .collect::<Vec<_>>();
+        let visible = (0..items.len()).collect();
+        Self {
+            items,
+            visible,
+            selected: Some(MoonComponentIndexPath::new(1)),
+        }
+    }
+}
+
+impl MoonListDelegate for GalleryListDelegate {
+    type Item = MoonListItem;
+
+    fn perform_search(
+        &mut self,
+        query: &str,
+        _window: &mut Window,
+        cx: &mut Context<MoonListState<Self>>,
+    ) -> Task<()> {
+        let query = query.to_lowercase();
+        self.visible = self
+            .items
+            .iter()
+            .enumerate()
+            .filter_map(|(ix, item)| item.to_lowercase().contains(&query).then_some(ix))
+            .collect();
+        if self
+            .selected
+            .is_some_and(|selected| selected.row >= self.visible.len())
+        {
+            self.selected = None;
+        }
+        cx.notify();
+        Task::ready(())
+    }
+
+    fn items_count(&self, _section: usize, _cx: &App) -> usize {
+        self.visible.len()
+    }
+
+    fn render_item(
+        &mut self,
+        ix: MoonComponentIndexPath,
+        _window: &mut Window,
+        _cx: &mut Context<MoonListState<Self>>,
+    ) -> Option<Self::Item> {
+        let item_ix = *self.visible.get(ix.row)?;
+        let label = self.items.get(item_ix)?.clone();
+        Some(
+            MoonListItem::new(ix)
+                .selected(self.selected == Some(ix))
+                .child(label),
+        )
+    }
+
+    fn set_selected_index(
+        &mut self,
+        ix: Option<MoonComponentIndexPath>,
+        _window: &mut Window,
+        cx: &mut Context<MoonListState<Self>>,
+    ) {
+        self.selected = ix;
+        cx.notify();
+    }
+}
+
 impl Gallery {
-    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    fn new(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        active_page: usize,
+        snapshot_dir: Option<PathBuf>,
+        theme_mode: ThemeMode,
+    ) -> Self {
         let select_state = cx.new(|cx| {
             MoonSelectState::new(
                 [
@@ -94,6 +287,35 @@ impl Gallery {
                 window,
                 cx,
             )
+        });
+        let combobox_state = cx.new(|cx| {
+            MoonComboboxState::new(
+                MoonSearchableVec::new(vec!["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"]),
+                vec![MoonComponentIndexPath::new(0)],
+                window,
+                cx,
+            )
+            .searchable(true)
+        });
+        let date_picker_state = cx.new(|cx| MoonDatePickerState::new(window, cx));
+        let calendar_state = cx.new(|cx| MoonCalendarState::new(window, cx));
+        let list_state = cx.new(|cx| {
+            MoonListState::new(GalleryListDelegate::new(), window, cx)
+                .searchable(true)
+                .selectable(true)
+        });
+        let tree_state = cx.new(|cx| {
+            MoonTreeState::new(cx).items([
+                MoonTreeItem::new("ui", "Moon UI")
+                    .expanded(true)
+                    .child(MoonTreeItem::new("ui.controls", "Controls"))
+                    .child(MoonTreeItem::new("ui.overlays", "Overlays"))
+                    .child(MoonTreeItem::new("ui.data", "Data")),
+                MoonTreeItem::new("runtime", "Runtime")
+                    .expanded(true)
+                    .child(MoonTreeItem::new("runtime.gpui", "GPUI fork"))
+                    .child(MoonTreeItem::new("runtime.theme", "Theme bridge")),
+            ])
         });
         let slider_state = cx.new(|_| {
             MoonSliderState::new()
@@ -125,19 +347,59 @@ impl Gallery {
                 cx,
             );
         });
+        cx.subscribe(&dock, |this, dock, event: &DockEvent, cx| match event {
+            DockEvent::LayoutChanged => {
+                let _ = dock;
+                this.push_event("Dock layout changed", cx);
+            }
+            DockEvent::DetachRequested { panel_name } => {
+                this.pending_detach.push(panel_name.clone());
+                this.push_event(format!("Dock detach requested: {panel_name}"), cx);
+            }
+            DockEvent::PanelCloseRequested { panel_name } => {
+                this.push_event(format!("Dock close requested: {panel_name}"), cx);
+            }
+        })
+        .detach();
 
         Self {
-            active_page: 0,
+            active_page: active_page.min(GALLERY_PAGES.len().saturating_sub(1)),
+            theme_mode,
+            snapshot: snapshot_dir.map(|dir| SnapshotRun {
+                dir,
+                page_ix: active_page.min(GALLERY_PAGES.len().saturating_sub(1)),
+                capture_scheduled: false,
+                settle_frames: 8,
+                next_capture_at: Instant::now() + Duration::from_millis(500),
+                cleaned_dir: false,
+            }),
             button_clicks: 0,
             alerts_enabled: true,
             compact_checked: true,
+            new_toggle_checked: true,
+            new_radio_index: 1,
+            new_stepper_value: 3.0,
+            new_switch_checked: true,
+            new_rating_value: 3,
+            new_pagination_page: 4,
+            new_sidebar_collapsed: false,
+            settings_enabled: Rc::new(Cell::new(true)),
+            settings_symbol: Rc::new(RefCell::new(SharedString::from("BTCUSDT"))),
+            settings_mode: Rc::new(RefCell::new(SharedString::from("paper"))),
+            settings_risk: Rc::new(Cell::new(2.5)),
             segment_index: 2,
             tab_index: 0,
             dropdown_value: SharedString::from("Auto"),
             popover_open: false,
             context_menu_open: false,
             event_log: vec![SharedString::from("Gallery ready")],
+            pending_detach: Vec::new(),
             select_state,
+            combobox_state,
+            date_picker_state,
+            calendar_state,
+            list_state,
+            tree_state,
             slider_state,
             range_slider_state,
             color_state,
@@ -159,8 +421,111 @@ impl Gallery {
         self.push_event(format!("Page: {}", GALLERY_PAGES[self.active_page]), cx);
     }
 
+    fn set_theme_mode(&mut self, mode: ThemeMode, cx: &mut Context<Self>) {
+        if self.theme_mode == mode {
+            return;
+        }
+        self.theme_mode = mode;
+        MoonTheme::set_mode(mode, std::borrow::BorrowMut::borrow_mut(cx));
+        self.push_event(format!("Theme: {}", theme_mode_name(mode)), cx);
+    }
+
+    fn schedule_snapshot_capture(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(snapshot) = self.snapshot.as_mut() else {
+            return;
+        };
+        if snapshot.capture_scheduled {
+            return;
+        }
+        snapshot.capture_scheduled = true;
+        cx.on_next_frame(window, |this, window, cx| {
+            this.capture_snapshot_page(window, cx);
+        });
+    }
+
+    #[cfg(feature = "snapshot")]
+    fn capture_snapshot_page(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(snapshot) = self.snapshot.as_mut() else {
+            return;
+        };
+        if snapshot.settle_frames == 8 {
+            window.blur();
+        }
+        if snapshot.settle_frames > 0 {
+            snapshot.settle_frames -= 1;
+            snapshot.capture_scheduled = false;
+            cx.notify();
+            return;
+        }
+        let now = Instant::now();
+        if now < snapshot.next_capture_at {
+            snapshot.capture_scheduled = false;
+            cx.notify();
+            return;
+        }
+        if !snapshot.cleaned_dir {
+            if let Err(err) = clear_snapshot_dir(&snapshot.dir) {
+                eprintln!(
+                    "failed to clear snapshot dir {}: {err}",
+                    snapshot.dir.display()
+                );
+                cx.quit();
+                return;
+            }
+            snapshot.cleaned_dir = true;
+        }
+        let page = GALLERY_PAGES
+            .get(snapshot.page_ix)
+            .copied()
+            .unwrap_or("unknown");
+        if let Err(err) = std::fs::create_dir_all(&snapshot.dir) {
+            eprintln!(
+                "failed to create snapshot dir {}: {err}",
+                snapshot.dir.display()
+            );
+            cx.quit();
+            return;
+        }
+        let path = snapshot.dir.join(format!("{page}.png"));
+        let image = match snapshot_window_image(window) {
+            Ok(image) => image,
+            Err(err) => {
+                eprintln!("snapshot {page} failed: {err}");
+                cx.quit();
+                return;
+            }
+        };
+        if let Err(err) = image.save(&path) {
+            eprintln!("snapshot {page} failed to save {}: {err}", path.display());
+            cx.quit();
+            return;
+        }
+        eprintln!("snapshot {page} -> {}", path.display());
+
+        snapshot.page_ix += 1;
+        if snapshot.page_ix >= GALLERY_PAGES.len() {
+            cx.quit();
+            return;
+        }
+        self.active_page = snapshot.page_ix;
+        snapshot.capture_scheduled = false;
+        snapshot.settle_frames = 8;
+        snapshot.next_capture_at = Instant::now() + Duration::from_millis(700);
+        cx.notify();
+    }
+
+    #[cfg(not(feature = "snapshot"))]
+    fn capture_snapshot_page(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        eprintln!("moon-ui-gallery --snapshot-dir requires `--features snapshot`");
+        cx.quit();
+    }
+
     fn render_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = MoonPalette::active(cx);
+        let next_mode = match self.theme_mode {
+            ThemeMode::Light => ThemeMode::Dark,
+            ThemeMode::Dark | ThemeMode::System => ThemeMode::Light,
+        };
         let frame = MoonWindowFrame::main("gallery-window-frame", 1260.0)
             .brand(MoonWindowFrameBrand::Full)
             .controls(MoonWindowFrameControls::MinimizeMaximizeClose);
@@ -191,6 +556,15 @@ impl Gallery {
                     .render(),
             )
             .child(div().flex_1())
+            .child(
+                MoonButton::new("gallery-theme-toggle")
+                    .label(theme_mode_name(self.theme_mode))
+                    .variant(MoonButtonVariant::Panel)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.set_theme_mode(next_mode, cx);
+                    }))
+                    .render(),
+            )
             .child(frame.visual_controls(cx))
     }
 
@@ -370,6 +744,35 @@ impl Gallery {
                     ),
             )
             .child(
+                card("MoonAccordion", cx).child(
+                    MoonAccordion::new("moon-accordion")
+                        .multiple(true)
+                        .item(|item| {
+                            item.title("MoonAccordion item")
+                                .open(true)
+                                .child(
+                                    MoonText::new("Accordion behavior is mirrored from Longbridge behind a Moon-facing API.")
+                                        .uppercase(false)
+                                        .mono(true)
+                                        .wrap()
+                                        .color(p.text_soft)
+                                        .render(),
+                                )
+                        })
+                        .item(|item| {
+                            item.title("Second item").child(
+                                MoonText::new("Application code should import MoonAccordion, not moon_ui::components::accordion::Accordion.")
+                                    .uppercase(false)
+                                    .mono(true)
+                                    .wrap()
+                                    .color(p.text_soft)
+                                    .render(),
+                            )
+                        })
+                        .render(),
+                ),
+            )
+            .child(
                 card("Badges / Checkbox / Segmented", cx)
                     .child(
                         h_flex()
@@ -400,6 +803,38 @@ impl Gallery {
                                     .icon(moon_ui::MOON_ICON_CHECK)
                                     .size(MoonBadgeSize::Status)
                                     .render(),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(8.0))
+                            .flex_wrap()
+                            .child(
+                                MoonTag::positive()
+                                    .rounded_full()
+                                    .child("MoonTag positive")
+                                    .render(),
+                            )
+                            .child(
+                                MoonTag::warning()
+                                    .outline()
+                                    .child("MoonTag warning")
+                                    .render(),
+                            )
+                            .child(
+                                MoonProgress::new("moon-progress-positive")
+                                    .value(68.0)
+                                    .tone(MoonTone::Positive)
+                                    .render(),
+                            )
+                            .child(
+                                div().w(px(160.0)).child(
+                                    MoonProgress::new("moon-progress-loading")
+                                        .loading(true)
+                                        .tone(MoonTone::Info)
+                                        .height(5.0)
+                                        .render(),
+                                ),
                             ),
                     )
                     .child(
@@ -609,8 +1044,71 @@ impl Gallery {
 
     fn render_menus(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let view = cx.entity();
-        section("Menus / Overlays", cx).child(
-            card("Dropdown / PopupMenu / ContextMenu / Popover / Tooltip", cx)
+        section("Menus / Overlays", cx)
+            .child(
+                card("MoonAlert", cx)
+                    .child(
+                        MoonAlert::info(
+                            "moon-alert-info",
+                            "MoonAlert mirrors Longbridge alert behavior behind a Moon-facing API.",
+                        )
+                        .title("Info alert")
+                        .render(),
+                    )
+                    .child(
+                        MoonAlert::warning(
+                            "moon-alert-warning",
+                            "Raw Alert stays visible on NewControls until the escape path is removed.",
+                        )
+                        .title("Warning alert")
+                        .render(),
+                    ),
+            )
+            .child(
+                card("MoonDialog / MoonNotification", cx).child(
+                    h_flex()
+                        .gap(px(8.0))
+                        .flex_wrap()
+                        .child(
+                            MoonButton::new("moon-dialog-open")
+                                .label("Open MoonDialog")
+                                .variant(MoonButtonVariant::Panel)
+                                .on_click(|_, window, app| {
+                                    window.open_unique_moon_dialog(
+                                        "gallery-moon-dialog",
+                                        app,
+                                        |dialog, _window, _cx| {
+                                            dialog
+                                                .w(px(300.0))
+                                                .title(div().child("MoonDialog"))
+                                                .content(|content, _window, _cx| {
+                                                    content.child(div().child(
+                                                        "Dialog opened through MoonWindowExt.",
+                                                    ))
+                                                })
+                                        },
+                                    );
+                                })
+                                .render(),
+                        )
+                        .child(
+                            MoonButton::new("moon-notification-push")
+                                .label("Push notification")
+                                .variant(MoonButtonVariant::Panel)
+                                .on_click(|_, window, app| {
+                                    window.push_notification(
+                                        MoonNotification::info("Root-owned MoonNotification")
+                                            .title("MoonNotification")
+                                            .autohide(false),
+                                        app,
+                                    );
+                                })
+                                .render(),
+                        ),
+                ),
+            )
+            .child(
+                card("Dropdown / PopupMenu / ContextMenu / Popover / Tooltip", cx)
                 .relative()
                 .min_h(px(330.0))
                 .child(
@@ -750,7 +1248,7 @@ impl Gallery {
                             MoonMenuItem::new("Delete").tone(MoonTone::Danger),
                         ]),
                 ),
-        )
+            )
     }
 
     fn render_tables(&self, cx: &App) -> impl IntoElement {
@@ -1006,17 +1504,1661 @@ impl Gallery {
                     ),
             )
     }
+
+    fn render_new_controls(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
+        let view = cx.entity();
+        let settings_enabled = self.settings_enabled.clone();
+        let settings_symbol = self.settings_symbol.clone();
+        let settings_mode = self.settings_mode.clone();
+        let settings_risk = self.settings_risk.clone();
+
+        section("NewControls / Ready Moon adaptations", cx)
+            .child(
+                card("What this page means", cx)
+                    .child(
+                        MoonText::new(
+                            "This page shows adapted Moon-facing controls that are already usable by applications. A Longbridge component is not allowed here just because it has a wrapper; it must look and behave like Moon UI first.",
+                        )
+                        .uppercase(false)
+                        .mono(true)
+                        .wrap()
+                        .color(p.text_soft)
+                        .render(),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(8.0))
+                            .flex_wrap()
+                            .child(MoonBadge::new("MoonReady").tone(MoonTone::Positive).render())
+                            .child(MoonBadge::new("Longbridge behavior").tone(MoonTone::Info).render())
+                            .child(MoonBadge::new("Visual checked").tone(MoonTone::Accent).render()),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("Feedback", cx)
+                            .w(px(500.0))
+                            .child(
+                                MoonAlert::success(
+                                    "new-controls-ready-alert",
+                                    "MoonAlert keeps Longbridge behavior behind a Moon-facing API.",
+                                )
+                                .title("MoonAlert")
+                                .render(),
+                            )
+                            .child(
+                                h_flex()
+                                    .gap(px(8.0))
+                                    .child(MoonTag::positive().child("MoonTag").render())
+                                    .child(MoonTag::warning().child("warning").render())
+                                    .child(MoonTag::danger().outline().child("outline").render()),
+                            )
+                            .child(
+                                div().w(px(240.0)).child(
+                                    MoonProgress::new("new-controls-progress")
+                                        .value(68.0)
+                                        .tone(MoonTone::Positive)
+                                        .height(5.0)
+                                        .render(),
+                                ),
+                            ),
+                    )
+                    .child(
+                        card("Root-owned overlays", cx)
+                            .w(px(500.0))
+                            .child(
+                                h_flex()
+                                    .gap(px(8.0))
+                                    .flex_wrap()
+                                    .child(
+                                        MoonButton::new("new-controls-dialog")
+                                            .label("Open MoonDialog")
+                                            .variant(MoonButtonVariant::Panel)
+                                            .on_click(|_, window, app| {
+                                                window.open_unique_moon_dialog(
+                                                    "new-controls-dialog",
+                                                    app,
+                                                    |dialog, _window, _cx| {
+                                                        dialog
+                                                            .w(px(300.0))
+                                                            .title(div().child("MoonDialog"))
+                                                            .content(|content, _window, _cx| {
+                                                                content.child(div().child(
+                                                                    "Opened through MoonWindowExt.",
+                                                                ))
+                                                            })
+                                                    },
+                                                );
+                                            })
+                                            .render(),
+                                    )
+                                    .child(
+                                        MoonButton::new("new-controls-notification")
+                                            .label("Push MoonNotification")
+                                            .variant(MoonButtonVariant::Panel)
+                                            .on_click(|_, window, app| {
+                                                window.push_notification(
+                                                    MoonNotification::info(
+                                                        "MoonNotification from NewControls",
+                                                    )
+                                                    .title("MoonNotification")
+                                                    .autohide(false),
+                                                    app,
+                                                );
+                                            })
+                                            .render(),
+                                    )
+                                    .child(
+                                        MoonButton::new("new-controls-native-menu")
+                                            .label("Open native menu")
+                                            .variant(MoonButtonVariant::Panel)
+                                            .on_click(|_, window, app| {
+                                                MoonNativeMenu::new()
+                                                    .label("MoonNativeMenu")
+                                                    .menu("No-op action", Box::new(NoAction))
+                                                    .menu_with_check(
+                                                        "Checked item",
+                                                        true,
+                                                        Box::new(NoAction),
+                                                    )
+                                                    .separator()
+                                                    .submenu(
+                                                        "Submenu",
+                                                        MoonNativeMenu::new().menu(
+                                                            "Nested item",
+                                                            Box::new(NoAction),
+                                                        ),
+                                                    )
+                                                    .show(point(px(180.0), px(180.0)), window, app);
+                                            })
+                                            .render(),
+                                    )
+                            )
+                            .child(
+                                MoonAccordion::new("new-controls-accordion")
+                                    .item(|item| {
+                                        item.title("MoonAccordion").open(true).child(
+                                            "Longbridge expansion behavior, Moon-facing API.",
+                                        )
+                                    })
+                                    .render(),
+                            ),
+                    ),
+            )
+            .child(
+                card("Choice controls", cx)
+                    .child(
+                        h_flex()
+                            .gap(px(18.0))
+                            .flex_wrap()
+                            .child(
+                                MoonToggle::new("new-controls-toggle")
+                                    .checked(self.new_toggle_checked)
+                                    .label("overlay hints")
+                                    .on_change({
+                                        let view = view.clone();
+                                        move |checked, _, app| {
+                                            let checked = *checked;
+                                            view.update(app, |this, cx| {
+                                                this.new_toggle_checked = checked;
+                                                this.push_event(format!("MoonToggle: {checked}"), cx);
+                                            });
+                                        }
+                                    }),
+                            )
+                            .child(
+                                MoonToggle::new("new-controls-toggle-compact")
+                                    .checked(false)
+                                    .label("compact")
+                                    .size(MoonToggleSize::Compact),
+                            )
+                            .child(MoonSpinner::new().tone(MoonTone::Info))
+                            .child(MoonKbd::new("Ctrl+K"))
+                            .child(MoonKbd::new("Esc").outline(true)),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(18.0))
+                            .items_center()
+                            .flex_wrap()
+                            .child(
+                                MoonSwitch::new("new-controls-switch")
+                                    .checked(self.new_switch_checked)
+                                    .label("MoonSwitch")
+                                    .tooltip("Longbridge switch behavior through Moon facade")
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |checked, _, app| {
+                                            let checked = *checked;
+                                            view.update(app, |this, cx| {
+                                                this.new_switch_checked = checked;
+                                                this.push_event(format!("MoonSwitch: {checked}"), cx);
+                                            });
+                                        }
+                                    }),
+                            )
+                            .child(
+                                MoonRating::new("new-controls-rating")
+                                    .value(self.new_rating_value)
+                                    .max(5)
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |value, _, app| {
+                                            let value = *value;
+                                            view.update(app, |this, cx| {
+                                                this.new_rating_value = value;
+                                                this.push_event(format!("MoonRating: {value}"), cx);
+                                            });
+                                        }
+                                    }),
+                            ),
+                    )
+                    .child(MoonSeparator::horizontal().alpha(0.72))
+                    .child(
+                        h_flex()
+                            .items_center()
+                            .gap(px(10.0))
+                            .flex_wrap()
+                            .child(
+                                MoonLink::new("new-controls-link", "MoonLink")
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |_, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.push_event("MoonLink clicked", cx);
+                                            });
+                                        }
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .w(px(180.0))
+                                    .child(MoonSkeleton::new("new-controls-skeleton").height(8.0)),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(14.0))
+                            .flex_wrap()
+                            .child(
+                                MoonRadio::new("new-controls-radio-fast")
+                                    .label("fast")
+                                    .checked(self.new_radio_index == 0)
+                                    .on_change({
+                                        let view = view.clone();
+                                        move |_, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.new_radio_index = 0;
+                                                this.push_event("MoonRadio: fast", cx);
+                                            });
+                                        }
+                                    }),
+                            )
+                            .child(
+                                MoonRadio::new("new-controls-radio-balanced")
+                                    .label("balanced")
+                                    .checked(self.new_radio_index == 1)
+                                    .on_change({
+                                        let view = view.clone();
+                                        move |_, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.new_radio_index = 1;
+                                                this.push_event("MoonRadio: balanced", cx);
+                                            });
+                                        }
+                                    }),
+                            )
+                            .child(
+                                MoonRadio::new("new-controls-radio-safe")
+                                    .label("safe")
+                                    .checked(self.new_radio_index == 2)
+                                    .disabled(true),
+                            ),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("Form primitives", cx)
+                            .w(px(500.0))
+                            .child(
+                                MoonSurface::new()
+                                    .id("new-controls-surface-card")
+                                    .variant(MoonSurfaceVariant::Card)
+                                    .child(
+                                        v_flex()
+                                            .gap(px(10.0))
+                                            .p(px(12.0))
+                                            .child(
+                                                MoonLabel::new("MoonLabel + MoonSurface")
+                                                    .color(p.text_soft)
+                                                    .font_size(10.5)
+                                                    .line_height(13.0)
+                                                    .weight(600.0)
+                                                    .mono(true)
+                                                    .uppercase(false)
+                                                    .render(),
+                                            )
+                                            .child(
+                                                MoonGroupBox::new("new-controls-group-box")
+                                                    .title("MoonGroupBox")
+                                                    .child(
+                                                        MoonFormRow::new(
+                                                            "new-controls-form-row-selector",
+                                                            "Market",
+                                                        )
+                                                        .label_width(96.0)
+                                                        .control(
+                                                            MoonSelectorPill::new(
+                                                                "new-controls-form-selector",
+                                                            )
+                                                            .leading_dot(p.green)
+                                                            .segment(
+                                                                MoonSelectorSegment::new("default")
+                                                                    .color(p.text_muted),
+                                                            )
+                                                            .segment(
+                                                                MoonSelectorSegment::new("BTCUSDT")
+                                                                    .color(p.text)
+                                                                    .weight(600.0),
+                                                            )
+                                                            .render(),
+                                                        ),
+                                                    )
+                                                    .child(
+                                                        MoonFormRow::new(
+                                                            "new-controls-form-row-stepper",
+                                                            "Risk",
+                                                        )
+                                                        .label_width(96.0)
+                                                        .control(
+                                                            MoonStepper::new(
+                                                                "new-controls-stepper",
+                                                            )
+                                                            .value(self.new_stepper_value)
+                                                            .range(0.0, 10.0)
+                                                            .step(0.5)
+                                                            .precision(1)
+                                                            .tone(MoonTone::Warning)
+                                                            .on_change({
+                                                                let view = view.clone();
+                                                                move |value, _, app| {
+                                                                    view.update(app, |this, cx| {
+                                                                        this.new_stepper_value =
+                                                                            value;
+                                                                        this.push_event(
+                                                                            format!(
+                                                                                "MoonStepper: {value:.1}"
+                                                                            ),
+                                                                            cx,
+                                                                        );
+                                                                    });
+                                                                }
+                                                            })
+                                                            .render(),
+                                                        ),
+                                                    ),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    .child(
+                        card("Toolbar primitives", cx)
+                            .w(px(500.0))
+                            .child(
+                                MoonSurface::new()
+                                    .id("new-controls-surface-sidebar")
+                                    .variant(MoonSurfaceVariant::Sidebar)
+                                    .child(
+                                        v_flex()
+                                            .gap(px(10.0))
+                                            .p(px(12.0))
+                                            .child(
+                                                MoonCollapsible::new(
+                                                    "new-controls-collapsible",
+                                                )
+                                                .title("MoonCollapsible")
+                                                .default_open(true)
+                                                .content(
+                                                    MoonText::new(
+                                                        "Expanded content keeps the Moon surface, border, typography and spacing rules.",
+                                                    )
+                                                    .uppercase(false)
+                                                    .mono(true)
+                                                    .wrap()
+                                                    .color(p.text_soft)
+                                                    .render(),
+                                                ),
+                                            )
+                                            .child(
+                                                MoonPresetStrip::new(
+                                                    "new-controls-preset-strip",
+                                                )
+                                                .slot_width(74.0)
+                                                .items([
+                                                    MoonPresetItem::new("TP", "F1", "+3.0%"),
+                                                    MoonPresetItem::new("SL", "F2", "-2.0%")
+                                                        .disabled(true),
+                                                    MoonPresetItem::new("F3", "0.05", "size")
+                                                        .selected(true),
+                                                    MoonPresetItem::new("S3", "3", "+3.0%"),
+                                                ])
+                                                .render(),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("Settings layout", cx)
+                            .w(px(500.0))
+                            .h(px(360.0))
+                            .child(
+                                MoonSettings::new("new-controls-settings")
+                                    .sidebar_width(px(170.0))
+                                    .page(
+                                        MoonSettingPage::new("Trading")
+                                            .description(
+                                                "Searchable settings page with typed fields.",
+                                            )
+                                            .default_open(true)
+                                            .group(
+                                                MoonSettingGroup::new()
+                                                    .title("Main")
+                                                    .item(
+                                                        MoonSettingItem::new(
+                                                            "Enable hints",
+                                                            {
+                                                                let value =
+                                                                    settings_enabled.clone();
+                                                                let set_value =
+                                                                    settings_enabled.clone();
+                                                                MoonSettingField::switch(
+                                                                    move |_| value.get(),
+                                                                    move |next, app| {
+                                                                        set_value.set(next);
+                                                                        app.refresh_windows();
+                                                                    },
+                                                                )
+                                                                .default_value(true)
+                                                            },
+                                                        )
+                                                        .description("Switch field uses the same Moon-facing path."),
+                                                    )
+                                                    .item(
+                                                        MoonSettingItem::new(
+                                                            "Symbol",
+                                                            {
+                                                                let value =
+                                                                    settings_symbol.clone();
+                                                                let set_value =
+                                                                    settings_symbol.clone();
+                                                                MoonSettingField::input(
+                                                                    move |_| value.borrow().clone(),
+                                                                    move |next, app| {
+                                                                        *set_value.borrow_mut() =
+                                                                            next;
+                                                                        app.refresh_windows();
+                                                                    },
+                                                                )
+                                                                .default_value("BTCUSDT")
+                                                            },
+                                                        )
+                                                        .description("Editable text field."),
+                                                    )
+                                                    .item(
+                                                        MoonSettingItem::new(
+                                                            "Mode",
+                                                            {
+                                                                let value = settings_mode.clone();
+                                                                let set_value =
+                                                                    settings_mode.clone();
+                                                                MoonSettingField::dropdown(
+                                                                    vec![
+                                                                        (
+                                                                            SharedString::from(
+                                                                                "paper",
+                                                                            ),
+                                                                            SharedString::from(
+                                                                                "Paper",
+                                                                            ),
+                                                                        ),
+                                                                        (
+                                                                            SharedString::from(
+                                                                                "live",
+                                                                            ),
+                                                                            SharedString::from(
+                                                                                "Live",
+                                                                            ),
+                                                                        ),
+                                                                        (
+                                                                            SharedString::from(
+                                                                                "review",
+                                                                            ),
+                                                                            SharedString::from(
+                                                                                "Review",
+                                                                            ),
+                                                                        ),
+                                                                    ],
+                                                                    move |_| value.borrow().clone(),
+                                                                    move |next, app| {
+                                                                        *set_value.borrow_mut() =
+                                                                            next;
+                                                                        app.refresh_windows();
+                                                                    },
+                                                                )
+                                                                .default_value("paper")
+                                                            },
+                                                        )
+                                                        .description("Dropdown field keeps menu behavior."),
+                                                    )
+                                                    .item(
+                                                        MoonSettingItem::new(
+                                                            "Risk",
+                                                            {
+                                                                let value = settings_risk.clone();
+                                                                let set_value =
+                                                                    settings_risk.clone();
+                                                                MoonSettingField::number_input(
+                                                                    MoonNumberFieldOptions {
+                                                                        min: 0.0,
+                                                                        max: 10.0,
+                                                                        step: 0.5,
+                                                                    },
+                                                                    move |_| value.get(),
+                                                                    move |next, app| {
+                                                                        set_value.set(next);
+                                                                        app.refresh_windows();
+                                                                    },
+                                                                )
+                                                                .default_value(2.5)
+                                                            },
+                                                        )
+                                                        .description("Number input field."),
+                                                    ),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    .child(
+                        card("Resizable panels", cx)
+                            .w(px(500.0))
+                            .h(px(360.0))
+                            .child({
+                                let resizable: MoonResizablePanelGroup =
+                                    moon_h_resizable("new-controls-resizable")
+                                        .child(
+                                            moon_resizable_panel()
+                                                .size(px(155.0))
+                                                .size_range(px(120.0)..px(230.0))
+                                                .flex_none()
+                                                .child(
+                                                    MoonSurface::new()
+                                                        .id("new-controls-resizable-left")
+                                                        .variant(MoonSurfaceVariant::Sidebar)
+                                                        .child(
+                                                            v_flex()
+                                                                .size_full()
+                                                                .p(px(12.0))
+                                                                .gap(px(8.0))
+                                                                .child(
+                                                                    MoonBadge::new("left")
+                                                                        .tone(MoonTone::Info)
+                                                                        .render(),
+                                                                )
+                                                                .child(
+                                                                    MoonText::new(
+                                                                        "Drag the divider.",
+                                                                    )
+                                                                    .uppercase(false)
+                                                                    .mono(true)
+                                                                    .wrap()
+                                                                    .color(p.text_soft)
+                                                                    .render(),
+                                                                ),
+                                                        ),
+                                                ),
+                                        )
+                                        .child(
+                                            moon_resizable_panel().child(
+                                                MoonSurface::new()
+                                                    .id("new-controls-resizable-right")
+                                                    .variant(MoonSurfaceVariant::Card)
+                                                    .child(
+                                                        v_flex()
+                                                            .size_full()
+                                                            .p(px(12.0))
+                                                            .gap(px(8.0))
+                                                            .child(
+                                                                MoonBadge::new("content")
+                                                                    .tone(MoonTone::Positive)
+                                                                    .render(),
+                                                            )
+                                                            .child(
+                                                                MoonText::new(
+                                                                    "This is the real Longbridge resizable engine, exposed as MoonResizablePanelGroup.",
+                                                                )
+                                                                .uppercase(false)
+                                                                .mono(true)
+                                                                .wrap()
+                                                                .color(p.text_soft)
+                                                                .render(),
+                                                            ),
+                                                    ),
+                                            ),
+                                        );
+                                resizable
+                            }),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("Identity / navigation", cx)
+                            .w(px(500.0))
+                            .child(
+                                h_flex()
+                                    .gap(px(14.0))
+                                    .items_center()
+                                    .child(
+                                        MoonAvatarGroup::new()
+                                            .size(MoonAvatarSize::Normal)
+                                            .limit(3)
+                                            .ellipsis(true)
+                                            .children([
+                                                MoonAvatar::new().name("Moon Operator"),
+                                                MoonAvatar::new().name("Risk Desk"),
+                                                MoonAvatar::new().name("Quant Lab"),
+                                                MoonAvatar::new().name("Ops"),
+                                            ])
+                                            .render(),
+                                    )
+                                    .child(MoonProgressCircle::new("new-controls-progress-circle")
+                                        .value(72.0)
+                                        .tone(MoonTone::Positive)
+                                        .size(MoonProgressCircleSize::Large)
+                                        .render()),
+                            )
+                            .child(
+                                MoonBreadcrumb::new()
+                                    .child(
+                                        MoonBreadcrumbItem::new("MoonUI").on_click({
+                                            let view = view.clone();
+                                            move |_, _, app| {
+                                                view.update(app, |this, cx| {
+                                                    this.push_event("MoonBreadcrumb: MoonUI", cx);
+                                                });
+                                            }
+                                        }),
+                                    )
+                                    .child("Components")
+                                    .child("NewControls")
+                                    .render(),
+                            )
+                            .child(
+                                MoonPagination::new("new-controls-pagination")
+                                    .current_page(self.new_pagination_page)
+                                    .total_pages(12)
+                                    .visible_pages(7)
+                                    .small()
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |page, _, app| {
+                                            let page = *page;
+                                            view.update(app, |this, cx| {
+                                                this.new_pagination_page = page;
+                                                this.push_event(
+                                                    format!("MoonPagination: page {page}"),
+                                                    cx,
+                                                );
+                                            });
+                                        }
+                                    })
+                                    .render(),
+                            ),
+                    )
+                    .child(
+                        card("Description data", cx).w(px(500.0)).child(
+                            MoonDescriptionList::new()
+                                .columns(2)
+                                .small()
+                                .item("Component class", "MoonReady", 1)
+                                .item("Behavior", "Longbridge or MoonCustom", 1)
+                                .item("Theme", "MoonTheme tokens", 1)
+                                .item("Snapshot", "covered", 1)
+                                .render(),
+                        ),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("Search / date controls", cx)
+                            .w(px(500.0))
+                            .child(
+                                MoonCombobox::new(&self.combobox_state)
+                                    .placeholder("Select market")
+                                    .search_placeholder("Search symbol")
+                                    .cleanable(true)
+                                    .menu_width(px(230.0))
+                                    .menu_max_h(px(190.0)),
+                            )
+                            .child(
+                                MoonDatePicker::new(&self.date_picker_state)
+                                    .placeholder("Pick session date")
+                                    .cleanable(true)
+                                    .number_of_months(1),
+                            )
+                            .child(
+                                MoonHoverCard::new("new-controls-hover-card")
+                                    .open_delay(Duration::from_millis(120))
+                                    .close_delay(Duration::from_millis(120))
+                                    .trigger(
+                                        MoonButton::new("new-controls-hover-trigger")
+                                            .label("Hover details")
+                                            .variant(MoonButtonVariant::Panel)
+                                            .render(),
+                                    )
+                                    .content(|_, _, app| {
+                                        let p = MoonPalette::active(app);
+                                        v_flex()
+                                            .gap(px(6.0))
+                                            .w(px(230.0))
+                                            .child(
+                                                MoonText::new("MoonHoverCard")
+                                                    .uppercase(false)
+                                                    .mono(true)
+                                                    .weight(700.0)
+                                                    .color(p.amber)
+                                                    .render(),
+                                            )
+                                            .child(
+                                                MoonText::new(
+                                                    "Hover lifecycle stays in the Longbridge engine; the surface uses Moon tokens.",
+                                                )
+                                                .uppercase(false)
+                                                .mono(true)
+                                                .wrap()
+                                                .color(p.text_soft)
+                                                .render(),
+                                            )
+                                    }),
+                            ),
+                    )
+                    .child(
+                        card("Calendar", cx).w(px(500.0)).child(
+                            MoonCalendar::new(&self.calendar_state)
+                                .number_of_months(1)
+                                .w(px(292.0)),
+                        ),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("MoonList", cx)
+                            .w(px(500.0))
+                            .h(px(280.0))
+                            .child(
+                                MoonList::new(&self.list_state)
+                                    .search_placeholder("Filter list")
+                                    .scrollbar_visible(true),
+                            ),
+                    )
+                    .child(
+                        card("MoonTree", cx)
+                            .w(px(500.0))
+                            .h(px(280.0))
+                            .child(MoonTree::new(
+                                &self.tree_state,
+                                |ix, entry, selected, _window, app| {
+                                    let p = MoonPalette::active(app);
+                                    let marker = if entry.is_folder() {
+                                        if entry.is_expanded() { "v" } else { ">" }
+                                    } else {
+                                        "-"
+                                    };
+                                    MoonListItem::new(ix)
+                                        .selected(selected)
+                                        .child(
+                                            h_flex()
+                                                .pl(px(12.0 * entry.depth() as f32))
+                                                .gap(px(6.0))
+                                                .child(
+                                                    MoonText::new(marker)
+                                                        .uppercase(false)
+                                                        .mono(true)
+                                                        .color(p.text_muted)
+                                                        .render(),
+                                                )
+                                                .child(
+                                                    MoonText::new(entry.item().label().clone())
+                                                        .uppercase(false)
+                                                        .mono(true)
+                                                        .color(if selected {
+                                                            p.text
+                                                        } else {
+                                                            p.text_soft
+                                                        })
+                                                        .render(),
+                                                ),
+                                        )
+                                },
+                            )),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("MoonSidebar", cx)
+                            .w(px(500.0))
+                            .child(
+                                h_flex()
+                                    .items_start()
+                                    .gap(px(10.0))
+                                    .child(
+                                        MoonSidebar::new("new-controls-sidebar")
+                                            .w(px(268.0))
+                                            .h(px(250.0))
+                                            .collapsed(self.new_sidebar_collapsed)
+                                            .header(
+                                                h_flex()
+                                                    .gap(px(8.0))
+                                                    .child(MoonBadge::new("UI").render())
+                                                    .child("MoonSidebar"),
+                                            )
+                                            .child(
+                                                MoonSidebarGroup::new("Navigation").child(
+                                                    MoonSidebarMenu::new().children([
+                                                        MoonSidebarMenuItem::new("Controls")
+                                                            .active(true),
+                                                        MoonSidebarMenuItem::new("Inputs"),
+                                                        MoonSidebarMenuItem::new("Overlays")
+                                                            .children([
+                                                                MoonSidebarMenuItem::new("Dialog"),
+                                                                MoonSidebarMenuItem::new("Sheet"),
+                                                            ])
+                                                            .default_open(true),
+                                                    ]),
+                                                ),
+                                            ),
+                                    )
+                                    .child(
+                                        v_flex()
+                                            .gap(px(8.0))
+                                            .child(
+                                                MoonSidebarToggleButton::new()
+                                                    .collapsed(self.new_sidebar_collapsed)
+                                                    .on_click({
+                                                        let view = view.clone();
+                                                        move |_, _, app| {
+                                                            view.update(app, |this, cx| {
+                                                                this.new_sidebar_collapsed =
+                                                                    !this.new_sidebar_collapsed;
+                                                                this.push_event(
+                                                                    format!(
+                                                                        "MoonSidebar collapsed: {}",
+                                                                        this.new_sidebar_collapsed
+                                                                    ),
+                                                                    cx,
+                                                                );
+                                                            });
+                                                        }
+                                                    }),
+                                            )
+                                            .child(
+                                                MoonText::new(
+                                                    "Collapse state, hierarchy and menu behavior stay in the sidebar engine.",
+                                                )
+                                                .uppercase(false)
+                                                .mono(true)
+                                                .wrap()
+                                                .color(p.text_soft)
+                                                .render(),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    .child(
+                        card("MoonSheet", cx)
+                            .w(px(500.0))
+                            .child(
+                                MoonButton::new("new-controls-sheet")
+                                    .label("Open root-owned sheet")
+                                    .variant(MoonButtonVariant::Panel)
+                                    .on_click(|_, window, app| {
+                                        window.open_moon_sheet_at(
+                                            MoonPlacement::Right,
+                                            app,
+                                            |sheet, _window, cx| {
+                                                let p = MoonPalette::active(cx);
+                                                sheet
+                                                    .title(div().child("MoonSheet"))
+                                                    .size(px(360.0))
+                                                    .child(
+                                                        v_flex()
+                                                            .gap(px(10.0))
+                                                            .child(
+                                                                MoonBadge::new("root overlay")
+                                                                    .tone(MoonTone::Info)
+                                                                    .variant(
+                                                                        MoonBadgeVariant::Outline,
+                                                                    )
+                                                                    .render(),
+                                                            )
+                                                            .child(
+                                                                MoonText::new(
+                                                                    "Sheet is opened through MoonWindowExt and Root ownership, not as a local panel fake.",
+                                                                )
+                                                                .uppercase(false)
+                                                                .mono(true)
+                                                                .wrap()
+                                                                .color(p.text_soft)
+                                                                .render(),
+                                                            ),
+                                                    )
+                                            },
+                                        );
+                                    })
+                                    .render(),
+                            )
+                            .child(
+                                MoonText::new(
+                                    "The sheet button exercises the same root-owned overlay path application windows should use.",
+                                )
+                                .uppercase(false)
+                                .mono(true)
+                                .wrap()
+                                .color(p.text_soft)
+                                .render(),
+                            ),
+                    ),
+            )
+            .child(
+                card("Rule", cx).child(
+                    MoonText::new(
+                        "Useful Longbridge controls still need real Moon styling before they appear here. Thin wrappers stay out of the gallery until the visual work is done.",
+                    )
+                    .uppercase(false)
+                    .mono(true)
+                    .wrap()
+                    .color(p.text_soft)
+                    .render(),
+                ),
+            )
+    }
+
+    fn render_composites(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
+        let settings_enabled = self.settings_enabled.clone();
+        let settings_symbol = self.settings_symbol.clone();
+        let settings_mode = self.settings_mode.clone();
+
+        section("Composites / Ready Moon adaptations", cx)
+            .child(
+                card("Rule", cx)
+                    .child(
+                        MoonText::new(
+                            "Composite controls are shown here only after they have a Moon-facing API and a Moon visual contract. This page exists so snapshot tests cover them without manual scrolling.",
+                        )
+                        .uppercase(false)
+                        .mono(true)
+                        .wrap()
+                        .color(p.text_soft)
+                        .render(),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(8.0))
+                            .flex_wrap()
+                            .child(MoonBadge::new("MoonReady").tone(MoonTone::Positive).render())
+                            .child(MoonBadge::new("Root-owned overlays").tone(MoonTone::Info).render())
+                            .child(MoonBadge::new("Stateful controls").tone(MoonTone::Accent).render()),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("MoonSettings", cx)
+                            .w(px(456.0))
+                            .h(px(292.0))
+                            .child(
+                                MoonSettings::new("composites-settings")
+                                    .sidebar_width(px(140.0))
+                                    .page(
+                                        MoonSettingPage::new("Trading")
+                                            .description("Typed fields through MoonSettingField.")
+                                            .default_open(true)
+                                            .group(
+                                                MoonSettingGroup::new()
+                                                    .title("Main")
+                                                    .item(
+                                                        MoonSettingItem::new("Hints", {
+                                                            let value = settings_enabled.clone();
+                                                            let set_value = settings_enabled.clone();
+                                                            MoonSettingField::switch(
+                                                                move |_| value.get(),
+                                                                move |next, app| {
+                                                                    set_value.set(next);
+                                                                    app.refresh_windows();
+                                                                },
+                                                            )
+                                                            .default_value(true)
+                                                        })
+                                                        .description("Switch field."),
+                                                    )
+                                                    .item(
+                                                        MoonSettingItem::new("Symbol", {
+                                                            let value = settings_symbol.clone();
+                                                            let set_value = settings_symbol.clone();
+                                                            MoonSettingField::input(
+                                                                move |_| value.borrow().clone(),
+                                                                move |next, app| {
+                                                                    *set_value.borrow_mut() = next;
+                                                                    app.refresh_windows();
+                                                                },
+                                                            )
+                                                            .default_value("BTCUSDT")
+                                                        })
+                                                        .description("Editable field."),
+                                                    )
+                                                    .item(
+                                                        MoonSettingItem::new("Mode", {
+                                                            let value = settings_mode.clone();
+                                                            let set_value = settings_mode.clone();
+                                                            MoonSettingField::dropdown(
+                                                                vec![
+                                                                    (
+                                                                        SharedString::from("paper"),
+                                                                        SharedString::from("Paper"),
+                                                                    ),
+                                                                    (
+                                                                        SharedString::from("live"),
+                                                                        SharedString::from("Live"),
+                                                                    ),
+                                                                ],
+                                                                move |_| value.borrow().clone(),
+                                                                move |next, app| {
+                                                                    *set_value.borrow_mut() = next;
+                                                                    app.refresh_windows();
+                                                                },
+                                                            )
+                                                            .default_value("paper")
+                                                        })
+                                                        .description("Dropdown field."),
+                                                    ),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    .child(
+                        card("MoonResizablePanelGroup", cx)
+                            .w(px(456.0))
+                            .h(px(292.0))
+                            .child({
+                                let resizable: MoonResizablePanelGroup =
+                                    moon_h_resizable("composites-resizable")
+                                        .child(
+                                            moon_resizable_panel()
+                                                .size(px(148.0))
+                                                .size_range(px(110.0)..px(220.0))
+                                                .flex_none()
+                                                .child(
+                                                    MoonSurface::new()
+                                                        .id("composites-resizable-left")
+                                                        .variant(MoonSurfaceVariant::Sidebar)
+                                                        .child(
+                                                            v_flex()
+                                                                .size_full()
+                                                                .p(px(10.0))
+                                                                .gap(px(8.0))
+                                                                .child(
+                                                                    MoonBadge::new("left")
+                                                                        .tone(MoonTone::Info)
+                                                                        .render(),
+                                                                )
+                                                                .child(
+                                                                    MoonText::new("Drag divider.")
+                                                                        .uppercase(false)
+                                                                        .mono(true)
+                                                                        .wrap()
+                                                                        .color(p.text_soft)
+                                                                        .render(),
+                                                                ),
+                                                        ),
+                                                ),
+                                        )
+                                        .child(
+                                            moon_resizable_panel().child(
+                                                MoonSurface::new()
+                                                    .id("composites-resizable-right")
+                                                    .variant(MoonSurfaceVariant::Card)
+                                                    .child(
+                                                        v_flex()
+                                                            .size_full()
+                                                            .p(px(10.0))
+                                                            .gap(px(8.0))
+                                                            .child(
+                                                                MoonBadge::new("content")
+                                                                    .tone(MoonTone::Positive)
+                                                                    .render(),
+                                                            )
+                                                            .child(
+                                                                MoonText::new(
+                                                                    "Longbridge resize behavior, Moon surfaces.",
+                                                                )
+                                                                .uppercase(false)
+                                                                .mono(true)
+                                                                .wrap()
+                                                                .color(p.text_soft)
+                                                                .render(),
+                                                            ),
+                                                    ),
+                                            ),
+                                        );
+                                resizable
+                            }),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("Search / date / hover", cx)
+                            .w(px(456.0))
+                            .h(px(270.0))
+                            .child(
+                                MoonCombobox::new(&self.combobox_state)
+                                    .placeholder("Select market")
+                                    .search_placeholder("Search symbol")
+                                    .cleanable(true)
+                                    .menu_width(px(230.0))
+                                    .menu_max_h(px(170.0)),
+                            )
+                            .child(
+                                MoonDatePicker::new(&self.date_picker_state)
+                                    .placeholder("Pick session date")
+                                    .cleanable(true)
+                                    .number_of_months(1),
+                            )
+                            .child(
+                                MoonHoverCard::new("composites-hover-card")
+                                    .open_delay(Duration::from_millis(120))
+                                    .close_delay(Duration::from_millis(120))
+                                    .trigger(
+                                        MoonButton::new("composites-hover-trigger")
+                                            .label("Hover details")
+                                            .variant(MoonButtonVariant::Panel)
+                                            .render(),
+                                    )
+                                    .content(|_, _, app| {
+                                        let p = MoonPalette::active(app);
+                                        v_flex()
+                                            .gap(px(6.0))
+                                            .w(px(230.0))
+                                            .child(
+                                                MoonText::new("MoonHoverCard")
+                                                    .uppercase(false)
+                                                    .mono(true)
+                                                    .weight(700.0)
+                                                    .color(p.amber)
+                                                    .render(),
+                                            )
+                                            .child(
+                                                MoonText::new(
+                                                    "Hover lifecycle stays in the component engine.",
+                                                )
+                                                .uppercase(false)
+                                                .mono(true)
+                                                .wrap()
+                                                .color(p.text_soft)
+                                                .render(),
+                                            )
+                                    }),
+                            ),
+                    )
+                    .child(
+                        card("Calendar / list", cx)
+                            .w(px(456.0))
+                            .h(px(270.0))
+                            .child(
+                                h_flex()
+                                    .items_start()
+                                    .gap(px(10.0))
+                                    .child(
+                                        MoonCalendar::new(&self.calendar_state)
+                                            .number_of_months(1)
+                                            .w(px(220.0)),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .h(px(218.0))
+                                            .child(
+                                                MoonList::new(&self.list_state)
+                                                    .search_placeholder("Filter")
+                                                    .scrollbar_visible(true),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            )
+    }
+
+    fn render_stateful(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
+        let view = cx.entity();
+
+        section("Stateful / Ready Moon adaptations", cx)
+            .child(
+                card("Rule", cx)
+                    .child(
+                        MoonText::new(
+                            "Stateful controls must prove keyboard, expansion, collapse and root-overlay ownership as live widgets, not as static screenshots.",
+                        )
+                        .uppercase(false)
+                        .mono(true)
+                        .wrap()
+                        .color(p.text_soft)
+                        .render(),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(8.0))
+                            .flex_wrap()
+                            .child(MoonBadge::new("Tree").tone(MoonTone::Info).render())
+                            .child(MoonBadge::new("Sidebar").tone(MoonTone::Accent).render())
+                            .child(
+                                MoonBadge::new("Root overlay")
+                                    .tone(MoonTone::Positive)
+                                    .render(),
+                            ),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        card("Tree / sidebar", cx)
+                            .w(px(456.0))
+                            .h(px(430.0))
+                            .child(
+                                h_flex()
+                                    .items_start()
+                                    .gap(px(10.0))
+                                    .child(
+                                        div().w(px(200.0)).h(px(378.0)).child(MoonTree::new(
+                                            &self.tree_state,
+                                            |ix, entry, selected, _window, app| {
+                                                let p = MoonPalette::active(app);
+                                                let marker = if entry.is_folder() {
+                                                    if entry.is_expanded() { "v" } else { ">" }
+                                                } else {
+                                                    "-"
+                                                };
+                                                MoonListItem::new(ix).selected(selected).child(
+                                                    h_flex()
+                                                        .pl(px(10.0 * entry.depth() as f32))
+                                                        .gap(px(6.0))
+                                                        .child(
+                                                            MoonText::new(marker)
+                                                                .uppercase(false)
+                                                                .mono(true)
+                                                                .color(p.text_muted)
+                                                                .render(),
+                                                        )
+                                                        .child(
+                                                            MoonText::new(entry.item().label().clone())
+                                                                .uppercase(false)
+                                                                .mono(true)
+                                                                .color(if selected {
+                                                                    p.text
+                                                                } else {
+                                                                    p.text_soft
+                                                                })
+                                                                .render(),
+                                                        ),
+                                                )
+                                            },
+                                        )),
+                                    )
+                                    .child(
+                                        v_flex()
+                                            .gap(px(8.0))
+                                            .child(
+                                                MoonSidebarToggleButton::new()
+                                                    .collapsed(self.new_sidebar_collapsed)
+                                                    .on_click({
+                                                        let view = view.clone();
+                                                        move |_, _, app| {
+                                                            view.update(app, |this, cx| {
+                                                                this.new_sidebar_collapsed =
+                                                                    !this.new_sidebar_collapsed;
+                                                                this.push_event(
+                                                                    format!(
+                                                                        "MoonSidebar collapsed: {}",
+                                                                        this.new_sidebar_collapsed
+                                                                    ),
+                                                                    cx,
+                                                                );
+                                                            });
+                                                        }
+                                                    }),
+                                            )
+                                            .child(
+                                                MoonSidebar::new("stateful-sidebar")
+                                                    .w(px(220.0))
+                                                    .h(px(336.0))
+                                                    .collapsed(self.new_sidebar_collapsed)
+                                                    .header(
+                                                        h_flex()
+                                                            .gap(px(8.0))
+                                                            .child("MoonSidebar"),
+                                                    )
+                                                    .child(
+                                                        MoonSidebarGroup::new("Navigation").child(
+                                                            MoonSidebarMenu::new().children([
+                                                                MoonSidebarMenuItem::new("Controls")
+                                                                    .active(true),
+                                                                MoonSidebarMenuItem::new("Inputs"),
+                                                                MoonSidebarMenuItem::new("Overlays")
+                                                                    .children([
+                                                                        MoonSidebarMenuItem::new(
+                                                                            "Dialog",
+                                                                        ),
+                                                                        MoonSidebarMenuItem::new(
+                                                                            "Sheet",
+                                                                        ),
+                                                                    ])
+                                                                    .default_open(true),
+                                                            ]),
+                                                        ),
+                                                    ),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    .child(
+                        card("Root-owned sheet", cx)
+                            .w(px(456.0))
+                            .h(px(430.0))
+                            .child(
+                                MoonButton::new("stateful-sheet")
+                                    .label("Open MoonSheet")
+                                    .variant(MoonButtonVariant::Panel)
+                                    .on_click(|_, window, app| {
+                                        window.open_moon_sheet_at(
+                                            MoonPlacement::Right,
+                                            app,
+                                            |sheet, _window, cx| {
+                                                let p = MoonPalette::active(cx);
+                                                sheet
+                                                    .title(div().child("MoonSheet"))
+                                                    .size(px(360.0))
+                                                    .child(
+                                                        v_flex()
+                                                            .gap(px(10.0))
+                                                            .child(
+                                                                MoonBadge::new("root overlay")
+                                                                    .tone(MoonTone::Info)
+                                                                    .variant(
+                                                                        MoonBadgeVariant::Outline,
+                                                                    )
+                                                                    .render(),
+                                                            )
+                                                            .child(
+                                                                MoonText::new(
+                                                                    "Sheet is opened through MoonWindowExt and Root ownership.",
+                                                                )
+                                                                .uppercase(false)
+                                                                .mono(true)
+                                                                .wrap()
+                                                                .color(p.text_soft)
+                                                                .render(),
+                                                            ),
+                                                    )
+                                            },
+                                        );
+                                    })
+                                    .render(),
+                            )
+                            .child(
+                                MoonDescriptionList::new()
+                                    .columns(1)
+                                    .small()
+                                    .item("Owner", "MoonRoot", 1)
+                                    .item("API", "MoonWindowExt", 1)
+                                    .item("Policy", "no local overlay fake", 2)
+                                    .item("Behavior", "root layer", 2)
+                                    .render(),
+                            )
+                            .child(
+                                MoonText::new(
+                                    "The button exercises the same root-owned sheet path application windows should use. It is intentionally not drawn as a panel child overlay.",
+                                )
+                                .uppercase(false)
+                                .mono(true)
+                                .wrap()
+                                .color(p.text_soft)
+                                .render(),
+                            ),
+                    ),
+            )
+    }
+}
+
+#[cfg(feature = "snapshot")]
+fn clear_snapshot_dir(dir: &std::path::Path) -> Result<(), String> {
+    std::fs::create_dir_all(dir).map_err(|err| format!("create {}: {err}", dir.display()))?;
+    let entries = std::fs::read_dir(dir).map_err(|err| format!("read {}: {err}", dir.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| format!("read dir entry {}: {err}", dir.display()))?;
+        if entry.path().extension().and_then(|ext| ext.to_str()) == Some("png") {
+            std::fs::remove_file(entry.path())
+                .map_err(|err| format!("remove {}: {err}", entry.path().display()))?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "snapshot")]
+fn snapshot_window_image(window: &mut Window) -> Result<image::RgbaImage, String> {
+    match window.render_to_image() {
+        Ok(image) => Ok(image),
+        Err(err) => snapshot_window_image_fallback(window)
+            .map_err(|fallback| format!("{err}; fallback failed: {fallback}")),
+    }
+}
+
+#[cfg(all(feature = "snapshot", target_os = "windows"))]
+fn snapshot_window_image_fallback(window: &Window) -> Result<image::RgbaImage, String> {
+    use windows::Win32::Foundation::{HWND, LPARAM, POINT};
+    use windows::Win32::Graphics::Gdi::{
+        BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BitBlt, ClientToScreen, CreateCompatibleBitmap,
+        CreateCompatibleDC, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC, GetDIBits, ReleaseDC,
+        SRCCOPY, SelectObject,
+    };
+    use windows::Win32::System::Threading::GetCurrentProcessId;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        BringWindowToTop, EnumWindows, GetClientRect, GetWindowThreadProcessId, HWND_NOTOPMOST,
+        HWND_TOPMOST, SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SetCursorPos,
+        SetForegroundWindow, SetWindowPos, ShowWindow,
+    };
+
+    struct TopmostGuard {
+        hwnd: Option<HWND>,
+    }
+
+    impl Drop for TopmostGuard {
+        fn drop(&mut self) {
+            if let Some(hwnd) = self.hwnd {
+                unsafe {
+                    let _ = SetWindowPos(
+                        hwnd,
+                        Some(HWND_NOTOPMOST),
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+                    );
+                }
+            }
+        }
+    }
+
+    struct EnumState {
+        pid: u32,
+        hwnd: Option<HWND>,
+    }
+
+    unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> windows::core::BOOL {
+        let state = unsafe { &mut *(lparam.0 as *mut EnumState) };
+        let mut pid = 0;
+        unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+        if pid == state.pid {
+            state.hwnd = Some(hwnd);
+            return windows::core::BOOL(0);
+        }
+        windows::core::BOOL(1)
+    }
+
+    unsafe fn find_gallery_window() -> Option<HWND> {
+        let mut state = EnumState {
+            pid: unsafe { GetCurrentProcessId() },
+            hwnd: None,
+        };
+        let state_ptr = &mut state as *mut EnumState;
+        let _ = unsafe { EnumWindows(Some(enum_windows_proc), LPARAM(state_ptr as isize)) };
+        state.hwnd
+    }
+
+    let mut topmost_guard = TopmostGuard { hwnd: None };
+    let (x, y, width, height) = unsafe {
+        match find_gallery_window() {
+            Some(hwnd) => {
+                topmost_guard.hwnd = Some(hwnd);
+                let _ = ShowWindow(hwnd, SW_SHOW);
+                let _ = SetWindowPos(
+                    hwnd,
+                    Some(HWND_TOPMOST),
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+                );
+                let _ = BringWindowToTop(hwnd);
+                let _ = SetForegroundWindow(hwnd);
+
+                let mut rect = Default::default();
+                if GetClientRect(hwnd, &mut rect).is_err() {
+                    return Err("GetClientRect failed".to_string());
+                }
+                let mut origin = POINT { x: 0, y: 0 };
+                if !ClientToScreen(hwnd, &mut origin).as_bool() {
+                    return Err("ClientToScreen failed".to_string());
+                }
+                let width = (rect.right - rect.left).max(1);
+                let height = (rect.bottom - rect.top).max(1);
+
+                // The Windows fallback captures real desktop pixels. Keep the
+                // cursor away from the taskbar so thumbnail previews or other
+                // shell overlays cannot be baked into component snapshots.
+                let _ = SetCursorPos(origin.x + 8, origin.y + 8);
+                std::thread::sleep(std::time::Duration::from_millis(350));
+                (origin.x, origin.y, width, height)
+            }
+            None => {
+                let bounds = window.bounds();
+                (
+                    f32::from(bounds.origin.x).round() as i32,
+                    f32::from(bounds.origin.y).round() as i32,
+                    f32::from(bounds.size.width).round().max(1.0) as i32,
+                    f32::from(bounds.size.height).round().max(1.0) as i32,
+                )
+            }
+        }
+    };
+
+    unsafe {
+        let screen = GetDC(None);
+        if screen.is_invalid() {
+            return Err("GetDC returned invalid HDC".to_string());
+        }
+        let memory = CreateCompatibleDC(Some(screen));
+        if memory.is_invalid() {
+            ReleaseDC(None, screen);
+            return Err("CreateCompatibleDC returned invalid HDC".to_string());
+        }
+        let bitmap = CreateCompatibleBitmap(screen, width, height);
+        if bitmap.is_invalid() {
+            let _ = DeleteDC(memory);
+            ReleaseDC(None, screen);
+            return Err("CreateCompatibleBitmap returned invalid HBITMAP".to_string());
+        }
+
+        let previous = SelectObject(memory, bitmap.into());
+        let bitblt_ok = BitBlt(memory, 0, 0, width, height, Some(screen), x, y, SRCCOPY).is_ok();
+        let _ = SelectObject(memory, previous);
+        if !bitblt_ok {
+            let _ = DeleteObject(bitmap.into());
+            let _ = DeleteDC(memory);
+            ReleaseDC(None, screen);
+            return Err("BitBlt failed".to_string());
+        }
+
+        let mut info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width,
+                biHeight: -height,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut pixels = vec![0_u8; (width as usize) * (height as usize) * 4];
+        let lines = GetDIBits(
+            memory,
+            bitmap,
+            0,
+            height as u32,
+            Some(pixels.as_mut_ptr().cast()),
+            &mut info,
+            DIB_RGB_COLORS,
+        );
+
+        let _ = DeleteObject(bitmap.into());
+        let _ = DeleteDC(memory);
+        ReleaseDC(None, screen);
+
+        if lines == 0 {
+            return Err("GetDIBits returned 0 lines".to_string());
+        }
+
+        for px in pixels.chunks_exact_mut(4) {
+            px.swap(0, 2);
+        }
+        image::RgbaImage::from_raw(width as u32, height as u32, pixels)
+            .ok_or_else(|| "image::RgbaImage::from_raw failed".to_string())
+    }
+}
+
+#[cfg(all(feature = "snapshot", not(target_os = "windows")))]
+fn snapshot_window_image_fallback(_window: &Window) -> Result<image::RgbaImage, String> {
+    Err("no platform fallback; implement backend render_to_image for this target".to_string())
 }
 
 impl Render for Gallery {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = MoonPalette::active(cx);
+        self.schedule_snapshot_capture(window, cx);
+        for panel_name in std::mem::take(&mut self.pending_detach) {
+            self.dock.update(cx, |dock, cx| {
+                dock.remove_panel_by_name(panel_name.as_ref(), window, cx);
+            });
+            self.event_log.insert(
+                0,
+                SharedString::from(format!("Detached window: {panel_name}")),
+            );
+            self.event_log.truncate(10);
+            cx.defer(move |cx| open_detached_gallery_panel(panel_name.clone(), cx));
+        }
+
         let page = match self.active_page {
             0 => self.render_controls(cx).into_any_element(),
             1 => self.render_inputs(cx).into_any_element(),
             2 => self.render_tables(cx).into_any_element(),
             3 => self.render_menus(cx).into_any_element(),
-            _ => self.render_navigation(cx).into_any_element(),
+            4 => self.render_navigation(cx).into_any_element(),
+            5 => self.render_new_controls(cx).into_any_element(),
+            6 => self.render_composites(cx).into_any_element(),
+            _ => self.render_stateful(cx).into_any_element(),
         };
 
         v_flex()
@@ -1090,7 +3232,8 @@ fn dock_panel(name: &'static str, title: &'static str, tone: MoonTone) -> Rc<dyn
                 .into_any_element()
         })
         .detachable(true)
-        .closable(true)
+        .show_dock_header(true)
+        .closable(false)
         .zoomable(true)
         .background_policy(MoonBackgroundPolicy::Opaque),
     )
@@ -1166,22 +3309,112 @@ fn window_frame_row(frame: MoonWindowFrame, title: &'static str, cx: &App) -> im
         .child(frame.visual_controls(cx))
 }
 
+struct DetachedGalleryPanel {
+    title: SharedString,
+}
+
+impl Render for DetachedGalleryPanel {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
+        let frame = MoonWindowFrame::tool("gallery-detached-frame", 0.0)
+            .brand(MoonWindowFrameBrand::Mark)
+            .controls(MoonWindowFrameControls::MinimizeClose);
+        v_flex()
+            .size_full()
+            .bg(rgba_from(p.shell, 1.0))
+            .text_color(rgb(p.text))
+            .child(
+                h_flex()
+                    .h(px(42.0))
+                    .px(px(12.0))
+                    .border_b_1()
+                    .border_color(rgba_from(p.border, 1.0))
+                    .bg(rgba_from(p.shell_high, 1.0))
+                    .child(frame.title_cluster(format!("Dock / {}", self.title), cx))
+                    .child(div().flex_1())
+                    .child(frame.visual_controls(cx)),
+            )
+            .child(
+                v_flex()
+                    .flex_1()
+                    .p(px(16.0))
+                    .gap(px(10.0))
+                    .child(
+                        MoonBadge::new("detached dock panel")
+                            .tone(MoonTone::Info)
+                            .variant(MoonBadgeVariant::Outline)
+                            .render(),
+                    )
+                    .child(
+                        MoonText::new(format!(
+                            "{} opened from DockEvent::DetachRequested.",
+                            self.title
+                        ))
+                        .uppercase(false)
+                        .mono(true)
+                        .wrap()
+                        .color(p.text_soft)
+                        .render(),
+                    ),
+            )
+    }
+}
+
+fn open_detached_gallery_panel(panel_name: SharedString, cx: &mut App) {
+    let p = MoonPalette::active(cx);
+    let bounds = Bounds::centered(None, size(px(520.0), px(340.0)), cx);
+    let title = panel_name.clone();
+    if let Err(err) = cx.open_window(
+        WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            window_clear_color: Some(rgba((p.shell << 8) | 0xFF)),
+            app_id: Some(format!("pro.moonbot.moon-ui-gallery.detached.{panel_name}")),
+            ..Default::default()
+        },
+        move |window, cx| {
+            let view = cx.new(|_| DetachedGalleryPanel {
+                title: title.clone(),
+            });
+            cx.new(|cx| {
+                Root::new(view, window, cx)
+                    .background_policy(MoonBackgroundPolicy::Opaque)
+                    .background(MoonPalette::active(cx).shell)
+            })
+        },
+    ) {
+        eprintln!("failed to open detached gallery panel {panel_name}: {err}");
+    }
+}
+
 fn run_gallery() {
-    application().run(|cx: &mut App| {
+    let args = gallery_args_from_cli();
+    let initial_page = args.page;
+    let snapshot_dir = args.snapshot_dir;
+    let theme_mode = args.theme_mode;
+    application().run(move |cx: &mut App| {
         moon_ui::foundation::init(cx);
-        MoonTheme::install_config(MoonThemeConfig::moon_terminal(), cx);
+        let mut theme_config = MoonThemeConfig::moon_terminal();
+        theme_config.mode = theme_mode;
+        MoonTheme::install_config(theme_config, cx);
 
         let p = MoonPalette::active(cx);
         let bounds = Bounds::centered(None, size(px(1280.0), px(900.0)), cx);
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
+                titlebar: Some(TitlebarOptions {
+                    title: Some(SharedString::from("MoonUI Gallery")),
+                    appears_transparent: true,
+                    traffic_light_position: None,
+                }),
                 window_clear_color: Some(rgba((p.shell << 8) | 0xFF)),
                 app_id: Some("pro.moonbot.moon-ui-gallery".to_string()),
                 ..Default::default()
             },
-            |window, cx| {
-                let view = cx.new(|cx| Gallery::new(window, cx));
+            move |window, cx| {
+                let view = cx.new(|cx| {
+                    Gallery::new(window, cx, initial_page, snapshot_dir.clone(), theme_mode)
+                });
                 cx.new(|cx| {
                     Root::new(view, window, cx)
                         .background_policy(MoonBackgroundPolicy::Opaque)
@@ -1198,9 +3431,92 @@ fn main() {
     run_gallery();
 }
 
+#[derive(Clone)]
+struct GalleryArgs {
+    page: usize,
+    snapshot_dir: Option<PathBuf>,
+    theme_mode: ThemeMode,
+}
+
+fn gallery_args_from_cli() -> GalleryArgs {
+    let mut args = std::env::args().skip(1);
+    let mut page = 0;
+    let mut snapshot_dir = None;
+    let mut theme_mode = ThemeMode::Dark;
+    while let Some(arg) = args.next() {
+        if arg == "--page" {
+            if let Some(page_name) = args.next() {
+                page = page_index(&page_name).unwrap_or(0);
+            }
+        } else if let Some(page_name) = arg.strip_prefix("--page=") {
+            page = page_index(page_name).unwrap_or(0);
+        } else if arg == "--snapshot-dir" {
+            if let Some(dir) = args.next() {
+                snapshot_dir = Some(PathBuf::from(dir));
+            }
+        } else if let Some(dir) = arg.strip_prefix("--snapshot-dir=") {
+            snapshot_dir = Some(PathBuf::from(dir));
+        } else if arg == "--theme" {
+            if let Some(mode) = args.next() {
+                theme_mode = parse_theme_mode(&mode).unwrap_or(ThemeMode::Dark);
+            }
+        } else if let Some(mode) = arg.strip_prefix("--theme=") {
+            theme_mode = parse_theme_mode(mode).unwrap_or(ThemeMode::Dark);
+        }
+    }
+    if snapshot_dir.is_some() {
+        page = 0;
+    }
+    GalleryArgs {
+        page,
+        snapshot_dir,
+        theme_mode,
+    }
+}
+
+fn page_index(page: &str) -> Option<usize> {
+    GALLERY_PAGES
+        .iter()
+        .position(|candidate| candidate.eq_ignore_ascii_case(page))
+}
+
+fn parse_theme_mode(mode: &str) -> Option<ThemeMode> {
+    match mode.to_ascii_lowercase().as_str() {
+        "light" => Some(ThemeMode::Light),
+        "dark" => Some(ThemeMode::Dark),
+        "system" => Some(ThemeMode::System),
+        _ => None,
+    }
+}
+
+fn theme_mode_name(mode: ThemeMode) -> &'static str {
+    match mode {
+        ThemeMode::Light => "Light",
+        ThemeMode::Dark => "Dark",
+        ThemeMode::System => "System",
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::COMPONENT_COVERAGE;
+    use super::{COMPONENT_COVERAGE, page_index, parse_theme_mode, theme_mode_name};
+    use moon_ui::ThemeMode;
+    use serde::Deserialize;
+
+    const COMPONENT_MANIFEST_JSON: &str =
+        include_str!("../../moon-ui-components/component-manifest.json");
+
+    #[derive(Deserialize)]
+    struct Manifest {
+        components: Vec<ManifestComponent>,
+    }
+
+    #[derive(Deserialize)]
+    struct ManifestComponent {
+        concept: String,
+        public_path: Option<String>,
+        escape_path: Option<String>,
+    }
 
     #[test]
     fn gallery_has_a_visual_coverage_manifest() {
@@ -1209,5 +3525,47 @@ mod tests {
         assert!(COMPONENT_COVERAGE.contains(&"MoonDataTable"));
         assert!(COMPONENT_COVERAGE.contains(&"DockArea"));
         assert!(COMPONENT_COVERAGE.contains(&"MoonWindowFrame"));
+    }
+
+    #[test]
+    fn gallery_covers_every_public_manifest_component() {
+        let manifest: Manifest =
+            serde_json::from_str(COMPONENT_MANIFEST_JSON).expect("valid component manifest");
+        for component in manifest.components {
+            for path in [component.public_path, component.escape_path]
+                .into_iter()
+                .flatten()
+            {
+                let public_name = path.rsplit("::").next().unwrap_or(&path);
+                assert!(
+                    COMPONENT_COVERAGE.contains(&public_name),
+                    "gallery coverage is missing manifest component {} ({})",
+                    component.concept,
+                    path
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn gallery_page_cli_names_match_tabs() {
+        assert_eq!(page_index("Controls"), Some(0));
+        assert_eq!(page_index("inputs"), Some(1));
+        assert_eq!(page_index("Layout"), Some(4));
+        assert_eq!(page_index("NewControls"), Some(5));
+        assert_eq!(page_index("Composites"), Some(6));
+        assert_eq!(page_index("Stateful"), Some(7));
+        assert_eq!(page_index("missing"), None);
+    }
+
+    #[test]
+    fn gallery_theme_cli_names_match_modes() {
+        assert_eq!(parse_theme_mode("dark"), Some(ThemeMode::Dark));
+        assert_eq!(parse_theme_mode("Light"), Some(ThemeMode::Light));
+        assert_eq!(parse_theme_mode("system"), Some(ThemeMode::System));
+        assert_eq!(parse_theme_mode("missing"), None);
+        assert_eq!(theme_mode_name(ThemeMode::Dark), "Dark");
+        assert_eq!(theme_mode_name(ThemeMode::Light), "Light");
+        assert_eq!(theme_mode_name(ThemeMode::System), "System");
     }
 }

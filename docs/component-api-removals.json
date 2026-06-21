@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "removals": [
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod accordion",
+      "reason": "Raw Longbridge accordion facade was replaced by moon_ui::MoonAccordion."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod alert",
+      "reason": "Raw Longbridge alert facade was replaced by moon_ui::MoonAlert."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod dialog",
+      "reason": "Raw Longbridge dialog facade was replaced by moon_ui::MoonDialog and MoonWindowExt::open_moon_dialog/open_unique_moon_dialog."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod menu",
+      "reason": "Raw Longbridge menu facade is not a MoonReady app API; menu/AppMenuBar remains a pending design decision in NewControls."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod notification",
+      "reason": "Raw Longbridge notification facade was replaced by moon_ui::MoonNotification."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod popover",
+      "reason": "Raw Longbridge popover facade is not needed because moon_ui::MoonPopover is the public API."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod progress",
+      "reason": "Raw Longbridge progress facade was replaced by moon_ui::MoonProgress."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod tag",
+      "reason": "Raw Longbridge tag facade was replaced by moon_ui::MoonTag."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::accordion::*;",
+      "reason": "Raw Longbridge accordion exports were replaced by moon_ui::MoonAccordion."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::alert::*;",
+      "reason": "Raw Longbridge alert exports were replaced by moon_ui::MoonAlert."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::dialog::*;",
+      "reason": "Raw Longbridge dialog exports were replaced by moon_ui::MoonDialog."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::menu::*;",
+      "reason": "Raw Longbridge menu exports were removed until a Moon menu/AppMenuBar contract exists."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::notification::*;",
+      "reason": "Raw Longbridge notification exports were replaced by moon_ui::MoonNotification."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::popover::*;",
+      "reason": "Raw Longbridge popover exports were removed in favor of moon_ui::MoonPopover."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::progress::*;",
+      "reason": "Raw Longbridge progress exports were replaced by moon_ui::MoonProgress."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::tag::*;",
+      "reason": "Raw Longbridge tag exports were replaced by moon_ui::MoonTag."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::Theme;",
+      "reason": "Raw Longbridge Theme must not be a top-level application API; MoonTheme owns the typed theme bridge."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod components",
+      "reason": "The raw moon_ui::components escape hatch was removed; applications must use Moon-facing public APIs from moon_ui::*."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::scroll::*;",
+      "reason": "Raw scroll exports were replaced by moon_ui::MoonScrollableElement and Moon scroll wrappers."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod scroll",
+      "reason": "Raw scroll module under moon_ui::components was removed with the escape hatch."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::theme::*;",
+      "reason": "Raw theme exports were replaced by MoonTheme, MoonThemeConfig, MoonThemeTokens, MoonPalette and MoonMetrics."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub mod theme",
+      "reason": "Raw theme module under moon_ui::components was removed; MoonTheme owns application theme access."
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component::{ Disableable, GlobalState, InteractiveElementExt, StyledExt, Theme, ThemeMode, WindowExt, init, locale, measure, measure_if, set_locale, };",
+      "reason": "Raw Longbridge utility trait bundle was removed from the app facade; Moon-facing exports cover supported application use."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/root.rs",
+      "signature": "pub type MoonRoot = crate::Root;",
+      "reason": "MoonRoot is now the real root type; Root remains only as a backward-compatible alias."
+    }
+  ]
+}

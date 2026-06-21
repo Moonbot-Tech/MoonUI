@@ -196,12 +196,15 @@ impl RenderOnce for MoonInput {
         let text_align = self.text_align;
         let pattern = self.pattern;
         let validate = self.validate.clone();
+        let placeholder = self.placeholder.clone();
+        let default_value = self.default_value.clone();
 
         let state = self.state.unwrap_or_else(|| {
-            cx.new(|cx| {
+            let id = ElementId::from(self.id.clone());
+            window.use_keyed_state(id, cx, move |window, cx| {
                 let mut state = MoonInputState::new(window, cx)
-                    .placeholder(self.placeholder.clone())
-                    .default_value(self.default_value.clone());
+                    .placeholder(placeholder.clone())
+                    .default_value(default_value.clone());
                 if clean_on_escape.unwrap_or(false) {
                     state = state.clean_on_escape();
                 }
@@ -229,12 +232,12 @@ impl RenderOnce for MoonInput {
             });
         }
 
-        let _input_id = self.id;
         let mut input = Input::new(&state)
             .with_size(size_for(self.size))
             .disabled(self.disabled)
             .cleanable(self.cleanable)
             .selected(self.selected)
+            .tone(self.tone)
             .when_some(self.text_align, |this, align| this.text_align(align))
             .when(self.mono, |this| this.font_family(tokens.font_family(true)))
             .when_some(self.prefix, |this, prefix| this.prefix(prefix))

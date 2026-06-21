@@ -7,8 +7,7 @@ use gpui::{
 
 use crate::{
     StyledExt,
-    moon::MoonTheme,
-    moon_skin::{MoonSkinPalette, moon_color},
+    moon::{MoonPalette, MoonTheme, rgba_from},
 };
 
 const MASKED: &'static str = "•";
@@ -153,8 +152,9 @@ impl Label {
     fn measure_highlights(
         &self,
         length: usize,
-        _cx: &mut App,
+        cx: &mut App,
     ) -> Option<Vec<(Range<usize>, HighlightStyle)>> {
+        let p = MoonPalette::active(cx);
         let ranges = self.highlight_ranges(length);
         if ranges.is_empty() {
             return None;
@@ -168,7 +168,7 @@ impl Label {
             highlights.push((
                 ranges[1].clone(),
                 HighlightStyle {
-                    color: Some(moon_color(MoonSkinPalette::TERMINAL.text_muted, 1.0)),
+                    color: Some(rgba_from(p.text_muted, 1.0)),
                     ..Default::default()
                 },
             ));
@@ -179,7 +179,7 @@ impl Label {
             highlights.push((
                 range.clone(),
                 HighlightStyle {
-                    color: Some(moon_color(MoonSkinPalette::TERMINAL.blue, 1.0)),
+                    color: Some(rgba_from(p.blue, 1.0)),
                     ..Default::default()
                 },
             ));
@@ -206,12 +206,13 @@ impl RenderOnce for Label {
 
         let highlights = self.measure_highlights(text.len(), cx);
         let tokens = MoonTheme::active_tokens(cx);
+        let p = MoonPalette::active(cx);
 
         div()
             .font_family("Geist Mono")
             .text_size(px(tokens.font(9.0)))
             .line_height(px(tokens.line_height(11.0)))
-            .text_color(moon_color(MoonSkinPalette::TERMINAL.text_muted, 1.0))
+            .text_color(rgba_from(p.text_muted, 1.0))
             .refine_style(&self.style)
             .child(
                 StyledText::new(&text).when_some(highlights, |this, hl| this.with_highlights(hl)),
@@ -410,19 +411,14 @@ mod tests {
             let highlights = secondary
                 .measure_highlights("Hello World".len(), cx)
                 .unwrap();
-            assert_eq!(
-                highlights[1].1.color,
-                Some(moon_color(MoonSkinPalette::TERMINAL.text_muted, 1.0))
-            );
+            let p = MoonPalette::active(cx);
+            assert_eq!(highlights[1].1.color, Some(rgba_from(p.text_muted, 1.0)));
 
             let highlighted = Label::new("Hello World").highlights("World");
             let highlights = highlighted
                 .measure_highlights("Hello World".len(), cx)
                 .unwrap();
-            assert_eq!(
-                highlights[0].1.color,
-                Some(moon_color(MoonSkinPalette::TERMINAL.blue, 1.0))
-            );
+            assert_eq!(highlights[0].1.color, Some(rgba_from(p.blue, 1.0)));
         });
     }
 }

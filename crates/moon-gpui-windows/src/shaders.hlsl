@@ -9,6 +9,13 @@ cbuffer GlobalParams: register(b0) {
     uint3 global_pad;
 };
 
+cbuffer RetainedTextParams: register(b1) {
+    uint retained_text_enabled;
+    uint3 retained_text_pad;
+    float4 retained_text_transform_x;
+    float4 retained_text_transform_y;
+};
+
 Texture2D<float4> t_sprite: register(t0);
 SamplerState s_sprite: register(s0);
 
@@ -118,6 +125,16 @@ float4 distance_from_clip_rect_transformed(float2 unit_vertex, Bounds bounds, Bo
     float2 position = unit_vertex * bounds.size + bounds.origin;
     float2 transformed = mul(position, transformation.rotation_scale) + transformation.translation;
     return distance_from_clip_rect_impl(transformed, clip_bounds);
+}
+
+float2 apply_retained_text_transform(float2 position) {
+    if (retained_text_enabled == 0u) {
+        return position;
+    }
+    return float2(
+        dot(position, retained_text_transform_x.xy) + retained_text_transform_x.z,
+        dot(position, retained_text_transform_y.xy) + retained_text_transform_y.z
+    );
 }
 
 // Convert linear RGB to sRGB
@@ -1158,9 +1175,12 @@ StructuredBuffer<MonochromeSprite> mono_sprites: register(t1);
 MonochromeSpriteVertexOutput monochrome_sprite_vertex(uint vertex_id: SV_VertexID, uint sprite_id: SV_InstanceID) {
     float2 unit_vertex = float2(float(vertex_id & 1u), 0.5 * float(vertex_id & 2u));
     MonochromeSprite sprite = mono_sprites[sprite_id];
-    float4 device_position =
-        to_device_position_transformed(unit_vertex, sprite.bounds, sprite.transformation);
-    float4 clip_distance = distance_from_clip_rect_transformed(unit_vertex, sprite.bounds, sprite.content_mask, sprite.transformation);
+    float2 unit_position = unit_vertex * sprite.bounds.size + sprite.bounds.origin;
+    float2 transformed = mul(unit_position, sprite.transformation.rotation_scale)
+        + sprite.transformation.translation;
+    transformed = apply_retained_text_transform(transformed);
+    float4 device_position = to_device_position_impl(transformed);
+    float4 clip_distance = distance_from_clip_rect_impl(transformed, sprite.content_mask);
     float2 tile_position = to_tile_position(unit_vertex, sprite.tile);
     float4 color = hsla_to_rgba(sprite.color);
 
@@ -1230,9 +1250,10 @@ StructuredBuffer<PolychromeSprite> poly_sprites: register(t1);
 PolychromeSpriteVertexOutput polychrome_sprite_vertex(uint vertex_id: SV_VertexID, uint sprite_id: SV_InstanceID) {
     float2 unit_vertex = float2(float(vertex_id & 1u), 0.5 * float(vertex_id & 2u));
     PolychromeSprite sprite = poly_sprites[sprite_id];
-    float4 device_position = to_device_position(unit_vertex, sprite.bounds);
-    float4 clip_distance = distance_from_clip_rect(unit_vertex, sprite.bounds,
-                                                    sprite.content_mask);
+    float2 unit_position = unit_vertex * sprite.bounds.size + sprite.bounds.origin;
+    float2 transformed = apply_retained_text_transform(unit_position);
+    float4 device_position = to_device_position_impl(transformed);
+    float4 clip_distance = distance_from_clip_rect_impl(transformed, sprite.content_mask);
     float2 tile_position = to_tile_position(unit_vertex, sprite.tile);
 
     PolychromeSpriteVertexOutput output;
@@ -1246,7 +1267,9 @@ PolychromeSpriteVertexOutput polychrome_sprite_vertex(uint vertex_id: SV_VertexI
 float4 polychrome_sprite_fragment(PolychromeSpriteFragmentInput input): SV_Target {
     PolychromeSprite sprite = poly_sprites[input.sprite_id];
     float4 sample = t_sprite.Sample(s_sprite, input.tile_position);
-    float distance = quad_sdf(input.position.xy, sprite.bounds, sprite.corner_radii);
+    Bounds bounds = sprite.bounds;
+    bounds.origin = apply_retained_text_transform(bounds.origin);
+    float distance = quad_sdf(input.position.xy, bounds, sprite.corner_radii);
 
     float4 color = sample;
     if ((sprite.grayscale & 0xFFu) != 0u) {

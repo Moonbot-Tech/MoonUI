@@ -91,10 +91,20 @@ struct GammaParams {
     pad: u32,
 }
 
+struct RetainedTextParams {
+    enabled: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
+    transform_x: vec4<f32>,
+    transform_y: vec4<f32>,
+}
+
 @group(0) @binding(0) var<uniform> globals: GlobalParams;
 @group(0) @binding(1) var<uniform> gamma_params: GammaParams;
 @group(1) @binding(1) var t_sprite: texture_2d<f32>;
 @group(1) @binding(2) var s_sprite: sampler;
+@group(1) @binding(3) var<uniform> retained_text: RetainedTextParams;
 
 const M_PI_F: f32 = 3.1415926;
 const GRAYSCALE_FACTORS: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
@@ -182,6 +192,26 @@ fn to_device_position_transformed(unit_vertex: vec2<f32>, bounds: Bounds, transf
     //Note: Rust side stores it as row-major, so transposing here
     let transformed = transpose(transform.rotation_scale) * position + transform.translation;
     return to_device_position_impl(transformed);
+}
+
+fn transform_sprite_position(unit_vertex: vec2<f32>, bounds: Bounds, transform: TransformationMatrix) -> vec2<f32> {
+    let position = unit_vertex * vec2<f32>(bounds.size) + bounds.origin;
+    return transpose(transform.rotation_scale) * position + transform.translation;
+}
+
+fn transform_position(unit_vertex: vec2<f32>, bounds: Bounds) -> vec2<f32> {
+    return unit_vertex * vec2<f32>(bounds.size) + bounds.origin;
+}
+
+fn apply_retained_text_transform(position: vec2<f32>) -> vec2<f32> {
+    if (retained_text.enabled == 0u) {
+        return position;
+    }
+    let p = vec3<f32>(position, 1.0);
+    return vec2<f32>(
+        dot(retained_text.transform_x.xyz, p),
+        dot(retained_text.transform_y.xyz, p),
+    );
 }
 
 fn to_tile_position(unit_vertex: vec2<f32>, tile: AtlasTile) -> vec2<f32> {
@@ -1236,13 +1266,16 @@ struct MonoSpriteVarying {
 fn vs_mono_sprite(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) instance_id: u32) -> MonoSpriteVarying {
     let unit_vertex = vec2<f32>(f32(vertex_id & 1u), 0.5 * f32(vertex_id & 2u));
     let sprite = b_mono_sprites[instance_id];
+    let transformed = apply_retained_text_transform(
+        transform_sprite_position(unit_vertex, sprite.bounds, sprite.transformation),
+    );
 
     var out = MonoSpriteVarying();
-    out.position = to_device_position_transformed(unit_vertex, sprite.bounds, sprite.transformation);
+    out.position = to_device_position_impl(transformed);
 
     out.tile_position = to_tile_position(unit_vertex, sprite.tile);
     out.color = hsla_to_rgba(sprite.color);
-    out.clip_distances = distance_from_clip_rect_transformed(unit_vertex, sprite.bounds, sprite.content_mask, sprite.transformation);
+    out.clip_distances = distance_from_clip_rect_impl(transformed, sprite.content_mask);
     return out;
 }
 
@@ -1284,12 +1317,15 @@ struct PolySpriteVarying {
 fn vs_poly_sprite(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) instance_id: u32) -> PolySpriteVarying {
     let unit_vertex = vec2<f32>(f32(vertex_id & 1u), 0.5 * f32(vertex_id & 2u));
     let sprite = b_poly_sprites[instance_id];
+    let transformed = apply_retained_text_transform(
+        transform_position(unit_vertex, sprite.bounds),
+    );
 
     var out = PolySpriteVarying();
-    out.position = to_device_position(unit_vertex, sprite.bounds);
+    out.position = to_device_position_impl(transformed);
     out.tile_position = to_tile_position(unit_vertex, sprite.tile);
     out.sprite_id = instance_id;
-    out.clip_distances = distance_from_clip_rect(unit_vertex, sprite.bounds, sprite.content_mask);
+    out.clip_distances = distance_from_clip_rect_impl(transformed, sprite.content_mask);
     return out;
 }
 
@@ -1302,7 +1338,9 @@ fn fs_poly_sprite(input: PolySpriteVarying) -> @location(0) vec4<f32> {
     }
 
     let sprite = b_poly_sprites[input.sprite_id];
-    let distance = quad_sdf(input.position.xy, sprite.bounds, sprite.corner_radii);
+    var bounds = sprite.bounds;
+    bounds.origin = apply_retained_text_transform(bounds.origin);
+    let distance = quad_sdf(input.position.xy, bounds, sprite.corner_radii);
 
     var color = sample;
     if ((sprite.grayscale & 0xFFu) != 0u) {

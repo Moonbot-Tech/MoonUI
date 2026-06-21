@@ -127,14 +127,14 @@ impl RenderOnce for MoonColorPicker {
             .px(px(tokens.ui(7.0)))
             .cursor_default()
             .when(!self.disabled, |this| {
-                this.hover(|this| this.border_color(rgba_from(0x343840, 1.0)))
+                this.hover(move |this| this.border_color(rgba_from(p.border_hover, 1.0)))
             })
             .child(
                 div()
                     .size(px(tokens.ui(14.0)))
                     .rounded(px(tokens.ui(3.0)))
                     .border(px(1.0))
-                    .border_color(rgba_from(0x000000, 0.38))
+                    .border_color(rgba_from(p.shadow, 0.38))
                     .bg(value),
             )
             .child(
@@ -172,7 +172,7 @@ impl RenderOnce for MoonColorPicker {
                     .border_color(if color == value {
                         rgba_from(p.blue, 1.0)
                     } else {
-                        rgba_from(0x000000, 0.40)
+                        rgba_from(p.shadow, 0.40)
                     })
                     .bg(color)
                     .when(!self.disabled, |this| {

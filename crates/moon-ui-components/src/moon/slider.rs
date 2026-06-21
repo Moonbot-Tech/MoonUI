@@ -23,7 +23,9 @@ impl MoonSlider {
     }
 
     pub fn id(self, _id: impl Into<SharedString>) -> Self {
-        self
+        let mut this = self;
+        this.inner = this.inner.id(ElementId::from(_id.into()));
+        this
     }
 
     pub fn bounds(mut self, bounds: MoonRect) -> Self {
