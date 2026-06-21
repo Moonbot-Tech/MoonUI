@@ -110,6 +110,27 @@ impl GpuCanvasTextRun {
         self.line.is_some()
     }
 
+    /// Measure this text run without emitting glyph sprites.
+    ///
+    /// This uses the same retained shaped line as [`Self::draw`] and
+    /// [`Self::draw_aligned`], so callers can place native backgrounds or
+    /// hitboxes from the exact shaped width without paying an extra shape when
+    /// they draw the same text afterwards.
+    pub fn measure(
+        &mut self,
+        ctx: &GpuCanvasTextContext<'_>,
+        text: impl AsRef<str>,
+        font: Font,
+        font_size: Pixels,
+        line_height: Pixels,
+    ) -> GpuCanvasTextMetrics {
+        let line = self.line(&ctx.text_system, text, font, font_size);
+        GpuCanvasTextMetrics {
+            width: line.width(),
+            line_height,
+        }
+    }
+
     fn line(
         &mut self,
         text_system: &WindowTextSystem,
