@@ -616,6 +616,7 @@ impl DirectXRenderer {
         &mut self,
         scene: &Scene,
         background_appearance: WindowBackgroundAppearance,
+        clear_color: Option<Rgba>,
     ) -> Result<()> {
         if self.skip_draws {
             // skip drawing this frame, we just recovered from a device lost event
@@ -628,7 +629,9 @@ impl DirectXRenderer {
         self.run_gpu_canvas_prepare(&scene.gpu_canvases_under_scene, GpuCanvasLayer::UnderScene);
         self.run_gpu_canvas_prepare(&scene.gpu_canvases_over_scene, GpuCanvasLayer::OverScene);
         self.pre_draw(&match background_appearance {
-            WindowBackgroundAppearance::Opaque => [1.0f32; 4],
+            WindowBackgroundAppearance::Opaque => clear_color
+                .map(|color| [color.r, color.g, color.b, 1.0])
+                .unwrap_or([1.0f32; 4]),
             _ => [0.0f32; 4],
         })?;
 

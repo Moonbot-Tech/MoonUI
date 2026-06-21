@@ -37,7 +37,7 @@ use crate::linux::{Globals, Output, WaylandClientStatePtr, get_window};
 use gpui::{
     AnyWindowHandle, Bounds, Capslock, Decorations, DevicePixels, GpuSpecs, Modifiers, Pixels,
     PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point,
-    PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, Scene, Size, Tiling,
+    PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, Rgba, Scene, Size, Tiling,
     WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowControls,
     WindowDecorations, WindowKind, WindowParams, layer_shell::LayerShellNotSupportedError, px,
     size,
@@ -1374,6 +1374,10 @@ impl PlatformWindow for WaylandWindow {
         let mut state = self.borrow_mut();
         state.background_appearance = background_appearance;
         update_window(state);
+    }
+
+    fn set_clear_color(&self, clear_color: Option<Rgba>) {
+        self.borrow_mut().renderer.update_clear_color(clear_color);
     }
 
     fn background_appearance(&self) -> WindowBackgroundAppearance {

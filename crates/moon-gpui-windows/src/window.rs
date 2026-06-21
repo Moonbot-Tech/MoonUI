@@ -57,6 +57,7 @@ pub struct WindowsWindowState {
     pub border_offset: WindowBorderOffset,
     pub appearance: Cell<WindowAppearance>,
     pub background_appearance: Cell<WindowBackgroundAppearance>,
+    pub clear_color: Cell<Option<Rgba>>,
     pub scale_factor: Cell<f32>,
     pub restore_from_minimized: Cell<Option<Box<dyn FnMut(RequestFrameOptions)>>>,
 
@@ -164,6 +165,7 @@ impl WindowsWindowState {
             border_offset,
             appearance: Cell::new(appearance),
             background_appearance: Cell::new(WindowBackgroundAppearance::Opaque),
+            clear_color: Cell::new(None),
             scale_factor: Cell::new(scale_factor),
             restore_from_minimized: Cell::new(restore_from_minimized),
             min_size,
@@ -881,6 +883,10 @@ impl PlatformWindow for WindowsWindow {
         }
     }
 
+    fn set_clear_color(&self, clear_color: Option<Rgba>) {
+        self.state.clear_color.set(clear_color);
+    }
+
     fn minimize(&self) {
         unsafe { ShowWindowAsync(self.0.hwnd, SW_MINIMIZE).ok().log_err() };
     }
@@ -973,7 +979,11 @@ impl PlatformWindow for WindowsWindow {
         self.state
             .renderer
             .borrow_mut()
-            .draw(scene, self.state.background_appearance.get())
+            .draw(
+                scene,
+                self.state.background_appearance.get(),
+                self.state.clear_color.get(),
+            )
             .log_err();
     }
 

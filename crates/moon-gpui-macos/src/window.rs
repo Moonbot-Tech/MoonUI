@@ -28,7 +28,7 @@ use gpui::{
     FileDropEvent, ForegroundExecutor, KeyDownEvent, Keystroke, Modifiers, ModifiersChangedEvent,
     MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, PlatformAtlas,
     PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point, PromptButton,
-    PromptLevel, RequestFrameOptions, SharedString, Size, SystemWindowTab, WindowAppearance,
+    PromptLevel, RequestFrameOptions, Rgba, SharedString, Size, SystemWindowTab, WindowAppearance,
     WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind, WindowParams, point,
     px, size,
 };
@@ -492,6 +492,7 @@ struct MacWindowState {
     cursor_visible: Arc<AtomicBool>,
     display_link: Option<DisplayLink>,
     renderer: renderer::Renderer,
+    clear_color: Option<Rgba>,
     request_frame_callback: Option<Box<dyn FnMut(RequestFrameOptions)>>,
     event_callback: Option<Box<dyn FnMut(PlatformInput) -> gpui::DispatchEventResult>>,
     activate_callback: Option<Box<dyn FnMut(bool)>>,
@@ -881,6 +882,7 @@ impl MacWindow {
                     bounds.size.map(|pixels| pixels.as_f32()),
                     false,
                 ),
+                clear_color: None,
                 request_frame_callback: None,
                 event_callback: None,
                 activate_callback: None,
@@ -1526,7 +1528,19 @@ impl PlatformWindow for MacWindow {
         unsafe {
             this.native_window.setOpaque_(opaque as BOOL);
             let background_color = if opaque {
-                NSColor::colorWithSRGBRed_green_blue_alpha_(nil, 0f64, 0f64, 0f64, 1f64)
+                let clear_color = this.clear_color.unwrap_or(Rgba {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 1.0,
+                });
+                NSColor::colorWithSRGBRed_green_blue_alpha_(
+                    nil,
+                    clear_color.r as f64,
+                    clear_color.g as f64,
+                    clear_color.b as f64,
+                    1f64,
+                )
             } else {
                 // Not using `+[NSColor clearColor]` to avoid broken shadow.
                 NSColor::colorWithSRGBRed_green_blue_alpha_(nil, 0f64, 0f64, 0f64, 0.0001)
@@ -1575,6 +1589,30 @@ impl PlatformWindow for MacWindow {
 
     fn background_appearance(&self) -> WindowBackgroundAppearance {
         self.0.as_ref().lock().background_appearance
+    }
+
+    fn set_clear_color(&self, clear_color: Option<Rgba>) {
+        let mut this = self.0.as_ref().lock();
+        this.clear_color = clear_color;
+        this.renderer.update_clear_color(clear_color);
+        if this.background_appearance == WindowBackgroundAppearance::Opaque {
+            let clear_color = clear_color.unwrap_or(Rgba {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            });
+            unsafe {
+                let background_color = NSColor::colorWithSRGBRed_green_blue_alpha_(
+                    nil,
+                    clear_color.r as f64,
+                    clear_color.g as f64,
+                    clear_color.b as f64,
+                    1f64,
+                );
+                this.native_window.setBackgroundColor_(background_color);
+            }
+        }
     }
 
     fn is_subpixel_rendering_supported(&self) -> bool {

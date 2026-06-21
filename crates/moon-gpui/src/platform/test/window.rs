@@ -2,7 +2,7 @@ use crate::{
     AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTile, Bounds, DevicePixels,
     DispatchEventResult, GpuSpecs, Pixels, PlatformAtlas, PlatformDisplay,
     PlatformHeadlessRenderer, PlatformInput, PlatformInputHandler, PlatformWindow, Point,
-    PromptButton, RequestFrameOptions, Scene, Size, TestPlatform, TileId, WindowAppearance,
+    PromptButton, RequestFrameOptions, Rgba, Scene, Size, TestPlatform, TileId, WindowAppearance,
     WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowParams,
 };
 use collections::HashMap;
@@ -228,6 +228,8 @@ impl PlatformWindow for TestWindow {
     fn set_app_id(&mut self, _app_id: &str) {}
 
     fn set_background_appearance(&self, _background: WindowBackgroundAppearance) {}
+
+    fn set_clear_color(&self, _clear_color: Option<Rgba>) {}
 
     fn set_edited(&mut self, edited: bool) {
         self.0.lock().edited = edited;

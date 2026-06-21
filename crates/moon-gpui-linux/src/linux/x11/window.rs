@@ -5,8 +5,8 @@ use crate::linux::X11ClientStatePtr;
 use gpui::{
     AnyWindowHandle, Bounds, Decorations, DevicePixels, ForegroundExecutor, GpuSpecs, Modifiers,
     Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow,
-    Point, PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, ScaledPixels, Scene, Size,
-    Tiling, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
+    Point, PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, Rgba, ScaledPixels, Scene,
+    Size, Tiling, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
     WindowDecorations, WindowKind, WindowParams, px,
 };
 use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig};
@@ -1567,6 +1567,14 @@ impl PlatformWindow for X11Window {
         state.background_appearance = background_appearance;
         let transparent = state.is_transparent();
         state.renderer.update_transparency(transparent);
+    }
+
+    fn set_clear_color(&self, clear_color: Option<Rgba>) {
+        self.0
+            .state
+            .borrow_mut()
+            .renderer
+            .update_clear_color(clear_color);
     }
 
     fn background_appearance(&self) -> WindowBackgroundAppearance {

@@ -3,8 +3,8 @@ use bytemuck::{Pod, Zeroable};
 use gpui::{
     AtlasTextureId, Background, Bounds, DevicePixels, GpuCanvasDrawContext, GpuCanvasLayer,
     GpuCanvasPrepareContext, GpuCanvasTextFrame, GpuSpecs, MonochromeSprite, PaintGpuCanvas, Path,
-    Point, PolychromeSprite, PrimitiveBatch, Quad, RawGpuAccess, ScaledPixels, Scene, Shadow, Size,
-    SubpixelSprite, Underline, WgpuRawAccess, get_gamma_correction_ratios,
+    Point, PolychromeSprite, PrimitiveBatch, Quad, RawGpuAccess, Rgba, ScaledPixels, Scene, Shadow,
+    Size, SubpixelSprite, Underline, WgpuRawAccess, get_gamma_correction_ratios,
 };
 use log::warn;
 #[cfg(not(target_family = "wasm"))]
@@ -163,6 +163,7 @@ pub struct WgpuRenderer {
     device_lost: std::sync::Arc<std::sync::atomic::AtomicBool>,
     surface_configured: bool,
     needs_redraw: bool,
+    clear_color: wgpu::Color,
 }
 
 impl WgpuRenderer {
@@ -496,6 +497,7 @@ impl WgpuRenderer {
             device_lost: context.device_lost_flag(),
             surface_configured: true,
             needs_redraw: false,
+            clear_color: wgpu::Color::TRANSPARENT,
         })
     }
 
@@ -1058,6 +1060,18 @@ impl WgpuRenderer {
         }
     }
 
+    pub fn update_clear_color(&mut self, clear_color: Option<Rgba>) {
+        self.clear_color = clear_color
+            .map(|color| wgpu::Color {
+                r: color.r as f64,
+                g: color.g as f64,
+                b: color.b as f64,
+                a: color.a as f64,
+            })
+            .unwrap_or(wgpu::Color::TRANSPARENT);
+        self.needs_redraw = true;
+    }
+
     #[allow(dead_code)]
     pub fn viewport_size(&self) -> Size<DevicePixels> {
         Size {
@@ -1313,6 +1327,7 @@ impl WgpuRenderer {
         loop {
             let mut instance_offset: u64 = 0;
             let mut overflow = false;
+            let clear_color = self.clear_color;
 
             let mut encoder =
                 self.resources()
@@ -1338,7 +1353,7 @@ impl WgpuRenderer {
             let scene_load = if scene.gpu_canvases_under_scene.is_empty()
                 && scene.gpu_canvas_text_under_scene.is_empty()
             {
-                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT)
+                wgpu::LoadOp::Clear(clear_color)
             } else {
                 {
                     let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -1347,7 +1362,7 @@ impl WgpuRenderer {
                             view: &frame_view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                                load: wgpu::LoadOp::Clear(clear_color),
                                 store: wgpu::StoreOp::Store,
                             },
                             depth_slice: None,

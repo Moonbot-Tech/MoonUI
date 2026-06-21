@@ -10,7 +10,7 @@ use gpui::{
     AtlasTextureId, Background, Bounds, ContentMask, DevicePixels, GpuCanvasDrawContext,
     GpuCanvasLayer, GpuCanvasPrepareContext, GpuCanvasTextFrame, MetalRawAccess, MonochromeSprite,
     PaintGpuCanvas, PaintSurface, Path, Point, PolychromeSprite, PrimitiveBatch, Quad,
-    RawGpuAccess, ScaledPixels, Scene, Shadow, Size, Surface, Underline, point, size,
+    RawGpuAccess, Rgba, ScaledPixels, Scene, Shadow, Size, Surface, Underline, point, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -128,6 +128,7 @@ pub(crate) struct MetalRenderer {
     presents_with_transaction: bool,
     /// For headless rendering, tracks whether output should be opaque
     opaque: bool,
+    clear_color: Rgba,
     command_queue: CommandQueue,
     paths_rasterization_pipeline_state: metal::RenderPipelineState,
     path_sprites_pipeline_state: metal::RenderPipelineState,
@@ -348,6 +349,12 @@ impl MetalRenderer {
             is_apple_gpu,
             is_unified_memory,
             opaque,
+            clear_color: Rgba {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            },
             command_queue,
             paths_rasterization_pipeline_state,
             path_sprites_pipeline_state,
@@ -451,6 +458,24 @@ impl MetalRenderer {
         if let Some(layer) = &self.layer {
             layer.set_opaque(!transparent);
         }
+    }
+
+    pub fn update_clear_color(&mut self, clear_color: Option<Rgba>) {
+        self.clear_color = clear_color.unwrap_or(Rgba {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        });
+    }
+
+    fn metal_clear_color(&self, alpha: f64) -> metal::MTLClearColor {
+        metal::MTLClearColor::new(
+            self.clear_color.r as f64,
+            self.clear_color.g as f64,
+            self.clear_color.b as f64,
+            alpha,
+        )
     }
 
     pub fn destroy(&self) {
@@ -901,7 +926,7 @@ impl MetalRenderer {
             new_command_encoder_for_texture(command_buffer, texture, viewport_size, |attachment| {
                 attachment.set_load_action(load_action);
                 if matches!(load_action, metal::MTLLoadAction::Clear) {
-                    attachment.set_clear_color(metal::MTLClearColor::new(0., 0., 0., clear_alpha));
+                    attachment.set_clear_color(self.metal_clear_color(clear_alpha));
                 }
             });
 
@@ -1027,7 +1052,7 @@ impl MetalRenderer {
             |color_attachment| {
                 color_attachment.set_load_action(scene_load_action);
                 if matches!(scene_load_action, metal::MTLLoadAction::Clear) {
-                    color_attachment.set_clear_color(metal::MTLClearColor::new(0., 0., 0., alpha));
+                    color_attachment.set_clear_color(self.metal_clear_color(alpha));
                 }
             },
         );

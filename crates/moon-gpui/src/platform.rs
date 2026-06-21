@@ -36,7 +36,7 @@ use crate::{
     DEFAULT_WINDOW_SIZE, DevicePixels, DispatchEventResult, Font, FontId, FontMetrics, FontRun,
     ForegroundExecutor, GlyphId, GpuSpecs, Hsla, ImageSource, Keymap, LineLayout, Pixels,
     PlatformInput, Point, Priority, RenderGlyphParams, RenderImage, RenderImageParams,
-    RenderSvgParams, Scene, ShapedGlyph, ShapedRun, SharedString, Size, SvgRenderer,
+    RenderSvgParams, Rgba, Scene, ShapedGlyph, ShapedRun, SharedString, Size, SvgRenderer,
     SystemWindowTab, Task, Window, WindowControlArea, hash, point, px, size,
 };
 use anyhow::Result;
@@ -644,6 +644,7 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn background_appearance(&self) -> WindowBackgroundAppearance;
     fn set_title(&mut self, title: &str);
     fn set_background_appearance(&self, background_appearance: WindowBackgroundAppearance);
+    fn set_clear_color(&self, clear_color: Option<Rgba>);
     fn minimize(&self);
     fn zoom(&self);
     fn toggle_fullscreen(&self);
@@ -1520,6 +1521,11 @@ pub struct WindowOptions {
     /// The appearance of the window background.
     pub window_background: WindowBackgroundAppearance,
 
+    /// The renderer clear color used when no scene content covers a pixel.
+    ///
+    /// `None` preserves the platform renderer default.
+    pub window_clear_color: Option<Rgba>,
+
     /// Application identifier of the window. Can by used by desktop environments to group applications together.
     pub app_id: Option<String>,
 
@@ -1648,6 +1654,7 @@ impl Default for WindowOptions {
             is_minimizable: true,
             display_id: None,
             window_background: WindowBackgroundAppearance::default(),
+            window_clear_color: None,
             icon: None,
             app_id: None,
             window_min_size: None,

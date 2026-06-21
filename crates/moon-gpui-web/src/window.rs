@@ -7,7 +7,7 @@ use gpui::{
     AnyWindowHandle, Bounds, Capslock, Decorations, DevicePixels, DispatchEventResult, GpuSpecs,
     Modifiers, MouseButton, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
     PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions,
-    ResizeEdge, Scene, Size, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
+    ResizeEdge, Rgba, Scene, Size, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
     WindowControlArea, WindowControls, WindowDecorations, WindowParams, px,
 };
 use gpui_wgpu::{WgpuContext, WgpuRenderer, WgpuSurfaceConfig};
@@ -597,6 +597,8 @@ impl PlatformWindow for WebWindow {
     }
 
     fn set_background_appearance(&self, _background: WindowBackgroundAppearance) {}
+
+    fn set_clear_color(&self, _clear_color: Option<Rgba>) {}
 
     fn minimize(&self) {
         log::warn!("WebWindow::minimize is not supported in the browser");
