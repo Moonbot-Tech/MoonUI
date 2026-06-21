@@ -25,6 +25,7 @@ members = [
     "crates/moon-gpui-web",
     "crates/moon-gpui-platform",
     "crates/moon-ui",
+    "crates/moon-ui-gallery",
     "crates/moon-ui-components",
     "crates/moon-ui-components-assets",
     "crates/moon-ui-components-macros",

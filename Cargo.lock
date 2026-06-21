@@ -4340,6 +4340,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "moon-ui-gallery"
+version = "0.1.0"
+dependencies = [
+ "moon-gpui",
+ "moon-gpui-platform",
+ "moon-ui",
+]
+
+[[package]]
 name = "moon-util"
 version = "0.0.0"
 dependencies = [
