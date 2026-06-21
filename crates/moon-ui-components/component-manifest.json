@@ -68,7 +68,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonButton",
       "upstream_ref": "Longbridge::button@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed Mirror drift: Moon width/mono/style hooks and regression tests live in base button files; Longbridge button behavior remains source-owned",
       "contracts": ["button.click", "button.width_api", "button.mono_font", "gallery.visual_coverage"]
     },
     {
@@ -118,7 +118,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonCheckbox",
       "upstream_ref": "Longbridge::checkbox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed Mirror drift: Moon checked SVG/theme hooks and click regression tests live in base checkbox; Longbridge checkbox behavior remains source-owned",
       "contracts": ["checkbox.checked_glyph.asset", "checkbox.click_toggles", "gallery.visual_coverage"]
     },
     {
@@ -288,7 +288,7 @@
       "theme_source": "MoonTheme bridge through MoonHoverCard facade",
       "public_path": "moon_ui::MoonHoverCard",
       "upstream_ref": "Longbridge::hover_card@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed Mirror drift: Moon overlay/theme bridge hook lives in base hover card; Longbridge hover-card lifecycle remains source-owned",
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -308,7 +308,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonInput",
       "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed Mirror drift: Moon tone/theme hooks plus UTF-8, mask, number, and search hardening live in base input; Longbridge editor engine remains source-owned",
       "contracts": ["input.utf8_boundary_clamp", "input.mask_contract", "gallery.visual_coverage"]
     },
     {
@@ -358,7 +358,7 @@
       "theme_source": "MoonTheme bridge through MoonList facade",
       "public_path": "moon_ui::MoonList",
       "upstream_ref": "Longbridge::list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed Mirror drift: Moon separator/list styling hook lives in base list; Longbridge list state and delegate behavior remain source-owned",
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -368,7 +368,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonPopover",
       "upstream_ref": "Longbridge::popover@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed Mirror drift: Moon placement/style hook lives in base popover; Longbridge popover lifecycle remains source-owned",
       "contracts": ["popover.open_close_lifecycle", "gallery.visual_coverage"]
     },
     {
