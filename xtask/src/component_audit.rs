@@ -44,6 +44,20 @@ struct ApprovedClassMigration {
     reason: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct MirrorBaselineFile {
+    version: u32,
+    donor_root_provided: bool,
+    entries: Vec<MirrorBaselineEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MirrorBaselineEntry {
+    concept: String,
+    #[serde(default)]
+    donor_changed_files: Option<Vec<String>>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ComponentClass {
     Mirror,
@@ -390,6 +404,7 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
 
     let gallery_missing = public_components_missing_from_gallery(&components, &gallery);
     let visual_missing = missing_visual_baselines(root);
+    let mirror_drift_without_reason = mirror_drift_without_reason(root, &components)?;
     let mut checks = vec![
         test_contract(
             "button.click",
@@ -515,6 +530,24 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
                 && !facade.contains("dock::"),
             "legacy Longbridge dock must stay manifest-owned as Internal and must not be exported through the public moon_ui facade",
         ),
+        ContractCheck {
+            id: "mirror.donor_drift_requires_reason".to_string(),
+            status: if mirror_drift_without_reason.is_empty() {
+                ContractStatus::Pass
+            } else {
+                ContractStatus::Fail
+            },
+            severity: ContractSeverity::Critical,
+            verifier: ContractVerifier::StructuralSource,
+            details: if mirror_drift_without_reason.is_empty() {
+                "every Mirror component with donor drift has an explicit fork_reason or has been reclassified".to_string()
+            } else {
+                format!(
+                    "Mirror component(s) have donor drift without fork_reason: {}",
+                    mirror_drift_without_reason.join("; ")
+                )
+            },
+        },
         pass_if(
             "root.moon_owned_type",
             ContractSeverity::Guardrail,
@@ -645,6 +678,61 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
     });
     checks.sort_by(|a, b| a.id.cmp(&b.id));
     Ok(checks)
+}
+
+fn mirror_drift_without_reason(root: &Path, components: &[ComponentEntry]) -> Result<Vec<String>> {
+    let baseline = load_mirror_baseline(root)?;
+    let manifest = components
+        .iter()
+        .map(|component| (component.concept.as_str(), component))
+        .collect::<BTreeMap<_, _>>();
+    let mut problems = Vec::new();
+
+    if baseline.version != REPORT_VERSION {
+        problems.push(format!(
+            "mirror baseline version {} != audit version {}",
+            baseline.version, REPORT_VERSION
+        ));
+    }
+    if !baseline.donor_root_provided {
+        problems.push("mirror baseline was recorded without donor_root".to_string());
+    }
+
+    for entry in baseline.entries {
+        let changed_files = entry.donor_changed_files.unwrap_or_default();
+        if changed_files.is_empty() {
+            continue;
+        }
+
+        let Some(component) = manifest.get(entry.concept.as_str()) else {
+            continue;
+        };
+        if component.class != ComponentClass::Mirror {
+            continue;
+        }
+        if component
+            .fork_reason
+            .as_deref()
+            .is_some_and(|reason| !reason.trim().is_empty())
+        {
+            continue;
+        }
+
+        problems.push(format!(
+            "{} ({} donor-changed file(s): {})",
+            entry.concept,
+            changed_files.len(),
+            changed_files.join(", ")
+        ));
+    }
+
+    Ok(problems)
+}
+
+fn load_mirror_baseline(root: &Path) -> Result<MirrorBaselineFile> {
+    let path = root.join("docs/component-mirror-baseline.json");
+    let text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    serde_json::from_str(&text).with_context(|| format!("parse {}", path.display()))
 }
 
 fn public_components_missing_from_gallery(
