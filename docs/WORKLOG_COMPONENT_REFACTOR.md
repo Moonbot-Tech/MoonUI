@@ -724,3 +724,29 @@ Closed mirror donor issue:
   donor and the current run has no donor.
 - `tools/run-component-guardrails.ps1` and GitHub Actions use the vendored donor
   by default.
+
+## 2026-06-22 Mirror Truth Contract
+
+The follow-up audit found one more blind spot: `component-mirror` knew which
+`Mirror` components had donor drift, but `component-audit` did not consume that
+fact. A component could therefore stay classified as a clean mirror with
+`fork_reason: null` even when the donor baseline showed modified base files.
+
+Closed mirror truth issue:
+
+- Added `mirror.donor_drift_requires_reason` to `component-audit`.
+- The audit now reads `docs/component-mirror-baseline.json` and fails if that
+  baseline was not recorded with a donor.
+- Any current manifest `Mirror` whose mirror baseline reports
+  `donor_changed_files > 0` must either have a non-empty manifest
+  `fork_reason` or be reclassified as `Forged`.
+- Added reviewed `fork_reason` entries for the existing drifted mirrors:
+  button, checkbox, dialog, hover_card, input, list, menu, popover, progress,
+  progress_circle, resizable, select, settings, slider, text_area, and tree.
+
+This preserves the intended distinction:
+
+- `Mirror` can still mean Longbridge behavior/state is source-owned;
+- reviewed Moon hooks/tests/style hardening inside base files are allowed, but
+  must be explicit;
+- unreviewed donor drift is now a critical audit failure, not a green report.

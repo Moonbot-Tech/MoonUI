@@ -75,6 +75,19 @@ This is intentionally source/manifest based because the invariant is an API
 boundary: the retained Longbridge dock source must stay internal and must not be
 exported through the public facade.
 
+Example mirror-truth contract:
+
+```text
+mirror.donor_drift_requires_reason
+```
+
+This joins `component-audit` with `component-mirror`. A component may remain
+classified as `Mirror` only while its relation to the pinned Longbridge donor is
+truthful. If the mirror baseline reports `donor_changed_files > 0`, the manifest
+entry must either record an explicit `fork_reason` for that reviewed local drift
+or be reclassified as `Forged`. A green audit without the donor side is not a
+valid proof of mirror health.
+
 ## Baseline Rule
 
 The baseline is intentionally allowed to contain current debt.
@@ -180,6 +193,10 @@ component is still tied to a known Longbridge source path and that any drift
 from that source is explicit. If a component needs Moon-specific rendering,
 styling, or behavior, reclassify it as `Forged` or record the intentional donor
 diff in the reviewed baseline update.
+
+`component-audit` also reads this mirror baseline. That makes donor drift part
+of the main semantic audit instead of a disconnected report: a `Mirror` entry
+with donor drift and no manifest `fork_reason` is a critical failure.
 
 ## Required Local Gate
 
