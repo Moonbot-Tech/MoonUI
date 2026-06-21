@@ -167,8 +167,9 @@ pub fn moon_scrollbar_overlay_with_palette(
         let viewport = f32::from(bounds.size.height).max(1.0);
         let content = viewport + f32::from(max.y);
         let thumb_h = (viewport / content * viewport).clamp(18.0_f32.min(viewport), viewport);
-        let top = (f32::from(offset.y) / f32::from(max.y) * (viewport - thumb_h))
-            .clamp(0.0, viewport - thumb_h);
+        let scroll_y = (-f32::from(offset.y)).clamp(0.0, f32::from(max.y));
+        let top =
+            (scroll_y / f32::from(max.y) * (viewport - thumb_h)).clamp(0.0, viewport - thumb_h);
         let state_for_down = state.clone();
         let state_for_track_hover = state.clone();
         let state_for_thumb_hover = state.clone();
@@ -212,7 +213,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                             .clamp(0.0, track_len);
                         let ratio = local / track_len;
                         let mut current = scroll_for_track.offset();
-                        current.y = px(ratio * f32::from(max.y));
+                        current.y = px(-ratio * f32::from(max.y));
                         scroll_for_track.set_offset(current);
                         cx.stop_propagation();
                     },
@@ -293,7 +294,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                             .clamp(0.0, track_len);
                         let ratio = local / track_len;
                         let mut current = scroll_for_move.offset();
-                        current.y = px(ratio * f32::from(max.y));
+                        current.y = px(-ratio * f32::from(max.y));
                         scroll_for_move.set_offset(current);
                         cx.notify();
                     },
@@ -305,8 +306,9 @@ pub fn moon_scrollbar_overlay_with_palette(
         let viewport = f32::from(bounds.size.width).max(1.0);
         let content = viewport + f32::from(max.x);
         let thumb_w = (viewport / content * viewport).clamp(18.0_f32.min(viewport), viewport);
-        let left = (f32::from(offset.x) / f32::from(max.x) * (viewport - thumb_w))
-            .clamp(0.0, viewport - thumb_w);
+        let scroll_x = (-f32::from(offset.x)).clamp(0.0, f32::from(max.x));
+        let left =
+            (scroll_x / f32::from(max.x) * (viewport - thumb_w)).clamp(0.0, viewport - thumb_w);
         let state_for_down = state.clone();
         let state_for_track_hover = state.clone();
         let state_for_thumb_hover = state.clone();
@@ -350,7 +352,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                             .clamp(0.0, track_len);
                         let ratio = local / track_len;
                         let mut current = scroll_for_track.offset();
-                        current.x = px(ratio * f32::from(max.x));
+                        current.x = px(-ratio * f32::from(max.x));
                         scroll_for_track.set_offset(current);
                         cx.stop_propagation();
                     },
@@ -431,7 +433,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                             .clamp(0.0, track_len);
                         let ratio = local / track_len;
                         let mut current = scroll_for_move.offset();
-                        current.x = px(ratio * f32::from(max.x));
+                        current.x = px(-ratio * f32::from(max.x));
                         scroll_for_move.set_offset(current);
                         cx.notify();
                     },

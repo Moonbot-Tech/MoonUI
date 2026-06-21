@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     foundation::ThemeMode,
-    tokens::{MoonMetrics, MoonPalette},
+    tokens::{MoonMetrics, MoonPalette, rgba_from},
 };
-use crate::theme::Theme as BaseTheme;
+use crate::theme::{Theme as BaseTheme, ThemeMode as BaseThemeMode};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -283,12 +283,136 @@ impl MoonTheme {
         }
         let tokens = self.tokens();
         let base = BaseTheme::global_mut(cx);
+        let p = tokens.palette;
+        let colors = &mut base.colors;
+
+        base.mode = match self.mode {
+            ThemeMode::Light => BaseThemeMode::Light,
+            ThemeMode::Dark | ThemeMode::System => BaseThemeMode::Dark,
+        };
         base.font_family = tokens.typography.font_family.clone();
         base.mono_font_family = tokens.typography.mono_font_family.clone();
         base.font_size = px(tokens.base_font_size());
         base.mono_font_size = px(tokens.base_mono_font_size());
         base.radius = px(tokens.ui(self.metrics.button_radius));
         base.radius_lg = px(tokens.ui(self.metrics.button_radius + 2.0));
+
+        colors.background = rgba_from(p.shell, 1.0);
+        colors.foreground = rgba_from(p.text, 1.0);
+        colors.border = rgba_from(p.border, 1.0);
+        colors.accent = rgba_from(p.accent, 1.0);
+        colors.accent_foreground = rgba_from(p.text, 1.0);
+        colors.accordion = rgba_from(p.panel, 1.0);
+        colors.accordion_hover = rgba_from(p.panel_high, 1.0);
+        colors.button_primary = rgba_from(p.accent, 1.0);
+        colors.button_primary_active = rgba_from(p.orange, 1.0);
+        colors.button_primary_foreground = rgba_from(p.text, 1.0);
+        colors.button_primary_hover = rgba_from(p.amber, 1.0);
+        colors.group_box = rgba_from(p.panel, 1.0);
+        colors.group_box_foreground = rgba_from(p.text, 1.0);
+        colors.caret = rgba_from(p.text, 1.0);
+        colors.chart_1 = rgba_from(p.blue, 1.0);
+        colors.chart_2 = rgba_from(p.green, 1.0);
+        colors.chart_3 = rgba_from(p.amber, 1.0);
+        colors.chart_4 = rgba_from(p.orange, 1.0);
+        colors.chart_5 = rgba_from(p.red, 1.0);
+        colors.chart_bullish = rgba_from(p.green, 1.0);
+        colors.chart_bearish = rgba_from(p.orange, 1.0);
+        colors.danger = rgba_from(p.red, 1.0);
+        colors.danger_active = rgba_from(p.red, 0.92);
+        colors.danger_foreground = rgba_from(p.text, 1.0);
+        colors.danger_hover = rgba_from(p.red, 0.72);
+        colors.description_list_label = rgba_from(p.panel, 1.0);
+        colors.description_list_label_foreground = rgba_from(p.text_soft, 1.0);
+        colors.drag_border = rgba_from(p.accent, 1.0);
+        colors.drop_target = rgba_from(p.accent, 0.18);
+        colors.info = rgba_from(p.blue, 0.22);
+        colors.info_active = rgba_from(p.blue, 0.34);
+        colors.info_foreground = rgba_from(p.blue, 1.0);
+        colors.info_hover = rgba_from(p.blue, 0.28);
+        colors.input = rgba_from(p.panel_high, 1.0);
+        colors.link = rgba_from(p.blue, 1.0);
+        colors.link_active = rgba_from(p.amber, 1.0);
+        colors.link_hover = rgba_from(p.blue, 0.82);
+        colors.list = rgba_from(p.panel, 1.0);
+        colors.list_active = rgba_from(p.table_selected, 1.0);
+        colors.list_active_border = rgba_from(p.accent, 1.0);
+        colors.list_even = rgba_from(p.shell_high, 1.0);
+        colors.list_head = rgba_from(p.table_head, 1.0);
+        colors.list_hover = rgba_from(p.panel_high, 1.0);
+        colors.muted = rgba_from(p.panel_high, 1.0);
+        colors.muted_foreground = rgba_from(p.text_muted, 1.0);
+        colors.popover = rgba_from(p.panel_high, 1.0);
+        colors.popover_foreground = rgba_from(p.text, 1.0);
+        colors.primary = rgba_from(p.accent, 1.0);
+        colors.primary_active = rgba_from(p.orange, 1.0);
+        colors.primary_foreground = rgba_from(p.text, 1.0);
+        colors.primary_hover = rgba_from(p.amber, 1.0);
+        colors.progress_bar = rgba_from(p.green, 1.0);
+        colors.ring = rgba_from(p.blue, 1.0);
+        colors.scrollbar = rgba_from(p.panel_high, 0.34);
+        colors.scrollbar_thumb = rgba_from(p.text_muted, 0.58);
+        colors.scrollbar_thumb_hover = rgba_from(p.text_soft, 0.72);
+        colors.secondary = rgba_from(p.panel, 1.0);
+        colors.secondary_active = rgba_from(p.panel_high, 1.0);
+        colors.secondary_foreground = rgba_from(p.text_soft, 1.0);
+        colors.secondary_hover = rgba_from(p.panel_high, 1.0);
+        colors.selection = rgba_from(p.blue, 0.32);
+        colors.sidebar = rgba_from(p.shell_high, 1.0);
+        colors.sidebar_accent = rgba_from(p.table_selected, 1.0);
+        colors.sidebar_accent_foreground = rgba_from(p.text, 1.0);
+        colors.sidebar_border = rgba_from(p.border, 1.0);
+        colors.sidebar_foreground = rgba_from(p.text_soft, 1.0);
+        colors.sidebar_primary = rgba_from(p.accent, 1.0);
+        colors.sidebar_primary_foreground = rgba_from(p.text, 1.0);
+        colors.skeleton = rgba_from(p.panel_high, 1.0);
+        colors.slider_bar = rgba_from(p.border, 1.0);
+        colors.slider_thumb = rgba_from(p.orange, 1.0);
+        colors.success = rgba_from(p.green, 1.0);
+        colors.success_foreground = rgba_from(p.text, 1.0);
+        colors.success_hover = rgba_from(p.green, 0.72);
+        colors.success_active = rgba_from(p.green, 0.92);
+        colors.switch = rgba_from(p.panel_high, 1.0);
+        colors.switch_thumb = rgba_from(p.text_soft, 1.0);
+        colors.tab = rgba_from(p.shell_high, 1.0);
+        colors.tab_active = rgba_from(p.panel, 1.0);
+        colors.tab_active_foreground = rgba_from(p.text, 1.0);
+        colors.tab_bar = rgba_from(p.shell_high, 1.0);
+        colors.tab_bar_segmented = rgba_from(p.panel, 1.0);
+        colors.tab_foreground = rgba_from(p.text_soft, 1.0);
+        colors.table = rgba_from(p.table_body, 1.0);
+        colors.table_active = rgba_from(p.table_selected, 1.0);
+        colors.table_active_border = rgba_from(p.accent, 1.0);
+        colors.table_even = rgba_from(p.shell_high, 1.0);
+        colors.table_head = rgba_from(p.table_head, 1.0);
+        colors.table_head_foreground = rgba_from(p.text_soft, 1.0);
+        colors.table_foot = rgba_from(p.table_head, 1.0);
+        colors.table_foot_foreground = rgba_from(p.text_soft, 1.0);
+        colors.table_hover = rgba_from(p.panel_high, 1.0);
+        colors.table_row_border = rgba_from(p.border, 1.0);
+        colors.title_bar = rgba_from(p.shell_high, 1.0);
+        colors.title_bar_border = rgba_from(p.border, 1.0);
+        colors.status_bar = rgba_from(p.shell_high, 1.0);
+        colors.status_bar_border = rgba_from(p.border, 1.0);
+        colors.tiles = rgba_from(p.panel, 1.0);
+        colors.warning = rgba_from(p.amber, 1.0);
+        colors.warning_active = rgba_from(p.orange, 1.0);
+        colors.warning_hover = rgba_from(p.amber, 0.72);
+        colors.warning_foreground = rgba_from(p.text, 1.0);
+        colors.overlay = rgba_from(p.shell, 0.72);
+        colors.window_border = rgba_from(p.border, 1.0);
+        colors.red = rgba_from(p.red, 1.0);
+        colors.red_light = rgba_from(p.red, 0.72);
+        colors.green = rgba_from(p.green, 1.0);
+        colors.green_light = rgba_from(p.green, 0.72);
+        colors.blue = rgba_from(p.blue, 1.0);
+        colors.blue_light = rgba_from(p.blue, 0.72);
+        colors.yellow = rgba_from(p.yellow, 1.0);
+        colors.yellow_light = rgba_from(p.yellow, 0.72);
+        colors.magenta = rgba_from(p.orange, 1.0);
+        colors.magenta_light = rgba_from(p.orange, 0.72);
+        colors.cyan = rgba_from(p.blue, 1.0);
+        colors.cyan_light = rgba_from(p.blue, 0.72);
     }
 }
 
