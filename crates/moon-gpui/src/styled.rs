@@ -70,6 +70,16 @@ pub trait Styled: Sized {
         self
     }
 
+    /// Restricts wheel scrolling to the axis indicated by the input.
+    ///
+    /// Plain mouse wheel scrolls vertically; Shift+wheel scrolls horizontally.
+    /// This prevents horizontal scrollers embedded in vertical lists from
+    /// hijacking normal vertical wheel navigation.
+    fn restrict_scroll_to_axis(mut self) -> Self {
+        self.style().restrict_scroll_to_axis = Some(true);
+        self
+    }
+
     /// Sets the whitespace of the element to `normal`.
     /// [Docs](https://tailwindcss.com/docs/whitespace#normal)
     fn whitespace_normal(mut self) -> Self {

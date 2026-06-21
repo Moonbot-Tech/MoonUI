@@ -306,7 +306,12 @@ impl RenderOnce for MoonTooltip {
             }
         }
 
-        let mut body = div().flex().flex_col().gap(px(tokens.ui(1.0))).flex_1();
+        let mut body = div()
+            .flex()
+            .flex_col()
+            .min_w_0()
+            .gap(px(tokens.ui(1.0)))
+            .flex_1();
         if has_custom_children {
             body = body.children(self.children);
         } else {
@@ -319,6 +324,7 @@ impl RenderOnce for MoonTooltip {
                         .weight(500.0)
                         .mono(self.mono)
                         .uppercase(false)
+                        .wrap()
                         .render(),
                 );
             }
@@ -331,6 +337,7 @@ impl RenderOnce for MoonTooltip {
                         .weight(400.0)
                         .mono(self.mono)
                         .uppercase(false)
+                        .wrap()
                         .render(),
                 );
             }

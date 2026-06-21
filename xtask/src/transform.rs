@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -48,7 +48,12 @@ pub fn moon_package_name(name: &str) -> String {
     format!("moon-{kebab}")
 }
 
-pub fn run(zed_tag: &str, zed_path: Option<&str>, output_dir: &str, use_local_deps: bool) -> Result<()> {
+pub fn run(
+    zed_tag: &str,
+    zed_path: Option<&str>,
+    output_dir: &str,
+    use_local_deps: bool,
+) -> Result<()> {
     println!("Transforming gpui from zed tag: {zed_tag}");
     if use_local_deps {
         println!("Using path dependencies for local testing");
@@ -80,7 +85,14 @@ pub fn run(zed_tag: &str, zed_path: Option<&str>, output_dir: &str, use_local_de
     // Transform each crate
     for crate_name in CRATE_PUBLISH_ORDER {
         println!("Transforming: {crate_name}");
-        transform_crate(&zed_dir, &output_path, crate_name, &workspace_deps, zed_tag, use_local_deps)?;
+        transform_crate(
+            &zed_dir,
+            &output_path,
+            crate_name,
+            &workspace_deps,
+            zed_tag,
+            use_local_deps,
+        )?;
     }
 
     // Write metadata file
@@ -171,7 +183,14 @@ fn transform_crate(
     }
 
     // Transform Cargo.toml
-    transform_cargo_toml(&dest_dir, output_dir, crate_name, workspace_deps, zed_tag, use_local_deps)?;
+    transform_cargo_toml(
+        &dest_dir,
+        output_dir,
+        crate_name,
+        workspace_deps,
+        zed_tag,
+        use_local_deps,
+    )?;
 
     // MoonUI intentionally does not carry Zed's GPL zlog/ztracing helper crates.
     if crate_name == "sum_tree" {
@@ -214,7 +233,10 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<()> {
 
 fn write_root_license_files(output_dir: &Path) -> Result<()> {
     let root_dir = if output_dir.is_absolute() {
-        output_dir.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
+        output_dir
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf()
     } else {
         std::env::current_dir()?
     };
@@ -299,7 +321,10 @@ fn transform_cargo_toml(
             table.insert("version", toml_edit::value(&version));
 
             // Remove workspace inheritance for edition, use explicit
-            if table.get("edition").is_some_and(|v| v.as_table_like().is_some()) {
+            if table
+                .get("edition")
+                .is_some_and(|v| v.as_table_like().is_some())
+            {
                 table.insert("edition", toml_edit::value("2024"));
             }
 
@@ -321,7 +346,9 @@ fn transform_cargo_toml(
             if !table.contains_key("description") {
                 table.insert(
                     "description",
-                    toml_edit::value(format!("Moon standalone build of Zed's {original_name} crate")),
+                    toml_edit::value(format!(
+                        "Moon standalone build of Zed's {original_name} crate"
+                    )),
                 );
             }
         }
@@ -364,25 +391,59 @@ fn transform_cargo_toml(
         remove_dependency(&mut doc, "dev-dependencies", "zlog");
         remove_dependency(&mut doc, "dev-dependencies", "ctor");
     }
-    transform_dependencies(&mut doc, "dependencies", workspace_deps, &version, output_dir, use_local_deps, &mut removed_optionals)?;
-    transform_dependencies(&mut doc, "dev-dependencies", workspace_deps, &version, output_dir, use_local_deps, &mut removed_optionals)?;
-    transform_dependencies(&mut doc, "build-dependencies", workspace_deps, &version, output_dir, use_local_deps, &mut removed_optionals)?;
+    transform_dependencies(
+        &mut doc,
+        "dependencies",
+        workspace_deps,
+        &version,
+        output_dir,
+        use_local_deps,
+        &mut removed_optionals,
+    )?;
+    transform_dependencies(
+        &mut doc,
+        "dev-dependencies",
+        workspace_deps,
+        &version,
+        output_dir,
+        use_local_deps,
+        &mut removed_optionals,
+    )?;
+    transform_dependencies(
+        &mut doc,
+        "build-dependencies",
+        workspace_deps,
+        &version,
+        output_dir,
+        use_local_deps,
+        &mut removed_optionals,
+    )?;
 
     // Handle target-specific dependencies
     if let Some(target) = doc.get_mut("target") {
         if let Some(target_table) = target.as_table_like_mut() {
             let targets: Vec<_> = target_table.iter().map(|(k, _)| k.to_string()).collect();
             for target_name in targets {
-                if let Some(target_section) = doc.get_mut("target")
-                    .and_then(|t| t.get_mut(&target_name))
+                if let Some(target_section) =
+                    doc.get_mut("target").and_then(|t| t.get_mut(&target_name))
                 {
                     if let Some(table) = target_section.as_table_like_mut() {
-                        for dep_section in ["dependencies", "dev-dependencies", "build-dependencies"] {
+                        for dep_section in
+                            ["dependencies", "dev-dependencies", "build-dependencies"]
+                        {
                             if table.contains_key(dep_section) {
                                 let mut temp_doc = DocumentMut::new();
                                 if let Some(deps) = table.get(dep_section).cloned() {
                                     temp_doc.insert(dep_section, deps);
-                                    transform_dependencies(&mut temp_doc, dep_section, workspace_deps, &version, output_dir, use_local_deps, &mut removed_optionals)?;
+                                    transform_dependencies(
+                                        &mut temp_doc,
+                                        dep_section,
+                                        workspace_deps,
+                                        &version,
+                                        output_dir,
+                                        use_local_deps,
+                                        &mut removed_optionals,
+                                    )?;
                                     if let Some(new_deps) = temp_doc.get(dep_section).cloned() {
                                         table.insert(dep_section, new_deps);
                                     }
@@ -459,10 +520,10 @@ fn transform_dependencies(
 
         if let Some(dep) = deps_table.get_mut(&dep_name) {
             // Check if it's a workspace dependency
-            let is_workspace = dep
-                .as_table_like()
-                .is_some_and(|t| t.get("workspace").is_some_and(|v| v.as_bool() == Some(true)))
-                || dep.as_str() == Some("workspace = true");
+            let is_workspace = dep.as_table_like().is_some_and(|t| {
+                t.get("workspace")
+                    .is_some_and(|v| v.as_bool() == Some(true))
+            }) || dep.as_str() == Some("workspace = true");
 
             if is_workspace || dep.get("workspace").is_some() {
                 if is_internal {
@@ -509,7 +570,8 @@ fn transform_dependencies(
                     // External crate - resolve from workspace
                     if let Some(workspace_dep) = workspace_deps.get(&dep_name) {
                         // Check optional before passing dep to resolve (borrow ends after call)
-                        let is_optional = dep.as_table_like()
+                        let is_optional = dep
+                            .as_table_like()
                             .and_then(|t| t.get("optional"))
                             .and_then(|v| v.as_bool())
                             .unwrap_or(false);
@@ -521,7 +583,9 @@ fn transform_dependencies(
                                 // Git-only dep with no version field.
                                 // For non-optional [dependencies], try to find the official crates.io
                                 // version (e.g. the zed-industries/wgpu fork tracks wgpu 29.x on crates.io).
-                                let resolved_via_lookup = if !is_optional && section == "dependencies" {
+                                let resolved_via_lookup = if !is_optional
+                                    && section == "dependencies"
+                                {
                                     let pkg = workspace_dep
                                         .as_table_like()
                                         .and_then(|t| t.get("package"))
@@ -748,17 +812,17 @@ fn patch_inspector_cfgs(crate_dir: &Path) -> Result<()> {
                 // Simple case: #[cfg(any(feature = "inspector", debug_assertions))]
                 .replace(
                     "#[cfg(any(feature = \"inspector\", debug_assertions))]",
-                    "#[cfg(debug_assertions)]"
+                    "#[cfg(debug_assertions)]",
                 )
                 // Negated case: #[cfg(not(any(feature = "inspector", debug_assertions)))]
                 .replace(
                     "#[cfg(not(any(feature = \"inspector\", debug_assertions)))]",
-                    "#[cfg(not(debug_assertions))]"
+                    "#[cfg(not(debug_assertions))]",
                 )
                 // Complex case with rust_analyzer: all(any(feature = "inspector", debug_assertions), not(rust_analyzer))
                 .replace(
                     "all(any(feature = \"inspector\", debug_assertions), not(rust_analyzer))",
-                    "all(debug_assertions, not(rust_analyzer))"
+                    "all(debug_assertions, not(rust_analyzer))",
                 );
 
             if patched != content {
@@ -781,10 +845,7 @@ fn patch_gpui_macos_source(crate_dir: &Path) -> Result<()> {
     let content = fs::read_to_string(&window_rs)?;
 
     // Remove unnecessary unsafe around NSBeep()
-    let patched = content.replace(
-        "unsafe { NSBeep() }",
-        "NSBeep()"
-    );
+    let patched = content.replace("unsafe { NSBeep() }", "NSBeep()");
 
     if patched != content {
         fs::write(&window_rs, patched)?;
@@ -839,10 +900,7 @@ fn patch_text_example(crate_dir: &Path) -> Result<()> {
     let content = content.replace("\r\n", "\n");
 
     // Remove the Cow import (no longer needed without include_bytes)
-    let patched = content.replace(
-        "    borrow::Cow,\n",
-        ""
-    );
+    let patched = content.replace("    borrow::Cow,\n", "");
 
     // Remove the font loading block
     let patched = patched.replace(
@@ -856,7 +914,7 @@ fn patch_text_example(crate_dir: &Path) -> Result<()> {
         _ = cx.text_system().add_fonts(fonts);
 
         "#,
-        ""
+        "",
     );
 
     if patched != content {
@@ -954,10 +1012,16 @@ fn add_custom_cfg_lints(doc: &mut DocumentMut, crate_name: &str) {
     unexpected_cfgs.insert("check-cfg", toml_edit::Value::Array(check_cfg_arr));
 
     let mut rust_lints = toml_edit::InlineTable::new();
-    rust_lints.insert("unexpected_cfgs", toml_edit::Value::InlineTable(unexpected_cfgs));
+    rust_lints.insert(
+        "unexpected_cfgs",
+        toml_edit::Value::InlineTable(unexpected_cfgs),
+    );
 
     let mut lints_table = toml_edit::Table::new();
-    lints_table.insert("rust", Item::Value(toml_edit::Value::InlineTable(rust_lints)));
+    lints_table.insert(
+        "rust",
+        Item::Value(toml_edit::Value::InlineTable(rust_lints)),
+    );
 
     doc.insert("lints", Item::Table(lints_table));
 }
@@ -1033,7 +1097,10 @@ fn write_metadata(output_dir: &Path, zed_tag: &str, zed_dir: &Path) -> Result<()
 
 fn write_workspace_manifest(output_dir: &Path) -> Result<()> {
     let root_dir = if output_dir.is_absolute() {
-        output_dir.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
+        output_dir
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf()
     } else {
         std::env::current_dir()?
     };
@@ -1058,11 +1125,13 @@ fn write_workspace_manifest(output_dir: &Path) -> Result<()> {
         .entry("workspace")
         .or_insert(Item::Table(toml_edit::Table::new()));
     let Some(table) = workspace.as_table_like_mut() else {
-        bail!("[workspace] in {} is not a table", cargo_toml_path.display());
+        bail!(
+            "[workspace] in {} is not a table",
+            cargo_toml_path.display()
+        );
     };
     table.insert("members", Item::Value(Value::Array(members)));
 
     fs::write(cargo_toml_path, doc.to_string())?;
     Ok(())
 }
-

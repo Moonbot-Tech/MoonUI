@@ -38,6 +38,7 @@ pub struct MoonText {
     bounds: Option<MoonRect>,
     text: SharedString,
     style: MoonTextStyle,
+    wrap: bool,
 }
 
 impl MoonText {
@@ -46,6 +47,7 @@ impl MoonText {
             bounds: None,
             text: text.into(),
             style: MoonTextStyle::default(),
+            wrap: false,
         }
     }
 
@@ -99,6 +101,12 @@ impl MoonText {
         self
     }
 
+    /// Allow the text to wrap and grow vertically instead of forcing one line.
+    pub fn wrap(mut self) -> Self {
+        self.wrap = true;
+        self
+    }
+
     pub fn render(self) -> Self {
         self
     }
@@ -115,18 +123,22 @@ impl RenderOnce for MoonText {
             self.text.as_ref().to_string()
         };
 
+        let wrap = self.wrap;
         let mut element = div()
             .relative()
-            .flex()
-            .items_center()
-            .h(px(text_metrics.line_height))
             .font_family(tokens.font_family(style.mono))
             .text_size(px(text_metrics.font_size))
             .line_height(px(text_metrics.line_height))
             .font_weight(FontWeight(style.weight))
             .text_color(rgba_from(style.color, style.alpha))
-            .whitespace_nowrap()
-            .when(style.tracking.abs() > f32::EPSILON, |this| {
+            .when(!wrap, |this| {
+                this.flex()
+                    .items_center()
+                    .h(px(text_metrics.line_height))
+                    .whitespace_nowrap()
+            })
+            .when(wrap, |this| this.block().whitespace_normal())
+            .when(!wrap && style.tracking.abs() > f32::EPSILON, |this| {
                 this.gap(px(tokens.ui(style.tracking)))
             });
 
@@ -139,7 +151,7 @@ impl RenderOnce for MoonText {
                 .h(px(bounds.h));
         }
 
-        if style.tracking.abs() > f32::EPSILON {
+        if !wrap && style.tracking.abs() > f32::EPSILON {
             for ch in text.chars() {
                 element = element.child(ch.to_string());
             }

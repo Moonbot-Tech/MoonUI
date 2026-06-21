@@ -3,11 +3,7 @@ use std::sync::Arc;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
-use super::{
-    foundation::h_flex,
-    theme::MoonTheme,
-    tokens::rgba_from,
-};
+use super::{foundation::h_flex, theme::MoonTheme, tokens::rgba_from};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonWindowFrameKind {
@@ -50,9 +46,11 @@ impl MoonWindowFrameControls {
             Self::None => &[],
             Self::Close => &[FrameButton::Close],
             Self::MinimizeClose => &[FrameButton::Minimize, FrameButton::Close],
-            Self::MinimizeMaximizeClose => {
-                &[FrameButton::Minimize, FrameButton::Maximize, FrameButton::Close]
-            }
+            Self::MinimizeMaximizeClose => &[
+                FrameButton::Minimize,
+                FrameButton::Maximize,
+                FrameButton::Close,
+            ],
         }
     }
 }
@@ -123,14 +121,9 @@ impl MoonWindowFrame {
                 12.0,
                 None,
             ),
-            MoonWindowFrameKind::Popup => (
-                MoonWindowFrameControls::Close,
-                32.0,
-                26.0,
-                22.0,
-                12.0,
-                None,
-            ),
+            MoonWindowFrameKind::Popup => {
+                (MoonWindowFrameControls::Close, 32.0, 26.0, 22.0, 12.0, None)
+            }
             MoonWindowFrameKind::DetachedChart | MoonWindowFrameKind::Debug => (
                 MoonWindowFrameControls::MinimizeClose,
                 34.0,
@@ -146,7 +139,11 @@ impl MoonWindowFrame {
             kind,
             width,
             header_h,
-            leading_inset: if cfg!(target_os = "macos") { 76.0 } else { 12.0 },
+            leading_inset: if cfg!(target_os = "macos") {
+                76.0
+            } else {
+                12.0
+            },
             right_inset,
             controls,
             button_width,
@@ -317,7 +314,9 @@ impl MoonWindowFrame {
             .items_center()
             .gap(px(tokens.ui(8.0)))
             .child(self.visual_brand(cx))
-            .when(has_brand, |this| this.child(vline(tokens.ui(16.0), p.border)))
+            .when(has_brand, |this| {
+                this.child(vline(tokens.ui(16.0), p.border))
+            })
     }
 
     pub fn title_cluster(&self, title: impl Into<SharedString>, cx: &App) -> Div {

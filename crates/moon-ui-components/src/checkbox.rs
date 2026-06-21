@@ -187,9 +187,9 @@ impl MoonCheckboxMetrics {
     fn scaled(self, cx: &App) -> Self {
         let tokens = MoonTheme::active_tokens(cx);
         let line_height = tokens.line_height(self.line_height.as_f32());
-        let box_size = tokens
-            .ui(self.box_size.as_f32())
-            .max(line_height.min(tokens.ui(self.box_size.as_f32()) + tokens.scale.font_delta.max(0.0)));
+        let box_size = tokens.ui(self.box_size.as_f32()).max(
+            line_height.min(tokens.ui(self.box_size.as_f32()) + tokens.scale.font_delta.max(0.0)),
+        );
         Self {
             box_size: px(box_size),
             font_size: px(tokens.font(self.font_size.as_f32())),
@@ -274,7 +274,11 @@ impl RenderOnce for Checkbox {
         );
         let bg_color = moon_color(
             if checked { p.blue } else { p.shell_high },
-            if checked { 0.22 * box_alpha } else { 0.95 * box_alpha },
+            if checked {
+                0.22 * box_alpha
+            } else {
+                0.95 * box_alpha
+            },
         );
         let label_color = if self.disabled {
             moon_color(p.text_muted, label_alpha)

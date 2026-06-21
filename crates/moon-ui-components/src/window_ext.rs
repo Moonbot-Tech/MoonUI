@@ -5,7 +5,7 @@ use crate::{
     notification::Notification,
     sheet::Sheet,
 };
-use gpui::{App, ElementId, Entity, Window};
+use gpui::{AnyElement, App, ElementId, Entity, SharedString, Window};
 use std::rc::Rc;
 
 /// Extension trait for [`Window`] to add dialog, sheet .. functionality.
@@ -28,6 +28,14 @@ pub trait WindowExt: Sized {
 
     /// Opens a Dialog.
     fn open_dialog<F>(&mut self, cx: &mut App, build: F)
+    where
+        F: Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static;
+
+    /// Opens or replaces a Dialog identified by `id`.
+    ///
+    /// Use this for form-like singleton dialogs owned by application state. Generic
+    /// nested dialog flows can keep using [`Self::open_dialog`].
+    fn open_unique_dialog<F>(&mut self, id: impl Into<SharedString>, cx: &mut App, build: F)
     where
         F: Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static;
 
@@ -60,6 +68,17 @@ pub trait WindowExt: Sized {
 
     /// Closes all active Dialogs.
     fn close_all_dialogs(&mut self, cx: &mut App);
+
+    /// Opens a window-level context menu/overlay layer owned by Root.
+    fn open_context_menu<F>(&mut self, cx: &mut App, build: F)
+    where
+        F: Fn(&mut Window, &mut App) -> AnyElement + 'static;
+
+    /// Return true if there is an active Root-owned context menu.
+    fn has_active_context_menu(&mut self, cx: &mut App) -> bool;
+
+    /// Closes the active Root-owned context menu.
+    fn close_context_menu(&mut self, cx: &mut App);
 
     /// Pushes a notification to the notification list.
     fn push_notification(&mut self, note: impl Into<Notification>, cx: &mut App);
@@ -142,6 +161,17 @@ impl WindowExt for Window {
     }
 
     #[inline]
+    fn open_unique_dialog<F>(&mut self, id: impl Into<SharedString>, cx: &mut App, build: F)
+    where
+        F: Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static,
+    {
+        let id = id.into();
+        Root::update(self, cx, move |root, window, cx| {
+            root.open_unique_dialog(id, build, window, cx);
+        })
+    }
+
+    #[inline]
     fn open_alert_dialog<F>(&mut self, cx: &mut App, build: F)
     where
         F: Fn(AlertDialog, &mut Window, &mut App) -> AlertDialog + 'static,
@@ -167,6 +197,28 @@ impl WindowExt for Window {
     fn close_all_dialogs(&mut self, cx: &mut App) {
         Root::update(self, cx, |root, window, cx| {
             root.close_all_dialogs(window, cx);
+        })
+    }
+
+    #[inline]
+    fn open_context_menu<F>(&mut self, cx: &mut App, build: F)
+    where
+        F: Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    {
+        Root::update(self, cx, move |root, window, cx| {
+            root.open_context_menu(build, window, cx);
+        })
+    }
+
+    #[inline]
+    fn has_active_context_menu(&mut self, cx: &mut App) -> bool {
+        Root::read(self, cx).active_context_menu.is_some()
+    }
+
+    #[inline]
+    fn close_context_menu(&mut self, cx: &mut App) {
+        Root::update(self, cx, |root, window, cx| {
+            root.close_context_menu(window, cx);
         })
     }
 

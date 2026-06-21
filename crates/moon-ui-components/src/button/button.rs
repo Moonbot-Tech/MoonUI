@@ -228,7 +228,6 @@ impl ButtonVariant {
     fn no_padding(&self) -> bool {
         self.is_link() || self.is_text()
     }
-
 }
 
 #[derive(Clone, Copy)]
@@ -298,7 +297,9 @@ impl MoonButtonMetrics {
         let base_pad_y = ((base_height - base_line_height) * 0.5).max(0.0);
         let line_height = tokens.line_height(base_line_height);
         Self {
-            height: px(tokens.ui(base_height).max(line_height + tokens.ui(base_pad_y) * 2.0)),
+            height: px(tokens
+                .ui(base_height)
+                .max(line_height + tokens.ui(base_pad_y) * 2.0)),
             radius: px(tokens.ui(self.radius.as_f32())),
             font_size: px(tokens.font(self.font_size.as_f32())),
             line_height: px(line_height),
@@ -836,9 +837,21 @@ impl ButtonVariant {
             }),
             Self::Primary | Self::Blue | Self::Info => Some(MoonButtonStyle {
                 bg: p.blue,
-                bg_alpha: if selected { 0.18 } else if outline { 0.0 } else { 0.10 },
+                bg_alpha: if selected {
+                    0.18
+                } else if outline {
+                    0.0
+                } else {
+                    0.10
+                },
                 border: p.blue,
-                border_alpha: if selected { 0.38 } else if outline { 0.35 } else { 0.22 },
+                border_alpha: if selected {
+                    0.38
+                } else if outline {
+                    0.35
+                } else {
+                    0.22
+                },
                 fg: p.blue,
                 fg_alpha: 1.0,
                 hover_bg_alpha: 0.18,
@@ -861,13 +874,39 @@ impl ButtonVariant {
                     0.10
                 },
                 border: p.amber,
-                border_alpha: if selected { 0.38 } else if outline { 0.35 } else { 0.22 },
-                fg: if matches!(self, Self::OutlineAmber) { p.text } else { p.amber },
+                border_alpha: if selected {
+                    0.38
+                } else if outline {
+                    0.35
+                } else {
+                    0.22
+                },
+                fg: if matches!(self, Self::OutlineAmber) {
+                    p.text
+                } else {
+                    p.amber
+                },
                 fg_alpha: 1.0,
-                hover_bg_alpha: if matches!(self, Self::OutlineAmber) || outline { 0.04 } else { 0.18 },
-                active_bg_alpha: if matches!(self, Self::OutlineAmber) || outline { 0.025 } else { 0.12 },
-                hover_border_alpha: if matches!(self, Self::OutlineAmber) || outline { 0.48 } else { 0.42 },
-                active_border_alpha: if matches!(self, Self::OutlineAmber) || outline { 0.40 } else { 0.30 },
+                hover_bg_alpha: if matches!(self, Self::OutlineAmber) || outline {
+                    0.04
+                } else {
+                    0.18
+                },
+                active_bg_alpha: if matches!(self, Self::OutlineAmber) || outline {
+                    0.025
+                } else {
+                    0.12
+                },
+                hover_border_alpha: if matches!(self, Self::OutlineAmber) || outline {
+                    0.48
+                } else {
+                    0.42
+                },
+                active_border_alpha: if matches!(self, Self::OutlineAmber) || outline {
+                    0.40
+                } else {
+                    0.30
+                },
                 shadow: selected,
             }),
             Self::Success | Self::Green => Some(MoonButtonStyle {
@@ -884,7 +923,11 @@ impl ButtonVariant {
                 shadow: false,
             }),
             Self::Danger | Self::Red | Self::OutlineRed => Some(MoonButtonStyle {
-                bg: if matches!(self, Self::OutlineRed) || outline { p.shell } else { p.red },
+                bg: if matches!(self, Self::OutlineRed) || outline {
+                    p.shell
+                } else {
+                    p.red
+                },
                 bg_alpha: if matches!(self, Self::OutlineRed) || outline {
                     0.0
                 } else if matches!(self, Self::Danger) {
@@ -896,10 +939,26 @@ impl ButtonVariant {
                 border_alpha: if outline { 0.40 } else { 0.38 },
                 fg: p.red,
                 fg_alpha: 1.0,
-                hover_bg_alpha: if matches!(self, Self::OutlineRed) || outline { 0.08 } else { 0.22 },
-                active_bg_alpha: if matches!(self, Self::OutlineRed) || outline { 0.04 } else { 0.14 },
-                hover_border_alpha: if matches!(self, Self::OutlineRed) || outline { 0.52 } else { 0.48 },
-                active_border_alpha: if matches!(self, Self::OutlineRed) || outline { 0.42 } else { 0.36 },
+                hover_bg_alpha: if matches!(self, Self::OutlineRed) || outline {
+                    0.08
+                } else {
+                    0.22
+                },
+                active_bg_alpha: if matches!(self, Self::OutlineRed) || outline {
+                    0.04
+                } else {
+                    0.14
+                },
+                hover_border_alpha: if matches!(self, Self::OutlineRed) || outline {
+                    0.52
+                } else {
+                    0.48
+                },
+                active_border_alpha: if matches!(self, Self::OutlineRed) || outline {
+                    0.42
+                } else {
+                    0.36
+                },
                 shadow: matches!(self, Self::Danger),
             }),
             Self::Ghost => Some(MoonButtonStyle {
@@ -947,7 +1006,11 @@ impl ButtonVariant {
             };
             return ButtonVariantStyle {
                 bg,
-                border: if outline { colors.color.opacity(0.4) } else { colors.color },
+                border: if outline {
+                    colors.color.opacity(0.4)
+                } else {
+                    colors.color
+                },
                 fg,
                 underline: self.underline(cx),
                 shadow: colors.shadow,

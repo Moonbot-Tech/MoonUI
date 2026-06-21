@@ -1,6 +1,6 @@
-use gpui::*;
 use crate::checkbox::Checkbox;
 use crate::{Disableable, Sizable};
+use gpui::*;
 
 use super::tokens::{MoonRect, MoonTone};
 

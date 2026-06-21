@@ -1,12 +1,15 @@
 use std::rc::Rc;
 
-use gpui::prelude::FluentBuilder as _;
-use gpui::*;
 use crate::input::{Input, InputEvent, InputState};
 use crate::{Selectable, Sizable, Size};
+use gpui::prelude::FluentBuilder as _;
+use gpui::*;
 use regex::Regex;
 
-use super::{theme::MoonTheme, tokens::{MoonRect, MoonTone}};
+use super::{
+    theme::MoonTheme,
+    tokens::{MoonRect, MoonTone},
+};
 
 pub type MoonInputEvent = InputEvent;
 pub type MoonInputState = InputState;
@@ -247,13 +250,18 @@ impl RenderOnce for MoonInput {
                 .w(px(bounds.w))
                 .h(px(bounds.h));
         }
-        if let MoonInputSize::Custom { height, radius, font_size, line_height, pad_x, pad_y, gap } =
-            self.size
+        if let MoonInputSize::Custom {
+            height,
+            radius,
+            font_size,
+            line_height,
+            pad_x,
+            pad_y,
+            gap,
+        } = self.size
         {
             let line_height = tokens.line_height(line_height);
-            let height = tokens
-                .ui(height)
-                .max(line_height + tokens.ui(pad_y) * 2.0);
+            let height = tokens.ui(height).max(line_height + tokens.ui(pad_y) * 2.0);
             input = input
                 .h(px(height))
                 .rounded(px(tokens.ui(radius)))

@@ -206,6 +206,14 @@ fn clamp_auto_grow_vertical_scroll_offset(
     }
 }
 
+fn clamp_to_char_boundary(text: &str, mut ix: usize) -> usize {
+    ix = ix.min(text.len());
+    while ix > 0 && !text.is_char_boundary(ix) {
+        ix -= 1;
+    }
+    ix
+}
+
 use super::MASK_CHAR;
 
 /// Convert a byte offset in the original text to a byte offset in the masked display string.
@@ -1275,23 +1283,25 @@ impl TextElement {
                 .get(buffer_line)
                 .expect("line should exists in wrapper");
 
-            debug_assert_eq!(line_item.len(), line_text.len());
-
             let mut wrapped_lines = SmallVec::with_capacity(1);
 
             for range in &line_item.wrapped_lines {
-                let line_runs = runs_for_range(runs, run_offset, &range);
+                let start = clamp_to_char_boundary(&line_text, range.start);
+                let mut end = clamp_to_char_boundary(&line_text, range.end);
+                end = end.max(start);
+                let safe_range = start..end;
+                let line_runs = runs_for_range(runs, run_offset, &safe_range);
                 let line_runs = if bg_segments.is_empty() {
                     line_runs
                 } else {
                     split_runs_by_bg_segments(
-                        last_layout.visible_line_byte_offsets[vi] + (range.start),
+                        last_layout.visible_line_byte_offsets[vi] + safe_range.start,
                         &line_runs,
                         bg_segments,
                     )
                 };
 
-                let sub_line: SharedString = line_text[range.clone()].to_string().into();
+                let sub_line: SharedString = line_text[safe_range].to_string().into();
                 let shaped_line = window
                     .text_system()
                     .shape_line(sub_line, font_size, &line_runs, None);
@@ -2409,6 +2419,20 @@ mod tests {
             clamp_auto_grow_vertical_scroll_offset(&plain_text, px(-260.), px(340.), px(160.)),
             px(-260.)
         );
+    }
+
+    #[test]
+    fn test_clamp_to_char_boundary_never_returns_middle_of_utf8_codepoint() {
+        let text = "AЖ🚀";
+
+        assert_eq!(clamp_to_char_boundary(text, 0), 0);
+        assert_eq!(clamp_to_char_boundary(text, 1), 1);
+        assert_eq!(clamp_to_char_boundary(text, 2), 1);
+        assert_eq!(clamp_to_char_boundary(text, 3), 3);
+        assert_eq!(clamp_to_char_boundary(text, 4), 3);
+        assert_eq!(clamp_to_char_boundary(text, 7), 7);
+        assert_eq!(clamp_to_char_boundary(text, 8), 7);
+        assert_eq!(clamp_to_char_boundary(text, 99), 7);
     }
 
     #[test]

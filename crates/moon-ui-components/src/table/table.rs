@@ -4,7 +4,8 @@ use gpui::{
 };
 
 use crate::{
-    moon::MoonTheme, AnyChildElement, ChildElement, Sizable, Size, StyledExt as _,
+    AnyChildElement, ChildElement, Sizable, Size, StyledExt as _,
+    moon::MoonTheme,
     moon_skin::{MoonSkinPalette, moon_color},
 };
 

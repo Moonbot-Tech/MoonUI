@@ -407,14 +407,18 @@ mod tests {
         let window = cx.add_empty_window();
         window.update(|_, cx| {
             let secondary = Label::new("Hello").secondary("World");
-            let highlights = secondary.measure_highlights("Hello World".len(), cx).unwrap();
+            let highlights = secondary
+                .measure_highlights("Hello World".len(), cx)
+                .unwrap();
             assert_eq!(
                 highlights[1].1.color,
                 Some(moon_color(MoonSkinPalette::TERMINAL.text_muted, 1.0))
             );
 
             let highlighted = Label::new("Hello World").highlights("World");
-            let highlights = highlighted.measure_highlights("Hello World".len(), cx).unwrap();
+            let highlights = highlighted
+                .measure_highlights("Hello World".len(), cx)
+                .unwrap();
             assert_eq!(
                 highlights[0].1.color,
                 Some(moon_color(MoonSkinPalette::TERMINAL.blue, 1.0))

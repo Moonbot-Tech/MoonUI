@@ -1,9 +1,12 @@
-use gpui::prelude::FluentBuilder as _;
-use gpui::*;
 use crate::input::{Input, InputEvent, InputState};
 use crate::{Selectable, Sizable, Size};
+use gpui::prelude::FluentBuilder as _;
+use gpui::*;
 
-use super::{theme::MoonTheme, tokens::{MoonRect, MoonTone}};
+use super::{
+    theme::MoonTheme,
+    tokens::{MoonRect, MoonTone},
+};
 
 pub type MoonTextAreaEvent = InputEvent;
 pub type MoonTextAreaState = InputState;

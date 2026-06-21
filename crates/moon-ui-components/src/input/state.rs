@@ -871,6 +871,7 @@ impl InputState {
             self.lsp.reset();
         }
 
+        self.last_layout = None;
         // Move scroll to top
         self.scroll_handle.set_offset(point(px(0.), px(0.)));
 
@@ -1261,6 +1262,7 @@ impl InputState {
             diagnostics.reset(&self.text);
         }
         self.selected_range = (self.text.len()..self.text.len()).into();
+        self.last_layout = None;
         self._pending_update = true;
         cx.notify();
     }

@@ -1,9 +1,12 @@
-use gpui::prelude::FluentBuilder as _;
-use gpui::*;
 use crate::button::{Button, ButtonRounded, ButtonVariant, ButtonVariants};
 use crate::{Disableable, Icon, Selectable, Sizable};
+use gpui::prelude::FluentBuilder as _;
+use gpui::*;
 
-use super::{theme::MoonTheme, tokens::{MoonRect, rgb_from}};
+use super::{
+    theme::MoonTheme,
+    tokens::{MoonRect, rgb_from},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonButtonVariant {
@@ -152,7 +155,9 @@ impl MoonButtonIconSlot {
 
     fn icon(self, cx: &App) -> Icon {
         let tokens = MoonTheme::active_tokens(cx);
-        let mut icon = Icon::default().path(self.path).size(px(tokens.ui(self.size)));
+        let mut icon = Icon::default()
+            .path(self.path)
+            .size(px(tokens.ui(self.size)));
         if let Some(color) = self.color {
             icon = icon.text_color(rgba_from_u32(color, self.alpha));
         }
@@ -381,7 +386,12 @@ impl RenderOnce for MoonButton {
             button = button.rounded(ButtonRounded::Size(px(tokens.ui(radius))));
         }
         if let Some(bounds) = self.bounds {
-            button = button.absolute().left(px(bounds.x)).top(px(bounds.y)).w(px(bounds.w)).h(px(bounds.h));
+            button = button
+                .absolute()
+                .left(px(bounds.x))
+                .top(px(bounds.y))
+                .w(px(bounds.w))
+                .h(px(bounds.h));
         }
         if let Some(width) = self.width {
             button = button.w(px(width));

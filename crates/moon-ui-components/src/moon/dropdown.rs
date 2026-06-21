@@ -1,6 +1,6 @@
+use crate::popover::Popover as CorePopover;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
-use crate::popover::Popover as CorePopover;
 
 use super::{
     button::{MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant},
@@ -372,7 +372,12 @@ impl MoonPopupMenu {
                             .items_center()
                             .justify_center()
                             .when(checked, |this| {
-                                this.child(moon_icon(MOON_ICON_CHECK, tokens.ui(11.0), p.blue, alpha))
+                                this.child(moon_icon(
+                                    MOON_ICON_CHECK,
+                                    tokens.ui(11.0),
+                                    p.blue,
+                                    alpha,
+                                ))
                             }),
                     )
                     .child(

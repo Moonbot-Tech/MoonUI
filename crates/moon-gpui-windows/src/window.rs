@@ -6,10 +6,7 @@ use std::{
     path::PathBuf,
     rc::{Rc, Weak},
     str::FromStr,
-    sync::{
-        Arc, Once,
-        atomic::AtomicBool,
-    },
+    sync::{Arc, Once, atomic::AtomicBool},
     time::{Duration, Instant},
 };
 
@@ -24,7 +21,7 @@ use windows::{
         Graphics::Dwm::*,
         Graphics::Gdi::*,
         System::{
-            Com::*, Com::StructuredStorage::PROPVARIANT, Diagnostics::Debug::MessageBeep,
+            Com::StructuredStorage::PROPVARIANT, Com::*, Diagnostics::Debug::MessageBeep,
             LibraryLoader::*, Ole::*, SystemServices::*,
         },
         UI::{

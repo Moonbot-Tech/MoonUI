@@ -1,5 +1,5 @@
-use gpui::*;
 use crate::slider::{Slider, SliderEvent, SliderState};
+use gpui::*;
 
 use super::tokens::MoonRect;
 

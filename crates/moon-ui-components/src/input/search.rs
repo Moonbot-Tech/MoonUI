@@ -4,8 +4,8 @@ use std::{ops::Range, rc::Rc};
 
 use gpui::{
     App, AppContext as _, Context, Empty, Entity, FocusHandle, Focusable, Half,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, Styled,
-    Subscription, Window, actions, div, prelude::FluentBuilder as _,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, Styled, Subscription,
+    Window, actions, div, prelude::FluentBuilder as _,
 };
 use ropey::Rope;
 

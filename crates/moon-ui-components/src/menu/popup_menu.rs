@@ -200,14 +200,10 @@ impl PopupMenuItem {
     /// reopening the menu after each click.
     pub fn close_on_click(mut self, close: bool) -> Self {
         match &mut self {
-            PopupMenuItem::Item {
-                close_on_click, ..
-            } => {
+            PopupMenuItem::Item { close_on_click, .. } => {
                 *close_on_click = close;
             }
-            PopupMenuItem::ElementItem {
-                close_on_click, ..
-            } => {
+            PopupMenuItem::ElementItem { close_on_click, .. } => {
                 *close_on_click = close;
             }
             _ => {}

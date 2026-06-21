@@ -1,5 +1,5 @@
-use gpui::*;
 use crate::status_bar::StatusBar as CoreStatusBar;
+use gpui::*;
 
 use super::{
     text::MoonText,
@@ -232,11 +232,7 @@ impl MoonStatusBar {
             border
         };
 
-        let mut root = div()
-            .id(id)
-            .relative()
-            .overflow_hidden()
-            .h(px(height));
+        let mut root = div().id(id).relative().overflow_hidden().h(px(height));
 
         if let Some(bounds) = bounds {
             root = root
@@ -247,11 +243,7 @@ impl MoonStatusBar {
                 .h(px(bounds.h));
         }
 
-        let mut left_row = div()
-            .ml(px(left_pad))
-            .h_full()
-            .flex()
-            .items_center();
+        let mut left_row = div().ml(px(left_pad)).h_full().flex().items_center();
 
         if let Some(indicator) = indicator {
             let indicator_size = tokens.ui(indicator.size);
@@ -275,8 +267,15 @@ impl MoonStatusBar {
             left_row = left_row.child(dot);
         }
 
-        let left_row =
-            Self::render_items(left_row, items, item_gap, font_size, line_height, p, &tokens);
+        let left_row = Self::render_items(
+            left_row,
+            items,
+            item_gap,
+            font_size,
+            line_height,
+            p,
+            &tokens,
+        );
 
         let mut status = CoreStatusBar::new()
             .left(left_row)
@@ -290,11 +289,7 @@ impl MoonStatusBar {
 
         if !right_items.is_empty() {
             let right_row = Self::render_items(
-                div()
-                    .mr(px(right_offset))
-                    .h_full()
-                    .flex()
-                    .items_center(),
+                div().mr(px(right_offset)).h_full().flex().items_center(),
                 right_items,
                 item_gap,
                 font_size,

@@ -23,11 +23,15 @@ const DOCK_TILE_SNAP: f32 = 4.0;
 
 pub enum DockEvent {
     LayoutChanged,
-    DetachRequested { panel_name: SharedString },
+    DetachRequested {
+        panel_name: SharedString,
+    },
     /// The close (×) button of a panel was clicked. The dock does NOT remove the panel
     /// itself — the host app decides what to do (e.g. move it back to its home tab strip
     /// instead of destroying it). Emitted instead of an internal `remove_panel_by_name`.
-    PanelCloseRequested { panel_name: SharedString },
+    PanelCloseRequested {
+        panel_name: SharedString,
+    },
 }
 
 pub enum PanelEvent {
@@ -274,10 +278,9 @@ impl PanelState {
                 horizontal: *axis == 0,
                 sizes: match &self.info {
                     // 0.0 sentinel (см. dump) → None (flex), иначе фиксированный размер.
-                    PanelInfo::Stack { sizes, .. } => sizes
-                        .iter()
-                        .map(|s| (*s > 0.0).then_some(*s))
-                        .collect(),
+                    PanelInfo::Stack { sizes, .. } => {
+                        sizes.iter().map(|s| (*s > 0.0).then_some(*s)).collect()
+                    }
                     _ => Vec::new(),
                 },
                 items: self
@@ -741,10 +744,11 @@ impl DockItem {
     ) -> bool {
         match self {
             DockItem::Tabs { items, active_ix } => {
-                if items
-                    .iter()
-                    .any(|p| sibling_names.iter().any(|n| p.panel_name(cx).as_ref() == *n))
-                {
+                if items.iter().any(|p| {
+                    sibling_names
+                        .iter()
+                        .any(|n| p.panel_name(cx).as_ref() == *n)
+                }) {
                     let ix = ix.min(items.len());
                     panel.on_added_to(dock_area.clone(), window, cx);
                     items.insert(ix, panel);
@@ -1143,8 +1147,7 @@ impl DockItem {
                 let sizes: Vec<f32> = (0..items.len())
                     .map(|i| sizes.get(i).copied().flatten().unwrap_or(0.0))
                     .collect();
-                let mut state =
-                    PanelState::new("stack").info(PanelInfo::stack(sizes, *horizontal));
+                let mut state = PanelState::new("stack").info(PanelInfo::stack(sizes, *horizontal));
                 state.children = items.iter().map(|item| item.dump(cx)).collect();
                 state
             }

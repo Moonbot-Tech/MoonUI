@@ -267,7 +267,7 @@ impl Dialog {
     /// Sets the footer of the dialog, the footer will render at the bottom of the dialog, usually for action buttons.
     ///
     /// When you set the footer, the `button_props` will be ignored, you need to render the action buttons by yourself.
-    pub(crate) fn header(mut self, header: impl IntoElement) -> Self {
+    pub fn header(mut self, header: impl IntoElement) -> Self {
         self.header = Some(header.into_any_element());
         self
     }

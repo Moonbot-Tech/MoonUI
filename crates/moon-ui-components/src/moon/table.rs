@@ -14,7 +14,6 @@ pub enum MoonTableAlign {
 
 #[derive(Clone, Debug)]
 pub struct MoonTableColumn {
-    title: SharedString,
     width: f32,
     fill: bool,
     align: MoonTableAlign,
@@ -25,9 +24,8 @@ pub struct MoonTableColumn {
 }
 
 impl MoonTableColumn {
-    pub fn new(title: impl Into<SharedString>, width: f32) -> Self {
+    pub fn new(_title: impl Into<SharedString>, width: f32) -> Self {
         Self {
-            title: title.into(),
             width,
             fill: false,
             align: MoonTableAlign::Left,
@@ -246,7 +244,6 @@ impl MoonTableStyle {
 pub(crate) struct MoonTable;
 
 impl MoonTable {
-
     pub(crate) fn render_row_inline_with_cells(
         columns: &[MoonTableColumn],
         row: MoonTableRow,
@@ -305,6 +302,7 @@ impl MoonTable {
             .when(!justify_right, |this| this.justify_start())
             .pl(px(column.cell_pad_left))
             .pr(px(column.cell_pad_right))
+            .overflow_hidden()
             .whitespace_nowrap();
 
         match cell.content {
@@ -330,4 +328,3 @@ impl MoonTable {
         el
     }
 }
-

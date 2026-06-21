@@ -457,14 +457,12 @@ impl Slider {
             .id(id)
             .absolute()
             .when(axis.is_horizontal(), |this| {
-                this
-                    .top(-(MOON_SLIDER_THUMB_SIZE - MOON_SLIDER_TRACK_HEIGHT) * 0.5)
+                this.top(-(MOON_SLIDER_THUMB_SIZE - MOON_SLIDER_TRACK_HEIGHT) * 0.5)
                     .left(start)
                     .ml(-MOON_SLIDER_THUMB_SIZE * 0.5)
             })
             .when(axis.is_vertical(), |this| {
-                this
-                    .bottom(start)
+                this.bottom(start)
                     .left(-(MOON_SLIDER_THUMB_SIZE - MOON_SLIDER_TRACK_HEIGHT) * 0.5)
                     .mb(-MOON_SLIDER_THUMB_SIZE * 0.5)
             })

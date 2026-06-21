@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
+use gpui::prelude::FluentBuilder as _;
 use gpui::{
     AnyElement, App, DefiniteLength, Edges, EdgesRefinement, Entity, Hsla, InteractiveElement as _,
     IntoElement, MouseButton, ParentElement as _, Pixels, RenderOnce, StyleRefinement, Styled,
     TextAlign, Window, div, px, relative,
 };
-use gpui::prelude::FluentBuilder as _;
 
+use crate::Sizable;
 use crate::button::{Button, ButtonVariants as _};
 use crate::input::clear_button;
 use crate::moon::MoonTheme;
@@ -16,7 +17,6 @@ use crate::spinner::Spinner;
 use crate::{ActiveTheme, v_flex};
 use crate::{IconName, Size};
 use crate::{Selectable, StyledExt, h_flex};
-use crate::Sizable;
 
 use super::{InputState, element::EditorScrollbar};
 
@@ -81,7 +81,9 @@ impl MoonInputMetrics {
         let base_pad_y = ((base_height - base_line_height) * 0.5).max(0.0);
         let line_height = tokens.line_height(base_line_height);
         Self {
-            height: px(tokens.ui(base_height).max(line_height + tokens.ui(base_pad_y) * 2.0)),
+            height: px(tokens
+                .ui(base_height)
+                .max(line_height + tokens.ui(base_pad_y) * 2.0)),
             font_size: px(tokens.font(self.font_size.as_f32())),
             line_height: px(line_height),
             pad_x: px(tokens.ui(self.pad_x.as_f32())),
@@ -431,7 +433,11 @@ impl RenderOnce for Input {
             .text_size(metrics.font_size)
             .font_family("Geist Mono")
             .text_color(moon_color(
-                if state.disabled { p.text_muted } else { p.text_soft },
+                if state.disabled {
+                    p.text_muted
+                } else {
+                    p.text_soft
+                },
                 if state.disabled { 0.45 } else { 1.0 },
             ))
             .when(!self.disabled, |this| this.cursor_text())
@@ -448,10 +454,10 @@ impl RenderOnce for Input {
                             if self.selected { p.blue } else { p.border },
                             if self.selected { 0.78 } else { 1.0 },
                         ))
-                            .border_1()
-                            .when(focused && self.focus_bordered, |this| {
-                                this.border_color(moon_color(p.blue, 0.92))
-                            })
+                        .border_1()
+                        .when(focused && self.focus_bordered, |this| {
+                            this.border_color(moon_color(p.blue, 0.92))
+                        })
                     })
                     .when(!state.disabled, |this| {
                         this.hover(|this| {
@@ -531,8 +537,14 @@ mod tests {
         let window = cx.add_empty_window();
         window.update(|_, cx| {
             let p = MoonSkinPalette::TERMINAL;
-            assert_eq!(input_style(false, cx), (moon_color(p.shell_high, 1.0), moon_color(p.text_soft, 1.0)));
-            assert_eq!(input_style(true, cx), (moon_color(p.panel, 0.55), moon_color(p.text_muted, 0.45)));
+            assert_eq!(
+                input_style(false, cx),
+                (moon_color(p.shell_high, 1.0), moon_color(p.text_soft, 1.0))
+            );
+            assert_eq!(
+                input_style(true, cx),
+                (moon_color(p.panel, 0.55), moon_color(p.text_muted, 0.45))
+            );
         });
     }
 }

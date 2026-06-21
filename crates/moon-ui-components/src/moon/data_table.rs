@@ -3,9 +3,11 @@ use std::{collections::HashMap, rc::Rc};
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
+use crate::window_ext::WindowExt as _;
+
 use super::{
     background::MoonBackgroundPolicy,
-    context_menu::MoonContextMenu,
+    context_menu::MoonContextMenuWindowExt as _,
     dropdown::MoonMenuItem,
     scroll_area::{MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette},
     table::{MoonTableAlign, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle},
@@ -690,6 +692,7 @@ impl MoonDataTable {
         column_selectable: bool,
         on_select_column: Option<MoonDataColumnHandler>,
         on_right_click_column: Option<MoonDataColumnHandler>,
+        context_menu_builder: Option<MoonDataContextMenuBuilder>,
         on_sort: Option<Rc<dyn Fn(&SharedString, bool, &mut Window, &mut App)>>,
         window: &mut Window,
         cx: &mut App,
@@ -812,16 +815,25 @@ impl MoonDataTable {
 
             {
                 let state = state.clone();
+                let table_id = id.clone();
                 let on_right_click_column = on_right_click_column.clone();
+                let context_menu_builder = context_menu_builder.clone();
                 cell = cell.on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                    let target = MoonDataTableContextTarget::Column(column_ix);
                     state.update(cx, |state, cx| {
-                        state.open_context_menu(
-                            MoonDataTableContextTarget::Column(column_ix),
-                            event.position,
-                        );
+                        state.open_context_menu(target.clone(), event.position);
                         cx.emit(MoonDataTableEvent::RightClickedColumn(column_ix));
                         cx.notify();
                     });
+                    Self::show_context_menu_layer(
+                        &table_id,
+                        &state,
+                        target,
+                        event.position,
+                        context_menu_builder.as_ref(),
+                        window,
+                        cx,
+                    );
                     if let Some(on_right_click_column) = &on_right_click_column {
                         on_right_click_column(column_ix, window, cx);
                     }
@@ -910,6 +922,39 @@ impl MoonDataTable {
 
         header
     }
+
+    fn show_context_menu_layer(
+        id: &SharedString,
+        state: &Entity<MoonDataTableState>,
+        target: MoonDataTableContextTarget,
+        position: Point<Pixels>,
+        context_menu_builder: Option<&MoonDataContextMenuBuilder>,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let Some(builder) = context_menu_builder else {
+            return;
+        };
+        let items = builder(&target, window, cx);
+        if items.is_empty() {
+            return;
+        }
+        let state = state.clone();
+        window.open_moon_context_menu_with_dismiss(
+            cx,
+            format!("{id}:context-menu"),
+            position,
+            items,
+            180.0,
+            move |window, cx| {
+                state.update(cx, |state, cx| {
+                    state.close_context_menu();
+                    cx.notify();
+                });
+                window.close_context_menu(cx);
+            },
+        );
+    }
 }
 
 impl RenderOnce for MoonDataTable {
@@ -942,8 +987,7 @@ impl RenderOnce for MoonDataTable {
             0.0
         };
         let horizontal_scroll_handle = state.read(cx).horizontal_scroll_handle();
-        let viewport_from_scroll =
-            f32::from(horizontal_scroll_handle.bounds().size.width).max(0.0);
+        let viewport_from_scroll = f32::from(horizontal_scroll_handle.bounds().size.width).max(0.0);
         let viewport_from_state = state.read(cx).viewport_width();
         let viewport_width = viewport_from_scroll.max(viewport_from_state);
         let columns = Self::auto_width_columns(
@@ -991,6 +1035,8 @@ impl RenderOnce for MoonDataTable {
         let keyboard_state = state.clone();
         let keyboard_scroll = scroll_handle.clone();
         let table_context_state = state.clone();
+        let table_context_builder = context_menu_builder.clone();
+        let table_context_id = id.clone();
         let mut root = background_policy
             .apply(
                 div()
@@ -1001,12 +1047,22 @@ impl RenderOnce for MoonDataTable {
                 1.0,
             )
             .track_focus(&focus_handle)
-            .on_mouse_down(MouseButton::Right, move |event, _window, cx| {
+            .on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                let target = MoonDataTableContextTarget::Table;
                 table_context_state.update(cx, |state, cx| {
-                    state.open_context_menu(MoonDataTableContextTarget::Table, event.position);
+                    state.open_context_menu(target.clone(), event.position);
                     cx.emit(MoonDataTableEvent::RightClickedRow(None));
                     cx.notify();
                 });
+                Self::show_context_menu_layer(
+                    &table_context_id,
+                    &table_context_state,
+                    target,
+                    event.position,
+                    table_context_builder.as_ref(),
+                    window,
+                    cx,
+                );
             })
             .on_key_down(move |event, window, cx| {
                 let key = event.keystroke.key.as_str();
@@ -1110,6 +1166,8 @@ impl RenderOnce for MoonDataTable {
         }
 
         let rows_id = id.clone();
+        let rows_context_id = id.clone();
+        let rows_context_builder = context_menu_builder.clone();
         let mut rows_list = MoonVirtualList::new(
             SharedString::from(format!("{id}:rows")),
             self.row_count,
@@ -1129,6 +1187,10 @@ impl RenderOnce for MoonDataTable {
                 let on_double_click_cell = on_double_click_cell.clone();
                 let on_right_click_cell = on_right_click_cell.clone();
                 let rows_id_for_cell = rows_id.clone();
+                let table_id_for_row = rows_context_id.clone();
+                let table_id_for_cells = rows_context_id.clone();
+                let context_menu_builder_for_row = rows_context_builder.clone();
+                let context_menu_builder_for_cells = rows_context_builder.clone();
                 let state_for_cells = state_for_rows.clone();
 
                 let row_content = super::table::MoonTable::render_row_inline_with_cells(
@@ -1152,6 +1214,9 @@ impl RenderOnce for MoonDataTable {
                             let on_select_cell = on_select_cell.clone();
                             let on_double_click_cell = on_double_click_cell.clone();
                             let on_right_click_cell = on_right_click_cell.clone();
+                            let table_id_for_cell = table_id_for_cells.clone();
+                            let context_menu_builder_for_cell =
+                                context_menu_builder_for_cells.clone();
                             cell = cell
                                 .cursor_pointer()
                                 .on_click(move |event, window, cx| {
@@ -1175,16 +1240,23 @@ impl RenderOnce for MoonDataTable {
                                     cx.stop_propagation();
                                 })
                                 .on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                                    let target = MoonDataTableContextTarget::Cell(ix, column_ix);
                                     state_for_cell_right.update(cx, |state, cx| {
-                                        state.open_context_menu(
-                                            MoonDataTableContextTarget::Cell(ix, column_ix),
-                                            event.position,
-                                        );
+                                        state.open_context_menu(target.clone(), event.position);
                                         cx.emit(MoonDataTableEvent::RightClickedCell(
                                             ix, column_ix,
                                         ));
                                         cx.notify();
                                     });
+                                    MoonDataTable::show_context_menu_layer(
+                                        &table_id_for_cell,
+                                        &state_for_cell_right,
+                                        target,
+                                        event.position,
+                                        context_menu_builder_for_cell.as_ref(),
+                                        window,
+                                        cx,
+                                    );
                                     if let Some(on_right_click_cell) = &on_right_click_cell {
                                         on_right_click_cell(ix, column_ix, window, cx);
                                     }
@@ -1230,14 +1302,21 @@ impl RenderOnce for MoonDataTable {
                         }
                     })
                     .on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                        let target = MoonDataTableContextTarget::Row(ix);
                         state_for_row_right.update(cx, |state, cx| {
-                            state.open_context_menu(
-                                MoonDataTableContextTarget::Row(ix),
-                                event.position,
-                            );
+                            state.open_context_menu(target.clone(), event.position);
                             cx.emit(MoonDataTableEvent::RightClickedRow(Some(ix)));
                             cx.notify();
                         });
+                        MoonDataTable::show_context_menu_layer(
+                            &table_id_for_row,
+                            &state_for_row_right,
+                            target,
+                            event.position,
+                            context_menu_builder_for_row.as_ref(),
+                            window,
+                            cx,
+                        );
                         if let Some(on_right_click_row) = &on_right_click_row {
                             on_right_click_row(ix, window, cx);
                         }
@@ -1316,6 +1395,7 @@ impl RenderOnce for MoonDataTable {
                 column_selectable,
                 on_select_column,
                 on_right_click_column,
+                context_menu_builder.clone(),
                 on_sort,
                 window,
                 cx,
@@ -1362,6 +1442,7 @@ impl RenderOnce for MoonDataTable {
                 .right(px(0.0))
                 .bottom(px(0.0))
                 .overflow_x_scroll()
+                .restrict_scroll_to_axis()
                 .track_scroll(&horizontal_scroll_handle)
                 .child(
                     canvas(
@@ -1395,25 +1476,21 @@ impl RenderOnce for MoonDataTable {
             root = root.child(scrollbar);
         }
 
-        if let (Some(builder), Some(context)) = (
-            context_menu_builder.as_ref(),
-            state.read(cx).context_menu.clone(),
-        ) {
-            let items = builder(&context.target, window, cx);
-            root = root.child(
-                MoonContextMenu::new(format!("{id}:context-menu"))
-                    .bounds(MoonRect {
-                        x: f32::from(context.position.x),
-                        y: f32::from(context.position.y),
-                        w: 0.0,
-                        h: 0.0,
-                    })
-                    .items(items)
-                    .open(true)
-                    .render(window, cx),
-            );
-        }
-
         root
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn data_table_context_menu_uses_root_owned_overlay_layer() {
+        let source = include_str!("data_table.rs");
+        let implementation = source.split("#[cfg(test)]").next().unwrap_or(source);
+
+        assert!(
+            implementation.contains("open_moon_context_menu_with_dismiss(")
+                && !implementation.contains("MoonContextMenu::new("),
+            "MoonDataTable must open context menus through the Root-owned window layer, not render local menu overlays as table children"
+        );
     }
 }

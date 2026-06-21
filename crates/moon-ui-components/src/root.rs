@@ -11,10 +11,10 @@ use crate::{
     window_border,
 };
 use gpui::{
-    Anchor, AnyView, App, AppContext, ClipboardItem, Context, DefiniteLength, ElementId, Entity,
-    EntityId, FocusHandle, Hitbox, Hsla, InteractiveElement, IntoElement, KeyBinding,
-    ParentElement as _, Pixels, Render, SharedString, StyleRefinement, Styled, WeakEntity,
-    WeakFocusHandle, Window, actions, div, prelude::FluentBuilder, rgba, rgb,
+    Anchor, AnyElement, AnyView, App, AppContext, ClipboardItem, Context, DefiniteLength,
+    ElementId, Entity, EntityId, FocusHandle, Hitbox, Hsla, InteractiveElement, IntoElement,
+    KeyBinding, ParentElement as _, Pixels, Render, SharedString, StyleRefinement, Styled,
+    WeakEntity, WeakFocusHandle, Window, actions, div, prelude::FluentBuilder, rgb, rgba,
 };
 use serde::{Deserialize, Serialize};
 use std::{any::TypeId, collections::HashMap, rc::Rc};
@@ -74,6 +74,7 @@ pub struct Root {
     view: AnyView,
     pub(crate) active_sheet: Option<ActiveSheet>,
     pub(crate) active_dialogs: Vec<ActiveDialog>,
+    pub(crate) active_context_menu: Option<ActiveContextMenu>,
     pub(super) focused_input: Option<Entity<InputState>>,
     pub notification: Entity<NotificationList>,
     pub(crate) tooltip_overlay: Entity<TooltipOverlay>,
@@ -106,19 +107,35 @@ pub(crate) struct ActiveSheet {
 
 #[derive(Clone)]
 pub(crate) struct ActiveDialog {
+    id: Option<SharedString>,
     focus_handle: FocusHandle,
     /// The previous focused handle before opening the Dialog.
     previous_focused_handle: Option<WeakFocusHandle>,
     builder: Rc<dyn Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static>,
 }
 
+#[derive(Clone)]
+pub(crate) struct ActiveContextMenu {
+    builder: Rc<dyn Fn(&mut Window, &mut App) -> AnyElement + 'static>,
+}
+
+impl ActiveContextMenu {
+    pub(crate) fn new(builder: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self {
+        Self {
+            builder: Rc::new(builder),
+        }
+    }
+}
+
 impl ActiveDialog {
     pub(crate) fn new(
+        id: Option<SharedString>,
         focus_handle: FocusHandle,
         previous_focused_handle: Option<WeakFocusHandle>,
         builder: impl Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static,
     ) -> Self {
         Self {
+            id,
             focus_handle,
             previous_focused_handle,
             builder: Rc::new(builder),
@@ -134,6 +151,7 @@ impl Root {
             view: view.into(),
             active_sheet: None,
             active_dialogs: Vec::new(),
+            active_context_menu: None,
             focused_input: None,
             notification: cx.new(|cx| NotificationList::new(window, cx)),
             tooltip_overlay: cx.new(|_| TooltipOverlay::new()),
@@ -212,16 +230,10 @@ impl Root {
             .read(cx)
     }
 
-    // Render Notification layer.
-    pub fn render_notification_layer(
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Option<impl IntoElement + use<>> {
-        let root = window.root::<Root>()??;
+    fn render_notification_layer_inline(&self, cx: &mut App) -> Option<AnyElement> {
+        let active_sheet_placement = self.active_sheet.clone().map(|d| d.placement);
 
-        let active_sheet_placement = root.read(cx).active_sheet.clone().map(|d| d.placement);
-
-        let sheet_size = root.read(cx).sheet_size;
+        let sheet_size = self.sheet_size;
         let (mt, mr, mb, ml) = match active_sheet_placement {
             Some(Placement::Top) => (sheet_size, None, None, None),
             Some(Placement::Right) => (None, sheet_size, None, None),
@@ -257,44 +269,43 @@ impl Root {
                 .when_some(mr, |this, offset| this.mr(offset))
                 .when_some(mb, |this, offset| this.mb(offset))
                 .when_some(ml, |this, offset| this.ml(offset))
-                .child(root.read(cx).notification.clone()),
+                .child(self.notification.clone())
+                .into_any_element(),
         )
     }
 
-    /// Render the Sheet layer.
-    pub fn render_sheet_layer(
+    fn render_sheet_layer_inline(
+        &self,
         window: &mut Window,
-        cx: &mut App,
-    ) -> Option<impl IntoElement + use<>> {
-        let root = window.root::<Root>()??;
-
-        if let Some(active_sheet) = root.read(cx).active_sheet.clone() {
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        if let Some(active_sheet) = self.active_sheet.clone() {
             let mut sheet = Sheet::new(window, cx);
             sheet = (active_sheet.builder)(sheet, window, cx);
             sheet.focus_handle = active_sheet.focus_handle.clone();
             sheet.placement = active_sheet.placement;
 
             let size = sheet.size;
+            let root = cx.entity();
 
             return Some(
                 div()
                     .relative()
                     .child(sheet)
-                    .on_prepaint(move |_, _, cx| root.update(cx, |r, _| r.sheet_size = Some(size))),
+                    .on_prepaint(move |_, _, cx| root.update(cx, |r, _| r.sheet_size = Some(size)))
+                    .into_any_element(),
             );
         }
 
         None
     }
 
-    /// Render the Dialog layer.
-    pub fn render_dialog_layer(
+    fn render_dialog_layer_inline(
+        &self,
         window: &mut Window,
-        cx: &mut App,
-    ) -> Option<impl IntoElement + use<>> {
-        let root = window.root::<Root>()??;
-
-        let active_dialogs = root.read(cx).active_dialogs.clone();
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        let active_dialogs = self.active_dialogs.clone();
 
         if active_dialogs.is_empty() {
             return None;
@@ -332,30 +343,104 @@ impl Root {
             }
         }
 
-        Some(div().children(dialogs))
+        Some(div().children(dialogs).into_any_element())
+    }
+
+    fn render_context_menu_layer_inline(
+        &self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        let active_context_menu = self.active_context_menu.clone()?;
+        Some((active_context_menu.builder)(window, cx))
     }
 
     pub fn open_dialog<F>(&mut self, build: F, window: &mut Window, cx: &mut Context<'_, Root>)
     where
         F: Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static,
     {
+        self.open_dialog_internal(None, build, window, cx);
+    }
+
+    pub fn open_unique_dialog<F>(
+        &mut self,
+        id: impl Into<SharedString>,
+        build: F,
+        window: &mut Window,
+        cx: &mut Context<'_, Root>,
+    ) where
+        F: Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static,
+    {
+        self.open_dialog_internal(Some(id.into()), build, window, cx);
+    }
+
+    fn open_dialog_internal<F>(
+        &mut self,
+        id: Option<SharedString>,
+        build: F,
+        window: &mut Window,
+        cx: &mut Context<'_, Root>,
+    ) where
+        F: Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static,
+    {
+        let replaced_previous_focus = id.as_ref().and_then(|id| {
+            let index = self
+                .active_dialogs
+                .iter()
+                .position(|dialog| dialog.id.as_ref() == Some(id))?;
+            self.active_dialogs.remove(index).previous_focused_handle
+        });
         let mut previous_focused_handle = window.focused(cx).map(|h| h.downgrade());
 
         // Use pending focus restore if available to maintain correct focus chain
         // when a new dialog is opened immediately after closing another dialog.
-        if let Some(pending_handle) = self.pending_focus_restore.take() {
+        if let Some(replaced_handle) = replaced_previous_focus {
+            previous_focused_handle = Some(replaced_handle);
+        } else if let Some(pending_handle) = self.pending_focus_restore.take() {
             previous_focused_handle = Some(pending_handle);
         }
 
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window, cx);
 
+        self.active_context_menu = None;
         self.active_dialogs.push(ActiveDialog::new(
+            id,
             focus_handle,
             previous_focused_handle,
             build,
         ));
         cx.notify();
+    }
+
+    pub fn open_context_menu<F>(
+        &mut self,
+        build: F,
+        _window: &mut Window,
+        cx: &mut Context<'_, Root>,
+    ) where
+        F: Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    {
+        self.active_context_menu = Some(ActiveContextMenu::new(build));
+        cx.notify();
+    }
+
+    pub fn close_context_menu(&mut self, _window: &mut Window, cx: &mut Context<'_, Root>) {
+        if self.active_context_menu.take().is_some() {
+            cx.notify();
+        }
+    }
+
+    pub fn has_active_context_menu(&self) -> bool {
+        self.active_context_menu.is_some()
+    }
+
+    pub fn active_dialog_count(&self) -> usize {
+        self.active_dialogs.len()
+    }
+
+    pub fn notification_count(&self, cx: &App) -> usize {
+        self.notification.read(cx).notifications().len()
     }
 
     fn close_dialog_internal(&mut self) -> Option<FocusHandle> {
@@ -426,6 +511,7 @@ impl Root {
 
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window, cx);
+        self.active_context_menu = None;
         self.active_sheet = Some(ActiveSheet {
             focus_handle,
             previous_focused_handle,
@@ -603,6 +689,11 @@ impl Render for Root {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(cx.theme().font_size);
 
+        let sheet_layer = self.render_sheet_layer_inline(window, cx);
+        let dialog_layer = self.render_dialog_layer_inline(window, cx);
+        let context_menu_layer = self.render_context_menu_layer_inline(window, cx);
+        let notification_layer = self.render_notification_layer_inline(cx);
+
         let inner = div()
             .id("root")
             .key_context(CONTEXT)
@@ -617,16 +708,19 @@ impl Render for Root {
                     .unwrap_or_else(|| cx.theme().font_family.clone()),
             )
             .when(self.background_policy.paints_fill(), |this| {
-                this.bg(
-                    self.background
-                        .unwrap_or(cx.theme().background)
-                        .opacity(self.background_policy.fill_alpha(1.0)),
-                )
+                this.bg(self
+                    .background
+                    .unwrap_or(cx.theme().background)
+                    .opacity(self.background_policy.fill_alpha(1.0)))
             })
             .text_color(self.text_color.unwrap_or(cx.theme().foreground))
             .refine_style(&self.style)
             .child(TextSelectionController)
             .child(self.view.clone())
+            .when_some(sheet_layer, |this, layer| this.child(layer))
+            .when_some(dialog_layer, |this, layer| this.child(layer))
+            .when_some(context_menu_layer, |this, layer| this.child(layer))
+            .when_some(notification_layer, |this, layer| this.child(layer))
             .child(self.tooltip_overlay.clone())
             .child(self.native_menu_overlay.clone());
 
@@ -675,5 +769,48 @@ mod tests {
             Root::new(view, window, cx).bordered(false).bordered(true)
         });
         assert!(root.read_with(cx, |root, _| root.bordered));
+    }
+
+    #[test]
+    fn root_render_owns_overlay_layers_contract() {
+        let source = include_str!("root.rs");
+
+        assert!(
+            source.contains("fn render_sheet_layer_inline(")
+                && source.contains("fn render_dialog_layer_inline(")
+                && source.contains("fn render_context_menu_layer_inline(")
+                && source.contains("fn render_notification_layer_inline("),
+            "Root must own inline sheet/dialog/context-menu/notification layer renderers"
+        );
+        assert!(
+            !source.contains(&format!("pub fn render_{}(", "sheet_layer"))
+                && !source.contains(&format!("pub fn render_{}(", "dialog_layer"))
+                && !source.contains(&format!("pub fn render_{}(", "notification_layer")),
+            "Root overlay layers must not be public external render hooks; Root::render owns them"
+        );
+        assert!(
+            source.contains("let sheet_layer = self.render_sheet_layer_inline(window, cx);")
+                && source
+                    .contains("let dialog_layer = self.render_dialog_layer_inline(window, cx);")
+                && source.contains(
+                    "let context_menu_layer = self.render_context_menu_layer_inline(window, cx);"
+                )
+                && source.contains(
+                    "let notification_layer = self.render_notification_layer_inline(cx);"
+                )
+                && source.contains(".when_some(sheet_layer, |this, layer| this.child(layer))")
+                && source.contains(".when_some(dialog_layer, |this, layer| this.child(layer))")
+                && source
+                    .contains(".when_some(context_menu_layer, |this, layer| this.child(layer))")
+                && source
+                    .contains(".when_some(notification_layer, |this, layer| this.child(layer))"),
+            "Root::render must compose overlay layers above the application view"
+        );
+        assert!(
+            source.contains("pub fn open_context_menu<F>(")
+                && source.contains("pub fn close_context_menu(")
+                && source.contains("pub fn open_unique_dialog<F>("),
+            "Root must expose window-level context menu and singleton dialog APIs instead of forcing apps to render overlays as panel children"
+        );
     }
 }

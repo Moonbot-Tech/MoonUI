@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use gpui::{px, App, Global, SharedString};
+use gpui::{App, Global, SharedString, px};
 use serde::{Deserialize, Serialize};
 
 use super::{

@@ -286,13 +286,8 @@ pub fn moon_active_tab_underline_scaled(p: MoonPalette, tokens: MoonThemeTokens)
         linear_color_stop(rgba_from(p.amber, 1.0), 0.0),
         linear_color_stop(rgba_from(p.amber, 0.0), 1.0),
     );
-    let shadow = super::foundation::box_shadow(
-        px(0.0),
-        px(0.0),
-        px(8.0),
-        px(0.0),
-        rgba_from(p.amber, 0.70),
-    );
+    let shadow =
+        super::foundation::box_shadow(px(0.0), px(0.0), px(8.0), px(0.0), rgba_from(p.amber, 0.70));
     div()
         .absolute()
         .left(px(tokens.ui(5.0)))

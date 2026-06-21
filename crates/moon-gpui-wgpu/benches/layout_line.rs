@@ -3,8 +3,7 @@ use gpui::{FontFallbacks, FontRun, PlatformTextSystem, font, px};
 use gpui_wgpu::CosmicTextSystem;
 use std::borrow::Cow;
 
-const GEIST_MONO: &[u8] =
-    include_bytes!("../../../assets/fonts/geist-mono/GeistMono-Regular.ttf");
+const GEIST_MONO: &[u8] = include_bytes!("../../../assets/fonts/geist-mono/GeistMono-Regular.ttf");
 const INTER: &[u8] = include_bytes!("../../../assets/fonts/inter/Inter-Regular.ttf");
 
 // ~4 000 chars of typical ASCII code text.

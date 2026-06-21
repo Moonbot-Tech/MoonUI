@@ -44,7 +44,9 @@ impl BadgeMetrics {
         let line_height = tokens.line_height(self.line_height);
         let pad_y = ((self.height - self.line_height) * 0.5).max(0.0);
         Self {
-            height: tokens.ui(self.height).max(line_height + tokens.ui(pad_y) * 2.0),
+            height: tokens
+                .ui(self.height)
+                .max(line_height + tokens.ui(pad_y) * 2.0),
             radius: tokens.ui(self.radius),
             font_size: self.font_size,
             line_height: self.line_height,

@@ -1,9 +1,9 @@
-use gpui::*;
 use crate::searchable_list::{SearchableListItem, SearchableVec};
 use crate::select::{
     Select as CoreSelect, SelectEvent as CoreSelectEvent, SelectState as CoreSelectState,
 };
 use crate::{Sizable as _, Size};
+use gpui::*;
 
 use super::{
     button::{MoonButtonSize, MoonButtonVariant},

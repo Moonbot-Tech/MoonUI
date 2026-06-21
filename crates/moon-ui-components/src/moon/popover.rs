@@ -1,5 +1,5 @@
-use gpui::*;
 use crate::popover::Popover as CorePopover;
+use gpui::*;
 
 use super::{
     background::MoonBackgroundPolicy,
@@ -139,9 +139,7 @@ impl RenderOnce for MoonPopover {
                 open: self.default_open,
             },
         );
-        let open = self
-            .controlled_open
-            .unwrap_or_else(|| state.read(cx).open);
+        let open = self.controlled_open.unwrap_or_else(|| state.read(cx).open);
         let on_open_change = self.on_open_change.clone();
 
         let mut root = div().id(ElementId::from(self.id.clone())).relative();

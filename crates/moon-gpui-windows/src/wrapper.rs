@@ -6,10 +6,7 @@ use std::{
     },
 };
 
-use windows::Win32::{
-    Foundation::HWND,
-    UI::WindowsAndMessaging::HCURSOR,
-};
+use windows::Win32::{Foundation::HWND, UI::WindowsAndMessaging::HCURSOR};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SafeCursor {
