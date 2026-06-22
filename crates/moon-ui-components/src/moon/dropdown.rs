@@ -56,6 +56,26 @@ impl MenuMetrics {
     }
 }
 
+fn moon_menu_item_accepts_click(kind: MoonMenuItemKind, disabled: bool) -> bool {
+    matches!(kind, MoonMenuItemKind::Item) && !disabled
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct MoonDropdownSelectPlan {
+    close_menu: bool,
+    update_internal_open: bool,
+}
+
+fn moon_dropdown_select_plan(
+    close_on_select: bool,
+    controlled_open: Option<bool>,
+) -> MoonDropdownSelectPlan {
+    MoonDropdownSelectPlan {
+        close_menu: close_on_select,
+        update_internal_open: close_on_select && controlled_open.is_none(),
+    }
+}
+
 #[derive(Clone)]
 pub struct MoonMenuItem {
     key: SharedString,
@@ -419,18 +439,16 @@ impl MoonPopupMenu {
                     );
                 }
 
-                if let Some(on_click) = item.on_click {
-                    row = row
-                        .on_mouse_down(MouseButton::Left, move |_, _, cx| {
-                            cx.stop_propagation();
-                        })
-                        .on_click(move |event, window, cx| {
-                            if disabled {
+                if moon_menu_item_accepts_click(MoonMenuItemKind::Item, disabled) {
+                    if let Some(on_click) = item.on_click {
+                        row = row
+                            .on_mouse_down(MouseButton::Left, move |_, _, cx| {
                                 cx.stop_propagation();
-                                return;
-                            }
-                            on_click(event, window, cx);
-                        });
+                            })
+                            .on_click(move |event, window, cx| {
+                                on_click(event, window, cx);
+                            });
+                    }
                 }
 
                 if selected && has_submenu {
@@ -509,24 +527,25 @@ fn wire_dropdown_items(
     items
         .into_iter()
         .map(|mut item| {
-            if matches!(item.kind, MoonMenuItemKind::Item) {
+            if moon_menu_item_accepts_click(item.kind, item.disabled) {
                 let key = item.key.clone();
                 let existing_handler = item.on_click.clone();
                 let on_select = on_select.clone();
                 let state = state.clone();
                 let on_open_change = on_open_change.clone();
                 item.on_click = Some(std::rc::Rc::new(move |event, window, cx| {
+                    let plan = moon_dropdown_select_plan(close_on_select, controlled_open);
                     if let Some(existing_handler) = existing_handler.as_ref() {
                         existing_handler(event, window, cx);
                     }
                     if let Some(on_select) = on_select.as_ref() {
                         on_select(&key, window, cx);
                     }
-                    if close_on_select {
+                    if plan.close_menu {
                         if let Some(on_open_change) = on_open_change.as_ref() {
                             on_open_change(false, window, cx);
                         }
-                        if controlled_open.is_none() {
+                        if plan.update_internal_open {
                             state.update(cx, |state, _| {
                                 state.open = false;
                             });
@@ -830,5 +849,52 @@ impl RenderOnce for MoonDropdown {
         }
 
         root.child(popover).into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        MoonDropdownSelectPlan, MoonMenuItemKind, moon_dropdown_select_plan,
+        moon_menu_item_accepts_click,
+    };
+
+    #[test]
+    fn menu_item_clickability_respects_kind_and_disabled_state() {
+        assert!(moon_menu_item_accepts_click(MoonMenuItemKind::Item, false));
+        assert!(!moon_menu_item_accepts_click(MoonMenuItemKind::Item, true));
+        assert!(!moon_menu_item_accepts_click(
+            MoonMenuItemKind::Label,
+            false
+        ));
+        assert!(!moon_menu_item_accepts_click(
+            MoonMenuItemKind::Separator,
+            false
+        ));
+    }
+
+    #[test]
+    fn dropdown_select_plan_respects_close_and_controlled_state() {
+        assert_eq!(
+            moon_dropdown_select_plan(true, None),
+            MoonDropdownSelectPlan {
+                close_menu: true,
+                update_internal_open: true,
+            }
+        );
+        assert_eq!(
+            moon_dropdown_select_plan(true, Some(true)),
+            MoonDropdownSelectPlan {
+                close_menu: true,
+                update_internal_open: false,
+            }
+        );
+        assert_eq!(
+            moon_dropdown_select_plan(false, None),
+            MoonDropdownSelectPlan {
+                close_menu: false,
+                update_internal_open: false,
+            }
+        );
     }
 }

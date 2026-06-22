@@ -30,6 +30,102 @@
       "from": "Pending",
       "to": "Mirror",
       "reason": "The raw menu escape hatch was replaced by the explicit MoonNativeMenu facade. In-window overlays stay on MoonContextMenu/MoonPopupMenu; OS-native popup behavior is exposed only as moon_ui::MoonNativeMenu."
+    },
+    {
+      "concept": "button",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon width/mono/style hooks and tests. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "checkbox",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon checked SVG/theme hooks and tests. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "dialog",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon dialog density and header/footer hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "hover_card",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon overlay/theme hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "input",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon tone/theme hooks and input hardening. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "list",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon list styling hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "menu",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon native-menu fallback and ownership hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "popover",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon popover placement/style hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "progress",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift in the shared progress module. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "progress_circle",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift in the shared progress module. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "resizable",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon resize handle/panel style hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "select",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon select trigger variant/style hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "settings",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon settings field style hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "slider",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon slider id and diffused visual hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "text_area",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift shared with Moon input. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "tree",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon tree surface/style hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
     }
   ]
 }

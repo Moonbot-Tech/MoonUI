@@ -30,7 +30,7 @@ catch accidental visual, behavioral, and facade regressions.
 | Expand component manifest to match gallery coverage | done | Public gallery-covered components now have manifest ownership. |
 | Fix obvious no-op Moon API | done | `MoonButton::mono()`, `MoonCheckbox::mono()/tone()`, `MoonSelect::trigger_variant()`, `MoonSlider::id()`, and uncontrolled `MoonInput` keyed state were fixed. |
 | Final validation | done | fmt/check/tests/audits/snapshot compare passed after fixing a Windows capture artifact. |
-| Final self-audit | done | Remaining debt is listed below with current mechanical counters. |
+| Final self-audit | done | Findings are tied to mechanical counters, contracts, or concrete fixes. |
 
 ## Self-Audit Findings
 
@@ -60,7 +60,8 @@ manifest entry is present in gallery coverage.
 Human audit output printed `Pass Debt ...`, which reads like the check itself is
 still debt. The intended meaning was "non-critical guardrail".
 
-Decision: rename the severity to `Guardrail` and keep real debt in metrics/docs.
+Decision: rename the severity to `Guardrail` and keep real problems tied to
+failing metrics, contracts, or concrete fixes.
 
 ### Found: one public Moon API was a no-op
 
@@ -132,15 +133,14 @@ integration check caught the one struct literal in `chartdx`; it now uses
 `..moon_ui::MoonPalette::TERMINAL` so future palette fields do not break that
 adapter again.
 
-## Remaining Debt Register
+## Measured Guardrail State
 
 - `raw_hex_in_moon_runtime` is now `0`. Runtime Moon components should not add
   new raw theme colors outside `moon/tokens.rs`.
 - `noop_public_api_markers` is now `0`. The audit baseline was updated so any
   new no-op public builder becomes a regression.
-- `Radio` still uses old `cx.theme()` styling in places. It is not currently a
-  Moon public surface in the gallery manifest, but it is a real future cleanup
-  item if radio enters the Moon-facing palette.
+- `MoonRadio` is now a Moon public surface with a behavior contract; its
+  disabled/click selection rule is covered by Rust tests.
 - Windows gallery snapshots use a GDI client-capture fallback because the
   Windows backend still reports `render_to_image` as unimplemented. This is a
   useful visual guardrail, but backend render capture is the cleaner final
@@ -618,7 +618,7 @@ Validation after this tightening:
 - `cargo test -p moon-ui-components` passed: 257 tests.
 - `cargo test -p moon-ui-gallery` passed: 3 tests.
 - `cargo xtask component-audit --check-baseline` passed with 0 Pending and all
-  source debt counters at 0.
+  source hygiene counters at 0.
 - `cargo xtask component-api --check-baseline` passed: 1019 public signatures
   after approved facade removals.
 - `cargo xtask component-mirror --check-baseline` passed: 28 mirror components.
@@ -688,7 +688,7 @@ Current audit counters after this pass:
 - `Domain: 2`;
 - `Internal: 7`;
 - `Forbidden: 2`;
-- all source debt counters are `0`, including `raw_hex_in_moon_base_runtime`.
+- all source hygiene counters are `0`, including `raw_hex_in_moon_base_runtime`.
 
 ## 2026-06-21 Audit Verifier Pass
 
@@ -732,9 +732,10 @@ The follow-up audit found one more blind spot: `component-mirror` knew which
 fact. A component could therefore stay classified as a clean mirror with
 `fork_reason: null` even when the donor baseline showed modified base files.
 
-Closed mirror truth issue:
+Initial mirror truth issue:
 
-- Added `mirror.donor_drift_requires_reason` to `component-audit`.
+- Added the first donor-drift guard to `component-audit` (later superseded by
+  `mirror.class_matches_donor_drift` below).
 - The audit now reads `docs/component-mirror-baseline.json` and fails if that
   baseline was not recorded with a donor.
 - Any current manifest `Mirror` whose mirror baseline reports
@@ -750,3 +751,62 @@ This preserves the intended distinction:
 - reviewed Moon hooks/tests/style hardening inside base files are allowed, but
   must be explicit;
 - unreviewed donor drift is now a critical audit failure, not a green report.
+
+## 2026-06-22 Mirror / TrackedFork Split
+
+The next audit found that `Mirror + fork_reason` still blurred the architecture.
+It made a drifted base-layer component look like a clean mirror, which weakens
+the year-long maintenance goal of cheap Longbridge pulls.
+
+Closed stronger mirror truth issue:
+
+- Added the `TrackedFork` component class.
+- `Mirror` now means exactly: Longbridge-owned behavior with zero donor drift.
+- `TrackedFork` now means: Longbridge-owned behavior, reviewed Moon base-file
+  drift, explicit `fork_reason`, and a positive `donor_drift_budget`.
+- `component-mirror` now tracks both `Mirror` and `TrackedFork` entries.
+- `component-audit` now fails when:
+  - a `Mirror` entry has any donor-changed file;
+  - a `TrackedFork` entry has no donor drift;
+  - a `TrackedFork` entry exceeds its `donor_drift_budget`;
+  - the mirror baseline was recorded without the pinned donor.
+- Drifted former mirrors were reclassified to `TrackedFork`: button, checkbox,
+  dialog, hover_card, input, list, menu, popover, progress, progress_circle,
+  resizable, select, settings, slider, text_area, and tree.
+
+This removes the previous ambiguity: `Mirror` is now a strict relation to the
+donor, not a label that can hide reviewed fork edits.
+
+## 2026-06-22 Forged Behavior Contracts / Restored Small Capabilities
+
+The follow-up audit also found that many forged controls were covered only by
+gallery PNGs. That proves visibility, not behavior. The interactive forged
+controls now expose small pure behavior helpers that are used by the render/click
+paths and covered by Rust tests:
+
+- `toggle.click_behavior`: disabled clicks do nothing, controlled mode does not
+  mutate internal state, uncontrolled mode does.
+- `radio.click_behavior`: enabled click selects `true`, disabled click is
+  ignored.
+- `stepper.value_behavior`: step changes clamp to min/max and normalize
+  non-positive steps.
+- `collapsible.click_behavior`: disabled and controlled headers do not mutate
+  internal state.
+- `dropdown.select_behavior`: labels/separators/disabled items are not clickable,
+  and select-close behavior respects controlled/uncontrolled open state.
+- `rating.click_behavior`: value/max/click selection are clamped and disabled
+  clicks are ignored.
+
+Two simple forged controls also regained useful Longbridge capabilities while
+keeping Moon styling:
+
+- `MoonKbd` now supports `from_keystroke`, `From<Keystroke>`, and
+  Longbridge-compatible platform keystroke formatting.
+- `MoonSkeleton` now supports `secondary()` and `animated(bool)`; animation is
+  on by default for applications and disabled explicitly in the gallery snapshot
+  fixture for deterministic PNGs.
+
+Verified:
+
+- `cargo test -p moon-ui-components --lib` passed with 271 tests.
+- `component-audit` now requires the new behavior contracts.

@@ -21,6 +21,8 @@ pub struct ComponentEntry {
     pub escape_path: Option<String>,
     pub upstream_ref: Option<String>,
     pub fork_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub donor_drift_budget: Option<usize>,
     pub contracts: Vec<String>,
 }
 
@@ -61,6 +63,7 @@ struct MirrorBaselineEntry {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ComponentClass {
     Mirror,
+    TrackedFork,
     Forged,
     Domain,
     Internal,
@@ -273,8 +276,56 @@ fn validate_component_manifest(components: &[ComponentEntry]) -> Result<()> {
                 if component.upstream_ref.is_none() {
                     bail!("Mirror component {} has no upstream_ref", component.concept);
                 }
+                if component.fork_reason.is_some() {
+                    bail!(
+                        "Mirror component {} must not have fork_reason; use TrackedFork for reviewed donor drift",
+                        component.concept
+                    );
+                }
+                if component.donor_drift_budget.is_some() {
+                    bail!(
+                        "Mirror component {} must not have donor_drift_budget; use TrackedFork for reviewed donor drift",
+                        component.concept
+                    );
+                }
                 if component.contracts.is_empty() {
                     bail!("Mirror component {} has no contracts", component.concept);
+                }
+            }
+            ComponentClass::TrackedFork => {
+                if component.public_path.is_none() {
+                    bail!(
+                        "TrackedFork component {} has no public_path",
+                        component.concept
+                    );
+                }
+                if component.upstream_ref.is_none() {
+                    bail!(
+                        "TrackedFork component {} has no upstream_ref",
+                        component.concept
+                    );
+                }
+                if component
+                    .fork_reason
+                    .as_deref()
+                    .is_none_or(|reason| reason.trim().is_empty())
+                {
+                    bail!(
+                        "TrackedFork component {} has no fork_reason",
+                        component.concept
+                    );
+                }
+                if component.donor_drift_budget.unwrap_or(0) == 0 {
+                    bail!(
+                        "TrackedFork component {} has no positive donor_drift_budget",
+                        component.concept
+                    );
+                }
+                if component.contracts.is_empty() {
+                    bail!(
+                        "TrackedFork component {} has no contracts",
+                        component.concept
+                    );
                 }
             }
             ComponentClass::Forged => {
@@ -393,7 +444,6 @@ fn metric(id: &str, policy: MetricPolicy, hits: Vec<SourceHit>) -> SourceMetric 
 fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
     let components = load_component_manifest(root)?;
     let tests = collect_rust_tests(&root.join("crates/moon-ui-components/src"))?;
-    let moon_button = read(root.join("crates/moon-ui-components/src/moon/button.rs"))?;
     let data_table = read(root.join("crates/moon-ui-components/src/moon/data_table.rs"))?;
     let context_menu = read(root.join("crates/moon-ui-components/src/moon/context_menu.rs"))?;
     let root_source = read(root.join("crates/moon-ui-components/src/root.rs"))?;
@@ -404,7 +454,7 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
 
     let gallery_missing = public_components_missing_from_gallery(&components, &gallery);
     let visual_missing = missing_visual_baselines(root);
-    let mirror_drift_without_reason = mirror_drift_without_reason(root, &components)?;
+    let mirror_class_drift_issues = mirror_class_drift_issues(root, &components)?;
     let mut checks = vec![
         test_contract(
             "button.click",
@@ -413,14 +463,11 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &tests,
             "button clickability must be covered by a Rust behavior test",
         ),
-        pass_if(
+        test_contract(
             "button.width_api",
             ContractSeverity::Critical,
-            ContractVerifier::StructuralSource,
-            moon_button.contains("pub fn width(mut self, width: f32) -> Self")
-                && moon_button.contains("pub fn full_width(mut self) -> Self")
-                && moon_button.contains("button = button.w(px(width))")
-                && moon_button.contains("button = button.w_full()"),
+            &["moon_button_width_builders_preserve_layout_intent"],
+            &tests,
             "MoonButton width/full_width builders must preserve layout intent",
         ),
         pass_if(
@@ -443,6 +490,13 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &["test_checkbox_handle_click_toggles_and_calls_handler"],
             &tests,
             "checkbox click path must toggle state and call Moon on_change",
+        ),
+        test_contract(
+            "collapsible.click_behavior",
+            ContractSeverity::Guardrail,
+            &["collapsible_header_click_respects_disabled_and_controlled_state"],
+            &tests,
+            "collapsible header click must respect disabled and controlled state",
         ),
         test_contract(
             "input.utf8_boundary_clamp",
@@ -468,6 +522,30 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             ],
             &tests,
             "input mask and number mask behavior must be covered by Rust tests",
+        ),
+        test_contract(
+            "kbd.keystroke_format",
+            ContractSeverity::Guardrail,
+            &["kbd_formats_keystrokes_like_longbridge"],
+            &tests,
+            "MoonKbd must preserve Longbridge-style platform keystroke formatting",
+        ),
+        test_contract(
+            "rating.click_behavior",
+            ContractSeverity::Guardrail,
+            &[
+                "rating_value_and_max_are_clamped",
+                "rating_click_value_respects_disabled_and_range",
+            ],
+            &tests,
+            "rating value/click handling must clamp and ignore disabled clicks",
+        ),
+        test_contract(
+            "radio.click_behavior",
+            ContractSeverity::Guardrail,
+            &["radio_click_value_respects_disabled_state"],
+            &tests,
+            "radio click handling must select true and ignore disabled clicks",
         ),
         pass_if(
             "data_table.text_clipping",
@@ -502,6 +580,16 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "context menu origin must clamp to the viewport edges and honor max-height",
         ),
         test_contract(
+            "dropdown.select_behavior",
+            ContractSeverity::Guardrail,
+            &[
+                "menu_item_clickability_respects_kind_and_disabled_state",
+                "dropdown_select_plan_respects_close_and_controlled_state",
+            ],
+            &tests,
+            "dropdown/menu selection must ignore disabled/non-item rows and close only when configured",
+        ),
+        test_contract(
             "dock.behavior_contracts",
             ContractSeverity::Guardrail,
             &[
@@ -531,20 +619,20 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "legacy Longbridge dock must stay manifest-owned as Internal and must not be exported through the public moon_ui facade",
         ),
         ContractCheck {
-            id: "mirror.donor_drift_requires_reason".to_string(),
-            status: if mirror_drift_without_reason.is_empty() {
+            id: "mirror.class_matches_donor_drift".to_string(),
+            status: if mirror_class_drift_issues.is_empty() {
                 ContractStatus::Pass
             } else {
                 ContractStatus::Fail
             },
             severity: ContractSeverity::Critical,
             verifier: ContractVerifier::StructuralSource,
-            details: if mirror_drift_without_reason.is_empty() {
-                "every Mirror component with donor drift has an explicit fork_reason or has been reclassified".to_string()
+            details: if mirror_class_drift_issues.is_empty() {
+                "Mirror components have zero donor drift; TrackedFork components have reviewed donor drift within manifest budget".to_string()
             } else {
                 format!(
-                    "Mirror component(s) have donor drift without fork_reason: {}",
-                    mirror_drift_without_reason.join("; ")
+                    "component class and donor drift are inconsistent: {}",
+                    mirror_class_drift_issues.join("; ")
                 )
             },
         },
@@ -574,12 +662,33 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &tests,
             "select open/select lifecycle must keep initial selection and cursor state covered",
         ),
+        test_contract(
+            "skeleton.longbridge_capabilities",
+            ContractSeverity::Guardrail,
+            &["skeleton_keeps_longbridge_secondary_and_animation_controls"],
+            &tests,
+            "MoonSkeleton must preserve secondary and animation controls from Longbridge while keeping Moon styling",
+        ),
         pass_if(
             "slider.diffused_visual_state",
             ContractSeverity::Critical,
             ContractVerifier::VisualGolden,
             visual_missing.is_empty(),
             "MoonSlider diffused visual state must be covered by committed gallery golden snapshots",
+        ),
+        test_contract(
+            "stepper.value_behavior",
+            ContractSeverity::Guardrail,
+            &["stepper_next_value_clamps_to_range_and_positive_step"],
+            &tests,
+            "stepper value changes must clamp to min/max and normalize non-positive steps",
+        ),
+        test_contract(
+            "toggle.click_behavior",
+            ContractSeverity::Guardrail,
+            &["toggle_click_plan_respects_disabled_and_controlled_state"],
+            &tests,
+            "toggle click handling must respect disabled and controlled state",
         ),
         pass_if(
             "window_frame.visual_types",
@@ -680,7 +789,7 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
     Ok(checks)
 }
 
-fn mirror_drift_without_reason(root: &Path, components: &[ComponentEntry]) -> Result<Vec<String>> {
+fn mirror_class_drift_issues(root: &Path, components: &[ComponentEntry]) -> Result<Vec<String>> {
     let baseline = load_mirror_baseline(root)?;
     let manifest = components
         .iter()
@@ -700,30 +809,63 @@ fn mirror_drift_without_reason(root: &Path, components: &[ComponentEntry]) -> Re
 
     for entry in baseline.entries {
         let changed_files = entry.donor_changed_files.unwrap_or_default();
-        if changed_files.is_empty() {
-            continue;
-        }
-
         let Some(component) = manifest.get(entry.concept.as_str()) else {
+            problems.push(format!(
+                "{} appears in mirror baseline but not in component manifest",
+                entry.concept
+            ));
             continue;
         };
-        if component.class != ComponentClass::Mirror {
-            continue;
-        }
-        if component
-            .fork_reason
-            .as_deref()
-            .is_some_and(|reason| !reason.trim().is_empty())
-        {
-            continue;
-        }
 
-        problems.push(format!(
-            "{} ({} donor-changed file(s): {})",
-            entry.concept,
-            changed_files.len(),
-            changed_files.join(", ")
-        ));
+        match component.class {
+            ComponentClass::Mirror => {
+                if !changed_files.is_empty() {
+                    problems.push(format!(
+                        "{} is Mirror but has {} donor-changed file(s): {}",
+                        entry.concept,
+                        changed_files.len(),
+                        changed_files.join(", ")
+                    ));
+                }
+            }
+            ComponentClass::TrackedFork => {
+                if changed_files.is_empty() {
+                    problems.push(format!(
+                        "{} is TrackedFork but currently has no donor drift",
+                        entry.concept
+                    ));
+                    continue;
+                }
+                let budget = component.donor_drift_budget.unwrap_or(0);
+                if changed_files.len() > budget {
+                    problems.push(format!(
+                        "{} donor drift exceeds budget: {} > {} ({})",
+                        entry.concept,
+                        changed_files.len(),
+                        budget,
+                        changed_files.join(", ")
+                    ));
+                }
+                if component
+                    .fork_reason
+                    .as_deref()
+                    .is_none_or(|reason| reason.trim().is_empty())
+                {
+                    problems.push(format!(
+                        "{} is TrackedFork without fork_reason",
+                        entry.concept
+                    ));
+                }
+            }
+            _ => {
+                if !changed_files.is_empty() {
+                    problems.push(format!(
+                        "{} appears in mirror baseline with donor drift but manifest class is {:?}",
+                        entry.concept, component.class
+                    ));
+                }
+            }
+        }
     }
 
     Ok(problems)

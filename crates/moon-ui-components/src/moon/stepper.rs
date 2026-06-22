@@ -35,6 +35,27 @@ struct StepperMetrics {
     line_height: f32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MoonStepperDirection {
+    Decrement,
+    Increment,
+}
+
+fn moon_stepper_next_value(
+    value: f32,
+    min: f32,
+    max: f32,
+    step: f32,
+    direction: MoonStepperDirection,
+) -> f32 {
+    let step = step.max(f32::EPSILON);
+    match direction {
+        MoonStepperDirection::Decrement => value - step,
+        MoonStepperDirection::Increment => value + step,
+    }
+    .clamp(min, max)
+}
+
 #[derive(IntoElement)]
 pub struct MoonStepper {
     id: SharedString,
@@ -223,7 +244,13 @@ impl RenderOnce for MoonStepper {
                     .width(metrics.button_width)
                     .segment(MoonButtonSegment::new("-").color(p.text_soft).weight(600.0))
                     .on_click(move |_, window, cx| {
-                        let next = (value - step).clamp(min, max);
+                        let next = moon_stepper_next_value(
+                            value,
+                            min,
+                            max,
+                            step,
+                            MoonStepperDirection::Decrement,
+                        );
                         if !controlled {
                             state_dec.update(cx, |state, _| state.value = next);
                         }
@@ -270,7 +297,13 @@ impl RenderOnce for MoonStepper {
                     .width(metrics.button_width)
                     .segment(MoonButtonSegment::new("+").color(p.text_soft).weight(600.0))
                     .on_click(move |_, window, cx| {
-                        let next = (value + step).clamp(min, max);
+                        let next = moon_stepper_next_value(
+                            value,
+                            min,
+                            max,
+                            step,
+                            MoonStepperDirection::Increment,
+                        );
                         if !controlled {
                             state_inc.update(cx, |state, _| state.value = next);
                         }
@@ -297,7 +330,7 @@ impl RenderOnce for MoonStepper {
 
 #[cfg(test)]
 mod tests {
-    use super::{MoonStepper, MoonStepperSize};
+    use super::{MoonStepper, MoonStepperDirection, MoonStepperSize, moon_stepper_next_value};
 
     #[test]
     fn stepper_metrics_match_designer_reference() {
@@ -307,5 +340,20 @@ mod tests {
         let normal = MoonStepper::new("normal");
         assert_eq!(normal.metrics().height, 26.0);
         assert_eq!(normal.metrics().value_width, 64.0);
+    }
+
+    #[test]
+    fn stepper_next_value_clamps_to_range_and_positive_step() {
+        assert_eq!(
+            moon_stepper_next_value(9.5, 0.0, 10.0, 2.0, MoonStepperDirection::Increment),
+            10.0
+        );
+        assert_eq!(
+            moon_stepper_next_value(0.5, 0.0, 10.0, 2.0, MoonStepperDirection::Decrement),
+            0.0
+        );
+        assert!(
+            moon_stepper_next_value(1.0, 0.0, 10.0, -1.0, MoonStepperDirection::Increment) > 1.0
+        );
     }
 }

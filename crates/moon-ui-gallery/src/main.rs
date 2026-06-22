@@ -1737,7 +1737,11 @@ impl Gallery {
                             .child(
                                 div()
                                     .w(px(180.0))
-                                    .child(MoonSkeleton::new("new-controls-skeleton").height(8.0)),
+                                    .child(
+                                        MoonSkeleton::new("new-controls-skeleton")
+                                            .height(8.0)
+                                            .animated(false),
+                                    ),
                             ),
                     )
                     .child(

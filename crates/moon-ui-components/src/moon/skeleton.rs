@@ -1,5 +1,6 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
+use instant::Duration;
 
 use super::{
     theme::MoonTheme,
@@ -14,6 +15,8 @@ pub struct MoonSkeleton {
     height: f32,
     radius: f32,
     alpha: f32,
+    secondary: bool,
+    animated: bool,
 }
 
 impl MoonSkeleton {
@@ -25,6 +28,8 @@ impl MoonSkeleton {
             height: 14.0,
             radius: 4.0,
             alpha: 0.52,
+            secondary: false,
+            animated: true,
         }
     }
 
@@ -52,19 +57,34 @@ impl MoonSkeleton {
         self.alpha = alpha;
         self
     }
+
+    pub fn secondary(mut self) -> Self {
+        self.secondary = true;
+        self
+    }
+
+    pub fn animated(mut self, animated: bool) -> Self {
+        self.animated = animated;
+        self
+    }
 }
 
 impl RenderOnce for MoonSkeleton {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
+        let alpha = if self.secondary {
+            self.alpha * 0.5
+        } else {
+            self.alpha
+        };
         let mut root = div()
             .id(ElementId::from(self.id))
             .relative()
             .h(px(tokens.ui(self.height)))
             .rounded(px(tokens.ui(self.radius)))
             .overflow_hidden()
-            .bg(rgba_from(p.panel_high, self.alpha))
+            .bg(rgba_from(p.panel_high, alpha))
             .when_some(self.width, |this, width| this.w(px(tokens.ui(width))));
 
         if let Some(bounds) = self.bounds {
@@ -76,6 +96,31 @@ impl RenderOnce for MoonSkeleton {
                 .h(px(bounds.h));
         }
 
-        root
+        root.map(|this| {
+            if self.animated {
+                this.with_animation(
+                    "moon-skeleton",
+                    Animation::new(Duration::from_secs(2))
+                        .repeat()
+                        .with_easing(bounce(ease_in_out)),
+                    |this, delta| this.opacity(1.0 - delta * 0.32),
+                )
+                .into_any_element()
+            } else {
+                this.into_any_element()
+            }
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MoonSkeleton;
+
+    #[test]
+    fn skeleton_keeps_longbridge_secondary_and_animation_controls() {
+        let static_secondary = MoonSkeleton::new("test").secondary().animated(false);
+        assert!(static_secondary.secondary);
+        assert!(!static_secondary.animated);
     }
 }

@@ -43,6 +43,27 @@ struct MoonToggleState {
     checked: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct MoonToggleClickPlan {
+    next_checked: bool,
+    update_internal: bool,
+}
+
+fn moon_toggle_click_plan(
+    checked: bool,
+    controlled: bool,
+    disabled: bool,
+) -> Option<MoonToggleClickPlan> {
+    if disabled {
+        None
+    } else {
+        Some(MoonToggleClickPlan {
+            next_checked: !checked,
+            update_internal: !controlled,
+        })
+    }
+}
+
 #[derive(IntoElement)]
 pub struct MoonToggle {
     id: SharedString,
@@ -278,14 +299,16 @@ impl RenderOnce for MoonToggle {
             let controlled = self.checked.is_some();
             let on_change = self.on_change.clone();
             root = root.on_click(move |_, window, cx| {
-                let next = !checked;
-                if !controlled {
+                let Some(plan) = moon_toggle_click_plan(checked, controlled, disabled) else {
+                    return;
+                };
+                if plan.update_internal {
                     state.update(cx, |state, _| {
-                        state.checked = next;
+                        state.checked = plan.next_checked;
                     });
                 }
                 if let Some(on_change) = on_change.as_ref() {
-                    on_change(&next, window, cx);
+                    on_change(&plan.next_checked, window, cx);
                 }
                 cx.notify(parent_view);
             });
@@ -297,7 +320,7 @@ impl RenderOnce for MoonToggle {
 
 #[cfg(test)]
 mod tests {
-    use super::{MoonToggle, MoonToggleSize};
+    use super::{MoonToggle, MoonToggleSize, moon_toggle_click_plan};
 
     #[test]
     fn toggle_metrics_match_designer_reference() {
@@ -307,5 +330,18 @@ mod tests {
         let normal = MoonToggle::new("normal");
         assert_eq!(normal.metrics().track_width, 36.0);
         assert_eq!(normal.metrics().track_height, 20.0);
+    }
+
+    #[test]
+    fn toggle_click_plan_respects_disabled_and_controlled_state() {
+        assert_eq!(moon_toggle_click_plan(false, false, true), None);
+
+        let uncontrolled = moon_toggle_click_plan(false, false, false).unwrap();
+        assert!(uncontrolled.next_checked);
+        assert!(uncontrolled.update_internal);
+
+        let controlled = moon_toggle_click_plan(true, true, false).unwrap();
+        assert!(!controlled.next_checked);
+        assert!(!controlled.update_internal);
     }
 }

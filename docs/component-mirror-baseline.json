@@ -4,6 +4,7 @@
   "entries": [
     {
       "concept": "accordion",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonAccordion",
       "upstream_ref": "Longbridge::accordion@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -29,6 +30,7 @@
     },
     {
       "concept": "alert",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonAlert",
       "upstream_ref": "Longbridge::alert@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -54,6 +56,7 @@
     },
     {
       "concept": "button",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonButton",
       "upstream_ref": "Longbridge::button@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -132,6 +135,7 @@
     },
     {
       "concept": "calendar",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonCalendar",
       "upstream_ref": "Longbridge::time::calendar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -157,6 +161,7 @@
     },
     {
       "concept": "checkbox",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonCheckbox",
       "upstream_ref": "Longbridge::checkbox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -184,6 +189,7 @@
     },
     {
       "concept": "color_picker",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonColorPicker",
       "upstream_ref": "Longbridge::color_picker@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -209,6 +215,7 @@
     },
     {
       "concept": "combobox",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonCombobox",
       "upstream_ref": "Longbridge::combobox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -234,6 +241,7 @@
     },
     {
       "concept": "date_picker",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonDatePicker",
       "upstream_ref": "Longbridge::time::date_picker@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -259,6 +267,7 @@
     },
     {
       "concept": "description_list",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonDescriptionList",
       "upstream_ref": "Longbridge::description_list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -284,6 +293,7 @@
     },
     {
       "concept": "dialog",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonDialog",
       "upstream_ref": "Longbridge::dialog@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -385,6 +395,7 @@
     },
     {
       "concept": "hover_card",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonHoverCard",
       "upstream_ref": "Longbridge::hover_card@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -412,6 +423,7 @@
     },
     {
       "concept": "input",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonInput",
       "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -804,6 +816,7 @@
     },
     {
       "concept": "list",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonList",
       "upstream_ref": "Longbridge::list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -891,6 +904,7 @@
     },
     {
       "concept": "menu",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonNativeMenu",
       "upstream_ref": "Longbridge::native_menu@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -950,6 +964,7 @@
     },
     {
       "concept": "notification",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonNotification",
       "upstream_ref": "Longbridge::notification@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -975,6 +990,7 @@
     },
     {
       "concept": "pagination",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonPagination",
       "upstream_ref": "Longbridge::pagination@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1000,6 +1016,7 @@
     },
     {
       "concept": "popover",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonPopover",
       "upstream_ref": "Longbridge::popover@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1027,6 +1044,7 @@
     },
     {
       "concept": "progress",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonProgress",
       "upstream_ref": "Longbridge::progress@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1074,6 +1092,7 @@
     },
     {
       "concept": "progress_circle",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonProgressCircle",
       "upstream_ref": "Longbridge::progress::ProgressCircle@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1121,6 +1140,7 @@
     },
     {
       "concept": "resizable",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonResizablePanelGroup",
       "upstream_ref": "Longbridge::resizable@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1169,6 +1189,7 @@
     },
     {
       "concept": "select",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonSelect",
       "upstream_ref": "Longbridge::select@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1196,6 +1217,7 @@
     },
     {
       "concept": "settings",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonSettings",
       "upstream_ref": "Longbridge::setting@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1324,6 +1346,7 @@
     },
     {
       "concept": "sheet",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonSheet",
       "upstream_ref": "Longbridge::sheet@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1349,6 +1372,7 @@
     },
     {
       "concept": "sidebar",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonSidebar",
       "upstream_ref": "Longbridge::sidebar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1414,6 +1438,7 @@
     },
     {
       "concept": "slider",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonSlider",
       "upstream_ref": "Longbridge::slider@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1441,6 +1466,7 @@
     },
     {
       "concept": "switch",
+      "class": "Mirror",
       "public_path": "moon_ui::MoonSwitch",
       "upstream_ref": "Longbridge::switch@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1466,6 +1492,7 @@
     },
     {
       "concept": "text_area",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonTextArea",
       "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
@@ -1858,6 +1885,7 @@
     },
     {
       "concept": "tree",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonTree",
       "upstream_ref": "Longbridge::tree@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [

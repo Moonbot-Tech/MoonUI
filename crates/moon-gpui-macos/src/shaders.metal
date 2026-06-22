@@ -3,6 +3,15 @@
 
 using namespace metal;
 
+struct RetainedTextParams {
+  uint enabled;
+  uint _pad0;
+  uint _pad1;
+  uint _pad2;
+  float4 transform_x;
+  float4 transform_y;
+};
+
 float4 hsla_to_rgba(Hsla hsla);
 float3 srgb_to_linear(float3 color);
 float3 linear_to_srgb(float3 color);

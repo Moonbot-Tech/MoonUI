@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -43,6 +43,7 @@ pub struct MirrorReport {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct MirrorEntry {
     concept: String,
+    class: String,
     public_path: String,
     upstream_ref: String,
     local_paths: Vec<String>,
@@ -116,13 +117,19 @@ fn build_report(root: &Path, donor_root: Option<&Path>) -> Result<MirrorReport> 
 
     for component in components
         .into_iter()
-        .filter(|component| component.class == "Mirror")
+        .filter(|component| component.class == "Mirror" || component.class == "TrackedFork")
     {
         let public_path = component.public_path.with_context(|| {
-            format!("Mirror component {} has no public_path", component.concept)
+            format!(
+                "{} component {} has no public_path",
+                component.class, component.concept
+            )
         })?;
         let upstream_ref = component.upstream_ref.with_context(|| {
-            format!("Mirror component {} has no upstream_ref", component.concept)
+            format!(
+                "{} component {} has no upstream_ref",
+                component.class, component.concept
+            )
         })?;
         let paths = mirror_source_paths(&upstream_ref)
             .with_context(|| format!("no mirror source path mapping for {upstream_ref}"))?;
@@ -143,6 +150,7 @@ fn build_report(root: &Path, donor_root: Option<&Path>) -> Result<MirrorReport> 
 
         entries.push(MirrorEntry {
             concept: component.concept,
+            class: component.class,
             public_path,
             upstream_ref,
             local_paths,
@@ -331,26 +339,32 @@ fn compare_with_baseline(baseline: &MirrorReport, current: &MirrorReport) -> Vec
             .find(|entry| entry.concept == current_entry.concept)
         else {
             failures.push(format!(
-                "new Mirror component without baseline: {}",
+                "new mirror-tracked component without baseline: {}",
                 current_entry.concept
             ));
             continue;
         };
+        if baseline_entry.class != current_entry.class {
+            failures.push(format!(
+                "mirror-tracked {} class changed: {} -> {}",
+                current_entry.concept, baseline_entry.class, current_entry.class
+            ));
+        }
         if baseline_entry.upstream_ref != current_entry.upstream_ref {
             failures.push(format!(
-                "Mirror {} upstream_ref changed: {} -> {}",
+                "mirror-tracked {} upstream_ref changed: {} -> {}",
                 current_entry.concept, baseline_entry.upstream_ref, current_entry.upstream_ref
             ));
         }
         if baseline_entry.local_paths != current_entry.local_paths {
             failures.push(format!(
-                "Mirror {} source paths changed: {:?} -> {:?}",
+                "mirror-tracked {} source paths changed: {:?} -> {:?}",
                 current_entry.concept, baseline_entry.local_paths, current_entry.local_paths
             ));
         }
         if baseline_entry.local_hash != current_entry.local_hash {
             failures.push(format!(
-                "Mirror {} local hash changed: {} -> {}",
+                "mirror-tracked {} local hash changed: {} -> {}",
                 current_entry.concept, baseline_entry.local_hash, current_entry.local_hash
             ));
         }
@@ -359,7 +373,7 @@ fn compare_with_baseline(baseline: &MirrorReport, current: &MirrorReport) -> Vec
         {
             if expected != actual {
                 failures.push(format!(
-                    "Mirror {} donor hash changed: {} -> {}",
+                    "mirror-tracked {} donor hash changed: {} -> {}",
                     current_entry.concept, expected, actual
                 ));
             }
@@ -373,7 +387,7 @@ fn compare_with_baseline(baseline: &MirrorReport, current: &MirrorReport) -> Vec
             .any(|entry| entry.concept == baseline_entry.concept)
         {
             failures.push(format!(
-                "Mirror component removed from current report: {}",
+                "mirror-tracked component removed from current report: {}",
                 baseline_entry.concept
             ));
         }
@@ -384,7 +398,19 @@ fn compare_with_baseline(baseline: &MirrorReport, current: &MirrorReport) -> Vec
 
 fn print_human_report(report: &MirrorReport, failures: &[String]) {
     println!("MoonUI component mirror report v{}", report.version);
-    println!("mirror components: {}", report.entries.len());
+    let mut by_class = BTreeMap::<&str, usize>::new();
+    for entry in &report.entries {
+        *by_class.entry(entry.class.as_str()).or_default() += 1;
+    }
+    println!(
+        "mirror-tracked components: {} ({})",
+        report.entries.len(),
+        by_class
+            .into_iter()
+            .map(|(class, count)| format!("{class}: {count}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     println!("donor root provided: {}", report.donor_root_provided);
     for entry in &report.entries {
         let changed = entry
@@ -393,8 +419,8 @@ fn print_human_report(report: &MirrorReport, failures: &[String]) {
             .map(|files| files.len().to_string())
             .unwrap_or_else(|| "n/a".to_string());
         println!(
-            "  {:<18} local={} donor_changed_files={}",
-            entry.concept, entry.local_hash, changed
+            "  {:<18} {:<11} local={} donor_changed_files={}",
+            entry.concept, entry.class, entry.local_hash, changed
         );
     }
     if failures.is_empty() {

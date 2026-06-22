@@ -37,9 +37,9 @@ docs/component-audit-baseline.json
 
 The audit currently records:
 
-- component manifest classification: `Mirror`, `Forged`, `Domain`, `Pending`,
-  `Forbidden`;
-- source debt counters such as `MoonSkinPalette`, `moon_color`, public facade
+- component manifest classification: `Mirror`, `TrackedFork`, `Forged`,
+  `Domain`, `Pending`, `Forbidden`;
+- source hygiene counters such as `MoonSkinPalette`, `moon_color`, public facade
   slurp, raw runtime hex and no-op API markers;
 - critical semantic contracts that must not regress;
 - guardrail contracts that prove the checking machinery is wired;
@@ -65,6 +65,14 @@ This does not grep implementation text. It requires a concrete Rust test name
 to exist and not be `#[ignore]`; `cargo test` is the execution side of the
 contract.
 
+Forged controls that own interaction logic must also have behavioral
+contracts. Examples: `toggle.click_behavior`, `radio.click_behavior`,
+`stepper.value_behavior`, `collapsible.click_behavior`,
+`dropdown.select_behavior`, `rating.click_behavior`, `kbd.keystroke_format`,
+and `skeleton.longbridge_capabilities`. A committed PNG proves the control is
+visible; these tests prove the important user-facing semantics did not turn
+into a static drawing.
+
 Example structural contract:
 
 ```text
@@ -78,21 +86,24 @@ exported through the public facade.
 Example mirror-truth contract:
 
 ```text
-mirror.donor_drift_requires_reason
+mirror.class_matches_donor_drift
 ```
 
 This joins `component-audit` with `component-mirror`. A component may remain
 classified as `Mirror` only while its relation to the pinned Longbridge donor is
-truthful. If the mirror baseline reports `donor_changed_files > 0`, the manifest
-entry must either record an explicit `fork_reason` for that reviewed local drift
-or be reclassified as `Forged`. A green audit without the donor side is not a
-valid proof of mirror health.
+truthful and clean: `donor_changed_files` must be empty. If the component keeps
+Longbridge behavior but has reviewed local base-file edits, it must be
+classified as `TrackedFork`, must explain the local drift in `fork_reason`, and
+must set a positive `donor_drift_budget`. If the drift grows past that budget,
+the audit fails. A green audit without the donor side is not a valid proof of
+mirror health.
 
 ## Baseline Rule
 
-The baseline is intentionally allowed to contain current debt.
+The baseline is a measured state, not permission to leave problems alone.
 
-Refactors are allowed to reduce debt. They are not allowed to increase it.
+Refactors are allowed to improve measured architecture and behavior. They are
+not allowed to make the measured state worse.
 
 For example:
 
@@ -158,7 +169,8 @@ migration, not an accidental side effect of refactoring.
 ## Mirror Source Guard
 
 The third guardrail tracks components that are intentionally classified as
-`Mirror` in `crates/moon-ui-components/component-manifest.json`.
+`Mirror` or `TrackedFork` in
+`crates/moon-ui-components/component-manifest.json`.
 
 Run it against the pinned Longbridge donor tree:
 
@@ -188,15 +200,21 @@ The manifest pins each upstream reference as `Longbridge::<component>@<sha>`.
 The current donor SHA is recorded in the vendored `UPSTREAM.md`. A donor-based
 baseline must not be checked without `--donor-root`; that is a false green.
 
-This guard does not prove Moon visual quality. It proves that every `Mirror`
-component is still tied to a known Longbridge source path and that any drift
-from that source is explicit. If a component needs Moon-specific rendering,
-styling, or behavior, reclassify it as `Forged` or record the intentional donor
-diff in the reviewed baseline update.
+This guard does not prove Moon visual quality. It proves that every `Mirror` or
+`TrackedFork` component is still tied to a known Longbridge source path.
+`Mirror` must have zero donor drift. `TrackedFork` may have reviewed donor
+drift, but that drift must stay within its manifest `donor_drift_budget`. If a
+component no longer treats Longbridge as the behavior source, reclassify it as
+`Forged`.
 
 `component-audit` also reads this mirror baseline. That makes donor drift part
-of the main semantic audit instead of a disconnected report: a `Mirror` entry
-with donor drift and no manifest `fork_reason` is a critical failure.
+of the main semantic audit instead of a disconnected report:
+
+- `Mirror` means zero donor drift.
+- `TrackedFork` means Longbridge behavior is still source-owned, but reviewed
+  Moon edits live in base files and are capped by `donor_drift_budget`.
+- `Forged` means Moon owns the implementation and the donor is no longer the
+  behavioral source.
 
 ## Required Local Gate
 

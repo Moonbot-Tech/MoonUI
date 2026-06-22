@@ -496,3 +496,19 @@ fn rgba_from_u32(color: u32, alpha: f32) -> Hsla {
     color.a *= alpha;
     color
 }
+
+#[cfg(test)]
+mod tests {
+    use super::MoonButton;
+
+    #[test]
+    fn moon_button_width_builders_preserve_layout_intent() {
+        let fixed = MoonButton::new("fixed").width(42.0);
+        assert_eq!(fixed.width, Some(42.0));
+        assert!(!fixed.full_width);
+
+        let full = MoonButton::new("full").full_width();
+        assert_eq!(full.width, None);
+        assert!(full.full_width);
+    }
+}

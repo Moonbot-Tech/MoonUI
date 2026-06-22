@@ -11,6 +11,22 @@ use super::{
     tokens::{MoonTone, rgba_from},
 };
 
+fn moon_rating_max(max: usize) -> usize {
+    max.max(1)
+}
+
+fn moon_rating_value(value: usize, max: usize) -> usize {
+    value.min(moon_rating_max(max))
+}
+
+fn moon_rating_click_value(ix: usize, max: usize, disabled: bool) -> Option<usize> {
+    if disabled || ix == 0 {
+        None
+    } else {
+        Some(moon_rating_value(ix, max))
+    }
+}
+
 #[derive(IntoElement)]
 pub struct MoonRating {
     id: SharedString,
@@ -34,13 +50,13 @@ impl MoonRating {
     }
 
     pub fn value(mut self, value: usize) -> Self {
-        self.value = value.min(self.max);
+        self.value = moon_rating_value(value, self.max);
         self
     }
 
     pub fn max(mut self, max: usize) -> Self {
-        self.max = max.max(1);
-        self.value = self.value.min(self.max);
+        self.max = moon_rating_max(max);
+        self.value = moon_rating_value(self.value, self.max);
         self
     }
 
@@ -71,14 +87,16 @@ impl RenderOnce for MoonRating {
         let active = self.tone.color(p);
         let inactive = p.text_muted;
         let disabled = self.disabled;
+        let max = moon_rating_max(self.max);
+        let value = moon_rating_value(self.value, max);
         let on_click = self.on_click.clone();
         let parent_view = window.current_view();
 
         h_flex()
             .id(ElementId::from(self.id))
             .gap(px(tokens.ui(2.0)))
-            .children((1..=self.max).map(move |ix| {
-                let filled = ix <= self.value;
+            .children((1..=max).map(move |ix| {
+                let filled = ix <= value;
                 let on_click = on_click.clone();
                 div()
                     .id(ix)
@@ -90,10 +108,14 @@ impl RenderOnce for MoonRating {
                             .on_click({
                                 let parent_view = parent_view.clone();
                                 move |_, window, app| {
-                                    if let Some(on_click) = &on_click {
-                                        on_click(&ix, window, app);
+                                    if let Some(selected) =
+                                        moon_rating_click_value(ix, max, disabled)
+                                    {
+                                        if let Some(on_click) = &on_click {
+                                            on_click(&selected, window, app);
+                                        }
+                                        app.notify(parent_view);
                                     }
-                                    app.notify(parent_view);
                                 }
                             })
                     })
@@ -108,5 +130,25 @@ impl RenderOnce for MoonRating {
                             .render(),
                     )
             }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{moon_rating_click_value, moon_rating_max, moon_rating_value};
+
+    #[test]
+    fn rating_value_and_max_are_clamped() {
+        assert_eq!(moon_rating_max(0), 1);
+        assert_eq!(moon_rating_value(7, 5), 5);
+        assert_eq!(moon_rating_value(0, 0), 0);
+    }
+
+    #[test]
+    fn rating_click_value_respects_disabled_and_range() {
+        assert_eq!(moon_rating_click_value(3, 5, false), Some(3));
+        assert_eq!(moon_rating_click_value(8, 5, false), Some(5));
+        assert_eq!(moon_rating_click_value(0, 5, false), None);
+        assert_eq!(moon_rating_click_value(3, 5, true), None);
     }
 }

@@ -13,6 +13,18 @@ struct MoonCollapsibleState {
     open: bool,
 }
 
+fn moon_collapsible_header_click_next(
+    open: bool,
+    controlled: bool,
+    disabled: bool,
+) -> Option<bool> {
+    if disabled || controlled {
+        None
+    } else {
+        Some(!open)
+    }
+}
+
 #[derive(IntoElement)]
 pub struct MoonCollapsible {
     id: SharedString,
@@ -155,8 +167,12 @@ impl RenderOnce for MoonCollapsible {
                         return;
                     }
                     window.prevent_default();
-                    if controlled_open.is_none() {
-                        state.update(cx, |state, _| state.open = !state.open);
+                    if let Some(next_open) = moon_collapsible_header_click_next(
+                        open,
+                        controlled_open.is_some(),
+                        disabled,
+                    ) {
+                        state.update(cx, |state, _| state.open = next_open);
                         cx.notify(parent_view);
                     }
                 }
@@ -206,5 +222,24 @@ impl RenderOnce for MoonCollapsible {
         }
 
         root
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::moon_collapsible_header_click_next;
+
+    #[test]
+    fn collapsible_header_click_respects_disabled_and_controlled_state() {
+        assert_eq!(
+            moon_collapsible_header_click_next(false, false, false),
+            Some(true)
+        );
+        assert_eq!(
+            moon_collapsible_header_click_next(true, false, false),
+            Some(false)
+        );
+        assert_eq!(moon_collapsible_header_click_next(false, true, false), None);
+        assert_eq!(moon_collapsible_header_click_next(false, false, true), None);
     }
 }

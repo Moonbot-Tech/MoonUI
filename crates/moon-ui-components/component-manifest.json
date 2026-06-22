@@ -63,12 +63,13 @@
     },
     {
       "concept": "button",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Button",
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonButton",
       "upstream_ref": "Longbridge::button@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon width/mono/style hooks and regression tests live in base button files; Longbridge button behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon width/mono/style hooks and regression tests live in base button files; Longbridge button behavior remains source-owned",
+      "donor_drift_budget": 2,
       "contracts": ["button.click", "button.width_api", "button.mono_font", "gallery.visual_coverage"]
     },
     {
@@ -113,12 +114,13 @@
     },
     {
       "concept": "checkbox",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Checkbox",
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonCheckbox",
       "upstream_ref": "Longbridge::checkbox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon checked SVG/theme hooks and click regression tests live in base checkbox; Longbridge checkbox behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon checked SVG/theme hooks and click regression tests live in base checkbox; Longbridge checkbox behavior remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["checkbox.checked_glyph.asset", "checkbox.click_toggles", "gallery.visual_coverage"]
     },
     {
@@ -129,7 +131,7 @@
       "public_path": "moon_ui::MoonCollapsible",
       "upstream_ref": null,
       "fork_reason": "MoonBot dense expandable panel styling",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["collapsible.click_behavior", "gallery.visual_coverage"]
     },
     {
       "concept": "color_picker",
@@ -249,7 +251,7 @@
       "public_path": "moon_ui::MoonDropdown",
       "upstream_ref": null,
       "fork_reason": "Moon popup styling and density",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["dropdown.select_behavior", "gallery.visual_coverage"]
     },
     {
       "concept": "popup_menu",
@@ -283,12 +285,13 @@
     },
     {
       "concept": "hover_card",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge HoverCard",
       "theme_source": "MoonTheme bridge through MoonHoverCard facade",
       "public_path": "moon_ui::MoonHoverCard",
       "upstream_ref": "Longbridge::hover_card@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon overlay/theme bridge hook lives in base hover card; Longbridge hover-card lifecycle remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon overlay/theme bridge hook lives in base hover card; Longbridge hover-card lifecycle remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -303,12 +306,13 @@
     },
     {
       "concept": "input",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Input",
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonInput",
       "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon tone/theme hooks plus UTF-8, mask, number, and search hardening live in base input; Longbridge editor engine remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon tone/theme hooks plus UTF-8, mask, number, and search hardening live in base input; Longbridge editor engine remains source-owned",
+      "donor_drift_budget": 16,
       "contracts": ["input.utf8_boundary_clamp", "input.mask_contract", "gallery.visual_coverage"]
     },
     {
@@ -329,7 +333,7 @@
       "public_path": "moon_ui::MoonKbd",
       "upstream_ref": null,
       "fork_reason": "MoonBot dense keyboard shortcut styling",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["kbd.keystroke_format", "gallery.visual_coverage"]
     },
     {
       "concept": "label",
@@ -353,22 +357,24 @@
     },
     {
       "concept": "list",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge List/ListState",
       "theme_source": "MoonTheme bridge through MoonList facade",
       "public_path": "moon_ui::MoonList",
       "upstream_ref": "Longbridge::list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon separator/list styling hook lives in base list; Longbridge list state and delegate behavior remain source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon separator/list styling hook lives in base list; Longbridge list state and delegate behavior remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
     },
     {
       "concept": "popover",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Popover",
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonPopover",
       "upstream_ref": "Longbridge::popover@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon placement/style hook lives in base popover; Longbridge popover lifecycle remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon placement/style hook lives in base popover; Longbridge popover lifecycle remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["popover.open_close_lifecycle", "gallery.visual_coverage"]
     },
     {
@@ -389,7 +395,7 @@
       "public_path": "moon_ui::MoonRating",
       "upstream_ref": "Longbridge::rating@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": "Longbridge rating icon rendering was not visually reliable in the Moon terminal palette",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["rating.click_behavior", "gallery.visual_coverage"]
     },
     {
       "concept": "preset_strip",
@@ -423,12 +429,13 @@
     },
     {
       "concept": "select",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Select",
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonSelect",
       "upstream_ref": "Longbridge::select@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon trigger variant/style hook lives in base select; Longbridge select state remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon trigger variant/style hook lives in base select; Longbridge select state remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["select.open_select_lifecycle", "gallery.visual_coverage"]
     },
     {
@@ -443,12 +450,13 @@
     },
     {
       "concept": "settings",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Settings/SettingPage/SettingGroup/SettingItem",
       "theme_source": "MoonTheme bridge through MoonSettings facade",
       "public_path": "moon_ui::MoonSettings",
       "upstream_ref": "Longbridge::setting@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon field style hooks live in base settings fields; Longbridge typed settings behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon field style hooks live in base settings fields; Longbridge typed settings behavior remains source-owned",
+      "donor_drift_budget": 2,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -479,16 +487,17 @@
       "public_path": "moon_ui::MoonSkeleton",
       "upstream_ref": null,
       "fork_reason": "MoonBot loading placeholder styling",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["skeleton.longbridge_capabilities", "gallery.visual_coverage"]
     },
     {
       "concept": "slider",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Slider",
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonSlider",
       "upstream_ref": "Longbridge::slider@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon id and diffused visual hooks live in base slider; Longbridge slider state remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon id and diffused visual hooks live in base slider; Longbridge slider state remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["slider.diffused_visual_state", "gallery.visual_coverage"]
     },
     {
@@ -509,26 +518,28 @@
       "public_path": "moon_ui::MoonStepper",
       "upstream_ref": null,
       "fork_reason": "MoonBot compact numeric [-] value [+] control",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["stepper.value_behavior", "gallery.visual_coverage"]
     },
     {
       "concept": "progress",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Progress",
       "theme_source": "MoonTheme tokens through MoonProgress wrapper",
       "public_path": "moon_ui::MoonProgress",
       "upstream_ref": "Longbridge::progress@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon progress circle style hook shares the base progress module; Longbridge progress behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon progress circle style hook shares the base progress module; Longbridge progress behavior remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
     },
     {
       "concept": "progress_circle",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge ProgressCircle",
       "theme_source": "MoonTheme bridge through MoonProgressCircle wrapper",
       "public_path": "moon_ui::MoonProgressCircle",
       "upstream_ref": "Longbridge::progress::ProgressCircle@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon progress circle style hook lives in base progress module; Longbridge progress circle behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon progress circle style hook lives in base progress module; Longbridge progress circle behavior remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -539,16 +550,17 @@
       "public_path": "moon_ui::MoonRadio",
       "upstream_ref": null,
       "fork_reason": "MoonBot compact radio metrics and visual state",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["radio.click_behavior", "gallery.visual_coverage"]
     },
     {
       "concept": "resizable",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge ResizablePanelGroup/ResizablePanel",
       "theme_source": "MoonTheme bridge through resize handles",
       "public_path": "moon_ui::MoonResizablePanelGroup",
       "upstream_ref": "Longbridge::resizable@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon resize handle/panel style hooks live in base resizable files; Longbridge resize behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon resize handle/panel style hooks live in base resizable files; Longbridge resize behavior remains source-owned",
+      "donor_drift_budget": 2,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -613,12 +625,13 @@
     },
     {
       "concept": "text_area",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Input multiline mode",
       "theme_source": "MoonTheme tokens through Moon wrapper",
       "public_path": "moon_ui::MoonTextArea",
       "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: MoonTextArea shares the reviewed Moon input engine drift; Longbridge multiline input behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: MoonTextArea shares the reviewed Moon input engine drift; Longbridge multiline input behavior remains source-owned",
+      "donor_drift_budget": 16,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -629,7 +642,7 @@
       "public_path": "moon_ui::MoonToggle",
       "upstream_ref": null,
       "fork_reason": "MoonBot compact toggle metrics and visual state",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["toggle.click_behavior", "gallery.visual_coverage"]
     },
     {
       "concept": "switch",
@@ -693,22 +706,24 @@
     },
     {
       "concept": "dialog",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Dialog",
       "theme_source": "MoonTheme bridge through MoonDialog wrapper",
       "public_path": "moon_ui::MoonDialog",
       "upstream_ref": "Longbridge::dialog@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon dialog density/header/footer style hooks live in base dialog files; Longbridge dialog lifecycle remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon dialog density/header/footer style hooks live in base dialog files; Longbridge dialog lifecycle remains source-owned",
+      "donor_drift_budget": 5,
       "contracts": ["gallery.visual_coverage"]
     },
     {
       "concept": "menu",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge NativeMenu",
       "theme_source": "OS-native menu surface with Moon explicit facade",
       "public_path": "moon_ui::MoonNativeMenu",
       "upstream_ref": "Longbridge::native_menu@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon native-menu fallback/window ownership hooks live in base native menu; Longbridge native menu behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon native-menu fallback/window ownership hooks live in base native menu; Longbridge native menu behavior remains source-owned",
+      "donor_drift_budget": 3,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -723,12 +738,13 @@
     },
     {
       "concept": "tree",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Tree",
       "theme_source": "MoonTheme bridge through MoonTree facade",
       "public_path": "moon_ui::MoonTree",
       "upstream_ref": "Longbridge::tree@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed Mirror drift: Moon tree surface/style hook lives in base tree; Longbridge focus, selection, and expansion behavior remain source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon tree surface/style hook lives in base tree; Longbridge focus, selection, and expansion behavior remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
     },
     {
