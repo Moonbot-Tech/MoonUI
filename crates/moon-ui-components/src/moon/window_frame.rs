@@ -228,6 +228,10 @@ impl MoonWindowFrame {
         self.leading_inset
     }
 
+    pub fn header_height_value(&self) -> f32 {
+        self.header_h
+    }
+
     pub fn controls_width(&self) -> f32 {
         if !self.show_controls {
             return 0.0;
