@@ -261,13 +261,37 @@ fn push_hash(
     if !seen.insert(rel.clone()) {
         return Ok(());
     }
-    let bytes = fs::read(path).with_context(|| format!("read {}", path.display()))?;
+    let bytes =
+        canonical_source_bytes(fs::read(path).with_context(|| format!("read {}", path.display()))?);
     out.push(MirrorFileHash {
         path: rel,
         hash: fnv_hex(&bytes),
         bytes: bytes.len() as u64,
     });
     Ok(())
+}
+
+fn canonical_source_bytes(bytes: Vec<u8>) -> Vec<u8> {
+    if !bytes.contains(&b'\r') {
+        return bytes;
+    }
+
+    let mut normalized = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'\r' {
+            normalized.push(b'\n');
+            index += if bytes.get(index + 1) == Some(&b'\n') {
+                2
+            } else {
+                1
+            };
+        } else {
+            normalized.push(bytes[index]);
+            index += 1;
+        }
+    }
+    normalized
 }
 
 fn combined_hash(files: &[MirrorFileHash]) -> String {
@@ -430,5 +454,18 @@ fn print_human_report(report: &MirrorReport, failures: &[String]) {
         for failure in failures {
             println!("  - {failure}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::canonical_source_bytes;
+
+    #[test]
+    fn canonical_source_bytes_normalizes_windows_and_legacy_newlines() {
+        assert_eq!(
+            canonical_source_bytes(b"a\r\nb\rc\n".to_vec()),
+            b"a\nb\nc\n".to_vec()
+        );
     }
 }

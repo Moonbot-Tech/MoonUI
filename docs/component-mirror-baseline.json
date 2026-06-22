@@ -10,20 +10,20 @@
       "local_paths": [
         "accordion.rs"
       ],
-      "local_hash": "0818ff63bcd7eb86",
+      "local_hash": "0959c071a7517e17",
       "local_files": [
         {
           "path": "accordion.rs",
-          "hash": "5f849983e2d979a6",
-          "bytes": 11011
+          "hash": "5ce3d89f1ee563e9",
+          "bytes": 10700
         }
       ],
-      "donor_hash": "0818ff63bcd7eb86",
+      "donor_hash": "0959c071a7517e17",
       "donor_files": [
         {
           "path": "accordion.rs",
-          "hash": "5f849983e2d979a6",
-          "bytes": 11011
+          "hash": "5ce3d89f1ee563e9",
+          "bytes": 10700
         }
       ],
       "donor_changed_files": []
@@ -36,20 +36,20 @@
       "local_paths": [
         "alert.rs"
       ],
-      "local_hash": "405b07a85599e764",
+      "local_hash": "db75ba340d185353",
       "local_files": [
         {
           "path": "alert.rs",
-          "hash": "8e92b2b19a21b817",
-          "bytes": 8713
+          "hash": "d1f643ad81e274c7",
+          "bytes": 8459
         }
       ],
-      "donor_hash": "405b07a85599e764",
+      "donor_hash": "db75ba340d185353",
       "donor_files": [
         {
           "path": "alert.rs",
-          "hash": "8e92b2b19a21b817",
-          "bytes": 8713
+          "hash": "d1f643ad81e274c7",
+          "bytes": 8459
         }
       ],
       "donor_changed_files": []
@@ -62,7 +62,7 @@
       "local_paths": [
         "button"
       ],
-      "local_hash": "7cc17787e57ac07b",
+      "local_hash": "25fce1f7b94906bf",
       "local_files": [
         {
           "path": "button/button.rs",
@@ -71,13 +71,13 @@
         },
         {
           "path": "button/button_group.rs",
-          "hash": "79f119361bc033de",
-          "bytes": 10486
+          "hash": "aa51c5590afeddac",
+          "bytes": 10192
         },
         {
           "path": "button/button_icon.rs",
-          "hash": "cade7a8ba115f492",
-          "bytes": 4914
+          "hash": "7cfba20abb73b238",
+          "bytes": 4746
         },
         {
           "path": "button/dropdown_button.rs",
@@ -86,46 +86,46 @@
         },
         {
           "path": "button/mod.rs",
-          "hash": "ccd515c986d6b0a6",
-          "bytes": 214
+          "hash": "8a3857805a58d411",
+          "bytes": 203
         },
         {
           "path": "button/toggle.rs",
-          "hash": "fad6513018d69eef",
-          "bytes": 13997
+          "hash": "3f19f769c5e3cc46",
+          "bytes": 13572
         }
       ],
-      "donor_hash": "61e2590a7c7d388f",
+      "donor_hash": "42c0ba3e90f9fe4c",
       "donor_files": [
         {
           "path": "button/button.rs",
-          "hash": "a77a316e8d02be9f",
-          "bytes": 35943
+          "hash": "e41a0f555aa5d406",
+          "bytes": 34888
         },
         {
           "path": "button/button_group.rs",
-          "hash": "79f119361bc033de",
-          "bytes": 10486
+          "hash": "aa51c5590afeddac",
+          "bytes": 10192
         },
         {
           "path": "button/button_icon.rs",
-          "hash": "cade7a8ba115f492",
-          "bytes": 4914
+          "hash": "7cfba20abb73b238",
+          "bytes": 4746
         },
         {
           "path": "button/dropdown_button.rs",
-          "hash": "efd354387cf64fb3",
-          "bytes": 8048
+          "hash": "ddf97c0d6a1f7277",
+          "bytes": 7798
         },
         {
           "path": "button/mod.rs",
-          "hash": "ccd515c986d6b0a6",
-          "bytes": 214
+          "hash": "8a3857805a58d411",
+          "bytes": 203
         },
         {
           "path": "button/toggle.rs",
-          "hash": "fad6513018d69eef",
-          "bytes": 13997
+          "hash": "3f19f769c5e3cc46",
+          "bytes": 13572
         }
       ],
       "donor_changed_files": [
@@ -141,20 +141,20 @@
       "local_paths": [
         "time/calendar.rs"
       ],
-      "local_hash": "424b876518dde75b",
+      "local_hash": "cbbde77dcd5f0b76",
       "local_files": [
         {
           "path": "time/calendar.rs",
-          "hash": "9e1364d60420fdc9",
-          "bytes": 34779
+          "hash": "c1eb7c19d501c575",
+          "bytes": 33765
         }
       ],
-      "donor_hash": "424b876518dde75b",
+      "donor_hash": "cbbde77dcd5f0b76",
       "donor_files": [
         {
           "path": "time/calendar.rs",
-          "hash": "9e1364d60420fdc9",
-          "bytes": 34779
+          "hash": "c1eb7c19d501c575",
+          "bytes": 33765
         }
       ],
       "donor_changed_files": []
@@ -175,12 +175,12 @@
           "bytes": 14709
         }
       ],
-      "donor_hash": "ab91ecef3fcb9007",
+      "donor_hash": "c665cd46d9f5aa2a",
       "donor_files": [
         {
           "path": "checkbox.rs",
-          "hash": "cbee4762b51bdb98",
-          "bytes": 10937
+          "hash": "e32b5425e590f8d6",
+          "bytes": 10617
         }
       ],
       "donor_changed_files": [
@@ -195,20 +195,20 @@
       "local_paths": [
         "color_picker.rs"
       ],
-      "local_hash": "d17b952b2932453b",
+      "local_hash": "3a5e2204fb35e7b8",
       "local_files": [
         {
           "path": "color_picker.rs",
-          "hash": "c02e79556c585138",
-          "bytes": 29415
+          "hash": "08b30074edbae829",
+          "bytes": 28564
         }
       ],
-      "donor_hash": "d17b952b2932453b",
+      "donor_hash": "3a5e2204fb35e7b8",
       "donor_files": [
         {
           "path": "color_picker.rs",
-          "hash": "c02e79556c585138",
-          "bytes": 29415
+          "hash": "08b30074edbae829",
+          "bytes": 28564
         }
       ],
       "donor_changed_files": []
@@ -221,20 +221,20 @@
       "local_paths": [
         "combobox.rs"
       ],
-      "local_hash": "50fe2ba4a6a790cd",
+      "local_hash": "2324438aee108e17",
       "local_files": [
         {
           "path": "combobox.rs",
-          "hash": "426caf2a1ba46acf",
-          "bytes": 46767
+          "hash": "7179a2db78cb1537",
+          "bytes": 45425
         }
       ],
-      "donor_hash": "50fe2ba4a6a790cd",
+      "donor_hash": "2324438aee108e17",
       "donor_files": [
         {
           "path": "combobox.rs",
-          "hash": "426caf2a1ba46acf",
-          "bytes": 46767
+          "hash": "7179a2db78cb1537",
+          "bytes": 45425
         }
       ],
       "donor_changed_files": []
@@ -247,20 +247,20 @@
       "local_paths": [
         "time/date_picker.rs"
       ],
-      "local_hash": "1fe225f6d5114a6a",
+      "local_hash": "402b40aff9fb4555",
       "local_files": [
         {
           "path": "time/date_picker.rs",
-          "hash": "90f8bfc262a89d6b",
-          "bytes": 19293
+          "hash": "75deaa97b7c01269",
+          "bytes": 18777
         }
       ],
-      "donor_hash": "1fe225f6d5114a6a",
+      "donor_hash": "402b40aff9fb4555",
       "donor_files": [
         {
           "path": "time/date_picker.rs",
-          "hash": "90f8bfc262a89d6b",
-          "bytes": 19293
+          "hash": "75deaa97b7c01269",
+          "bytes": 18777
         }
       ],
       "donor_changed_files": []
@@ -273,20 +273,20 @@
       "local_paths": [
         "description_list.rs"
       ],
-      "local_hash": "2c353e7341cd0816",
+      "local_hash": "3b12f26580c5950e",
       "local_files": [
         {
           "path": "description_list.rs",
-          "hash": "96c148bfccda1d5f",
-          "bytes": 13123
+          "hash": "3c29497d08db6f83",
+          "bytes": 12739
         }
       ],
-      "donor_hash": "2c353e7341cd0816",
+      "donor_hash": "3b12f26580c5950e",
       "donor_files": [
         {
           "path": "description_list.rs",
-          "hash": "96c148bfccda1d5f",
-          "bytes": 13123
+          "hash": "3c29497d08db6f83",
+          "bytes": 12739
         }
       ],
       "donor_changed_files": []
@@ -299,12 +299,12 @@
       "local_paths": [
         "dialog"
       ],
-      "local_hash": "5b366f8562d57d9d",
+      "local_hash": "6edf5ce3633f7631",
       "local_files": [
         {
           "path": "dialog/alert_dialog.rs",
-          "hash": "5aebe27f473108fa",
-          "bytes": 13627
+          "hash": "c3e9c93f3971f643",
+          "bytes": 13260
         },
         {
           "path": "dialog/content.rs",
@@ -318,8 +318,8 @@
         },
         {
           "path": "dialog/dialog.rs",
-          "hash": "c015a6afaa62bfa9",
-          "bytes": 27429
+          "hash": "a5af807a6065db87",
+          "bytes": 26761
         },
         {
           "path": "dialog/footer.rs",
@@ -333,56 +333,56 @@
         },
         {
           "path": "dialog/mod.rs",
-          "hash": "9037c87a16b9fc64",
-          "bytes": 304
+          "hash": "a82c82e83e0020b3",
+          "bytes": 289
         },
         {
           "path": "dialog/title.rs",
-          "hash": "979bb031c24a940c",
-          "bytes": 1136
+          "hash": "e5c4428c1c428292",
+          "bytes": 1090
         }
       ],
-      "donor_hash": "112b00008ab254d7",
+      "donor_hash": "33e795996da4ab80",
       "donor_files": [
         {
           "path": "dialog/alert_dialog.rs",
-          "hash": "5aebe27f473108fa",
-          "bytes": 13627
+          "hash": "c3e9c93f3971f643",
+          "bytes": 13260
         },
         {
           "path": "dialog/content.rs",
-          "hash": "4e16bdd92f141801",
-          "bytes": 1059
+          "hash": "187309b5862fa32a",
+          "bytes": 1018
         },
         {
           "path": "dialog/description.rs",
-          "hash": "090fbd7b526687df",
-          "bytes": 1334
+          "hash": "d76207a46d1d9baf",
+          "bytes": 1284
         },
         {
           "path": "dialog/dialog.rs",
-          "hash": "67399b9c9d25ba77",
-          "bytes": 27440
+          "hash": "ef0f11ee2707765f",
+          "bytes": 26768
         },
         {
           "path": "dialog/footer.rs",
-          "hash": "9610af320bee2d1d",
-          "bytes": 2994
+          "hash": "650fe3e2386fe702",
+          "bytes": 2875
         },
         {
           "path": "dialog/header.rs",
-          "hash": "a41bc905e6b51cc5",
-          "bytes": 1191
+          "hash": "24dffdf1a4646eeb",
+          "bytes": 1147
         },
         {
           "path": "dialog/mod.rs",
-          "hash": "9037c87a16b9fc64",
-          "bytes": 304
+          "hash": "a82c82e83e0020b3",
+          "bytes": 289
         },
         {
           "path": "dialog/title.rs",
-          "hash": "979bb031c24a940c",
-          "bytes": 1136
+          "hash": "e5c4428c1c428292",
+          "bytes": 1090
         }
       ],
       "donor_changed_files": [
@@ -401,20 +401,20 @@
       "local_paths": [
         "hover_card.rs"
       ],
-      "local_hash": "49dc822b5c2da61e",
+      "local_hash": "b6d35f85456fbf1b",
       "local_files": [
         {
           "path": "hover_card.rs",
-          "hash": "659aca563022cc4c",
-          "bytes": 10425
+          "hash": "099b6de8fdea16d4",
+          "bytes": 10099
         }
       ],
-      "donor_hash": "d60118df47e22236",
+      "donor_hash": "3702d3d7567d3c4b",
       "donor_files": [
         {
           "path": "hover_card.rs",
-          "hash": "18a0e28e684866f6",
-          "bytes": 10409
+          "hash": "87c2fc05c7120243",
+          "bytes": 10084
         }
       ],
       "donor_changed_files": [
@@ -429,7 +429,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "77a8b81881721016",
+      "local_hash": "65d74102a3afe7ff",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -438,8 +438,8 @@
         },
         {
           "path": "input/change.rs",
-          "hash": "acab7cd61a3135e0",
-          "bytes": 916
+          "hash": "7e2d5e5fbfcd4ddb",
+          "bytes": 877
         },
         {
           "path": "input/clear_button.rs",
@@ -448,13 +448,13 @@
         },
         {
           "path": "input/cursor.rs",
-          "hash": "1b08c633d4690d05",
-          "bytes": 1657
+          "hash": "231c75ac5c0c141a",
+          "bytes": 1588
         },
         {
           "path": "input/display_map/README.md",
-          "hash": "60e9f63f10a25155",
-          "bytes": 1769
+          "hash": "e0a4e886257ed39d",
+          "bytes": 1723
         },
         {
           "path": "input/display_map/display_map.rs",
@@ -463,18 +463,18 @@
         },
         {
           "path": "input/display_map/fold_map.rs",
-          "hash": "0d26ab572e9e5e86",
-          "bytes": 12714
+          "hash": "4791754f14799551",
+          "bytes": 12371
         },
         {
           "path": "input/display_map/folding.rs",
-          "hash": "f73d3b68c0357988",
-          "bytes": 5638
+          "hash": "efc85b86510b8a8d",
+          "bytes": 5457
         },
         {
           "path": "input/display_map/mod.rs",
-          "hash": "55e0ae2e3cc54210",
-          "bytes": 1971
+          "hash": "841bd57f5c33e6a5",
+          "bytes": 1902
         },
         {
           "path": "input/display_map/text_wrapper.rs",
@@ -483,18 +483,18 @@
         },
         {
           "path": "input/display_map/wrap_map.rs",
-          "hash": "b143ce888769ee24",
-          "bytes": 7852
+          "hash": "d8d5f91f3d338a96",
+          "bytes": 7630
         },
         {
           "path": "input/element.rs",
-          "hash": "16e487aa9173ee45",
-          "bytes": 98833
+          "hash": "511c756aa3009759",
+          "bytes": 96171
         },
         {
           "path": "input/indent.rs",
-          "hash": "87ce1a959d4f8039",
-          "bytes": 13834
+          "hash": "6e9c5f4f3fe412c1",
+          "bytes": 13402
         },
         {
           "path": "input/input.rs",
@@ -503,18 +503,18 @@
         },
         {
           "path": "input/lsp/code_actions.rs",
-          "hash": "66ebc66318abf24a",
-          "bytes": 4416
+          "hash": "5deb9411a5d82592",
+          "bytes": 4276
         },
         {
           "path": "input/lsp/completions.rs",
-          "hash": "0cc23009fab18817",
-          "bytes": 10634
+          "hash": "c1462bd24f48b141",
+          "bytes": 10324
         },
         {
           "path": "input/lsp/definitions.rs",
-          "hash": "51e53ed1d998a324",
-          "bytes": 6918
+          "hash": "c89d7d4cd118cec3",
+          "bytes": 6685
         },
         {
           "path": "input/lsp/document_colors.rs",
@@ -528,8 +528,8 @@
         },
         {
           "path": "input/lsp/mod.rs",
-          "hash": "9efc7d2450968cc8",
-          "bytes": 5586
+          "hash": "3498cc7283db6d11",
+          "bytes": 5413
         },
         {
           "path": "input/lsp/semantic_tokens.rs",
@@ -538,43 +538,43 @@
         },
         {
           "path": "input/mask_pattern.rs",
-          "hash": "e8b67c4e98741592",
-          "bytes": 25091
+          "hash": "08592e04821f5a5a",
+          "bytes": 24367
         },
         {
           "path": "input/mod.rs",
-          "hash": "0fd608057a9db01f",
-          "bytes": 922
+          "hash": "8c53c91d41b130d1",
+          "bytes": 884
         },
         {
           "path": "input/mode.rs",
-          "hash": "f17cede60ea60f9d",
-          "bytes": 14897
+          "hash": "195a52e72924089f",
+          "bytes": 14431
         },
         {
           "path": "input/movement.rs",
-          "hash": "f171d2a3dfd677ca",
-          "bytes": 9426
+          "hash": "f3ae8c8bdb484770",
+          "bytes": 9152
         },
         {
           "path": "input/number_input.rs",
-          "hash": "86b865d1a1d24e62",
-          "bytes": 16285
+          "hash": "9adbb67bd30a203c",
+          "bytes": 15815
         },
         {
           "path": "input/otp_input.rs",
-          "hash": "d6d6f91fe8b48785",
-          "bytes": 12986
+          "hash": "e1167b3a45741070",
+          "bytes": 12607
         },
         {
           "path": "input/popovers/code_action_menu.rs",
-          "hash": "60de6e9ce5e8c236",
-          "bytes": 9817
+          "hash": "5758e26153bf8aa1",
+          "bytes": 9480
         },
         {
           "path": "input/popovers/completion_menu.rs",
-          "hash": "06806ce046d0d060",
-          "bytes": 15212
+          "hash": "040d5b8e3cb38d6b",
+          "bytes": 14755
         },
         {
           "path": "input/popovers/diagnostic_popover.rs",
@@ -583,8 +583,8 @@
         },
         {
           "path": "input/popovers/hover_popover.rs",
-          "hash": "e6586ea75d4512d9",
-          "bytes": 9106
+          "hash": "63639b9e8cf89fb5",
+          "bytes": 8814
         },
         {
           "path": "input/popovers/mod.rs",
@@ -593,8 +593,8 @@
         },
         {
           "path": "input/rope_ext.rs",
-          "hash": "0a938e3f8343d733",
-          "bytes": 25090
+          "hash": "ded3206a4f302ac3",
+          "bytes": 24366
         },
         {
           "path": "input/search.rs",
@@ -603,196 +603,196 @@
         },
         {
           "path": "input/selection.rs",
-          "hash": "344cf9d3fdd19f8a",
-          "bytes": 4567
+          "hash": "d69f0ca52df4bab3",
+          "bytes": 4426
         },
         {
           "path": "input/state.rs",
-          "hash": "448808cf0a56cf83",
-          "bytes": 135316
+          "hash": "3e9dfc1007034e55",
+          "bytes": 131678
         }
       ],
-      "donor_hash": "ce28b7730707df2e",
+      "donor_hash": "018ee239acbf3f7c",
       "donor_files": [
         {
           "path": "input/blink_cursor.rs",
-          "hash": "41677eb1082ce983",
-          "bytes": 2761
+          "hash": "dbf922f0d86bca64",
+          "bytes": 2666
         },
         {
           "path": "input/change.rs",
-          "hash": "acab7cd61a3135e0",
-          "bytes": 916
+          "hash": "7e2d5e5fbfcd4ddb",
+          "bytes": 877
         },
         {
           "path": "input/clear_button.rs",
-          "hash": "0992882adf8ef3f1",
-          "bytes": 393
+          "hash": "8742aee954263ee5",
+          "bytes": 377
         },
         {
           "path": "input/cursor.rs",
-          "hash": "1b08c633d4690d05",
-          "bytes": 1657
+          "hash": "231c75ac5c0c141a",
+          "bytes": 1588
         },
         {
           "path": "input/display_map/README.md",
-          "hash": "60e9f63f10a25155",
-          "bytes": 1769
+          "hash": "e0a4e886257ed39d",
+          "bytes": 1723
         },
         {
           "path": "input/display_map/display_map.rs",
-          "hash": "13247dc7d3360fbb",
-          "bytes": 12139
+          "hash": "07be87150f3409fb",
+          "bytes": 11803
         },
         {
           "path": "input/display_map/fold_map.rs",
-          "hash": "0d26ab572e9e5e86",
-          "bytes": 12714
+          "hash": "4791754f14799551",
+          "bytes": 12371
         },
         {
           "path": "input/display_map/folding.rs",
-          "hash": "f73d3b68c0357988",
-          "bytes": 5638
+          "hash": "efc85b86510b8a8d",
+          "bytes": 5457
         },
         {
           "path": "input/display_map/mod.rs",
-          "hash": "55e0ae2e3cc54210",
-          "bytes": 1971
+          "hash": "841bd57f5c33e6a5",
+          "bytes": 1902
         },
         {
           "path": "input/display_map/text_wrapper.rs",
-          "hash": "1dd85f44435cf7f6",
-          "bytes": 32695
+          "hash": "7551c518a195ea5a",
+          "bytes": 31765
         },
         {
           "path": "input/display_map/wrap_map.rs",
-          "hash": "b143ce888769ee24",
-          "bytes": 7852
+          "hash": "d8d5f91f3d338a96",
+          "bytes": 7630
         },
         {
           "path": "input/element.rs",
-          "hash": "e714a579c087be5f",
-          "bytes": 97940
+          "hash": "6c8a62069feab4a7",
+          "bytes": 95242
         },
         {
           "path": "input/indent.rs",
-          "hash": "87ce1a959d4f8039",
-          "bytes": 13834
+          "hash": "6e9c5f4f3fe412c1",
+          "bytes": 13402
         },
         {
           "path": "input/input.rs",
-          "hash": "f1e1892ab55cff0d",
-          "bytes": 17151
+          "hash": "ea074a74b693c9e1",
+          "bytes": 16719
         },
         {
           "path": "input/lsp/code_actions.rs",
-          "hash": "66ebc66318abf24a",
-          "bytes": 4416
+          "hash": "5deb9411a5d82592",
+          "bytes": 4276
         },
         {
           "path": "input/lsp/completions.rs",
-          "hash": "0cc23009fab18817",
-          "bytes": 10634
+          "hash": "c1462bd24f48b141",
+          "bytes": 10324
         },
         {
           "path": "input/lsp/definitions.rs",
-          "hash": "51e53ed1d998a324",
-          "bytes": 6918
+          "hash": "c89d7d4cd118cec3",
+          "bytes": 6685
         },
         {
           "path": "input/lsp/document_colors.rs",
-          "hash": "9772b5ae791c3f03",
-          "bytes": 3488
+          "hash": "73b19506b547d805",
+          "bytes": 3386
         },
         {
           "path": "input/lsp/hover.rs",
-          "hash": "ff6e6dae3d870565",
-          "bytes": 2566
+          "hash": "8682b5e01f88285f",
+          "bytes": 2488
         },
         {
           "path": "input/lsp/mod.rs",
-          "hash": "9efc7d2450968cc8",
-          "bytes": 5586
+          "hash": "3498cc7283db6d11",
+          "bytes": 5413
         },
         {
           "path": "input/lsp/semantic_tokens.rs",
-          "hash": "5297d82f49663d39",
-          "bytes": 12663
+          "hash": "fdd19081597ede10",
+          "bytes": 12336
         },
         {
           "path": "input/mask_pattern.rs",
-          "hash": "b6a3b9e6171ed76e",
-          "bytes": 21883
+          "hash": "8d99bca560f6a23b",
+          "bytes": 21246
         },
         {
           "path": "input/mod.rs",
-          "hash": "73c3c2e442c73a22",
-          "bytes": 910
+          "hash": "b50ebb876f9cb19e",
+          "bytes": 872
         },
         {
           "path": "input/mode.rs",
-          "hash": "f17cede60ea60f9d",
-          "bytes": 14897
+          "hash": "195a52e72924089f",
+          "bytes": 14431
         },
         {
           "path": "input/movement.rs",
-          "hash": "f171d2a3dfd677ca",
-          "bytes": 9426
+          "hash": "f3ae8c8bdb484770",
+          "bytes": 9152
         },
         {
           "path": "input/number_input.rs",
-          "hash": "fca7d2e7bd688e00",
-          "bytes": 7587
+          "hash": "f2a6d4510af8cbbe",
+          "bytes": 7359
         },
         {
           "path": "input/otp_input.rs",
-          "hash": "d6d6f91fe8b48785",
-          "bytes": 12986
+          "hash": "e1167b3a45741070",
+          "bytes": 12607
         },
         {
           "path": "input/popovers/code_action_menu.rs",
-          "hash": "60de6e9ce5e8c236",
-          "bytes": 9817
+          "hash": "5758e26153bf8aa1",
+          "bytes": 9480
         },
         {
           "path": "input/popovers/completion_menu.rs",
-          "hash": "06806ce046d0d060",
-          "bytes": 15212
+          "hash": "040d5b8e3cb38d6b",
+          "bytes": 14755
         },
         {
           "path": "input/popovers/diagnostic_popover.rs",
-          "hash": "fb205e9c515136fd",
-          "bytes": 2489
+          "hash": "1d9405cb9db0ba22",
+          "bytes": 2394
         },
         {
           "path": "input/popovers/hover_popover.rs",
-          "hash": "e6586ea75d4512d9",
-          "bytes": 9106
+          "hash": "63639b9e8cf89fb5",
+          "bytes": 8814
         },
         {
           "path": "input/popovers/mod.rs",
-          "hash": "6c3835c3972aa562",
-          "bytes": 2167
+          "hash": "8d33a83b82e1e508",
+          "bytes": 2091
         },
         {
           "path": "input/rope_ext.rs",
-          "hash": "0a938e3f8343d733",
-          "bytes": 25090
+          "hash": "ded3206a4f302ac3",
+          "bytes": 24366
         },
         {
           "path": "input/search.rs",
-          "hash": "035d9707c84f1f69",
-          "bytes": 26417
+          "hash": "93cb73673024700c",
+          "bytes": 25660
         },
         {
           "path": "input/selection.rs",
-          "hash": "344cf9d3fdd19f8a",
-          "bytes": 4567
+          "hash": "d69f0ca52df4bab3",
+          "bytes": 4426
         },
         {
           "path": "input/state.rs",
-          "hash": "b1d9d07a55b95fd8",
-          "bytes": 112632
+          "hash": "ae8eecfe2ef6f259",
+          "bytes": 109561
         }
       ],
       "donor_changed_files": [
@@ -822,37 +822,37 @@
       "local_paths": [
         "list"
       ],
-      "local_hash": "7f9facdc80503eb8",
+      "local_hash": "5d70006254d533d6",
       "local_files": [
         {
           "path": "list/cache.rs",
-          "hash": "54c6d9593f0fc9c2",
-          "bytes": 12284
+          "hash": "54ed8ade3b1d69aa",
+          "bytes": 11900
         },
         {
           "path": "list/delegate.rs",
-          "hash": "be7747eae0c15172",
-          "bytes": 5388
+          "hash": "bbb28ccc5c2a3277",
+          "bytes": 5217
         },
         {
           "path": "list/list.rs",
-          "hash": "f9a00c5ef35e6b0c",
-          "bytes": 26520
+          "hash": "2bd926b2ebbe2a75",
+          "bytes": 25759
         },
         {
           "path": "list/list_item.rs",
-          "hash": "f157c2f458af2d96",
-          "bytes": 8500
+          "hash": "6fbf94d3fdfd0512",
+          "bytes": 8246
         },
         {
           "path": "list/loading.rs",
-          "hash": "34ff6b03469c2834",
-          "bytes": 961
+          "hash": "e71a8b676ba895e2",
+          "bytes": 929
         },
         {
           "path": "list/mod.rs",
-          "hash": "08f8b1975bd19c55",
-          "bytes": 613
+          "hash": "11bc24a58d7b5eeb",
+          "bytes": 585
         },
         {
           "path": "list/separator_item.rs",
@@ -860,42 +860,42 @@
           "bytes": 1024
         }
       ],
-      "donor_hash": "91486bf6f9959f43",
+      "donor_hash": "4e6ce85fa6faa632",
       "donor_files": [
         {
           "path": "list/cache.rs",
-          "hash": "54c6d9593f0fc9c2",
-          "bytes": 12284
+          "hash": "54ed8ade3b1d69aa",
+          "bytes": 11900
         },
         {
           "path": "list/delegate.rs",
-          "hash": "be7747eae0c15172",
-          "bytes": 5388
+          "hash": "bbb28ccc5c2a3277",
+          "bytes": 5217
         },
         {
           "path": "list/list.rs",
-          "hash": "f9a00c5ef35e6b0c",
-          "bytes": 26520
+          "hash": "2bd926b2ebbe2a75",
+          "bytes": 25759
         },
         {
           "path": "list/list_item.rs",
-          "hash": "f157c2f458af2d96",
-          "bytes": 8500
+          "hash": "6fbf94d3fdfd0512",
+          "bytes": 8246
         },
         {
           "path": "list/loading.rs",
-          "hash": "34ff6b03469c2834",
-          "bytes": 961
+          "hash": "e71a8b676ba895e2",
+          "bytes": 929
         },
         {
           "path": "list/mod.rs",
-          "hash": "08f8b1975bd19c55",
-          "bytes": 613
+          "hash": "11bc24a58d7b5eeb",
+          "bytes": 585
         },
         {
           "path": "list/separator_item.rs",
-          "hash": "5d6511347bec6b2c",
-          "bytes": 1076
+          "hash": "b2034ee8fa6ace75",
+          "bytes": 1031
         }
       ],
       "donor_changed_files": [
@@ -910,7 +910,7 @@
       "local_paths": [
         "native_menu"
       ],
-      "local_hash": "220e727519aab7a7",
+      "local_hash": "d8df00f5803a0e99",
       "local_files": [
         {
           "path": "native_menu/fallback.rs",
@@ -919,13 +919,13 @@
         },
         {
           "path": "native_menu/macos.rs",
-          "hash": "23bb8960a123a8d7",
-          "bytes": 6413
+          "hash": "e3d981192ccf16c6",
+          "bytes": 6234
         },
         {
           "path": "native_menu/mod.rs",
-          "hash": "0bcc49687c27728d",
-          "bytes": 6597
+          "hash": "52ffde15e826453f",
+          "bytes": 6395
         },
         {
           "path": "native_menu/windows.rs",
@@ -933,27 +933,27 @@
           "bytes": 6183
         }
       ],
-      "donor_hash": "e023c04cb87a1ae6",
+      "donor_hash": "0d33f1edcda61625",
       "donor_files": [
         {
           "path": "native_menu/fallback.rs",
-          "hash": "84eb3a5ec69c31eb",
-          "bytes": 4473
+          "hash": "017ce04ea6210947",
+          "bytes": 4341
         },
         {
           "path": "native_menu/macos.rs",
-          "hash": "23bb8960a123a8d7",
-          "bytes": 6413
+          "hash": "e3d981192ccf16c6",
+          "bytes": 6234
         },
         {
           "path": "native_menu/mod.rs",
-          "hash": "88fe94d41368c9a7",
-          "bytes": 6028
+          "hash": "8ed14593c359cf85",
+          "bytes": 5846
         },
         {
           "path": "native_menu/windows.rs",
-          "hash": "1979590d34cef48d",
-          "bytes": 6332
+          "hash": "606a9b2be475a7a8",
+          "bytes": 6165
         }
       ],
       "donor_changed_files": [
@@ -970,20 +970,20 @@
       "local_paths": [
         "notification.rs"
       ],
-      "local_hash": "1cb2e6f8df5aaf66",
+      "local_hash": "bf00b5ef957591f6",
       "local_files": [
         {
           "path": "notification.rs",
-          "hash": "841fa288511e5b7a",
-          "bytes": 26373
+          "hash": "9d201cad9ed5f761",
+          "bytes": 25600
         }
       ],
-      "donor_hash": "1cb2e6f8df5aaf66",
+      "donor_hash": "bf00b5ef957591f6",
       "donor_files": [
         {
           "path": "notification.rs",
-          "hash": "841fa288511e5b7a",
-          "bytes": 26373
+          "hash": "9d201cad9ed5f761",
+          "bytes": 25600
         }
       ],
       "donor_changed_files": []
@@ -996,20 +996,20 @@
       "local_paths": [
         "pagination.rs"
       ],
-      "local_hash": "19393f9169246b8d",
+      "local_hash": "0ee619db05da9df8",
       "local_files": [
         {
           "path": "pagination.rs",
-          "hash": "f31ba745aa4ffb1e",
-          "bytes": 10826
+          "hash": "afb7879eda1da21c",
+          "bytes": 10480
         }
       ],
-      "donor_hash": "19393f9169246b8d",
+      "donor_hash": "0ee619db05da9df8",
       "donor_files": [
         {
           "path": "pagination.rs",
-          "hash": "f31ba745aa4ffb1e",
-          "bytes": 10826
+          "hash": "afb7879eda1da21c",
+          "bytes": 10480
         }
       ],
       "donor_changed_files": []
@@ -1030,12 +1030,12 @@
           "bytes": 19758
         }
       ],
-      "donor_hash": "06f87f7fbb343a9e",
+      "donor_hash": "da9409c2c18e2a14",
       "donor_files": [
         {
           "path": "popover.rs",
-          "hash": "c915aba7d658dbaf",
-          "bytes": 18682
+          "hash": "a4990d0138c2c274",
+          "bytes": 18151
         }
       ],
       "donor_changed_files": [
@@ -1050,17 +1050,17 @@
       "local_paths": [
         "progress"
       ],
-      "local_hash": "5241b422493371ab",
+      "local_hash": "79bc8c926375335a",
       "local_files": [
         {
           "path": "progress/mod.rs",
-          "hash": "8a29f376e6e3b62f",
-          "bytes": 1077
+          "hash": "44e4a310a558f4ab",
+          "bytes": 1039
         },
         {
           "path": "progress/progress.rs",
-          "hash": "54fb8e3a08df63ff",
-          "bytes": 5809
+          "hash": "e576030bca75de6c",
+          "bytes": 5648
         },
         {
           "path": "progress/progress_circle.rs",
@@ -1068,22 +1068,22 @@
           "bytes": 7709
         }
       ],
-      "donor_hash": "0d54530d88209feb",
+      "donor_hash": "6d7fc97784123343",
       "donor_files": [
         {
           "path": "progress/mod.rs",
-          "hash": "8a29f376e6e3b62f",
-          "bytes": 1077
+          "hash": "44e4a310a558f4ab",
+          "bytes": 1039
         },
         {
           "path": "progress/progress.rs",
-          "hash": "54fb8e3a08df63ff",
-          "bytes": 5809
+          "hash": "e576030bca75de6c",
+          "bytes": 5648
         },
         {
           "path": "progress/progress_circle.rs",
-          "hash": "7ac2d3e550a8a50f",
-          "bytes": 7944
+          "hash": "bc47a6a5841ebd36",
+          "bytes": 7721
         }
       ],
       "donor_changed_files": [
@@ -1098,17 +1098,17 @@
       "local_paths": [
         "progress"
       ],
-      "local_hash": "5241b422493371ab",
+      "local_hash": "79bc8c926375335a",
       "local_files": [
         {
           "path": "progress/mod.rs",
-          "hash": "8a29f376e6e3b62f",
-          "bytes": 1077
+          "hash": "44e4a310a558f4ab",
+          "bytes": 1039
         },
         {
           "path": "progress/progress.rs",
-          "hash": "54fb8e3a08df63ff",
-          "bytes": 5809
+          "hash": "e576030bca75de6c",
+          "bytes": 5648
         },
         {
           "path": "progress/progress_circle.rs",
@@ -1116,22 +1116,22 @@
           "bytes": 7709
         }
       ],
-      "donor_hash": "0d54530d88209feb",
+      "donor_hash": "6d7fc97784123343",
       "donor_files": [
         {
           "path": "progress/mod.rs",
-          "hash": "8a29f376e6e3b62f",
-          "bytes": 1077
+          "hash": "44e4a310a558f4ab",
+          "bytes": 1039
         },
         {
           "path": "progress/progress.rs",
-          "hash": "54fb8e3a08df63ff",
-          "bytes": 5809
+          "hash": "e576030bca75de6c",
+          "bytes": 5648
         },
         {
           "path": "progress/progress_circle.rs",
-          "hash": "7ac2d3e550a8a50f",
-          "bytes": 7944
+          "hash": "bc47a6a5841ebd36",
+          "bytes": 7721
         }
       ],
       "donor_changed_files": [
@@ -1146,17 +1146,17 @@
       "local_paths": [
         "resizable"
       ],
-      "local_hash": "c3c6baba5c5e5320",
+      "local_hash": "74a2039ca2f4a82a",
       "local_files": [
         {
           "path": "resizable/mod.rs",
-          "hash": "9c2f9adc9046cd81",
-          "bytes": 11014
+          "hash": "be27c2b7341a653d",
+          "bytes": 10680
         },
         {
           "path": "resizable/panel.rs",
-          "hash": "dd5fb00c3c44043f",
-          "bytes": 15599
+          "hash": "d2b5c3b75745910e",
+          "bytes": 15146
         },
         {
           "path": "resizable/resize_handle.rs",
@@ -1164,22 +1164,22 @@
           "bytes": 7057
         }
       ],
-      "donor_hash": "a592583f553603a0",
+      "donor_hash": "10921b00f6f59cfe",
       "donor_files": [
         {
           "path": "resizable/mod.rs",
-          "hash": "9c2f9adc9046cd81",
-          "bytes": 11014
+          "hash": "be27c2b7341a653d",
+          "bytes": 10680
         },
         {
           "path": "resizable/panel.rs",
-          "hash": "86890b1388e68fda",
-          "bytes": 15625
+          "hash": "508cf37c5fd0476e",
+          "bytes": 15169
         },
         {
           "path": "resizable/resize_handle.rs",
-          "hash": "a6f9617e0b5edf6e",
-          "bytes": 7277
+          "hash": "223f8a17cb02d750",
+          "bytes": 7057
         }
       ],
       "donor_changed_files": [
@@ -1203,12 +1203,12 @@
           "bytes": 31301
         }
       ],
-      "donor_hash": "81d5ecf842445cff",
+      "donor_hash": "245acdb36368c661",
       "donor_files": [
         {
           "path": "select.rs",
-          "hash": "b3d9bc34ff997cc9",
-          "bytes": 29535
+          "hash": "391c5f5df69f1f70",
+          "bytes": 28722
         }
       ],
       "donor_changed_files": [
@@ -1223,7 +1223,7 @@
       "local_paths": [
         "setting"
       ],
-      "local_hash": "a47c2caca8e5897d",
+      "local_hash": "f10cbf0d9e63f21c",
       "local_files": [
         {
           "path": "setting/fields/bool.rs",
@@ -1232,8 +1232,8 @@
         },
         {
           "path": "setting/fields/dropdown.rs",
-          "hash": "e65bbd77800297bb",
-          "bytes": 2991
+          "hash": "cca81a6786327b50",
+          "bytes": 2902
         },
         {
           "path": "setting/fields/element.rs",
@@ -1242,101 +1242,101 @@
         },
         {
           "path": "setting/fields/mod.rs",
-          "hash": "172fd049078a8a05",
-          "bytes": 12166
+          "hash": "c1a149c5cec690bd",
+          "bytes": 11778
         },
         {
           "path": "setting/fields/number.rs",
-          "hash": "f1ff8fa2c646bd88",
-          "bytes": 6510
+          "hash": "5755a9aa1491a3d1",
+          "bytes": 6339
         },
         {
           "path": "setting/fields/string.rs",
-          "hash": "539aa17757f879d4",
-          "bytes": 3077
+          "hash": "bb3faac1cd821602",
+          "bytes": 2975
         },
         {
           "path": "setting/group.rs",
-          "hash": "1ad0c2bf351a4fc4",
-          "bytes": 3714
+          "hash": "925053abb8e90a44",
+          "bytes": 3592
         },
         {
           "path": "setting/item.rs",
-          "hash": "d28e7cc98f510e4c",
-          "bytes": 12251
+          "hash": "678e49fa1cf207d2",
+          "bytes": 11925
         },
         {
           "path": "setting/mod.rs",
-          "hash": "85e7c5b54b45f768",
-          "bytes": 161
+          "hash": "2e7ae04b0af9cce3",
+          "bytes": 150
         },
         {
           "path": "setting/page.rs",
-          "hash": "a0c499986f7c2394",
-          "bytes": 7360
+          "hash": "5e961b936748b46e",
+          "bytes": 7150
         },
         {
           "path": "setting/settings.rs",
-          "hash": "5f46243d979af11a",
-          "bytes": 10759
+          "hash": "55d66cd4dec5bd9b",
+          "bytes": 10458
         }
       ],
-      "donor_hash": "ea80b64488ae1230",
+      "donor_hash": "08126486eae2201f",
       "donor_files": [
         {
           "path": "setting/fields/bool.rs",
-          "hash": "1ca2cd800e11cf12",
-          "bytes": 1768
+          "hash": "746947f8f3970713",
+          "bytes": 1709
         },
         {
           "path": "setting/fields/dropdown.rs",
-          "hash": "e65bbd77800297bb",
-          "bytes": 2991
+          "hash": "cca81a6786327b50",
+          "bytes": 2902
         },
         {
           "path": "setting/fields/element.rs",
-          "hash": "595c1a19055c9d3a",
-          "bytes": 2339
+          "hash": "c26a6bb52842c88a",
+          "bytes": 2247
         },
         {
           "path": "setting/fields/mod.rs",
-          "hash": "172fd049078a8a05",
-          "bytes": 12166
+          "hash": "c1a149c5cec690bd",
+          "bytes": 11778
         },
         {
           "path": "setting/fields/number.rs",
-          "hash": "f1ff8fa2c646bd88",
-          "bytes": 6510
+          "hash": "5755a9aa1491a3d1",
+          "bytes": 6339
         },
         {
           "path": "setting/fields/string.rs",
-          "hash": "539aa17757f879d4",
-          "bytes": 3077
+          "hash": "bb3faac1cd821602",
+          "bytes": 2975
         },
         {
           "path": "setting/group.rs",
-          "hash": "1ad0c2bf351a4fc4",
-          "bytes": 3714
+          "hash": "925053abb8e90a44",
+          "bytes": 3592
         },
         {
           "path": "setting/item.rs",
-          "hash": "d28e7cc98f510e4c",
-          "bytes": 12251
+          "hash": "678e49fa1cf207d2",
+          "bytes": 11925
         },
         {
           "path": "setting/mod.rs",
-          "hash": "85e7c5b54b45f768",
-          "bytes": 161
+          "hash": "2e7ae04b0af9cce3",
+          "bytes": 150
         },
         {
           "path": "setting/page.rs",
-          "hash": "a0c499986f7c2394",
-          "bytes": 7360
+          "hash": "5e961b936748b46e",
+          "bytes": 7150
         },
         {
           "path": "setting/settings.rs",
-          "hash": "5f46243d979af11a",
-          "bytes": 10759
+          "hash": "55d66cd4dec5bd9b",
+          "bytes": 10458
         }
       ],
       "donor_changed_files": [
@@ -1352,20 +1352,20 @@
       "local_paths": [
         "sheet.rs"
       ],
-      "local_hash": "933535db22900c74",
+      "local_hash": "9b87efdcf8f5ce63",
       "local_files": [
         {
           "path": "sheet.rs",
-          "hash": "966730aea2b98e74",
-          "bytes": 11843
+          "hash": "495073a4724c43cd",
+          "bytes": 11552
         }
       ],
-      "donor_hash": "933535db22900c74",
+      "donor_hash": "9b87efdcf8f5ce63",
       "donor_files": [
         {
           "path": "sheet.rs",
-          "hash": "966730aea2b98e74",
-          "bytes": 11843
+          "hash": "495073a4724c43cd",
+          "bytes": 11552
         }
       ],
       "donor_changed_files": []
@@ -1378,60 +1378,60 @@
       "local_paths": [
         "sidebar"
       ],
-      "local_hash": "a6bac0a64ce4cfe5",
+      "local_hash": "1b093a2a6db1a9b6",
       "local_files": [
         {
           "path": "sidebar/footer.rs",
-          "hash": "3647e3c67cf54885",
-          "bytes": 2265
+          "hash": "fa0b0ec6fb0d773b",
+          "bytes": 2177
         },
         {
           "path": "sidebar/group.rs",
-          "hash": "68f712d7d25b01fa",
-          "bytes": 2599
+          "hash": "770b4cd5166fb8d8",
+          "bytes": 2513
         },
         {
           "path": "sidebar/header.rs",
-          "hash": "6141b58a152c6de2",
-          "bytes": 2593
+          "hash": "66a794df2074704a",
+          "bytes": 2493
         },
         {
           "path": "sidebar/menu.rs",
-          "hash": "20e6c73b6cac219c",
-          "bytes": 13731
+          "hash": "789e54c0d7561f2d",
+          "bytes": 13346
         },
         {
           "path": "sidebar/mod.rs",
-          "hash": "1024324cdc1a4f4f",
-          "bytes": 25935
+          "hash": "f0337ffc40d90ad4",
+          "bytes": 25166
         }
       ],
-      "donor_hash": "a6bac0a64ce4cfe5",
+      "donor_hash": "1b093a2a6db1a9b6",
       "donor_files": [
         {
           "path": "sidebar/footer.rs",
-          "hash": "3647e3c67cf54885",
-          "bytes": 2265
+          "hash": "fa0b0ec6fb0d773b",
+          "bytes": 2177
         },
         {
           "path": "sidebar/group.rs",
-          "hash": "68f712d7d25b01fa",
-          "bytes": 2599
+          "hash": "770b4cd5166fb8d8",
+          "bytes": 2513
         },
         {
           "path": "sidebar/header.rs",
-          "hash": "6141b58a152c6de2",
-          "bytes": 2593
+          "hash": "66a794df2074704a",
+          "bytes": 2493
         },
         {
           "path": "sidebar/menu.rs",
-          "hash": "20e6c73b6cac219c",
-          "bytes": 13731
+          "hash": "789e54c0d7561f2d",
+          "bytes": 13346
         },
         {
           "path": "sidebar/mod.rs",
-          "hash": "1024324cdc1a4f4f",
-          "bytes": 25935
+          "hash": "f0337ffc40d90ad4",
+          "bytes": 25166
         }
       ],
       "donor_changed_files": []
@@ -1452,12 +1452,12 @@
           "bytes": 25724
         }
       ],
-      "donor_hash": "8c2333055cd5b576",
+      "donor_hash": "845f6d32d82ffd16",
       "donor_files": [
         {
           "path": "slider.rs",
-          "hash": "b706cf98268ad7c9",
-          "bytes": 24377
+          "hash": "7550533973e39372",
+          "bytes": 23678
         }
       ],
       "donor_changed_files": [
@@ -1472,20 +1472,20 @@
       "local_paths": [
         "switch.rs"
       ],
-      "local_hash": "f800f37bd19b4c5f",
+      "local_hash": "06e00f0198e5a60c",
       "local_files": [
         {
           "path": "switch.rs",
-          "hash": "bf98dee47ae48628",
-          "bytes": 8367
+          "hash": "a83d87c6b44e6d9a",
+          "bytes": 8145
         }
       ],
-      "donor_hash": "f800f37bd19b4c5f",
+      "donor_hash": "06e00f0198e5a60c",
       "donor_files": [
         {
           "path": "switch.rs",
-          "hash": "bf98dee47ae48628",
-          "bytes": 8367
+          "hash": "a83d87c6b44e6d9a",
+          "bytes": 8145
         }
       ],
       "donor_changed_files": []
@@ -1498,7 +1498,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "77a8b81881721016",
+      "local_hash": "65d74102a3afe7ff",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -1507,8 +1507,8 @@
         },
         {
           "path": "input/change.rs",
-          "hash": "acab7cd61a3135e0",
-          "bytes": 916
+          "hash": "7e2d5e5fbfcd4ddb",
+          "bytes": 877
         },
         {
           "path": "input/clear_button.rs",
@@ -1517,13 +1517,13 @@
         },
         {
           "path": "input/cursor.rs",
-          "hash": "1b08c633d4690d05",
-          "bytes": 1657
+          "hash": "231c75ac5c0c141a",
+          "bytes": 1588
         },
         {
           "path": "input/display_map/README.md",
-          "hash": "60e9f63f10a25155",
-          "bytes": 1769
+          "hash": "e0a4e886257ed39d",
+          "bytes": 1723
         },
         {
           "path": "input/display_map/display_map.rs",
@@ -1532,18 +1532,18 @@
         },
         {
           "path": "input/display_map/fold_map.rs",
-          "hash": "0d26ab572e9e5e86",
-          "bytes": 12714
+          "hash": "4791754f14799551",
+          "bytes": 12371
         },
         {
           "path": "input/display_map/folding.rs",
-          "hash": "f73d3b68c0357988",
-          "bytes": 5638
+          "hash": "efc85b86510b8a8d",
+          "bytes": 5457
         },
         {
           "path": "input/display_map/mod.rs",
-          "hash": "55e0ae2e3cc54210",
-          "bytes": 1971
+          "hash": "841bd57f5c33e6a5",
+          "bytes": 1902
         },
         {
           "path": "input/display_map/text_wrapper.rs",
@@ -1552,18 +1552,18 @@
         },
         {
           "path": "input/display_map/wrap_map.rs",
-          "hash": "b143ce888769ee24",
-          "bytes": 7852
+          "hash": "d8d5f91f3d338a96",
+          "bytes": 7630
         },
         {
           "path": "input/element.rs",
-          "hash": "16e487aa9173ee45",
-          "bytes": 98833
+          "hash": "511c756aa3009759",
+          "bytes": 96171
         },
         {
           "path": "input/indent.rs",
-          "hash": "87ce1a959d4f8039",
-          "bytes": 13834
+          "hash": "6e9c5f4f3fe412c1",
+          "bytes": 13402
         },
         {
           "path": "input/input.rs",
@@ -1572,18 +1572,18 @@
         },
         {
           "path": "input/lsp/code_actions.rs",
-          "hash": "66ebc66318abf24a",
-          "bytes": 4416
+          "hash": "5deb9411a5d82592",
+          "bytes": 4276
         },
         {
           "path": "input/lsp/completions.rs",
-          "hash": "0cc23009fab18817",
-          "bytes": 10634
+          "hash": "c1462bd24f48b141",
+          "bytes": 10324
         },
         {
           "path": "input/lsp/definitions.rs",
-          "hash": "51e53ed1d998a324",
-          "bytes": 6918
+          "hash": "c89d7d4cd118cec3",
+          "bytes": 6685
         },
         {
           "path": "input/lsp/document_colors.rs",
@@ -1597,8 +1597,8 @@
         },
         {
           "path": "input/lsp/mod.rs",
-          "hash": "9efc7d2450968cc8",
-          "bytes": 5586
+          "hash": "3498cc7283db6d11",
+          "bytes": 5413
         },
         {
           "path": "input/lsp/semantic_tokens.rs",
@@ -1607,43 +1607,43 @@
         },
         {
           "path": "input/mask_pattern.rs",
-          "hash": "e8b67c4e98741592",
-          "bytes": 25091
+          "hash": "08592e04821f5a5a",
+          "bytes": 24367
         },
         {
           "path": "input/mod.rs",
-          "hash": "0fd608057a9db01f",
-          "bytes": 922
+          "hash": "8c53c91d41b130d1",
+          "bytes": 884
         },
         {
           "path": "input/mode.rs",
-          "hash": "f17cede60ea60f9d",
-          "bytes": 14897
+          "hash": "195a52e72924089f",
+          "bytes": 14431
         },
         {
           "path": "input/movement.rs",
-          "hash": "f171d2a3dfd677ca",
-          "bytes": 9426
+          "hash": "f3ae8c8bdb484770",
+          "bytes": 9152
         },
         {
           "path": "input/number_input.rs",
-          "hash": "86b865d1a1d24e62",
-          "bytes": 16285
+          "hash": "9adbb67bd30a203c",
+          "bytes": 15815
         },
         {
           "path": "input/otp_input.rs",
-          "hash": "d6d6f91fe8b48785",
-          "bytes": 12986
+          "hash": "e1167b3a45741070",
+          "bytes": 12607
         },
         {
           "path": "input/popovers/code_action_menu.rs",
-          "hash": "60de6e9ce5e8c236",
-          "bytes": 9817
+          "hash": "5758e26153bf8aa1",
+          "bytes": 9480
         },
         {
           "path": "input/popovers/completion_menu.rs",
-          "hash": "06806ce046d0d060",
-          "bytes": 15212
+          "hash": "040d5b8e3cb38d6b",
+          "bytes": 14755
         },
         {
           "path": "input/popovers/diagnostic_popover.rs",
@@ -1652,8 +1652,8 @@
         },
         {
           "path": "input/popovers/hover_popover.rs",
-          "hash": "e6586ea75d4512d9",
-          "bytes": 9106
+          "hash": "63639b9e8cf89fb5",
+          "bytes": 8814
         },
         {
           "path": "input/popovers/mod.rs",
@@ -1662,8 +1662,8 @@
         },
         {
           "path": "input/rope_ext.rs",
-          "hash": "0a938e3f8343d733",
-          "bytes": 25090
+          "hash": "ded3206a4f302ac3",
+          "bytes": 24366
         },
         {
           "path": "input/search.rs",
@@ -1672,196 +1672,196 @@
         },
         {
           "path": "input/selection.rs",
-          "hash": "344cf9d3fdd19f8a",
-          "bytes": 4567
+          "hash": "d69f0ca52df4bab3",
+          "bytes": 4426
         },
         {
           "path": "input/state.rs",
-          "hash": "448808cf0a56cf83",
-          "bytes": 135316
+          "hash": "3e9dfc1007034e55",
+          "bytes": 131678
         }
       ],
-      "donor_hash": "ce28b7730707df2e",
+      "donor_hash": "018ee239acbf3f7c",
       "donor_files": [
         {
           "path": "input/blink_cursor.rs",
-          "hash": "41677eb1082ce983",
-          "bytes": 2761
+          "hash": "dbf922f0d86bca64",
+          "bytes": 2666
         },
         {
           "path": "input/change.rs",
-          "hash": "acab7cd61a3135e0",
-          "bytes": 916
+          "hash": "7e2d5e5fbfcd4ddb",
+          "bytes": 877
         },
         {
           "path": "input/clear_button.rs",
-          "hash": "0992882adf8ef3f1",
-          "bytes": 393
+          "hash": "8742aee954263ee5",
+          "bytes": 377
         },
         {
           "path": "input/cursor.rs",
-          "hash": "1b08c633d4690d05",
-          "bytes": 1657
+          "hash": "231c75ac5c0c141a",
+          "bytes": 1588
         },
         {
           "path": "input/display_map/README.md",
-          "hash": "60e9f63f10a25155",
-          "bytes": 1769
+          "hash": "e0a4e886257ed39d",
+          "bytes": 1723
         },
         {
           "path": "input/display_map/display_map.rs",
-          "hash": "13247dc7d3360fbb",
-          "bytes": 12139
+          "hash": "07be87150f3409fb",
+          "bytes": 11803
         },
         {
           "path": "input/display_map/fold_map.rs",
-          "hash": "0d26ab572e9e5e86",
-          "bytes": 12714
+          "hash": "4791754f14799551",
+          "bytes": 12371
         },
         {
           "path": "input/display_map/folding.rs",
-          "hash": "f73d3b68c0357988",
-          "bytes": 5638
+          "hash": "efc85b86510b8a8d",
+          "bytes": 5457
         },
         {
           "path": "input/display_map/mod.rs",
-          "hash": "55e0ae2e3cc54210",
-          "bytes": 1971
+          "hash": "841bd57f5c33e6a5",
+          "bytes": 1902
         },
         {
           "path": "input/display_map/text_wrapper.rs",
-          "hash": "1dd85f44435cf7f6",
-          "bytes": 32695
+          "hash": "7551c518a195ea5a",
+          "bytes": 31765
         },
         {
           "path": "input/display_map/wrap_map.rs",
-          "hash": "b143ce888769ee24",
-          "bytes": 7852
+          "hash": "d8d5f91f3d338a96",
+          "bytes": 7630
         },
         {
           "path": "input/element.rs",
-          "hash": "e714a579c087be5f",
-          "bytes": 97940
+          "hash": "6c8a62069feab4a7",
+          "bytes": 95242
         },
         {
           "path": "input/indent.rs",
-          "hash": "87ce1a959d4f8039",
-          "bytes": 13834
+          "hash": "6e9c5f4f3fe412c1",
+          "bytes": 13402
         },
         {
           "path": "input/input.rs",
-          "hash": "f1e1892ab55cff0d",
-          "bytes": 17151
+          "hash": "ea074a74b693c9e1",
+          "bytes": 16719
         },
         {
           "path": "input/lsp/code_actions.rs",
-          "hash": "66ebc66318abf24a",
-          "bytes": 4416
+          "hash": "5deb9411a5d82592",
+          "bytes": 4276
         },
         {
           "path": "input/lsp/completions.rs",
-          "hash": "0cc23009fab18817",
-          "bytes": 10634
+          "hash": "c1462bd24f48b141",
+          "bytes": 10324
         },
         {
           "path": "input/lsp/definitions.rs",
-          "hash": "51e53ed1d998a324",
-          "bytes": 6918
+          "hash": "c89d7d4cd118cec3",
+          "bytes": 6685
         },
         {
           "path": "input/lsp/document_colors.rs",
-          "hash": "9772b5ae791c3f03",
-          "bytes": 3488
+          "hash": "73b19506b547d805",
+          "bytes": 3386
         },
         {
           "path": "input/lsp/hover.rs",
-          "hash": "ff6e6dae3d870565",
-          "bytes": 2566
+          "hash": "8682b5e01f88285f",
+          "bytes": 2488
         },
         {
           "path": "input/lsp/mod.rs",
-          "hash": "9efc7d2450968cc8",
-          "bytes": 5586
+          "hash": "3498cc7283db6d11",
+          "bytes": 5413
         },
         {
           "path": "input/lsp/semantic_tokens.rs",
-          "hash": "5297d82f49663d39",
-          "bytes": 12663
+          "hash": "fdd19081597ede10",
+          "bytes": 12336
         },
         {
           "path": "input/mask_pattern.rs",
-          "hash": "b6a3b9e6171ed76e",
-          "bytes": 21883
+          "hash": "8d99bca560f6a23b",
+          "bytes": 21246
         },
         {
           "path": "input/mod.rs",
-          "hash": "73c3c2e442c73a22",
-          "bytes": 910
+          "hash": "b50ebb876f9cb19e",
+          "bytes": 872
         },
         {
           "path": "input/mode.rs",
-          "hash": "f17cede60ea60f9d",
-          "bytes": 14897
+          "hash": "195a52e72924089f",
+          "bytes": 14431
         },
         {
           "path": "input/movement.rs",
-          "hash": "f171d2a3dfd677ca",
-          "bytes": 9426
+          "hash": "f3ae8c8bdb484770",
+          "bytes": 9152
         },
         {
           "path": "input/number_input.rs",
-          "hash": "fca7d2e7bd688e00",
-          "bytes": 7587
+          "hash": "f2a6d4510af8cbbe",
+          "bytes": 7359
         },
         {
           "path": "input/otp_input.rs",
-          "hash": "d6d6f91fe8b48785",
-          "bytes": 12986
+          "hash": "e1167b3a45741070",
+          "bytes": 12607
         },
         {
           "path": "input/popovers/code_action_menu.rs",
-          "hash": "60de6e9ce5e8c236",
-          "bytes": 9817
+          "hash": "5758e26153bf8aa1",
+          "bytes": 9480
         },
         {
           "path": "input/popovers/completion_menu.rs",
-          "hash": "06806ce046d0d060",
-          "bytes": 15212
+          "hash": "040d5b8e3cb38d6b",
+          "bytes": 14755
         },
         {
           "path": "input/popovers/diagnostic_popover.rs",
-          "hash": "fb205e9c515136fd",
-          "bytes": 2489
+          "hash": "1d9405cb9db0ba22",
+          "bytes": 2394
         },
         {
           "path": "input/popovers/hover_popover.rs",
-          "hash": "e6586ea75d4512d9",
-          "bytes": 9106
+          "hash": "63639b9e8cf89fb5",
+          "bytes": 8814
         },
         {
           "path": "input/popovers/mod.rs",
-          "hash": "6c3835c3972aa562",
-          "bytes": 2167
+          "hash": "8d33a83b82e1e508",
+          "bytes": 2091
         },
         {
           "path": "input/rope_ext.rs",
-          "hash": "0a938e3f8343d733",
-          "bytes": 25090
+          "hash": "ded3206a4f302ac3",
+          "bytes": 24366
         },
         {
           "path": "input/search.rs",
-          "hash": "035d9707c84f1f69",
-          "bytes": 26417
+          "hash": "93cb73673024700c",
+          "bytes": 25660
         },
         {
           "path": "input/selection.rs",
-          "hash": "344cf9d3fdd19f8a",
-          "bytes": 4567
+          "hash": "d69f0ca52df4bab3",
+          "bytes": 4426
         },
         {
           "path": "input/state.rs",
-          "hash": "b1d9d07a55b95fd8",
-          "bytes": 112632
+          "hash": "ae8eecfe2ef6f259",
+          "bytes": 109561
         }
       ],
       "donor_changed_files": [
@@ -1891,20 +1891,20 @@
       "local_paths": [
         "tree.rs"
       ],
-      "local_hash": "2d3939e02fd68580",
+      "local_hash": "958d7f7d8370b815",
       "local_files": [
         {
           "path": "tree.rs",
-          "hash": "9b131b41b3faa1f7",
-          "bytes": 28430
+          "hash": "7933db558a02b13e",
+          "bytes": 27601
         }
       ],
-      "donor_hash": "5db0391a3e48cd6c",
+      "donor_hash": "92a269d303be767f",
       "donor_files": [
         {
           "path": "tree.rs",
-          "hash": "f33a31209e1d8342",
-          "bytes": 28187
+          "hash": "e296257386e930a4",
+          "bytes": 27347
         }
       ],
       "donor_changed_files": [
