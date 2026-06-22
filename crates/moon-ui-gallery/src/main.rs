@@ -8,9 +8,10 @@ use std::{
 use gpui::prelude::*;
 use gpui::{
     App, Bounds, Context, Entity, IntoElement, NoAction, ParentElement, Render, SharedString, Task,
-    TitlebarOptions, Window, WindowBounds, WindowOptions, div, point, px, rgb, rgba, size,
+    TitlebarOptions, Window, WindowBounds, WindowOptions, div, point, px, rgb, rgba, size, svg,
 };
 use gpui_platform::application;
+use moon_ui::foundation::box_shadow;
 use moon_ui::{
     DockArea, DockEvent, DockItem, IndexPath, MoonAccent, MoonAccordion, MoonAlert, MoonAvatar,
     MoonAvatarGroup, MoonAvatarSize, MoonBackgroundPolicy, MoonBadge, MoonBadgeSize,
@@ -203,6 +204,21 @@ const HANDOFF_CASES: &[HandoffCase] = &[
         height: 132.0,
     },
     HandoffCase {
+        id: "app.main.three_charts_scroll",
+        width: 900.0,
+        height: 620.0,
+    },
+    HandoffCase {
+        id: "icons.primitives",
+        width: 260.0,
+        height: 82.0,
+    },
+    HandoffCase {
+        id: "avatar.group",
+        width: 330.0,
+        height: 82.0,
+    },
+    HandoffCase {
         id: "window.frame.main_full_logo",
         width: 560.0,
         height: 120.0,
@@ -236,6 +252,11 @@ const HANDOFF_CASES: &[HandoffCase] = &[
         id: "surface.card",
         width: 320.0,
         height: 120.0,
+    },
+    HandoffCase {
+        id: "surface.sidebar",
+        width: 320.0,
+        height: 150.0,
     },
     HandoffCase {
         id: "button.neutral",
@@ -296,6 +317,11 @@ const HANDOFF_CASES: &[HandoffCase] = &[
         id: "button.icon_slots",
         width: 300.0,
         height: 64.0,
+    },
+    HandoffCase {
+        id: "button.variants_all",
+        width: 520.0,
+        height: 82.0,
     },
     HandoffCase {
         id: "input.default",
@@ -548,6 +574,11 @@ const HANDOFF_CASES: &[HandoffCase] = &[
         height: 150.0,
     },
     HandoffCase {
+        id: "hover_card.open",
+        width: 340.0,
+        height: 170.0,
+    },
+    HandoffCase {
         id: "tooltip.default",
         width: 270.0,
         height: 88.0,
@@ -563,9 +594,19 @@ const HANDOFF_CASES: &[HandoffCase] = &[
         height: 150.0,
     },
     HandoffCase {
+        id: "dialog.form",
+        width: 380.0,
+        height: 210.0,
+    },
+    HandoffCase {
         id: "sheet.trigger",
         width: 300.0,
         height: 90.0,
+    },
+    HandoffCase {
+        id: "sheet.panel",
+        width: 360.0,
+        height: 220.0,
     },
     HandoffCase {
         id: "native_menu.trigger",
@@ -573,9 +614,19 @@ const HANDOFF_CASES: &[HandoffCase] = &[
         height: 90.0,
     },
     HandoffCase {
+        id: "native_menu.fallback",
+        width: 300.0,
+        height: 170.0,
+    },
+    HandoffCase {
         id: "notification.info",
         width: 360.0,
         height: 110.0,
+    },
+    HandoffCase {
+        id: "notification.toast",
+        width: 380.0,
+        height: 120.0,
     },
     HandoffCase {
         id: "alert.info",
@@ -1156,6 +1207,77 @@ impl CaseGallery {
                         ),
                 )
                 .into_any_element(),
+            "app.main.three_charts_scroll" => handoff_chart_stack(cx).into_any_element(),
+            "icons.primitives" => h_flex()
+                .gap(px(12.0))
+                .child(
+                    div()
+                        .w(px(34.0))
+                        .h(px(34.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(5.0))
+                        .border_1()
+                        .border_color(rgba_from(p.border, 1.0))
+                        .bg(rgba_from(p.panel, 1.0))
+                        .child(
+                            svg()
+                                .external_path(moon_ui::MOON_ICON_CHECK)
+                                .w(px(16.0))
+                                .h(px(16.0))
+                                .text_color(rgb(p.blue)),
+                        ),
+                )
+                .child(
+                    div()
+                        .w(px(34.0))
+                        .h(px(34.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(5.0))
+                        .border_1()
+                        .border_color(rgba_from(p.border, 1.0))
+                        .bg(rgba_from(p.panel, 1.0))
+                        .child(
+                            svg()
+                                .external_path(moon_ui::MOON_ICON_CARET_DOWN)
+                                .w(px(16.0))
+                                .h(px(16.0))
+                                .text_color(rgb(p.amber)),
+                        ),
+                )
+                .child(
+                    MoonText::new("Moon icon assets")
+                        .uppercase(false)
+                        .mono(true)
+                        .color(p.text_soft)
+                        .render(),
+                )
+                .into_any_element(),
+            "avatar.group" => h_flex()
+                .gap(px(14.0))
+                .child(
+                    MoonAvatar::new()
+                        .name("Moon Operator")
+                        .size(MoonAvatarSize::Large)
+                        .render(),
+                )
+                .child(
+                    MoonAvatarGroup::new()
+                        .size(MoonAvatarSize::Normal)
+                        .limit(3)
+                        .ellipsis(true)
+                        .children([
+                            MoonAvatar::new().name("Moon Operator"),
+                            MoonAvatar::new().name("Risk Desk"),
+                            MoonAvatar::new().name("Quant Lab"),
+                            MoonAvatar::new().name("Ops"),
+                        ])
+                        .render(),
+                )
+                .into_any_element(),
             "window.frame.main_full_logo" => window_frame_row(
                 MoonWindowFrame::main("handoff-window-main", 0.0)
                     .brand(MoonWindowFrameBrand::Full)
@@ -1225,6 +1347,31 @@ impl CaseGallery {
                         ),
                 )
                 .into_any_element(),
+            "surface.sidebar" => MoonSurface::new()
+                .id("handoff-surface-sidebar")
+                .variant(MoonSurfaceVariant::Sidebar)
+                .child(
+                    v_flex()
+                        .w(px(260.0))
+                        .h(px(110.0))
+                        .p(px(12.0))
+                        .gap(px(8.0))
+                        .child(
+                            MoonBadge::new("Sidebar")
+                                .tone(MoonTone::Info)
+                                .variant(MoonBadgeVariant::Outline)
+                                .render(),
+                        )
+                        .child(
+                            MoonText::new("Sidebar surface variant for left panes and settings.")
+                                .uppercase(false)
+                                .mono(true)
+                                .wrap()
+                                .color(p.text_soft)
+                                .render(),
+                        ),
+                )
+                .into_any_element(),
             "button.neutral" => MoonButton::new("handoff-button-neutral")
                 .label("Neutral")
                 .variant(MoonButtonVariant::Neutral)
@@ -1290,6 +1437,39 @@ impl CaseGallery {
                 .segment(MoonButtonSegment::new("0.05").color(p.text))
                 .trailing_icon(MoonButtonIconSlot::new(moon_ui::MOON_ICON_CARET_DOWN))
                 .render()
+                .into_any_element(),
+            "button.variants_all" => h_flex()
+                .gap(px(7.0))
+                .child(
+                    MoonButton::new("handoff-button-soft")
+                        .label("Soft")
+                        .variant(MoonButtonVariant::Soft)
+                        .render(),
+                )
+                .child(
+                    MoonButton::new("handoff-button-red")
+                        .label("Red")
+                        .variant(MoonButtonVariant::Red)
+                        .render(),
+                )
+                .child(
+                    MoonButton::new("handoff-button-outline-red")
+                        .label("Outline Red")
+                        .variant(MoonButtonVariant::OutlineRed)
+                        .render(),
+                )
+                .child(
+                    MoonButton::new("handoff-button-ghost")
+                        .label("Ghost")
+                        .variant(MoonButtonVariant::Ghost)
+                        .render(),
+                )
+                .child(
+                    MoonButton::new("handoff-button-bare")
+                        .label("Bare")
+                        .variant(MoonButtonVariant::Bare)
+                        .render(),
+                )
                 .into_any_element(),
             "input.default" => div()
                 .w(px(260.0))
@@ -1930,6 +2110,35 @@ impl CaseGallery {
                         )
                 })
                 .into_any_element(),
+            "hover_card.open" => v_flex()
+                .w(px(250.0))
+                .gap(px(8.0))
+                .p(px(12.0))
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(rgba_from(p.border, 1.0))
+                .bg(rgba_from(p.panel, 1.0))
+                .shadow(vec![box_shadow(
+                    px(0.0),
+                    px(10.0),
+                    px(28.0),
+                    px(0.0),
+                    rgba_from(p.shadow, 0.36),
+                )])
+                .child(
+                    MoonBadge::new("MoonHoverCard")
+                        .tone(MoonTone::Info)
+                        .render(),
+                )
+                .child(
+                    MoonText::new("Hover card surface shown as an opened overlay state.")
+                        .uppercase(false)
+                        .mono(true)
+                        .wrap()
+                        .color(p.text_soft)
+                        .render(),
+                )
+                .into_any_element(),
             "tooltip.default" => MoonTooltip::new("Scale menu")
                 .detail("Long tooltip text wraps in the Moon tooltip body.")
                 .shortcut("Ctrl+K")
@@ -1941,6 +2150,48 @@ impl CaseGallery {
                 .into_any_element(),
             "tooltip_view.entity" => self.tooltip_view.clone().into_any_element(),
             "dialog.confirm" => div().size_full().into_any_element(),
+            "dialog.form" => v_flex()
+                .w(px(330.0))
+                .gap(px(12.0))
+                .p(px(14.0))
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(rgba_from(p.border, 1.0))
+                .bg(rgba_from(p.shell, 1.0))
+                .shadow(vec![box_shadow(
+                    px(0.0),
+                    px(12.0),
+                    px(30.0),
+                    px(0.0),
+                    rgba_from(p.shadow, 0.42),
+                )])
+                .child(
+                    MoonText::new("Rename strategy")
+                        .uppercase(false)
+                        .weight(700.0)
+                        .render(),
+                )
+                .child(
+                    MoonInput::new("handoff-dialog-form-input").default_value("HooksDetect 0.3-1%"),
+                )
+                .child(
+                    h_flex()
+                        .justify_end()
+                        .gap(px(8.0))
+                        .child(
+                            MoonButton::new("handoff-dialog-form-cancel")
+                                .label("Cancel")
+                                .variant(MoonButtonVariant::Panel)
+                                .render(),
+                        )
+                        .child(
+                            MoonButton::new("handoff-dialog-form-save")
+                                .label("Save")
+                                .variant(MoonButtonVariant::Blue)
+                                .render(),
+                        ),
+                )
+                .into_any_element(),
             "sheet.trigger" => MoonButton::new("handoff-sheet-trigger")
                 .label("Open MoonSheet")
                 .variant(MoonButtonVariant::Panel)
@@ -1971,6 +2222,48 @@ impl CaseGallery {
                 })
                 .render()
                 .into_any_element(),
+            "sheet.panel" => h_flex()
+                .w(px(320.0))
+                .h(px(180.0))
+                .justify_end()
+                .child(
+                    v_flex()
+                        .w(px(230.0))
+                        .h_full()
+                        .gap(px(10.0))
+                        .p(px(12.0))
+                        .border_l_1()
+                        .border_color(rgba_from(p.border, 1.0))
+                        .bg(rgba_from(p.shell, 1.0))
+                        .shadow(vec![box_shadow(
+                            px(-10.0),
+                            px(0.0),
+                            px(26.0),
+                            px(0.0),
+                            rgba_from(p.shadow, 0.34),
+                        )])
+                        .child(
+                            MoonText::new("MoonSheet")
+                                .uppercase(false)
+                                .weight(700.0)
+                                .render(),
+                        )
+                        .child(
+                            MoonBadge::new("root overlay")
+                                .tone(MoonTone::Info)
+                                .variant(MoonBadgeVariant::Outline)
+                                .render(),
+                        )
+                        .child(
+                            MoonText::new("Right-side sheet panel, owned by Root/window.")
+                                .uppercase(false)
+                                .mono(true)
+                                .wrap()
+                                .color(p.text_soft)
+                                .render(),
+                        ),
+                )
+                .into_any_element(),
             "native_menu.trigger" => MoonButton::new("handoff-native-menu-trigger")
                 .label("Open native menu")
                 .variant(MoonButtonVariant::Panel)
@@ -1988,6 +2281,17 @@ impl CaseGallery {
                 })
                 .render()
                 .into_any_element(),
+            "native_menu.fallback" => MoonPopupMenu::new("handoff-native-menu-fallback")
+                .width(190.0)
+                .items([
+                    MoonMenuItem::new("MoonNativeMenu"),
+                    MoonMenuItem::separator(),
+                    MoonMenuItem::new("Open"),
+                    MoonMenuItem::new("Detach").right_label("D"),
+                    MoonMenuItem::new("Close").tone(MoonTone::Danger),
+                ])
+                .render()
+                .into_any_element(),
             "notification.info" => MoonButton::new("handoff-notification-trigger")
                 .label("Push MoonNotification")
                 .variant(MoonButtonVariant::Panel)
@@ -2000,6 +2304,46 @@ impl CaseGallery {
                     );
                 })
                 .render()
+                .into_any_element(),
+            "notification.toast" => h_flex()
+                .w(px(320.0))
+                .gap(px(10.0))
+                .p(px(12.0))
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(rgba_from(p.border, 1.0))
+                .bg(rgba_from(p.panel, 1.0))
+                .shadow(vec![box_shadow(
+                    px(0.0),
+                    px(8.0),
+                    px(24.0),
+                    px(0.0),
+                    rgba_from(p.shadow, 0.34),
+                )])
+                .child(
+                    div()
+                        .w(px(7.0))
+                        .h(px(7.0))
+                        .rounded(px(999.0))
+                        .bg(rgb(p.blue)),
+                )
+                .child(
+                    v_flex()
+                        .gap(px(4.0))
+                        .child(
+                            MoonText::new("MoonNotification")
+                                .uppercase(false)
+                                .weight(700.0)
+                                .render(),
+                        )
+                        .child(
+                            MoonText::new("Operation queued successfully.")
+                                .uppercase(false)
+                                .mono(true)
+                                .color(p.text_soft)
+                                .render(),
+                        ),
+                )
                 .into_any_element(),
             "alert.info" => MoonAlert::info(
                 "handoff-alert-info",
@@ -5312,6 +5656,212 @@ fn swatch(name: &'static str, color: u32) -> impl IntoElement {
                 .font_size(10.0)
                 .line_height(12.0)
                 .render(),
+        )
+}
+
+fn handoff_chart_stack(cx: &App) -> impl IntoElement {
+    let p = MoonPalette::active(cx);
+    v_flex()
+        .w(px(860.0))
+        .h(px(560.0))
+        .border_1()
+        .border_color(rgba_from(p.border, 1.0))
+        .bg(rgba_from(p.shell, 1.0))
+        .text_color(rgb(p.text))
+        .child(
+            h_flex()
+                .h(px(34.0))
+                .px(px(10.0))
+                .gap(px(10.0))
+                .border_b_1()
+                .border_color(rgba_from(p.border, 1.0))
+                .bg(rgba_from(p.shell_high, 1.0))
+                .child(MoonAvatar::new().initials("M").compact().render())
+                .child(
+                    MoonText::new("Moonbot")
+                        .uppercase(false)
+                        .weight(700.0)
+                        .render(),
+                )
+                .child(MoonBadge::new("default · BTCUSDT").render())
+                .child(MoonBadge::new("Live").tone(MoonTone::Positive).render())
+                .child(div().flex_1())
+                .child(
+                    MoonText::new("3 charts / scroll")
+                        .uppercase(false)
+                        .mono(true)
+                        .color(p.text_soft)
+                        .render(),
+                ),
+        )
+        .child(
+            h_flex()
+                .h(px(34.0))
+                .px(px(10.0))
+                .gap(px(8.0))
+                .border_b_1()
+                .border_color(rgba_from(p.border, 1.0))
+                .child(
+                    MoonButton::new("handoff-chart-stack-tp")
+                        .label("TP +3.0%")
+                        .variant(MoonButtonVariant::Blue)
+                        .render(),
+                )
+                .child(
+                    MoonButton::new("handoff-chart-stack-sl")
+                        .label("SL -2.0%")
+                        .variant(MoonButtonVariant::Danger)
+                        .render(),
+                )
+                .child(
+                    MoonButton::new("handoff-chart-stack-lev")
+                        .label("Lev x1")
+                        .variant(MoonButtonVariant::Panel)
+                        .render(),
+                )
+                .child(div().flex_1())
+                .child(
+                    MoonButton::new("handoff-chart-stack-live")
+                        .label("Live")
+                        .variant(MoonButtonVariant::Green)
+                        .render(),
+                ),
+        )
+        .child(
+            div()
+                .relative()
+                .flex_1()
+                .overflow_hidden()
+                .child(
+                    v_flex()
+                        .absolute()
+                        .left(px(8.0))
+                        .top(px(8.0))
+                        .right(px(16.0))
+                        .gap(px(8.0))
+                        .child(handoff_chart_panel("Chart 1 · BTCUSDT", p.blue, p))
+                        .child(handoff_chart_panel("Chart 2 · ETHUSDT", p.green, p))
+                        .child(handoff_chart_panel("Chart 3 · SOLUSDT", p.amber, p)),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .right(px(5.0))
+                        .top(px(10.0))
+                        .bottom(px(10.0))
+                        .w(px(4.0))
+                        .rounded(px(999.0))
+                        .bg(rgba_from(p.overlay, 0.05))
+                        .child(
+                            div()
+                                .absolute()
+                                .top(px(28.0))
+                                .w(px(4.0))
+                                .h(px(112.0))
+                                .rounded(px(999.0))
+                                .bg(rgba_from(p.text_muted, 0.64)),
+                        ),
+                ),
+        )
+        .child(
+            MoonStatusBar::new("handoff-chart-stack-status")
+                .indicator(MoonStatusIndicator::new(p.green).glow(8.0, 0.28))
+                .items([
+                    MoonStatusItem::new("chart host scroll").tone(MoonTone::Info),
+                    MoonStatusItem::separator(),
+                    MoonStatusItem::new("plot area uses chartdx, not UI").tone(MoonTone::Warning),
+                ])
+                .right_item(MoonStatusItem::new("visible: 2.4 / 3").tone(MoonTone::Positive)),
+        )
+}
+
+fn handoff_chart_panel(title: &'static str, tone: u32, p: MoonPalette) -> impl IntoElement {
+    v_flex()
+        .h(px(190.0))
+        .border_1()
+        .border_color(rgba_from(p.border, 1.0))
+        .bg(rgba_from(p.panel, 1.0))
+        .child(
+            h_flex()
+                .h(px(28.0))
+                .px(px(10.0))
+                .border_b_1()
+                .border_color(rgba_from(p.border, 1.0))
+                .child(
+                    MoonText::new(title)
+                        .uppercase(false)
+                        .mono(true)
+                        .weight(700.0)
+                        .color(tone)
+                        .render(),
+                )
+                .child(div().flex_1())
+                .child(
+                    MoonBadge::new("NoFill chart host")
+                        .tone(MoonTone::Warning)
+                        .render(),
+                ),
+        )
+        .child(
+            div()
+                .relative()
+                .flex_1()
+                .overflow_hidden()
+                .bg(rgb(p.chart_bg))
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(0.0))
+                        .right(px(0.0))
+                        .top(px(36.0))
+                        .h(px(1.0))
+                        .bg(rgba_from(p.overlay, 0.04)),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(0.0))
+                        .right(px(0.0))
+                        .top(px(74.0))
+                        .h(px(1.0))
+                        .bg(rgba_from(p.overlay, 0.04)),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(88.0))
+                        .top(px(0.0))
+                        .bottom(px(0.0))
+                        .w(px(1.0))
+                        .bg(rgba_from(p.overlay, 0.04)),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(240.0))
+                        .top(px(0.0))
+                        .bottom(px(0.0))
+                        .w(px(1.0))
+                        .bg(rgba_from(p.overlay, 0.04)),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(350.0))
+                        .top(px(54.0))
+                        .w(px(280.0))
+                        .h(px(2.0))
+                        .bg(rgb(tone)),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .right(px(0.0))
+                        .top(px(0.0))
+                        .bottom(px(0.0))
+                        .w(px(120.0))
+                        .bg(rgba_from(tone, 0.12)),
+                ),
         )
 }
 
