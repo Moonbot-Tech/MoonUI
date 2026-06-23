@@ -531,6 +531,17 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "MoonKbd must preserve Longbridge-style platform keystroke formatting",
         ),
         test_contract(
+            "hotkey_input.capture_behavior",
+            ContractSeverity::Guardrail,
+            &[
+                "hotkey_input_does_not_steal_global_shortcuts_when_idle",
+                "hotkey_input_waits_for_non_modifier_key",
+                "hotkey_input_commits_full_chord_while_recording",
+            ],
+            &tests,
+            "MoonHotkeyInput must record complete shortcuts without stealing idle app keybindings",
+        ),
+        test_contract(
             "rating.click_behavior",
             ContractSeverity::Guardrail,
             &[

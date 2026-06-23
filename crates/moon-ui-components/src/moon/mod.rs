@@ -20,6 +20,7 @@ mod dock;
 mod dropdown;
 mod form;
 mod group_box;
+mod hotkey_input;
 mod hover_card;
 mod icons;
 mod index_path;
@@ -108,6 +109,10 @@ pub use dropdown::{MoonDropdown, MoonMenuItem, MoonMenuSize, MoonPopupMenu};
 pub use form::MoonFormRow;
 pub use foundation::{StyledExt, ThemeMode, h_flex, init, v_flex};
 pub use group_box::MoonGroupBox;
+pub use hotkey_input::{
+    MoonHotkeyCapture, MoonHotkeyChangeHandler, MoonHotkeyInput, MoonHotkeyInputSize,
+    moon_hotkey_capture,
+};
 pub use hover_card::{MoonHoverCard, MoonHoverCardState};
 pub use icons::{MOON_ICON_CARET_DOWN, MOON_ICON_CHECK};
 pub use index_path::IndexPath;

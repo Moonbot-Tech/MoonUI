@@ -328,6 +328,19 @@
       ]
     },
     {
+      "concept": "hotkey_input",
+      "class": "Forged",
+      "behavior_source": "Moon hotkey capture state machine over GPUI Keystroke",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonHotkeyInput",
+      "upstream_ref": null,
+      "fork_reason": "Longbridge only has Kbd display tags; MoonUI needs a reusable shortcut recording control",
+      "contracts": [
+        "hotkey_input.capture_behavior",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
       "concept": "hover_card",
       "class": "TrackedFork",
       "behavior_source": "Longbridge HoverCard",
@@ -1108,6 +1121,13 @@
       "severity": "Critical",
       "verifier": "VisualGolden",
       "details": "gallery dark/light golden snapshots must be committed for every gallery page"
+    },
+    {
+      "id": "hotkey_input.capture_behavior",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "MoonHotkeyInput must record complete shortcuts without stealing idle app keybindings; covered by Rust test(s): hotkey_input_does_not_steal_global_shortcuts_when_idle, hotkey_input_waits_for_non_modifier_key, hotkey_input_commits_full_chord_while_recording"
     },
     {
       "id": "input.mask_contract",

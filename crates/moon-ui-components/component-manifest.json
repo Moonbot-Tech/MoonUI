@@ -326,6 +326,16 @@
       "contracts": ["gallery.visual_coverage"]
     },
     {
+      "concept": "hotkey_input",
+      "class": "Forged",
+      "behavior_source": "Moon hotkey capture state machine over GPUI Keystroke",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonHotkeyInput",
+      "upstream_ref": null,
+      "fork_reason": "Longbridge only has Kbd display tags; MoonUI needs a reusable shortcut recording control",
+      "contracts": ["hotkey_input.capture_behavior", "gallery.visual_coverage"]
+    },
+    {
       "concept": "kbd",
       "class": "Forged",
       "behavior_source": "Moon designer-stand keyboard tag renderer",

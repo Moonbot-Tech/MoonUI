@@ -21,12 +21,12 @@ use moon_ui::{
     MoonCombobox, MoonComboboxState, MoonComponentIndexPath, MoonContextMenu, MoonDataCell,
     MoonDataRow, MoonDataTable, MoonDataTableColumn, MoonDataTableState, MoonDatePicker,
     MoonDatePickerState, MoonDescriptionList, MoonDockPanel, MoonDropdown, MoonFormRow,
-    MoonGroupBox, MoonHoverCard, MoonInput, MoonInputMaskPattern, MoonKbd, MoonKbdSize, MoonLabel,
-    MoonLink, MoonList, MoonListDelegate, MoonListItem, MoonListState, MoonMenuItem, MoonMenuSize,
-    MoonNativeMenu, MoonNotification, MoonNumberFieldOptions, MoonPagination, MoonPalette,
-    MoonPlacement, MoonPopover, MoonPopoverPlacement, MoonPopupMenu, MoonPresetItem,
-    MoonPresetStrip, MoonProgress, MoonProgressCircle, MoonProgressCircleSize, MoonRadio,
-    MoonRadioSize, MoonRating, MoonResizablePanelGroup, MoonScrollableElement,
+    MoonGroupBox, MoonHotkeyInput, MoonHoverCard, MoonInput, MoonInputMaskPattern, MoonKbd,
+    MoonKbdSize, MoonLabel, MoonLink, MoonList, MoonListDelegate, MoonListItem, MoonListState,
+    MoonMenuItem, MoonMenuSize, MoonNativeMenu, MoonNotification, MoonNumberFieldOptions,
+    MoonPagination, MoonPalette, MoonPlacement, MoonPopover, MoonPopoverPlacement, MoonPopupMenu,
+    MoonPresetItem, MoonPresetStrip, MoonProgress, MoonProgressCircle, MoonProgressCircleSize,
+    MoonRadio, MoonRadioSize, MoonRating, MoonResizablePanelGroup, MoonScrollableElement,
     MoonScrollbarVisibility, MoonSearchableVec, MoonSegmentItem, MoonSegmentedControl, MoonSelect,
     MoonSelectItem, MoonSelectState, MoonSelectorPill, MoonSelectorSegment, MoonSeparator,
     MoonSettingField, MoonSettingGroup, MoonSettingItem, MoonSettingPage, MoonSettings,
@@ -74,6 +74,7 @@ const COMPONENT_COVERAGE: &[&str] = &[
     "MoonMenuItem",
     "MoonInput",
     "MoonInputMaskPattern",
+    "MoonHotkeyInput",
     "MoonKbd",
     "MoonLabel",
     "MoonLink",
@@ -342,6 +343,11 @@ const HANDOFF_CASES: &[HandoffCase] = &[
         id: "input.mask",
         width: 380.0,
         height: 74.0,
+    },
+    HandoffCase {
+        id: "input.hotkey",
+        width: 520.0,
+        height: 170.0,
     },
     HandoffCase {
         id: "select.toolbar",
@@ -1517,6 +1523,34 @@ impl CaseGallery {
                     .mono(true)
                     .color(p.text_soft)
                     .render(),
+                )
+                .into_any_element(),
+            "input.hotkey" => v_flex()
+                .w(px(420.0))
+                .gap(px(9.0))
+                .child(
+                    MoonHotkeyInput::new("handoff-hotkey-primary")
+                        .default_value(gpui::Keystroke::parse("ctrl-alt-k").ok())
+                        .placeholder("Click to record shortcut")
+                        .width(270.0),
+                )
+                .child(
+                    MoonHotkeyInput::new("handoff-hotkey-recording")
+                        .recording(true)
+                        .recording_placeholder("Press shortcut...")
+                        .width(270.0),
+                )
+                .child(
+                    MoonHotkeyInput::new("handoff-hotkey-conflict")
+                        .default_value(gpui::Keystroke::parse("ctrl-k").ok())
+                        .conflict_label("used by Search")
+                        .width(320.0),
+                )
+                .child(
+                    MoonHotkeyInput::new("handoff-hotkey-disabled")
+                        .default_value(gpui::Keystroke::parse("shift-f4").ok())
+                        .disabled(true)
+                        .width(230.0),
                 )
                 .into_any_element(),
             "select.toolbar" => div()
