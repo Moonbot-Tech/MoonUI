@@ -4231,6 +4231,7 @@ name = "moon-ui"
 version = "0.1.0"
 dependencies = [
  "moon-ui-components",
+ "moon-ui-components-assets",
 ]
 
 [[package]]

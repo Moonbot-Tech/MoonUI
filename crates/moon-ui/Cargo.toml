@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 gpui-component = { workspace = true }
+gpui-component-assets = { workspace = true }
 
 [lints]
 workspace = true

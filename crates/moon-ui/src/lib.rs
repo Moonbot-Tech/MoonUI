@@ -12,3 +12,4 @@ pub mod foundation {
 }
 
 pub use gpui_component::moon::*;
+pub use gpui_component_assets::Assets as MoonAssets;
