@@ -3098,11 +3098,19 @@ impl DockArea {
                         );
                         split = split.child(separator);
                     }
+                    // Zero the minimum on BOTH axes (not just the main one). Otherwise a child
+                    // of a vertical split (e.g. the bottom block with a dense row of side-by-side
+                    // panels) keeps the min-WIDTH of its content, won't shrink to the window
+                    // width, and its sibling (the top block with the chart) ends up a different
+                    // width → an empty unfilled region appears to the right of the chart. With
+                    // `overflow_hidden` the content is clipped instead.
                     let mut slot = div()
                         .relative()
                         .overflow_hidden()
-                        .when(*horizontal, |this| this.h_full().min_w(px(0.0)))
-                        .when(!*horizontal, |this| this.w_full().min_h(px(0.0)));
+                        .min_w(px(0.0))
+                        .min_h(px(0.0))
+                        .when(*horizontal, |this| this.h_full())
+                        .when(!*horizontal, |this| this.w_full());
                     slot = child.background_policy(cx).apply(slot, p.shell, 1.0);
                     let slot_size = if first_child_flexes && ix == 0 {
                         None
@@ -3110,12 +3118,18 @@ impl DockArea {
                         sizes.get(ix).copied().flatten()
                     };
                     if let Some(size) = slot_size {
-                        slot = if *horizontal {
-                            slot.w(px(size)).h_full().flex_none()
-                        } else {
-                            slot.h(px(size)).w_full().flex_none()
-                        };
+                        // A fixed panel PREFERS its size (`flex_basis`) but YIELDS
+                        // (`flex_shrink`) when the container is narrower than the sum of sizes —
+                        // otherwise the block doesn't fit the window, its sibling in the vertical
+                        // split stays wider, and an empty region appears to the right of the
+                        // chart. On widening it returns to its size (basis preserved).
+                        slot = slot.flex_basis(px(size)).flex_shrink_1();
+                        slot = if *horizontal { slot.h_full() } else { slot.w_full() };
                     } else {
+                        // Flexible slot (e.g. the chart): grows and shrinks. No minimum here —
+                        // in a dense row (bottom) the sum of minimums would inflate the block's
+                        // min-width and break width sync in the vertical split. The base slot
+                        // already has min_w(0)/overflow_hidden, so content is clipped, not forced.
                         slot = slot.flex_1();
                     }
 
@@ -3215,7 +3229,12 @@ impl Render for DockArea {
             ));
         }
 
-        row = row.child(div().relative().flex_1().h_full().child(self.render_item(
+        // `min_w(0)`: a flex item's min-width defaults to auto (= min-content), so without it
+        // the center wrapper could not shrink below its CONTENT min-width (set by a dense bottom
+        // row of side-by-side panels). On window narrowing the center overflowed it and the top
+        // block with the chart did not stretch to full width → an empty region on the right.
+        // `min_w(0)` + the row's `overflow_hidden` let the center shrink to the window.
+        row = row.child(div().relative().flex_1().h_full().min_w(px(0.)).child(self.render_item(
             SharedString::from(format!("{}:center", self.id)),
             DockRoot::Center,
             Vec::new(),
