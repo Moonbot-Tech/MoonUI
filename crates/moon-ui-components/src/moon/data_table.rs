@@ -994,8 +994,11 @@ impl RenderOnce for MoonDataTable {
         // Original column order (by key) BEFORE reordering — `render_row` returns cells in
         // this order. After columns are reordered (drag), the body cells must be permuted to
         // match, otherwise only the header moves while cell content stays in place.
-        let original_keys: Vec<SharedString> =
-            self.columns.iter().map(|column| column.key.clone()).collect();
+        let original_keys: Vec<SharedString> = self
+            .columns
+            .iter()
+            .map(|column| column.key.clone())
+            .collect();
         let columns = Self::auto_width_columns(
             Self::ordered_columns(self.columns, state.read(cx)),
             viewport_width,
