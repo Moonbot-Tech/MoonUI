@@ -1891,12 +1891,12 @@
       "local_paths": [
         "tree.rs"
       ],
-      "local_hash": "958d7f7d8370b815",
+      "local_hash": "ddcc8bfc4c11f004",
       "local_files": [
         {
           "path": "tree.rs",
-          "hash": "7933db558a02b13e",
-          "bytes": 27601
+          "hash": "ccab082bcb3f0290",
+          "bytes": 50804
         }
       ],
       "donor_hash": "92a269d303be767f",
