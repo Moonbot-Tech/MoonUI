@@ -990,10 +990,28 @@ impl RenderOnce for MoonDataTable {
         let viewport_from_scroll = f32::from(horizontal_scroll_handle.bounds().size.width).max(0.0);
         let viewport_from_state = state.read(cx).viewport_width();
         let viewport_width = viewport_from_scroll.max(viewport_from_state);
+        // Original column order (by key) BEFORE reordering — `render_row` returns cells in
+        // this order. After columns are reordered (drag), the body cells must be permuted to
+        // match, otherwise only the header moves while cell content stays in place.
+        let original_keys: Vec<SharedString> =
+            self.columns.iter().map(|column| column.key.clone()).collect();
         let columns = Self::auto_width_columns(
             Self::ordered_columns(self.columns, state.read(cx)),
             viewport_width,
             row_header_width,
+        );
+        // Permutation: displayed column position -> index of that column in the original
+        // (render_row) order. Used to reorder each row's cells in lockstep with the header.
+        let cell_perm: Rc<Vec<usize>> = Rc::new(
+            columns
+                .iter()
+                .map(|column| {
+                    original_keys
+                        .iter()
+                        .position(|key| key == &column.key)
+                        .unwrap_or(0)
+                })
+                .collect(),
         );
         let table_columns = columns
             .iter()
@@ -1168,12 +1186,24 @@ impl RenderOnce for MoonDataTable {
         let rows_id = id.clone();
         let rows_context_id = id.clone();
         let rows_context_builder = context_menu_builder.clone();
+        let cell_perm = cell_perm.clone();
         let mut rows_list = MoonVirtualList::new(
             SharedString::from(format!("{id}:rows")),
             self.row_count,
             row_height,
             move |ix, window, cx| {
                 let mut row = (render_row)(ix, window, cx);
+                // Reorder cells to follow the (possibly drag-reordered) column order. Cells come
+                // from `render_row` in the original column order; `cell_perm[d]` is the original
+                // index of the column now displayed at position `d`. Skip if shapes disagree.
+                if cell_perm.len() == row.cells.len() {
+                    let mut taken: Vec<Option<MoonDataCell>> =
+                        row.cells.drain(..).map(Some).collect();
+                    row.cells = cell_perm
+                        .iter()
+                        .map(|&i| taken[i].take().unwrap_or_else(|| MoonDataCell::text("")))
+                        .collect();
+                }
                 let selected_row = state_for_rows.read(cx).selected_row == Some(ix);
                 let selected_cell = state_for_rows.read(cx).selected_cell;
                 row.selected = row.selected || selected_row;
