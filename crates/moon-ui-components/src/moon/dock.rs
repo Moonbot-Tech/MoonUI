@@ -3124,7 +3124,11 @@ impl DockArea {
                         // split stays wider, and an empty region appears to the right of the
                         // chart. On widening it returns to its size (basis preserved).
                         slot = slot.flex_basis(px(size)).flex_shrink_1();
-                        slot = if *horizontal { slot.h_full() } else { slot.w_full() };
+                        slot = if *horizontal {
+                            slot.h_full()
+                        } else {
+                            slot.w_full()
+                        };
                     } else {
                         // Flexible slot (e.g. the chart): grows and shrinks. No minimum here —
                         // in a dense row (bottom) the sum of minimums would inflate the block's
@@ -3234,13 +3238,20 @@ impl Render for DockArea {
         // row of side-by-side panels). On window narrowing the center overflowed it and the top
         // block with the chart did not stretch to full width → an empty region on the right.
         // `min_w(0)` + the row's `overflow_hidden` let the center shrink to the window.
-        row = row.child(div().relative().flex_1().h_full().min_w(px(0.)).child(self.render_item(
-            SharedString::from(format!("{}:center", self.id)),
-            DockRoot::Center,
-            Vec::new(),
-            &self.center,
-            cx,
-        )));
+        row = row.child(
+            div()
+                .relative()
+                .flex_1()
+                .h_full()
+                .min_w(px(0.))
+                .child(self.render_item(
+                    SharedString::from(format!("{}:center", self.id)),
+                    DockRoot::Center,
+                    Vec::new(),
+                    &self.center,
+                    cx,
+                )),
+        );
 
         if let Some((item, size, true)) = &self.right {
             row = row.child(self.resize_handle(

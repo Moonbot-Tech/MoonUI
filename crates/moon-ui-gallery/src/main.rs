@@ -7,8 +7,9 @@ use std::{
 
 use gpui::prelude::*;
 use gpui::{
-    App, Bounds, Context, Entity, IntoElement, NoAction, ParentElement, Render, SharedString, Task,
-    TitlebarOptions, Window, WindowBounds, WindowOptions, div, point, px, rgb, rgba, size, svg,
+    App, Bounds, Context, Entity, IntoElement, MouseButton, NoAction, ParentElement, Render,
+    SharedString, Task, TitlebarOptions, Window, WindowBounds, WindowOptions, div, point, px, rgb,
+    rgba, size, svg,
 };
 use gpui_platform::application;
 use moon_ui::foundation::box_shadow;
@@ -36,9 +37,10 @@ use moon_ui::{
     MoonTabItem, MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle,
     MoonTag, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonToggle, MoonToggleSize,
     MoonTone, MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree,
-    MoonTreeItem, MoonTreeState, MoonVirtualList, MoonVirtualListScrollHandle, MoonWindowExt as _,
-    MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, PanelView, Root, TabPanel,
-    ThemeMode, h_flex, moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
+    MoonTreeItem, MoonTreeSelectionMode, MoonTreeState, MoonVirtualList,
+    MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand,
+    MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex, moon_h_resizable,
+    moon_resizable_panel, rgba_from, v_flex,
 };
 
 const COMPONENT_COVERAGE: &[&str] = &[
@@ -167,6 +169,7 @@ struct Gallery {
     calendar_state: Entity<MoonCalendarState>,
     list_state: Entity<MoonListState<GalleryListDelegate>>,
     tree_state: Entity<MoonTreeState>,
+    controlled_tree_state: Entity<MoonTreeState>,
     slider_state: Entity<MoonSliderState>,
     range_slider_state: Entity<MoonSliderState>,
     color_state: Entity<MoonColorPickerState>,
@@ -2711,6 +2714,40 @@ impl Gallery {
                     .child(MoonTreeItem::new("runtime.theme", "Theme bridge")),
             ])
         });
+        let controlled_tree_state = cx.new(|cx| {
+            MoonTreeState::new(cx).items([
+                MoonTreeItem::new("core.1", "server 1")
+                    .folder(true)
+                    .child(
+                        MoonTreeItem::new("core.1.folder.hooks", "Moon Hook")
+                            .folder(true)
+                            .child(MoonTreeItem::new("strategy.1", "HooksDetect 0.3-1%"))
+                            .child(MoonTreeItem::new("strategy.2", "Delta Reversal")),
+                    )
+                    .child(MoonTreeItem::new("core.1.folder.empty", "Empty folder").folder(true)),
+                MoonTreeItem::new("core.2", "server 2")
+                    .folder(true)
+                    .child(MoonTreeItem::new("strategy.3", "Scalp Guard")),
+            ])
+        });
+        controlled_tree_state.update(cx, |state, cx| {
+            state.set_selection_mode(MoonTreeSelectionMode::Multi, cx);
+            state.set_expanded(
+                [
+                    SharedString::from("core.1"),
+                    SharedString::from("core.1.folder.hooks"),
+                    SharedString::from("core.2"),
+                ],
+                cx,
+            );
+            state.set_selected_ids(
+                [
+                    SharedString::from("strategy.1"),
+                    SharedString::from("strategy.2"),
+                ],
+                cx,
+            );
+        });
         let slider_state = cx.new(|_| {
             MoonSliderState::new()
                 .min(0.0)
@@ -2794,6 +2831,7 @@ impl Gallery {
             calendar_state,
             list_state,
             tree_state,
+            controlled_tree_state,
             slider_state,
             range_slider_state,
             color_state,
@@ -4720,6 +4758,81 @@ impl Gallery {
                                 },
                             )),
                     ),
+            )
+            .child(
+                h_flex().items_start().gap(px(12.0)).child(
+                    card("MoonTree controlled/headless", cx)
+                        .w(px(500.0))
+                        .h(px(280.0))
+                        .child(MoonTree::custom(
+                            &self.controlled_tree_state,
+                            |entry, meta, _window, app| {
+                                let p = MoonPalette::active(app);
+                                let marker = if entry.is_folder() {
+                                    if entry.is_expanded() { "v" } else { ">" }
+                                } else {
+                                    "-"
+                                };
+                                let tone = if meta.selected { p.amber } else { p.text_soft };
+                                h_flex()
+                                    .id(SharedString::from(format!(
+                                        "controlled-tree-row-{}",
+                                        entry.item().id()
+                                    )))
+                                    .h(px(24.0))
+                                    .w_full()
+                                    .items_center()
+                                    .gap(px(6.0))
+                                    .pl(px(10.0 + 14.0 * entry.depth() as f32))
+                                    .pr(px(8.0))
+                                    .rounded(px(4.0))
+                                    .border_1()
+                                    .border_color(rgba_from(
+                                        if meta.selected { p.amber } else { p.border },
+                                        if meta.selected { 0.58 } else { 0.20 },
+                                    ))
+                                    .bg(rgba_from(
+                                        if meta.selected { p.amber } else { p.panel },
+                                        if meta.selected { 0.15 } else { 0.34 },
+                                    ))
+                                    .on_mouse_down(MouseButton::Left, |_event, _window, app| {
+                                        app.stop_propagation();
+                                    })
+                                    .child(
+                                        MoonText::new(marker)
+                                            .mono(true)
+                                            .uppercase(false)
+                                            .color(p.text_muted)
+                                            .render(),
+                                    )
+                                    .child(
+                                        MoonCheckbox::new(SharedString::from(format!(
+                                            "controlled-tree-check-{}",
+                                            entry.item().id()
+                                        )))
+                                        .checked(meta.selected)
+                                        .size(MoonCheckboxSize::Compact),
+                                    )
+                                    .child(
+                                        div().flex_1().min_w_0().truncate().child(
+                                            MoonText::new(entry.item().label().clone())
+                                                .mono(true)
+                                                .uppercase(false)
+                                                .color(tone)
+                                                .render(),
+                                        ),
+                                    )
+                                    .child(
+                                        MoonBadge::new(if entry.is_folder() {
+                                            "folder"
+                                        } else {
+                                            "strategy"
+                                        })
+                                        .size(MoonBadgeSize::Tiny),
+                                    )
+                            },
+                        )),
+                ),
             )
             .child(
                 h_flex()

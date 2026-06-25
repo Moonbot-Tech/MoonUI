@@ -175,7 +175,10 @@ pub use theme::{
 pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleSize};
 pub use tokens::{MoonMetrics, MoonPalette, MoonRect, MoonTone, rgba_from};
 pub use tooltip::{MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView};
-pub use tree::{MoonTree, MoonTreeEntry, MoonTreeEvent, MoonTreeItem, MoonTreeState};
+pub use tree::{
+    MoonTree, MoonTreeEntry, MoonTreeEvent, MoonTreeItem, MoonTreeRowMeta, MoonTreeSelectionMode,
+    MoonTreeState,
+};
 pub use virtual_list::{MoonVirtualList, MoonVirtualListScrollHandle};
 pub use window_ext::MoonWindowExt;
 pub use window_frame::{

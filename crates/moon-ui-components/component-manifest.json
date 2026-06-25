@@ -753,9 +753,12 @@
       "theme_source": "MoonTheme bridge through MoonTree facade",
       "public_path": "moon_ui::MoonTree",
       "upstream_ref": "Longbridge::tree@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon tree surface/style hook lives in base tree; Longbridge focus, selection, and expansion behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon tree surface/style hook lives in base tree; strategy-tree support adds controlled/headless rows, id-based selection/expansion, empty folders, multi-selection, and typed row DnD hooks on top of Longbridge focus/virtualization behavior",
       "donor_drift_budget": 1,
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": [
+        "gallery.visual_coverage",
+        "tree.strategy_tree_capabilities"
+      ]
     },
     {
       "concept": "chart",

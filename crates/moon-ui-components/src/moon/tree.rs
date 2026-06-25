@@ -6,5 +6,6 @@
 
 pub use crate::tree::{
     Tree as MoonTree, TreeEntry as MoonTreeEntry, TreeEvent as MoonTreeEvent,
-    TreeItem as MoonTreeItem, TreeState as MoonTreeState,
+    TreeItem as MoonTreeItem, TreeRowMeta as MoonTreeRowMeta,
+    TreeSelectionMode as MoonTreeSelectionMode, TreeState as MoonTreeState,
 };

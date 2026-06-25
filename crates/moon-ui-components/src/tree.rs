@@ -1,9 +1,10 @@
-use std::{cell::RefCell, ops::Range, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, ops::Range, rc::Rc};
 
 use gpui::{
-    App, Context, ElementId, Entity, EventEmitter, FocusHandle, InteractiveElement as _,
-    IntoElement, KeyBinding, ListSizingBehavior, MouseButton, ParentElement, Render, RenderOnce,
-    SharedString, StyleRefinement, Styled, UniformListScrollHandle, Window, div,
+    AnyElement, App, Context, Div, ElementId, Entity, EventEmitter, FocusHandle,
+    InteractiveElement as _, IntoElement, KeyBinding, ListSizingBehavior, Modifiers, MouseButton,
+    MouseDownEvent, ParentElement, Pixels, Point, Render, RenderOnce, SharedString, Stateful,
+    StatefulInteractiveElement as _, StyleRefinement, Styled, UniformListScrollHandle, Window, div,
     prelude::FluentBuilder as _, uniform_list,
 };
 
@@ -16,6 +17,16 @@ use crate::{
 };
 
 const CONTEXT: &str = "Tree";
+type RowRenderer =
+    Rc<dyn Fn(&TreeEntry, TreeRowMeta, &mut Window, &mut App) -> AnyElement + 'static>;
+type ContextMenuBuilder = Rc<
+    dyn Fn(usize, &TreeEntry, PopupMenu, &mut Window, &mut Context<TreeState>) -> PopupMenu
+        + 'static,
+>;
+type RowDecorator = Rc<
+    dyn Fn(Stateful<Div>, &TreeEntry, TreeRowMeta, &mut Window, &mut App) -> Stateful<Div>
+        + 'static,
+>;
 pub(crate) fn init(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("up", SelectUp, Some(CONTEXT)),
@@ -54,9 +65,28 @@ where
     Tree::new(state, render_item)
 }
 
+/// Selection behavior for a tree.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TreeSelectionMode {
+    /// Only one visible entry can be selected.
+    #[default]
+    Single,
+    /// Multiple entries can be selected with Shift and the platform secondary modifier.
+    Multi,
+}
+
+/// Metadata passed to a custom tree row renderer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TreeRowMeta {
+    pub index: usize,
+    pub selected: bool,
+    pub right_clicked: bool,
+}
+
 struct TreeItemState {
     expanded: bool,
     disabled: bool,
+    folder: Option<bool>,
 }
 
 /// A tree item with a label, children, and an expanded state.
@@ -73,6 +103,7 @@ pub struct TreeItem {
 pub struct TreeEntry {
     item: TreeItem,
     depth: usize,
+    expanded: bool,
 }
 
 impl TreeEntry {
@@ -89,7 +120,7 @@ impl TreeEntry {
     }
 
     #[inline]
-    fn is_root(&self) -> bool {
+    pub fn is_root(&self) -> bool {
         self.depth == 0
     }
 
@@ -102,7 +133,7 @@ impl TreeEntry {
     /// Return true if the item is expanded.
     #[inline]
     pub fn is_expanded(&self) -> bool {
-        self.item.is_expanded()
+        self.expanded
     }
 
     #[inline]
@@ -118,6 +149,16 @@ pub enum TreeEvent {
     Expanded(SharedString),
     /// A tree node was collapsed.
     Collapsed(SharedString),
+    /// A row received a mouse down event in the built-in interaction mode.
+    RowClicked {
+        id: SharedString,
+        modifiers: Modifiers,
+        button: MouseButton,
+    },
+    /// A folder row requested expand/collapse.
+    ChevronClicked { id: SharedString },
+    /// A row was activated by keyboard or double-click style interaction.
+    Activated(SharedString),
 }
 
 impl TreeItem {
@@ -139,6 +180,7 @@ impl TreeItem {
             state: Rc::new(RefCell::new(TreeItemState {
                 expanded: false,
                 disabled: false,
+                folder: None,
             })),
         }
     }
@@ -177,10 +219,22 @@ impl TreeItem {
         self
     }
 
+    /// Explicitly mark this item as a folder or a leaf.
+    ///
+    /// This is required for empty folders: without an explicit flag an item is
+    /// considered a folder only when it has children.
+    pub fn folder(self, folder: bool) -> Self {
+        self.state.borrow_mut().folder = Some(folder);
+        self
+    }
+
     /// Whether this item is a folder (has children).
     #[inline]
     pub fn is_folder(&self) -> bool {
-        self.children.len() > 0
+        self.state
+            .borrow()
+            .folder
+            .unwrap_or_else(|| !self.children.is_empty())
     }
 
     /// Return true if the item is disabled.
@@ -213,14 +267,20 @@ impl TreeItem {
 /// State for managing tree items.
 pub struct TreeState {
     focus_handle: FocusHandle,
+    root_items: Vec<TreeItem>,
     entries: Vec<TreeEntry>,
     scroll_handle: UniformListScrollHandle,
     selected_ix: Option<usize>,
+    selected_ids: HashSet<SharedString>,
+    anchor_id: Option<SharedString>,
+    expanded_ids: HashSet<SharedString>,
+    force_expanded: bool,
+    selection_mode: TreeSelectionMode,
     right_clicked_ix: Option<usize>,
-    render_item: Rc<dyn Fn(usize, &TreeEntry, bool, &mut Window, &mut App) -> ListItem>,
-    context_menu_builder: Option<
-        Rc<dyn Fn(usize, &TreeEntry, PopupMenu, &mut Window, &mut Context<TreeState>) -> PopupMenu>,
-    >,
+    render_row: RowRenderer,
+    row_decorators: Vec<RowDecorator>,
+    custom_rows: bool,
+    context_menu_builder: Option<ContextMenuBuilder>,
 }
 
 impl EventEmitter<TreeEvent> for TreeState {}
@@ -230,33 +290,42 @@ impl TreeState {
     pub fn new(cx: &mut App) -> Self {
         Self {
             selected_ix: None,
+            selected_ids: HashSet::new(),
+            anchor_id: None,
+            expanded_ids: HashSet::new(),
+            force_expanded: false,
+            selection_mode: TreeSelectionMode::Single,
             right_clicked_ix: None,
             focus_handle: cx.focus_handle(),
             scroll_handle: UniformListScrollHandle::default(),
+            root_items: Vec::new(),
             entries: Vec::new(),
-            render_item: Rc::new(|_, _, _, _, _| ListItem::new(0)),
+            render_row: Rc::new(|entry, meta, _, _| {
+                ListItem::new(meta.index)
+                    .child(entry.item().label.clone())
+                    .into_any_element()
+            }),
+            row_decorators: Vec::new(),
+            custom_rows: false,
             context_menu_builder: None,
         }
     }
 
     /// Set the tree items.
     pub fn items(mut self, items: impl Into<Vec<TreeItem>>) -> Self {
-        let items = items.into();
-        self.entries.clear();
-        for item in items.into_iter() {
-            self.add_entry(item, 0);
-        }
+        self.root_items = items.into();
+        self.collect_item_expansion_flags();
+        self.rebuild_entries();
+        self.reconcile_selection();
         self
     }
 
     /// Set the tree items.
     pub fn set_items(&mut self, items: impl Into<Vec<TreeItem>>, cx: &mut Context<Self>) {
-        let items = items.into();
-        self.entries.clear();
-        for item in items.into_iter() {
-            self.add_entry(item, 0);
-        }
-        self.selected_ix = None;
+        self.root_items = items.into();
+        self.collect_item_expansion_flags();
+        self.rebuild_entries();
+        self.reconcile_selection();
         self.right_clicked_ix = None;
         cx.notify();
     }
@@ -269,6 +338,15 @@ impl TreeState {
     /// Set the selected index, or `None` to clear selection.
     pub fn set_selected_index(&mut self, ix: Option<usize>, cx: &mut Context<Self>) {
         self.selected_ix = ix;
+        self.selected_ids.clear();
+        if let Some(ix) = ix
+            && let Some(entry) = self.entries.get(ix)
+        {
+            self.selected_ids.insert(entry.item.id.clone());
+            self.anchor_id = Some(entry.item.id.clone());
+        } else {
+            self.anchor_id = None;
+        }
         cx.notify();
     }
 
@@ -288,10 +366,124 @@ impl TreeState {
                     .iter()
                     .position(|entry| entry.item.id == item.id);
             }
+            self.selected_ids.clear();
+            self.selected_ids.insert(item.id.clone());
+            self.anchor_id = Some(item.id.clone());
         } else {
             self.selected_ix = None;
+            self.selected_ids.clear();
+            self.anchor_id = None;
         }
         cx.notify();
+    }
+
+    /// Configure selection behavior.
+    pub fn set_selection_mode(&mut self, mode: TreeSelectionMode, cx: &mut Context<Self>) {
+        if self.selection_mode == mode {
+            return;
+        }
+        self.selection_mode = mode;
+        if mode == TreeSelectionMode::Single {
+            self.keep_primary_selection_only();
+        }
+        self.reconcile_selection();
+        cx.notify();
+    }
+
+    /// Return the configured selection behavior.
+    pub fn selection_mode(&self) -> TreeSelectionMode {
+        self.selection_mode
+    }
+
+    /// Return selected ids in visible tree order, followed by hidden selected ids.
+    pub fn selected_ids(&self) -> Vec<SharedString> {
+        let mut ids = Vec::with_capacity(self.selected_ids.len());
+        for entry in &self.entries {
+            if self.selected_ids.contains(&entry.item.id) {
+                ids.push(entry.item.id.clone());
+            }
+        }
+        for id in &self.selected_ids {
+            if !ids.contains(id) {
+                ids.push(id.clone());
+            }
+        }
+        ids
+    }
+
+    /// Replace selection by ids. Hidden ids are retained and reconciled when entries rebuild.
+    pub fn set_selected_ids(
+        &mut self,
+        ids: impl IntoIterator<Item = SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        self.selected_ids = ids.into_iter().collect();
+        if self.selection_mode == TreeSelectionMode::Single {
+            self.keep_primary_selection_only();
+        }
+        self.anchor_id = self.selected_ids().first().cloned();
+        self.reconcile_selection();
+        cx.notify();
+    }
+
+    /// Select all currently visible entries. Useful for Ctrl+A handling in consumers.
+    pub fn select_all_visible(&mut self, cx: &mut Context<Self>) {
+        if self.selection_mode != TreeSelectionMode::Multi {
+            return;
+        }
+        self.selected_ids = self
+            .entries
+            .iter()
+            .map(|entry| entry.item.id.clone())
+            .collect();
+        self.anchor_id = self.entries.first().map(|entry| entry.item.id.clone());
+        self.reconcile_selection();
+        cx.notify();
+    }
+
+    /// Set expanded ids; the set is keyed by item id and survives item rebuilds.
+    pub fn set_expanded(
+        &mut self,
+        ids: impl IntoIterator<Item = SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        self.expanded_ids = ids.into_iter().collect();
+        self.rebuild_entries();
+        self.reconcile_selection();
+        cx.notify();
+    }
+
+    /// Return expanded ids.
+    pub fn expanded_ids(&self) -> Vec<SharedString> {
+        self.expanded_ids.iter().cloned().collect()
+    }
+
+    /// Expand all current folders.
+    pub fn expand_all(&mut self, cx: &mut Context<Self>) {
+        let mut ids = HashSet::new();
+        for item in &self.root_items {
+            Self::collect_folder_ids(item, &mut ids);
+        }
+        self.expanded_ids.extend(ids);
+        self.rebuild_entries();
+        self.reconcile_selection();
+        cx.notify();
+    }
+
+    /// Temporarily render all folders as expanded without mutating `expanded_ids`.
+    pub fn set_force_expanded(&mut self, force: bool, cx: &mut Context<Self>) {
+        if self.force_expanded == force {
+            return;
+        }
+        self.force_expanded = force;
+        self.rebuild_entries();
+        self.reconcile_selection();
+        cx.notify();
+    }
+
+    /// Whether all folders are temporarily rendered as expanded.
+    pub fn force_expanded(&self) -> bool {
+        self.force_expanded
     }
 
     /// Get the currently selected tree item, if any.
@@ -309,11 +501,109 @@ impl TreeState {
         self.selected_ix.and_then(|ix| self.entries.get(ix))
     }
 
+    fn collect_item_expansion_flags(&mut self) {
+        let mut ids = HashSet::new();
+        for item in &self.root_items {
+            Self::collect_expanded_item_ids(item, &mut ids);
+        }
+        self.expanded_ids.extend(ids);
+    }
+
+    fn collect_expanded_item_ids(item: &TreeItem, ids: &mut HashSet<SharedString>) {
+        if item.is_expanded() {
+            ids.insert(item.id.clone());
+        }
+        for child in &item.children {
+            Self::collect_expanded_item_ids(child, ids);
+        }
+    }
+
+    fn collect_folder_ids(item: &TreeItem, ids: &mut HashSet<SharedString>) {
+        if item.is_folder() {
+            ids.insert(item.id.clone());
+        }
+        for child in &item.children {
+            Self::collect_folder_ids(child, ids);
+        }
+    }
+
+    fn is_expanded_item(&self, item: &TreeItem) -> bool {
+        self.force_expanded || self.expanded_ids.contains(&item.id)
+    }
+
+    fn index_for_id(&self, id: &SharedString) -> Option<usize> {
+        self.entries.iter().position(|entry| entry.item.id == *id)
+    }
+
+    fn keep_primary_selection_only(&mut self) {
+        let primary = self
+            .selected_ix
+            .and_then(|ix| self.entries.get(ix).map(|entry| entry.item.id.clone()))
+            .or_else(|| self.selected_ids().first().cloned());
+        self.selected_ids.clear();
+        if let Some(id) = primary {
+            self.selected_ids.insert(id.clone());
+            self.anchor_id = Some(id);
+        }
+    }
+
+    fn reconcile_selection(&mut self) {
+        self.selected_ix = self
+            .selected_ids()
+            .first()
+            .and_then(|id| self.index_for_id(id));
+        self.right_clicked_ix = self.right_clicked_ix.filter(|ix| *ix < self.entries.len());
+    }
+
+    fn select_entry_with_modifiers(
+        &mut self,
+        ix: usize,
+        modifiers: Modifiers,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(entry) = self.entries.get(ix) else {
+            return;
+        };
+        if entry.item.is_disabled() {
+            return;
+        }
+        let id = entry.item.id.clone();
+        if self.selection_mode == TreeSelectionMode::Multi && modifiers.shift {
+            let anchor_ix = self
+                .anchor_id
+                .as_ref()
+                .and_then(|anchor| self.index_for_id(anchor))
+                .unwrap_or(ix);
+            let (start, end) = if anchor_ix <= ix {
+                (anchor_ix, ix)
+            } else {
+                (ix, anchor_ix)
+            };
+            self.selected_ids.clear();
+            for entry in &self.entries[start..=end] {
+                if !entry.item.is_disabled() {
+                    self.selected_ids.insert(entry.item.id.clone());
+                }
+            }
+        } else if self.selection_mode == TreeSelectionMode::Multi && modifiers.secondary() {
+            if !self.selected_ids.remove(&id) {
+                self.selected_ids.insert(id.clone());
+            }
+            self.anchor_id = Some(id.clone());
+        } else {
+            self.selected_ids.clear();
+            self.selected_ids.insert(id.clone());
+            self.anchor_id = Some(id.clone());
+        }
+        self.selected_ix = Some(ix);
+        cx.notify();
+    }
+
     fn expand_ancestors(&mut self, target_id: SharedString, cx: &mut Context<Self>) {
         let mut ancestors = Vec::new();
 
-        for entry in &self.entries {
-            if let Some(found_ancestors) = entry.item.find_ancestors(&target_id) {
+        for item in &self.root_items {
+            if let Some(found_ancestors) = item.find_ancestors(&target_id) {
                 ancestors = found_ancestors;
                 break;
             }
@@ -324,8 +614,8 @@ impl TreeState {
         }
 
         for ancestor in ancestors.into_iter().rev() {
-            if !ancestor.is_expanded() {
-                ancestor.state.borrow_mut().expanded = true;
+            if !self.expanded_ids.contains(&ancestor.id) {
+                self.expanded_ids.insert(ancestor.id.clone());
                 cx.emit(TreeEvent::Expanded(ancestor.id.clone()));
             }
         }
@@ -337,8 +627,9 @@ impl TreeState {
         self.entries.push(TreeEntry {
             item: item.clone(),
             depth,
+            expanded: self.is_expanded_item(&item),
         });
-        if item.is_expanded() {
+        if self.is_expanded_item(&item) {
             for child in &item.children {
                 self.add_entry(child.clone(), depth + 1);
             }
@@ -346,20 +637,21 @@ impl TreeState {
     }
 
     fn toggle_expand(&mut self, ix: usize, cx: &mut Context<Self>) {
-        let Some(entry) = self.entries.get_mut(ix) else {
+        let Some(entry) = self.entries.get(ix) else {
             return;
         };
         if !entry.is_folder() {
             return;
         }
 
-        let expanded = !entry.is_expanded();
+        let expanded = !self.expanded_ids.contains(&entry.item.id);
         let id = entry.item.id.clone();
-        entry.item.state.borrow_mut().expanded = expanded;
 
         if expanded {
+            self.expanded_ids.insert(id.clone());
             cx.emit(TreeEvent::Expanded(id));
         } else {
+            self.expanded_ids.remove(&id);
             cx.emit(TreeEvent::Collapsed(id));
         }
 
@@ -368,14 +660,8 @@ impl TreeState {
     }
 
     fn rebuild_entries(&mut self) {
-        let root_items: Vec<TreeItem> = self
-            .entries
-            .iter()
-            .filter(|e| e.is_root())
-            .map(|e| e.item.clone())
-            .collect();
         self.entries.clear();
-        for item in root_items.into_iter() {
+        for item in self.root_items.clone().into_iter() {
             self.add_entry(item, 0);
         }
     }
@@ -387,7 +673,11 @@ impl TreeState {
     fn on_action_confirm(&mut self, _: &Confirm, _: &mut Window, cx: &mut Context<Self>) {
         if let Some(selected_ix) = self.selected_ix {
             if let Some(entry) = self.entries.get(selected_ix) {
+                cx.emit(TreeEvent::Activated(entry.item.id.clone()));
                 if entry.is_folder() {
+                    cx.emit(TreeEvent::ChevronClicked {
+                        id: entry.item.id.clone(),
+                    });
                     self.toggle_expand(selected_ix, cx);
                     cx.notify();
                 }
@@ -426,7 +716,16 @@ impl TreeState {
             selected_ix = self.entries.len().saturating_sub(1);
         }
 
+        let id = self
+            .entries
+            .get(selected_ix)
+            .map(|entry| entry.item.id.clone());
         self.selected_ix = Some(selected_ix);
+        self.selected_ids.clear();
+        if let Some(id) = id {
+            self.selected_ids.insert(id.clone());
+            self.anchor_id = Some(id);
+        }
         self.scroll_handle
             .scroll_to_item(selected_ix, gpui::ScrollStrategy::Top);
         cx.notify();
@@ -440,23 +739,53 @@ impl TreeState {
             selected_ix = 0;
         }
 
+        let id = self
+            .entries
+            .get(selected_ix)
+            .map(|entry| entry.item.id.clone());
         self.selected_ix = Some(selected_ix);
+        self.selected_ids.clear();
+        if let Some(id) = id {
+            self.selected_ids.insert(id.clone());
+            self.anchor_id = Some(id);
+        }
         self.scroll_handle
             .scroll_to_item(selected_ix, gpui::ScrollStrategy::Bottom);
         cx.notify();
     }
 
-    fn on_entry_click(&mut self, ix: usize, _: &mut Window, cx: &mut Context<Self>) {
-        self.selected_ix = Some(ix);
-        self.toggle_expand(ix, cx);
+    fn on_entry_click(
+        &mut self,
+        ix: usize,
+        event: &MouseDownEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(entry) = self.entries.get(ix) else {
+            return;
+        };
+        let id = entry.item.id.clone();
+        let is_folder = entry.is_folder();
+        cx.emit(TreeEvent::RowClicked {
+            id: id.clone(),
+            modifiers: event.modifiers,
+            button: event.button,
+        });
+        self.select_entry_with_modifiers(ix, event.modifiers, cx);
+        if event.button == MouseButton::Left && is_folder {
+            cx.emit(TreeEvent::ChevronClicked { id });
+            self.toggle_expand(ix, cx);
+        }
         cx.notify();
     }
 }
 
 impl Render for TreeState {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let render_item = self.render_item.clone();
+        let render_row = self.render_row.clone();
         let state = cx.entity().clone();
+        let custom_rows = self.custom_rows;
+        let row_decorators = self.row_decorators.clone();
 
         div()
             .id("tree-state")
@@ -496,34 +825,70 @@ impl Render for TreeState {
                         let mut items = Vec::with_capacity(visible_range.len());
                         for ix in visible_range {
                             let entry = &state.entries[ix];
-                            let selected = Some(ix) == state.selected_ix;
+                            let selected = state.selected_ids.contains(&entry.item.id);
                             let right_clicked = Some(ix) == state.right_clicked_ix;
-                            let item = (render_item)(ix, entry, selected, window, cx);
+                            let item = (render_row)(
+                                entry,
+                                TreeRowMeta {
+                                    index: ix,
+                                    selected,
+                                    right_clicked,
+                                },
+                                window,
+                                cx,
+                            );
 
-                            let el = div()
-                                .id(ix)
-                                .child(
-                                    item.disabled(entry.item().is_disabled())
-                                        .selected(selected)
-                                        .secondary_selected(right_clicked),
-                                )
-                                .when(!entry.item().is_disabled(), |this| {
+                            let mut el = div().id(ix).child(item).when(
+                                !custom_rows && !entry.item().is_disabled(),
+                                |this| {
                                     this.on_mouse_down(
                                         MouseButton::Left,
                                         cx.listener({
-                                            move |this, _, window, cx| {
-                                                this.on_entry_click(ix, window, cx);
+                                            move |this, event: &MouseDownEvent, window, cx| {
+                                                this.on_entry_click(ix, event, window, cx);
                                             }
                                         }),
                                     )
                                     .on_mouse_down(
                                         MouseButton::Right,
-                                        cx.listener(move |this, _, _, cx| {
-                                            this.right_clicked_ix = Some(ix);
-                                            cx.notify();
-                                        }),
+                                        cx.listener(
+                                            move |this, event: &MouseDownEvent, window, cx| {
+                                                this.right_clicked_ix = Some(ix);
+                                                let Some(entry) = this.entries.get(ix) else {
+                                                    return;
+                                                };
+                                                let id = entry.item.id.clone();
+                                                cx.emit(TreeEvent::RowClicked {
+                                                    id: id.clone(),
+                                                    modifiers: event.modifiers,
+                                                    button: event.button,
+                                                });
+                                                if !this.selected_ids.contains(&id) {
+                                                    this.selected_ids.clear();
+                                                    this.selected_ids.insert(id.clone());
+                                                    this.selected_ix = Some(ix);
+                                                    this.anchor_id = Some(id);
+                                                }
+                                                let _ = window;
+                                                cx.notify();
+                                            },
+                                        ),
                                     )
-                                });
+                                },
+                            );
+                            for decorator in &row_decorators {
+                                el = decorator(
+                                    el,
+                                    entry,
+                                    TreeRowMeta {
+                                        index: ix,
+                                        selected,
+                                        right_clicked,
+                                    },
+                                    window,
+                                    cx,
+                                );
+                            }
 
                             items.push(el)
                         }
@@ -546,10 +911,11 @@ pub struct Tree {
     id: ElementId,
     state: Entity<TreeState>,
     style: StyleRefinement,
-    render_item: Rc<dyn Fn(usize, &TreeEntry, bool, &mut Window, &mut App) -> ListItem>,
-    context_menu_builder: Option<
-        Rc<dyn Fn(usize, &TreeEntry, PopupMenu, &mut Window, &mut Context<TreeState>) -> PopupMenu>,
-    >,
+    render_row: RowRenderer,
+    row_decorators: Vec<RowDecorator>,
+    custom_rows: bool,
+    selection_mode: Option<TreeSelectionMode>,
+    context_menu_builder: Option<ContextMenuBuilder>,
 }
 
 impl Tree {
@@ -561,11 +927,136 @@ impl Tree {
             id: ElementId::Name(format!("tree-{}", state.entity_id()).into()),
             state: state.clone(),
             style: StyleRefinement::default(),
-            render_item: Rc::new(move |ix, item, selected, window, app| {
-                render_item(ix, item, selected, window, app)
+            render_row: Rc::new(move |entry, meta, window, app| {
+                render_item(meta.index, entry, meta.selected, window, app)
+                    .disabled(entry.item().is_disabled())
+                    .selected(meta.selected)
+                    .secondary_selected(meta.right_clicked)
+                    .into_any_element()
             }),
+            row_decorators: Vec::new(),
+            custom_rows: false,
+            selection_mode: None,
             context_menu_builder: None,
         }
+    }
+
+    /// Create a headless/controlled tree: the renderer returns the full row
+    /// element and the tree does not install row click/expand handlers.
+    ///
+    /// Consumers keep their own row interaction logic while reusing TreeState's
+    /// item flattening, virtualization, scroll handle, focus and keyboard action
+    /// wiring.
+    pub fn custom<R, E>(state: &Entity<TreeState>, render_row: R) -> Self
+    where
+        R: Fn(&TreeEntry, TreeRowMeta, &mut Window, &mut App) -> E + 'static,
+        E: IntoElement,
+    {
+        Self {
+            id: ElementId::Name(format!("tree-{}", state.entity_id()).into()),
+            state: state.clone(),
+            style: StyleRefinement::default(),
+            render_row: Rc::new(move |entry, meta, window, app| {
+                render_row(entry, meta, window, app).into_any_element()
+            }),
+            row_decorators: Vec::new(),
+            custom_rows: true,
+            selection_mode: None,
+            context_menu_builder: None,
+        }
+    }
+
+    /// Configure built-in selection behavior.
+    pub fn selection_mode(mut self, mode: TreeSelectionMode) -> Self {
+        self.selection_mode = Some(mode);
+        self
+    }
+
+    /// Decorate the virtualized row container.
+    ///
+    /// This is the low-level hook for behaviors that must live on the real row
+    /// hitbox, such as typed drag-and-drop.
+    pub fn row_decorator<F>(mut self, decorator: F) -> Self
+    where
+        F: Fn(Stateful<Div>, &TreeEntry, TreeRowMeta, &mut Window, &mut App) -> Stateful<Div>
+            + 'static,
+    {
+        self.row_decorators.push(Rc::new(decorator));
+        self
+    }
+
+    /// Make rows draggable with a typed GPUI payload.
+    pub fn draggable<T, W, V, P>(self, value: V, preview: P) -> Self
+    where
+        T: 'static,
+        W: Render + 'static,
+        V: Fn(&TreeEntry, &TreeRowMeta) -> Option<T> + 'static,
+        P: Fn(&T, Point<Pixels>, &mut Window, &mut App) -> Entity<W> + 'static,
+    {
+        let value = Rc::new(value);
+        let preview = Rc::new(preview);
+        self.row_decorator(move |row, entry, meta, _window, _app| {
+            let Some(payload) = value(entry, &meta) else {
+                return row;
+            };
+            let preview = preview.clone();
+            row.on_drag(payload, move |drag, pos, window, app| {
+                preview(drag, pos, window, app)
+            })
+        })
+    }
+
+    /// Apply a style while a typed payload is dragged over a row.
+    pub fn drag_over<T, F>(self, style: F) -> Self
+    where
+        T: 'static,
+        F: Fn(
+                StyleRefinement,
+                &TreeEntry,
+                &TreeRowMeta,
+                &T,
+                &mut Window,
+                &mut App,
+            ) -> StyleRefinement
+            + 'static,
+    {
+        let style = Rc::new(style);
+        self.row_decorator(move |row, entry, meta, _window, _app| {
+            let entry = entry.clone();
+            row.drag_over::<T>({
+                let style = style.clone();
+                move |base, drag, window, app| style(base, &entry, &meta, drag, window, app)
+            })
+        })
+    }
+
+    /// Install a typed drop target on every row.
+    pub fn drop_target<T, C, D>(self, can_drop: C, on_drop: D) -> Self
+    where
+        T: 'static,
+        C: Fn(&TreeEntry, &TreeRowMeta, &T, &mut Window, &mut App) -> bool + 'static,
+        D: Fn(&TreeEntry, &TreeRowMeta, &T, &mut Window, &mut App) + 'static,
+    {
+        let can_drop = Rc::new(can_drop);
+        let on_drop = Rc::new(on_drop);
+        self.row_decorator(move |row, entry, meta, _window, _app| {
+            let drop_entry = entry.clone();
+            let drop_meta = meta.clone();
+            let can_entry = entry.clone();
+            let can_meta = meta.clone();
+            row.can_drop({
+                let can_drop = can_drop.clone();
+                move |drag, window, app| {
+                    drag.downcast_ref::<T>()
+                        .map(|drag| can_drop(&can_entry, &can_meta, drag, window, app))
+                        .unwrap_or(false)
+                }
+            })
+            .on_drop({
+                let on_drop = on_drop.clone();
+                move |drag: &T, window, app| on_drop(&drop_entry, &drop_meta, drag, window, app)
+            })
+        })
     }
 
     /// Add a context menu to the tree.
@@ -596,7 +1087,16 @@ impl RenderOnce for Tree {
         let scroll_handle = self.state.read(cx).scroll_handle.clone();
 
         self.state.update(cx, |state, _| {
-            state.render_item = self.render_item;
+            state.render_row = self.render_row;
+            state.row_decorators = self.row_decorators;
+            state.custom_rows = self.custom_rows;
+            if let Some(mode) = self.selection_mode {
+                state.selection_mode = mode;
+                if mode == TreeSelectionMode::Single {
+                    state.keep_primary_selection_only();
+                }
+                state.reconcile_selection();
+            }
             state.context_menu_builder = self.context_menu_builder;
         });
 
@@ -624,7 +1124,7 @@ mod tests {
     use indoc::indoc;
 
     use super::{TreeEvent, TreeState};
-    use gpui::{AppContext as _, Render, Subscription};
+    use gpui::{AppContext as _, ParentElement as _, Render, SharedString, Subscription};
 
     struct TestCollector {
         _state: gpui::Entity<TreeState>,
@@ -845,6 +1345,143 @@ mod tests {
                 TreeEvent::Expanded("src".into()),
                 TreeEvent::Expanded("src/ui".into())
             ]
+        );
+    }
+
+    #[gpui::test]
+    fn empty_folder_is_visible_and_expandable_by_explicit_flag(cx: &mut gpui::TestAppContext) {
+        let items = vec![super::TreeItem::new("empty", "empty").folder(true)];
+        let state = cx.new(|cx| TreeState::new(cx).items(items));
+
+        state.update(cx, |state, cx| {
+            assert_eq!(state.entries.len(), 1);
+            assert!(state.entries[0].is_folder());
+            state.toggle_expand(0, cx);
+            assert!(state.expanded_ids().contains(&SharedString::from("empty")));
+        });
+    }
+
+    #[gpui::test]
+    fn selected_ids_survive_rebuild_by_id(cx: &mut gpui::TestAppContext) {
+        let first = vec![
+            super::TreeItem::new("root", "root")
+                .expanded(true)
+                .child(super::TreeItem::new("a", "a"))
+                .child(super::TreeItem::new("b", "b")),
+        ];
+        let state = cx.new(|cx| TreeState::new(cx).items(first));
+
+        state.update(cx, |state, cx| {
+            state.set_selected_ids([SharedString::from("b")], cx);
+            assert_eq!(state.selected_index(), Some(2));
+            let rebuilt = vec![
+                super::TreeItem::new("root", "root")
+                    .expanded(true)
+                    .child(super::TreeItem::new("x", "x"))
+                    .child(super::TreeItem::new("b", "b")),
+            ];
+            state.set_items(rebuilt, cx);
+            assert_eq!(state.selected_ids(), vec![SharedString::from("b")]);
+            assert_eq!(state.selected_index(), Some(2));
+        });
+    }
+
+    #[gpui::test]
+    fn force_expanded_does_not_mutate_expanded_ids(cx: &mut gpui::TestAppContext) {
+        let items = vec![
+            super::TreeItem::new("root", "root")
+                .child(super::TreeItem::new("root/a", "a"))
+                .child(super::TreeItem::new("root/b", "b")),
+        ];
+        let state = cx.new(|cx| TreeState::new(cx).items(items));
+
+        state.update(cx, |state, cx| {
+            assert_eq!(state.entries.len(), 1);
+            assert!(state.expanded_ids().is_empty());
+            state.set_force_expanded(true, cx);
+            assert_eq!(state.entries.len(), 3);
+            assert!(state.expanded_ids().is_empty());
+            state.set_force_expanded(false, cx);
+            assert_eq!(state.entries.len(), 1);
+        });
+    }
+
+    #[gpui::test]
+    fn multi_selection_supports_shift_range_and_secondary_toggle(cx: &mut gpui::TestAppContext) {
+        let items = vec![
+            super::TreeItem::new("a", "a"),
+            super::TreeItem::new("b", "b"),
+            super::TreeItem::new("c", "c"),
+            super::TreeItem::new("d", "d"),
+        ];
+        let state = cx.new(|cx| {
+            let mut state = TreeState::new(cx).items(items);
+            state.selection_mode = super::TreeSelectionMode::Multi;
+            state
+        });
+
+        state.update(cx, |state, cx| {
+            state.select_entry_with_modifiers(1, gpui::Modifiers::none(), cx);
+            let mut shift = gpui::Modifiers::none();
+            shift.shift = true;
+            state.select_entry_with_modifiers(3, shift, cx);
+            assert_eq!(
+                state.selected_ids(),
+                vec![
+                    SharedString::from("b"),
+                    SharedString::from("c"),
+                    SharedString::from("d")
+                ]
+            );
+
+            let mut secondary = gpui::Modifiers::none();
+            secondary.control = true;
+            state.select_entry_with_modifiers(2, secondary, cx);
+            assert_eq!(
+                state.selected_ids(),
+                vec![SharedString::from("b"), SharedString::from("d")]
+            );
+        });
+    }
+
+    #[gpui::test]
+    fn tree_typed_dnd_builders_are_composable(cx: &mut gpui::TestAppContext) {
+        #[derive(Clone)]
+        struct DragPayload {
+            id: SharedString,
+        }
+
+        struct DragPreview;
+        impl Render for DragPreview {
+            fn render(
+                &mut self,
+                _: &mut gpui::Window,
+                _: &mut gpui::Context<Self>,
+            ) -> impl gpui::IntoElement {
+                gpui::div()
+            }
+        }
+
+        let state =
+            cx.new(|cx| TreeState::new(cx).items([super::TreeItem::new("a", "a").folder(true)]));
+        let _tree = super::Tree::custom(&state, |entry, _meta, _window, _cx| {
+            gpui::div().child(entry.item().label().clone())
+        })
+        .draggable(
+            |entry, _meta| {
+                Some(DragPayload {
+                    id: entry.item().id().clone(),
+                })
+            },
+            |_drag, _pos, _window, cx| cx.new(|_| DragPreview),
+        )
+        .drag_over::<DragPayload, _>(|style, entry, _meta, drag, _window, _cx| {
+            assert_eq!(entry.item().id(), &drag.id);
+            style
+        })
+        .drop_target::<DragPayload, _, _>(
+            |entry, _meta, drag, _window, _cx| entry.item().id() == &drag.id,
+            |_entry, _meta, _drag, _window, _cx| {},
         );
     }
 }

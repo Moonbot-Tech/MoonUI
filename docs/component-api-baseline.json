@@ -2271,7 +2271,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use tree::{MoonTree, MoonTreeEntry, MoonTreeEvent, MoonTreeItem, MoonTreeState};"
+      "signature": "pub use tree::{ MoonTree, MoonTreeEntry, MoonTreeEvent, MoonTreeItem, MoonTreeRowMeta, MoonTreeSelectionMode, MoonTreeState, };"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -4015,7 +4015,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tree.rs",
-      "signature": "pub use crate::tree::{ Tree as MoonTree, TreeEntry as MoonTreeEntry, TreeEvent as MoonTreeEvent, TreeItem as MoonTreeItem, TreeState as MoonTreeState, };"
+      "signature": "pub use crate::tree::{ Tree as MoonTree, TreeEntry as MoonTreeEntry, TreeEvent as MoonTreeEvent, TreeItem as MoonTreeItem, TreeRowMeta as MoonTreeRowMeta, TreeSelectionMode as MoonTreeSelectionMode, TreeState as MoonTreeState, };"
     },
     {
       "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
@@ -4200,6 +4200,10 @@
     {
       "file": "crates/moon-ui/src/lib.rs",
       "signature": "pub use gpui_component::moon::foundation::*;"
+    },
+    {
+      "file": "crates/moon-ui/src/lib.rs",
+      "signature": "pub use gpui_component_assets::Assets as MoonAssets;"
     }
   ]
 }

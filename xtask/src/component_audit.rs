@@ -613,6 +613,19 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &tests,
             "dock must preserve panel flags, tab creation, tab-move target resolution, self-drop guards, tile clamping, and cached panel embedding",
         ),
+        test_contract(
+            "tree.strategy_tree_capabilities",
+            ContractSeverity::Guardrail,
+            &[
+                "empty_folder_is_visible_and_expandable_by_explicit_flag",
+                "selected_ids_survive_rebuild_by_id",
+                "force_expanded_does_not_mutate_expanded_ids",
+                "multi_selection_supports_shift_range_and_secondary_toggle",
+                "tree_typed_dnd_builders_are_composable",
+            ],
+            &tests,
+            "tree must preserve strategy-tree requirements: empty folders, id-based state, temporary force-open search state, multi-selection, and typed row DnD hooks",
+        ),
         pass_if(
             "legacy_dock.internal_only",
             ContractSeverity::Guardrail,

@@ -941,10 +941,11 @@
       "theme_source": "MoonTheme bridge through MoonTree facade",
       "public_path": "moon_ui::MoonTree",
       "upstream_ref": "Longbridge::tree@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon tree surface/style hook lives in base tree; Longbridge focus, selection, and expansion behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon tree surface/style hook lives in base tree; strategy-tree support adds controlled/headless rows, id-based selection/expansion, empty folders, multi-selection, and typed row DnD hooks on top of Longbridge focus/virtualization behavior",
       "donor_drift_budget": 1,
       "contracts": [
-        "gallery.visual_coverage"
+        "gallery.visual_coverage",
+        "tree.strategy_tree_capabilities"
       ]
     },
     {
@@ -1240,6 +1241,13 @@
       "severity": "Guardrail",
       "verifier": "BehavioralTest",
       "details": "toggle click handling must respect disabled and controlled state; covered by Rust test(s): toggle_click_plan_respects_disabled_and_controlled_state"
+    },
+    {
+      "id": "tree.strategy_tree_capabilities",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "tree must preserve strategy-tree requirements: empty folders, id-based state, temporary force-open search state, multi-selection, and typed row DnD hooks; covered by Rust test(s): empty_folder_is_visible_and_expandable_by_explicit_flag, selected_ids_survive_rebuild_by_id, force_expanded_does_not_mutate_expanded_ids, multi_selection_supports_shift_range_and_secondary_toggle, tree_typed_dnd_builders_are_composable"
     },
     {
       "id": "visual_snapshots",
