@@ -400,13 +400,14 @@ impl MoonDataTableState {
             return false;
         };
         let source_key = self.column_order.remove(source_ix);
-        let Some(mut target_ix) = self.column_order.iter().position(|key| key == target) else {
+        // `target_ix` is found AFTER removing the source, so it already accounts for the shift.
+        // Inserting at it places the source immediately before the target. (A previous
+        // `if source_ix < target_ix { target_ix -= 1 }` adjustment double-counted the removal,
+        // which shifted right-ward moves one slot too far left — columns could only move left.)
+        let Some(target_ix) = self.column_order.iter().position(|key| key == target) else {
             self.column_order.push(source_key);
             return true;
         };
-        if source_ix < target_ix {
-            target_ix = target_ix.saturating_sub(1);
-        }
         self.column_order.insert(target_ix, source_key);
         true
     }
