@@ -17,13 +17,17 @@ impl MoonRect {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MoonPalette {
     pub shell: u32,
     pub shell_high: u32,
+    pub surface: u32,
     pub panel: u32,
     pub panel_high: u32,
+    pub chrome: u32,
+    pub panel_head: u32,
+    pub gutter: u32,
     pub chart_bg: u32,
     pub border: u32,
     pub border_hover: u32,
@@ -42,6 +46,8 @@ pub struct MoonPalette {
     pub amber: u32,
     pub blue: u32,
     pub accent: u32,
+    pub accent_fg: u32,
+    pub accent_tint_a: f32,
     pub yellow: u32,
 }
 
@@ -55,6 +61,7 @@ pub struct MoonMetrics {
     pub table_header_h: f32,
     pub table_row_h: f32,
     pub button_radius: f32,
+    pub container_radius: f32,
     pub hairline: f32,
 }
 
@@ -68,6 +75,7 @@ impl MoonMetrics {
         table_header_h: 26.0,
         table_row_h: 25.0,
         button_radius: 4.0,
+        container_radius: 8.0,
         hairline: 1.0,
     };
 
@@ -82,9 +90,13 @@ impl MoonPalette {
     pub const TERMINAL: Self = Self {
         shell: 0x131416,
         shell_high: 0x1A1C1F,
+        surface: 0x16181B,
         panel: 0x20232A,
-        panel_high: 0x23262D,
-        chart_bg: 0x14171B,
+        panel_high: 0x22252B,
+        chrome: 0x1A1C1F,
+        panel_head: 0x22252B,
+        gutter: 0x0F1012,
+        chart_bg: 0x16181B,
         border: 0x2A2D31,
         border_hover: 0x343840,
         shadow: 0x000000,
@@ -92,42 +104,50 @@ impl MoonPalette {
         on_accent: 0xFFFFFF,
         text: 0xE8E4DC,
         text_soft: 0x97928A,
-        text_muted: 0x5E5A53,
+        text_muted: 0x7D7669,
         table_head: 0x20232A,
         table_body: 0x1A1C1F,
-        table_selected: 0x212120,
-        green: 0x2FA85C,
-        red: 0xFF4A4A,
+        table_selected: 0xFFB347,
+        green: 0x1E8C5B,
+        red: 0xE5484D,
         orange: 0xFF8E5A,
         amber: 0xFFB347,
         blue: 0x7FC9FF,
-        accent: 0xD2691E,
+        accent: 0xFFB347,
+        accent_fg: 0xFFCF94,
+        accent_tint_a: 0.11,
         yellow: 0xFFD93D,
     };
 
     pub const LIGHT: Self = Self {
-        shell: 0xF3F5F7,
-        shell_high: 0xFFFFFF,
-        panel: 0xE7EBEF,
-        panel_high: 0xFFFFFF,
-        chart_bg: 0xF5F7FA,
-        border: 0xCDD3DA,
-        border_hover: 0xB8C0C8,
+        shell: 0xEAEAEC,
+        shell_high: 0xF0F0F2,
+        surface: 0xFFFFFF,
+        panel: 0xF2F2F4,
+        panel_high: 0xE8E8EB,
+        chrome: 0xF0F0F2,
+        panel_head: 0xE8E8EB,
+        gutter: 0xE1E1E4,
+        chart_bg: 0xFFFFFF,
+        border: 0xD7D7DB,
+        border_hover: 0xC4C4CB,
         shadow: 0x000000,
         overlay: 0x000000,
         on_accent: 0xFFFFFF,
-        text: 0x18202A,
-        text_soft: 0x4F5B68,
-        text_muted: 0x7A8591,
-        table_head: 0xEEF2F5,
+        text: 0x17171A,
+        text_soft: 0x5C5C62,
+        text_muted: 0x6E6E76,
+        table_head: 0xE8E8EB,
         table_body: 0xFFFFFF,
-        table_selected: 0xE7F1FF,
-        green: 0x168A49,
-        red: 0xD92D3A,
+        table_selected: 0x8A6326,
+        green: 0x0E9F6E,
+        red: 0xE5484D,
         orange: 0xC85F17,
-        amber: 0xB97800,
-        blue: 0x126CBF,
-        accent: 0xB95C18,
+        amber: 0x8A6326,
+        blue: 0x2563EB,
+        accent: 0x8A6326,
+        accent_fg: 0x73521D,
+        accent_tint_a: 0.10,
         yellow: 0xB48A00,
     };
 
@@ -135,6 +155,21 @@ impl MoonPalette {
         super::theme::MoonTheme::global(cx)
             .map(|theme| theme.palette)
             .unwrap_or(Self::TERMINAL)
+    }
+
+    pub fn is_light(self) -> bool {
+        let r = ((self.shell >> 16) & 0xFF) as f32;
+        let g = ((self.shell >> 8) & 0xFF) as f32;
+        let b = (self.shell & 0xFF) as f32;
+        (0.2126 * r + 0.7152 * g + 0.0722 * b) >= 128.0
+    }
+
+    pub fn selected_fg(self) -> u32 {
+        if self.is_light() {
+            self.text
+        } else {
+            self.accent_fg
+        }
     }
 }
 

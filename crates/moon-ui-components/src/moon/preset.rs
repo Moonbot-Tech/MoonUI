@@ -2,7 +2,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
-    foundation::box_shadow,
+    foundation::accent_underline,
     text::MoonText,
     theme::MoonTheme,
     tokens::{MoonRect, rgba_from},
@@ -109,25 +109,9 @@ impl RenderOnce for MoonPresetStrip {
             let x = ix as f32 * self.slot_width;
             let active = item.selected;
             let disabled = item.disabled;
-            let fg = if active { p.amber } else { p.text_muted };
+            let fg = if active { p.accent } else { p.text_muted };
             let fg_alpha = if disabled { 0.40 } else { 1.0 };
             let hotkey_alpha = if active || !disabled { 1.0 } else { 0.40 };
-
-            let selected_bg = linear_gradient(
-                180.0,
-                linear_color_stop(rgba_from(p.amber, 0.12), 0.0),
-                linear_color_stop(rgba_from(p.amber, 0.024), 1.0),
-            );
-            let underline_left = linear_gradient(
-                90.0,
-                linear_color_stop(rgba_from(p.amber, 0.0), 0.0),
-                linear_color_stop(rgba_from(p.amber, 0.70), 1.0),
-            );
-            let underline_right = linear_gradient(
-                90.0,
-                linear_color_stop(rgba_from(p.amber, 0.70), 0.0),
-                linear_color_stop(rgba_from(p.amber, 0.0), 1.0),
-            );
 
             let mut slot = div()
                 .id(("preset-slot", ix))
@@ -136,9 +120,7 @@ impl RenderOnce for MoonPresetStrip {
                 .top(px(0.0))
                 .w(px(tokens.ui(self.slot_width)))
                 .h(px(tokens.ui(36.0)))
-                .rounded(px(tokens.ui(3.0)))
                 .cursor_default()
-                .when(active, |this| this.bg(selected_bg))
                 .when(!active && !disabled, |this| {
                     this.hover(|this| this.bg(rgba_from(p.overlay, 0.018)))
                         .active(|this| this.bg(rgba_from(p.overlay, 0.012)))
@@ -200,33 +182,7 @@ impl RenderOnce for MoonPresetStrip {
                 );
 
             if active {
-                let shadow = box_shadow(
-                    px(0.0),
-                    px(0.0),
-                    px(tokens.ui(6.0)),
-                    px(0.0),
-                    rgba_from(p.amber, 0.42),
-                );
-                slot = slot.child(
-                    div()
-                        .absolute()
-                        .left(px(tokens.ui(4.0)))
-                        .top(px(tokens.ui(34.0)))
-                        .w(px(tokens.ui(36.0)))
-                        .h(px(tokens.ui(1.0)))
-                        .bg(underline_left)
-                        .shadow(vec![shadow.clone()]),
-                );
-                slot = slot.child(
-                    div()
-                        .absolute()
-                        .left(px(tokens.ui(40.0)))
-                        .top(px(tokens.ui(34.0)))
-                        .w(px(tokens.ui(36.0)))
-                        .h(px(tokens.ui(1.0)))
-                        .bg(underline_right)
-                        .shadow(vec![shadow]),
-                );
+                slot = slot.child(accent_underline(p, &tokens, 4.0, 4.0, 0.0));
             }
 
             root = root.child(slot);

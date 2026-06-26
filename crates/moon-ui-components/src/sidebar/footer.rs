@@ -3,7 +3,11 @@ use gpui::{
     prelude::FluentBuilder as _,
 };
 
-use crate::{ActiveTheme as _, Collapsible, Selectable, h_flex, menu::DropdownMenu};
+use crate::{
+    ActiveTheme as _, Collapsible, Selectable, h_flex,
+    menu::DropdownMenu,
+    moon::{MoonPalette, foundation::selected_background},
+};
 
 /// Footer for the [`super::Sidebar`].
 #[derive(IntoElement)]
@@ -68,6 +72,7 @@ impl DropdownMenu for SidebarFooter {}
 
 impl RenderOnce for SidebarFooter {
     fn render(self, _: &mut gpui::Window, cx: &mut gpui::App) -> impl gpui::IntoElement {
+        let p = MoonPalette::active(cx);
         h_flex()
             .id("sidebar-footer")
             .gap_2()
@@ -76,11 +81,11 @@ impl RenderOnce for SidebarFooter {
             .justify_between()
             .rounded(cx.theme().radius)
             .hover(|this| {
-                this.bg(cx.theme().sidebar_accent)
+                this.bg(selected_background(p))
                     .text_color(cx.theme().sidebar_accent_foreground)
             })
             .when(self.selected, |this| {
-                this.bg(cx.theme().sidebar_accent)
+                this.bg(selected_background(p))
                     .text_color(cx.theme().sidebar_accent_foreground)
             })
             .child(self.base)

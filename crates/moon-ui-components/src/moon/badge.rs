@@ -300,7 +300,7 @@ impl MoonBadge {
         match self.size {
             MoonBadgeSize::Tiny => BadgeMetrics {
                 height: 13.0,
-                radius: 6.5,
+                radius: 4.0,
                 font_size: 8.5,
                 line_height: 11.0,
                 pad_x: 4.0,
@@ -308,7 +308,7 @@ impl MoonBadge {
             },
             MoonBadgeSize::Status => BadgeMetrics {
                 height: 17.0,
-                radius: 7.0,
+                radius: 4.0,
                 font_size: 9.5,
                 line_height: 12.0,
                 pad_x: 7.0,
@@ -345,7 +345,7 @@ impl MoonBadge {
             },
             MoonBadgeVariant::Soft => BadgeStyle {
                 bg: tone,
-                bg_alpha: 0.08,
+                bg_alpha: 0.14,
                 border: tone,
                 border_alpha: 0.0,
                 fg: tone,

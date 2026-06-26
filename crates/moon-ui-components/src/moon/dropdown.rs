@@ -4,7 +4,7 @@ use gpui::*;
 
 use super::{
     button::{MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant},
-    foundation::{MoonClickHandler, MoonSelectHandler},
+    foundation::{MoonClickHandler, MoonSelectHandler, selected_background},
     icons::{MOON_ICON_CHECK, moon_icon},
     text::MoonText,
     theme::{MoonTheme, MoonThemeTokens},
@@ -364,6 +364,8 @@ impl MoonPopupMenu {
                 let has_submenu = !submenu.is_empty();
                 let fg = if disabled {
                     p.text_muted
+                } else if selected {
+                    p.selected_fg()
                 } else {
                     item.tone.color(p)
                 };
@@ -379,7 +381,7 @@ impl MoonPopupMenu {
                     .items_center()
                     .gap(px(metrics.gap))
                     .cursor_default()
-                    .when(selected, |this| this.bg(rgba_from(p.blue, 0.12)))
+                    .when(selected, |this| this.bg(selected_background(p)))
                     .when(!disabled, |this| {
                         this.hover(move |this| this.bg(rgba_from(p.overlay, 0.055)))
                             .active(move |this| this.bg(rgba_from(p.overlay, 0.032)))
@@ -395,7 +397,7 @@ impl MoonPopupMenu {
                                 this.child(moon_icon(
                                     MOON_ICON_CHECK,
                                     tokens.ui(11.0),
-                                    p.blue,
+                                    p.accent,
                                     alpha,
                                 ))
                             }),

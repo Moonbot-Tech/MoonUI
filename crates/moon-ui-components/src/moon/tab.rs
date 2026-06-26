@@ -4,6 +4,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::badge::{MoonBadge, MoonBadgeSize, MoonBadgeVariant};
+use super::foundation::accent_underline;
 use super::text::MoonText;
 use super::theme::{MoonTheme, MoonThemeTokens};
 use super::tokens::{MoonPalette, MoonRect, rgba_from};
@@ -213,7 +214,7 @@ impl MoonTabStrip {
                         } else {
                             MoonBadgeVariant::Soft
                         })
-                        .bg_color(if active { p.amber } else { p.overlay })
+                        .bg_color(if active { p.accent } else { p.overlay })
                         .bg_alpha(if active { 0.80 } else { 0.06 })
                         .text_color(if active { p.shell } else { p.text_soft })
                         .weight(600.0)
@@ -267,7 +268,7 @@ impl RenderOnce for MoonTabStrip {
     }
 }
 
-/// Янтарный underline активной вкладки (точный вид MoonTabStrip), адаптивный по ширине:
+/// Акцентный underline активной вкладки (точный вид MoonTabStrip), адаптивный по ширине:
 /// fade-in слева, сплошной центр (растягивается), fade-out справа, с мягкой тенью.
 /// Абсолютно позиционируется по низу родителя (родитель должен быть `relative`).
 /// Единый источник вида для верхних (MoonTabStrip) и нижних (dock TabPanel) вкладок.
@@ -276,44 +277,5 @@ pub fn moon_active_tab_underline(p: MoonPalette) -> Div {
 }
 
 pub fn moon_active_tab_underline_scaled(p: MoonPalette, tokens: MoonThemeTokens) -> Div {
-    let underline_left = linear_gradient(
-        90.0,
-        linear_color_stop(rgba_from(p.amber, 0.0), 0.0),
-        linear_color_stop(rgba_from(p.amber, 1.0), 1.0),
-    );
-    let underline_right = linear_gradient(
-        90.0,
-        linear_color_stop(rgba_from(p.amber, 1.0), 0.0),
-        linear_color_stop(rgba_from(p.amber, 0.0), 1.0),
-    );
-    let shadow =
-        super::foundation::box_shadow(px(0.0), px(0.0), px(8.0), px(0.0), rgba_from(p.amber, 0.70));
-    div()
-        .absolute()
-        .left(px(tokens.ui(5.0)))
-        .right(px(tokens.ui(5.0)))
-        .bottom(px(0.0))
-        .h(px(1.0))
-        .flex()
-        .child(
-            div()
-                .w(px(tokens.ui(25.0)))
-                .h_full()
-                .bg(underline_left)
-                .shadow(vec![shadow.clone()]),
-        )
-        .child(
-            div()
-                .flex_1()
-                .h_full()
-                .bg(rgba_from(p.amber, 1.0))
-                .shadow(vec![shadow.clone()]),
-        )
-        .child(
-            div()
-                .w(px(tokens.ui(25.0)))
-                .h_full()
-                .bg(underline_right)
-                .shadow(vec![shadow]),
-        )
+    accent_underline(p, &tokens, 5.0, 5.0, 0.0)
 }

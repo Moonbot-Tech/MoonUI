@@ -1,4 +1,7 @@
-use crate::{ActiveTheme, Disableable, StyledExt, h_flex};
+use crate::{
+    ActiveTheme, Disableable, StyledExt, h_flex,
+    moon::{MoonPalette, foundation::selected_background},
+};
 use gpui::{
     AnyElement, App, ClickEvent, ElementId, InteractiveElement, IntoElement, MouseButton,
     ParentElement, RenderOnce, SharedString, StatefulInteractiveElement as _, StyleRefinement,
@@ -84,6 +87,8 @@ impl ParentElement for MenuItemElement {
 
 impl RenderOnce for MenuItemElement {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
+        let selected_fg = gpui::rgb(p.selected_fg());
         h_flex()
             .id(self.id)
             .group(&self.group_name)
@@ -101,12 +106,10 @@ impl RenderOnce for MenuItemElement {
             })
             .when(!self.disabled, |this| {
                 this.group_hover(self.group_name, |this| {
-                    this.bg(cx.theme().accent)
-                        .text_color(cx.theme().accent_foreground)
+                    this.bg(selected_background(p)).text_color(selected_fg)
                 })
                 .when(self.selected, |this| {
-                    this.bg(cx.theme().accent)
-                        .text_color(cx.theme().accent_foreground)
+                    this.bg(selected_background(p)).text_color(selected_fg)
                 })
                 .when_some(self.on_click, |this, on_click| {
                     this.on_mouse_down(MouseButton::Left, move |_, _, cx| {

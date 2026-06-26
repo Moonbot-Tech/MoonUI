@@ -5,7 +5,7 @@ use crate::{
     StyledExt,
     button::ButtonIcon,
     h_flex,
-    moon::{MoonPalette, MoonTheme, rgba_from},
+    moon::{MoonPalette, MoonTheme, foundation::selected_flat, rgba_from},
     tooltip::{ManagedTooltipExt as _, Tooltip},
 };
 use gpui::{
@@ -1033,6 +1033,22 @@ impl ButtonVariant {
 
         let selected = matches!(state, ButtonVisualState::Selected);
         let p = MoonPalette::active(cx);
+
+        if matches!(self, Self::Default)
+            && matches!(
+                state,
+                ButtonVisualState::Active | ButtonVisualState::Selected
+            )
+        {
+            return ButtonVariantStyle {
+                bg: selected_flat(p),
+                border: rgba_from(p.accent, 1.0),
+                fg: rgba_from(p.selected_fg(), 1.0),
+                underline: self.underline(cx),
+                shadow: false,
+            };
+        }
+
         let style = self
             .moon_style(p, outline, selected)
             .unwrap_or_else(|| unreachable!("custom variants are resolved above"));
@@ -1147,12 +1163,13 @@ mod tests {
         let window = cx.add_empty_window();
         window.update(|_, cx| {
             let variant = ButtonVariant::Danger;
+            let p = MoonPalette::active(cx);
             let active_style = variant.active(true, cx);
             let selected_style = variant.selected(true, cx);
 
             assert_eq!(selected_style.bg.a, 0.0);
-            assert_eq!(selected_style.border, rgba_from(0xFF4A4A, 0.40));
-            assert_eq!(selected_style.fg, rgba_from(0xFF4A4A, 1.0));
+            assert_eq!(selected_style.border, rgba_from(p.red, 0.40));
+            assert_eq!(selected_style.fg, rgba_from(p.red, 1.0));
             assert_ne!(selected_style.bg, active_style.bg);
         });
     }

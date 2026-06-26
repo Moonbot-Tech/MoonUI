@@ -21,8 +21,8 @@ impl MoonTag {
     pub fn new() -> Self {
         Self {
             tone: MoonTone::Default,
-            outline: false,
-            rounded_full: false,
+            outline: true,
+            rounded_full: true,
             mono: true,
             children: Vec::new(),
         }
@@ -64,6 +64,13 @@ impl MoonTag {
         self
     }
 
+    pub fn label(mut self, label: impl Into<SharedString>) -> Self {
+        let label: SharedString = label.into();
+        self.children
+            .push(label.to_string().to_uppercase().into_any_element());
+        self
+    }
+
     pub fn render(self) -> impl IntoElement {
         self
     }
@@ -97,6 +104,7 @@ impl RenderOnce for MoonTag {
             .font_family(tokens.font_family(self.mono))
             .text_size(px(text.font_size))
             .line_height(px(text.line_height))
+            .font_weight(FontWeight::MEDIUM)
             .when(!self.outline, |this| this.shadow_sm())
             .children(self.children)
     }

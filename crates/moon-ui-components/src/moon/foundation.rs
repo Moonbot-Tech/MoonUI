@@ -1,10 +1,16 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, BoxShadow, ClickEvent, Corners, DefiniteLength, Div, Edges, FontWeight, Hsla, Pixels,
-    Refineable, SharedString, StyleRefinement, Styled, Window, div, point,
+    App, Background, BoxShadow, ClickEvent, Corners, DefiniteLength, Div, Edges, FontWeight, Hsla,
+    ParentElement, Pixels, Refineable, SharedString, StyleRefinement, Styled, Window, div,
+    linear_color_stop, linear_gradient, point, px,
 };
 use serde::{Deserialize, Serialize};
+
+use super::{
+    theme::MoonThemeTokens,
+    tokens::{MoonPalette, rgba_from},
+};
 
 #[inline(always)]
 pub fn h_flex() -> Div {
@@ -31,6 +37,73 @@ pub fn box_shadow(
         inset: false,
         color,
     }
+}
+
+pub fn selected_background(p: MoonPalette) -> Background {
+    linear_gradient(
+        90.0,
+        linear_color_stop(rgba_from(p.accent, p.accent_tint_a), 0.0),
+        linear_color_stop(rgba_from(p.accent, 0.0), 0.72),
+    )
+}
+
+pub fn selected_flat(p: MoonPalette) -> Hsla {
+    rgba_from(p.accent, p.accent_tint_a)
+}
+
+pub fn accent_underline(
+    p: MoonPalette,
+    tokens: &MoonThemeTokens,
+    left: f32,
+    right: f32,
+    bottom: f32,
+) -> Div {
+    let underline_left = linear_gradient(
+        90.0,
+        linear_color_stop(rgba_from(p.accent, 0.0), 0.0),
+        linear_color_stop(rgba_from(p.accent, 1.0), 1.0),
+    );
+    let underline_right = linear_gradient(
+        90.0,
+        linear_color_stop(rgba_from(p.accent, 1.0), 0.0),
+        linear_color_stop(rgba_from(p.accent, 0.0), 1.0),
+    );
+    let shadow = box_shadow(
+        px(0.0),
+        px(0.0),
+        px(tokens.ui(8.0)),
+        px(0.0),
+        rgba_from(p.accent, 0.62),
+    );
+
+    div()
+        .absolute()
+        .left(px(tokens.ui(left)))
+        .right(px(tokens.ui(right)))
+        .bottom(px(tokens.ui(bottom)))
+        .h(px(tokens.ui(2.0)))
+        .flex()
+        .child(
+            div()
+                .w(px(tokens.ui(25.0)))
+                .h_full()
+                .bg(underline_left)
+                .shadow(vec![shadow.clone()]),
+        )
+        .child(
+            div()
+                .flex_1()
+                .h_full()
+                .bg(rgba_from(p.accent, 1.0))
+                .shadow(vec![shadow.clone()]),
+        )
+        .child(
+            div()
+                .w(px(tokens.ui(25.0)))
+                .h_full()
+                .bg(underline_right)
+                .shadow(vec![shadow]),
+        )
 }
 
 pub trait StyledExt: Styled + Sized {

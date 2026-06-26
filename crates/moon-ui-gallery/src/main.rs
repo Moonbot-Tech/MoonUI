@@ -12,7 +12,7 @@ use gpui::{
     rgba, size, svg,
 };
 use gpui_platform::application;
-use moon_ui::foundation::box_shadow;
+use moon_ui::foundation::{box_shadow, selected_background};
 use moon_ui::{
     DockArea, DockEvent, DockItem, IndexPath, MoonAccent, MoonAccordion, MoonAlert, MoonAvatar,
     MoonAvatarGroup, MoonAvatarSize, MoonBackgroundPolicy, MoonBadge, MoonBadgeSize,
@@ -209,6 +209,11 @@ const HANDOFF_CASES: &[HandoffCase] = &[
     },
     HandoffCase {
         id: "app.main.three_charts_scroll",
+        width: 900.0,
+        height: 620.0,
+    },
+    HandoffCase {
+        id: "app.strategy_editor.selected",
         width: 900.0,
         height: 620.0,
     },
@@ -558,6 +563,11 @@ const HANDOFF_CASES: &[HandoffCase] = &[
         height: 160.0,
     },
     HandoffCase {
+        id: "scroll_area.overlay",
+        width: 420.0,
+        height: 180.0,
+    },
+    HandoffCase {
         id: "popup_menu.scale",
         width: 250.0,
         height: 162.0,
@@ -831,7 +841,9 @@ impl MoonListDelegate for GalleryListDelegate {
 
 struct CaseGallery {
     snapshot: Option<CaseSnapshotRun>,
+    #[cfg(feature = "snapshot")]
     theme_mode: ThemeMode,
+    #[cfg(feature = "snapshot")]
     dialog_case_open: bool,
     slider_58_state: Entity<MoonSliderState>,
     slider_100_state: Entity<MoonSliderState>,
@@ -857,6 +869,9 @@ impl CaseGallery {
         snapshot_case_ids: Vec<String>,
         theme_mode: ThemeMode,
     ) -> Self {
+        #[cfg(not(feature = "snapshot"))]
+        let _ = theme_mode;
+
         let first_case = HANDOFF_CASES.first().copied().unwrap_or(HandoffCase {
             id: "empty",
             width: 320.0,
@@ -961,7 +976,9 @@ impl CaseGallery {
                 cleaned_dir: false,
                 targeted,
             }),
+            #[cfg(feature = "snapshot")]
             theme_mode,
+            #[cfg(feature = "snapshot")]
             dialog_case_open: false,
             slider_58_state,
             slider_100_state,
@@ -1103,6 +1120,7 @@ impl CaseGallery {
         cx.quit();
     }
 
+    #[cfg(feature = "snapshot")]
     fn prepare_case_overlay(
         &mut self,
         case: HandoffCase,
@@ -1217,6 +1235,7 @@ impl CaseGallery {
                 )
                 .into_any_element(),
             "app.main.three_charts_scroll" => handoff_chart_stack(cx).into_any_element(),
+            "app.strategy_editor.selected" => handoff_strategy_editor(cx).into_any_element(),
             "icons.primitives" => h_flex()
                 .gap(px(12.0))
                 .child(
@@ -2040,6 +2059,7 @@ impl CaseGallery {
                     .child(resizable)
                     .into_any_element()
             }
+            "scroll_area.overlay" => handoff_scroll_area(cx).into_any_element(),
             "popup_menu.scale" => MoonPopupMenu::new("handoff-popup-scale")
                 .width(150.0)
                 .items([
@@ -2572,11 +2592,11 @@ impl CaseGallery {
                 .child(
                     MoonTag::positive()
                         .rounded_full()
-                        .child("positive")
+                        .label("positive")
                         .render(),
                 )
-                .child(MoonTag::warning().outline().child("warning").render())
-                .child(MoonTag::danger().outline().child("danger").render())
+                .child(MoonTag::warning().outline().label("warning").render())
+                .child(MoonTag::danger().outline().label("danger").render())
                 .into_any_element(),
             "kbd.spinner.skeleton" => h_flex()
                 .gap(px(10.0))
@@ -3244,13 +3264,13 @@ impl Gallery {
                             .child(
                                 MoonTag::positive()
                                     .rounded_full()
-                                    .child("MoonTag positive")
+                                    .label("MoonTag positive")
                                     .render(),
                             )
                             .child(
                                 MoonTag::warning()
                                     .outline()
-                                    .child("MoonTag warning")
+                                    .label("MoonTag warning")
                                     .render(),
                             )
                             .child(
@@ -3985,9 +4005,9 @@ impl Gallery {
                             .child(
                                 h_flex()
                                     .gap(px(8.0))
-                                    .child(MoonTag::positive().child("MoonTag").render())
-                                    .child(MoonTag::warning().child("warning").render())
-                                    .child(MoonTag::danger().outline().child("outline").render()),
+                                    .child(MoonTag::positive().label("MoonTag").render())
+                                    .child(MoonTag::warning().label("warning").render())
+                                    .child(MoonTag::danger().outline().label("outline").render()),
                             )
                             .child(
                                 div().w(px(240.0)).child(
@@ -5924,16 +5944,43 @@ fn handoff_chart_stack(cx: &App) -> impl IntoElement {
 
 fn handoff_chart_panel(title: &'static str, tone: u32, p: MoonPalette) -> impl IntoElement {
     v_flex()
-        .h(px(190.0))
+        .h(px(184.0))
         .border_1()
-        .border_color(rgba_from(p.border, 1.0))
+        .border_color(rgba_from(tone, 0.62))
         .bg(rgba_from(p.panel, 1.0))
         .child(
             h_flex()
-                .h(px(28.0))
+                .h(px(30.0))
                 .px(px(10.0))
+                .gap(px(8.0))
                 .border_b_1()
                 .border_color(rgba_from(p.border, 1.0))
+                .bg(rgba_from(p.shell_high, 0.78))
+                .child(
+                    div()
+                        .w(px(22.0))
+                        .h(px(16.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(3.0))
+                        .border_1()
+                        .border_color(rgba_from(tone, 0.86))
+                        .child(
+                            MoonText::new(match title {
+                                "Chart 1 · BTCUSDT" => "01",
+                                "Chart 2 · ETHUSDT" => "02",
+                                _ => "03",
+                            })
+                            .uppercase(false)
+                            .mono(true)
+                            .font_size(9.0)
+                            .line_height(10.0)
+                            .weight(700.0)
+                            .color(tone)
+                            .render(),
+                        ),
+                )
                 .child(
                     MoonText::new(title)
                         .uppercase(false)
@@ -5994,6 +6041,30 @@ fn handoff_chart_panel(title: &'static str, tone: u32, p: MoonPalette) -> impl I
                 .child(
                     div()
                         .absolute()
+                        .left(px(10.0))
+                        .top(px(8.0))
+                        .h(px(17.0))
+                        .px(px(6.0))
+                        .flex()
+                        .items_center()
+                        .rounded(px(3.0))
+                        .border_1()
+                        .border_color(rgba_from(p.border, 0.86))
+                        .bg(rgba_from(p.shell, 0.72))
+                        .child(
+                            MoonText::new("plot / chartdx")
+                                .uppercase(false)
+                                .mono(true)
+                                .font_size(9.0)
+                                .line_height(10.0)
+                                .weight(600.0)
+                                .color(p.text_muted)
+                                .render(),
+                        ),
+                )
+                .child(
+                    div()
+                        .absolute()
                         .left(px(350.0))
                         .top(px(54.0))
                         .w(px(280.0))
@@ -6008,6 +6079,479 @@ fn handoff_chart_panel(title: &'static str, tone: u32, p: MoonPalette) -> impl I
                         .bottom(px(0.0))
                         .w(px(120.0))
                         .bg(rgba_from(tone, 0.12)),
+                ),
+        )
+}
+
+fn handoff_strategy_editor(cx: &App) -> impl IntoElement {
+    let p = MoonPalette::active(cx);
+    v_flex()
+        .w(px(860.0))
+        .h(px(560.0))
+        .border_1()
+        .border_color(rgba_from(p.border, 1.0))
+        .bg(rgba_from(p.shell, 1.0))
+        .text_color(rgb(p.text))
+        .child(
+            h_flex()
+                .h(px(26.0))
+                .px(px(10.0))
+                .gap(px(8.0))
+                .border_b_1()
+                .border_color(rgba_from(p.border, 1.0))
+                .bg(rgba_from(p.shell_high, 1.0))
+                .child(
+                    div()
+                        .w(px(7.0))
+                        .h(px(7.0))
+                        .rounded(px(999.0))
+                        .bg(rgb(p.orange)),
+                )
+                .child(
+                    MoonText::new("Strategies")
+                        .uppercase(false)
+                        .weight(700.0)
+                        .render(),
+                )
+                .child(div().flex_1())
+                .child(
+                    MoonText::new("fields: 15")
+                        .uppercase(false)
+                        .mono(true)
+                        .color(p.text_soft)
+                        .render(),
+                )
+                .child(MoonText::new("-").mono(true).color(p.text_soft).render())
+                .child(MoonText::new("x").mono(true).color(p.orange).render()),
+        )
+        .child(
+            h_flex()
+                .flex_1()
+                .min_h_0()
+                .child(
+                    v_flex()
+                        .w(px(218.0))
+                        .size_full()
+                        .p(px(10.0))
+                        .gap(px(8.0))
+                        .border_1()
+                        .border_color(rgba_from(p.border, 1.0))
+                        .bg(rgba_from(p.shell_high, 0.72))
+                        .child(
+                            MoonInput::new("handoff-strategy-search")
+                                .placeholder("search")
+                                .small(),
+                        )
+                        .child(
+                            h_flex()
+                                .gap(px(8.0))
+                                .child(
+                                    MoonButton::new("handoff-strategy-type")
+                                        .label("all types")
+                                        .variant(MoonButtonVariant::Panel)
+                                        .render(),
+                                )
+                                .child(
+                                    MoonButton::new("handoff-strategy-filter")
+                                        .label("all")
+                                        .variant(MoonButtonVariant::Panel)
+                                        .render(),
+                                ),
+                        )
+                        .child(
+                            MoonCheckbox::new("handoff-strategy-active")
+                                .label("active only")
+                                .checked(true)
+                                .size(MoonCheckboxSize::Compact),
+                        )
+                        .child(strategy_tree_row("v server 1", "8/172", p.blue, false, p))
+                        .child(strategy_tree_row("> TestF", "7/21", p.text_soft, false, p))
+                        .child(strategy_tree_row(
+                            "HooksDetec...  Moon Hook",
+                            "",
+                            p.text,
+                            true,
+                            p,
+                        ))
+                        .child(div().flex_1())
+                        .child(
+                            h_flex()
+                                .gap(px(7.0))
+                                .child(MoonBadge::new("marked").tone(MoonTone::Info).render())
+                                .child(
+                                    MoonBadge::new("canceled")
+                                        .tone(MoonTone::Warning)
+                                        .variant(MoonBadgeVariant::Outline)
+                                        .render(),
+                                ),
+                        ),
+                )
+                .child(
+                    v_flex()
+                        .w(px(220.0))
+                        .size_full()
+                        .p(px(14.0))
+                        .gap(px(4.0))
+                        .border_1()
+                        .border_color(rgba_from(p.border, 1.0))
+                        .bg(rgba_from(p.shell, 1.0))
+                        .child(
+                            MoonText::new("Sections")
+                                .uppercase(false)
+                                .weight(700.0)
+                                .render(),
+                        )
+                        .child(strategy_section("Main", true, p))
+                        .child(strategy_section("Dynamic White\\Black List", false, p))
+                        .child(strategy_section("Filters", false, p))
+                        .child(strategy_section("Triggers Master / Slave", false, p))
+                        .child(strategy_section("Buy conditions", false, p))
+                        .child(strategy_section("Delta Modifiers", false, p))
+                        .child(strategy_section("Sell order", false, p))
+                        .child(strategy_section("Stops", false, p))
+                        .child(strategy_section("Strategy settings", false, p))
+                        .child(strategy_section_muted("User Interface", p))
+                        .child(strategy_section_muted("Filters / Base", p))
+                        .child(strategy_section_muted("Session", p)),
+                )
+                .child(
+                    v_flex()
+                        .flex_1()
+                        .size_full()
+                        .p(px(24.0))
+                        .gap(px(11.0))
+                        .bg(rgba_from(p.shell, 1.0))
+                        .child(
+                            h_flex()
+                                .child(
+                                    MoonText::new("Main")
+                                        .uppercase(false)
+                                        .weight(700.0)
+                                        .render(),
+                                )
+                                .child(div().flex_1())
+                                .child(
+                                    MoonText::new("fields: 15")
+                                        .uppercase(false)
+                                        .mono(true)
+                                        .color(p.text_muted)
+                                        .render(),
+                                ),
+                        )
+                        .child(
+                            MoonCheckbox::new("handoff-strategy-form-active")
+                                .label("active only")
+                                .checked(true)
+                                .size(MoonCheckboxSize::Compact),
+                        )
+                        .child(div().h(px(1.0)).bg(rgba_from(p.border, 1.0)))
+                        .child(strategy_field_input(
+                            "StrategyName",
+                            "HooksDetect 0.3-1%",
+                            p,
+                        ))
+                        .child(strategy_field_input("Comment", "", p))
+                        .child(strategy_field_select("SignalType", "MoonHook", p))
+                        .child(strategy_field_memo(
+                            "CustomEMA",
+                            "ema(close, 12) > ema(close, 36)\nand volume > sma(volume, 20)",
+                            p,
+                        ))
+                        .child(strategy_field_memo(
+                            "CommentMemo",
+                            "long multiline strategy note / autocompletion target",
+                            p,
+                        ))
+                        .child(
+                            h_flex()
+                                .gap(px(14.0))
+                                .child(
+                                    MoonCheckbox::new("handoff-silent")
+                                        .label("SilentNoCharts")
+                                        .checked(true)
+                                        .size(MoonCheckboxSize::Compact),
+                                )
+                                .child(
+                                    MoonCheckbox::new("handoff-debug")
+                                        .label("DebugLog")
+                                        .size(MoonCheckboxSize::Compact),
+                                )
+                                .child(
+                                    MoonCheckbox::new("handoff-independent")
+                                        .label("IndependentSignals")
+                                        .checked(true)
+                                        .size(MoonCheckboxSize::Compact),
+                                ),
+                        ),
+                ),
+        )
+}
+
+fn strategy_tree_row(
+    label: &'static str,
+    meta: &'static str,
+    color: u32,
+    selected: bool,
+    p: MoonPalette,
+) -> impl IntoElement {
+    h_flex()
+        .relative()
+        .h(px(22.0))
+        .px(px(7.0))
+        .gap(px(8.0))
+        .rounded(px(3.0))
+        .border_1()
+        .border_color(if selected {
+            rgba_from(p.accent, 1.0)
+        } else {
+            rgba_from(p.border, 0.0)
+        })
+        .when(selected, |this| {
+            this.bg(selected_background(p))
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(0.0))
+                        .top(px(3.0))
+                        .bottom(px(3.0))
+                        .w(px(3.0))
+                        .bg(rgb(p.accent)),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(7.0))
+                        .top(px(9.0))
+                        .w(px(4.0))
+                        .h(px(4.0))
+                        .rounded_full()
+                        .bg(rgb(p.accent)),
+                )
+        })
+        .child(
+            MoonText::new(label)
+                .uppercase(false)
+                .mono(true)
+                .color(color)
+                .render(),
+        )
+        .child(div().flex_1())
+        .child(
+            MoonText::new(meta)
+                .uppercase(false)
+                .mono(true)
+                .color(p.blue)
+                .render(),
+        )
+}
+
+fn strategy_section(label: &'static str, active: bool, p: MoonPalette) -> impl IntoElement {
+    div()
+        .h(px(24.0))
+        .px(px(7.0))
+        .flex()
+        .items_center()
+        .rounded(px(3.0))
+        .border_1()
+        .border_color(if active {
+            rgba_from(p.accent, 1.0)
+        } else {
+            rgba_from(p.border, 0.0)
+        })
+        .bg(if active {
+            rgba_from(p.accent, 0.24)
+        } else {
+            rgba_from(p.shell, 0.0)
+        })
+        .child(
+            MoonText::new(label)
+                .uppercase(false)
+                .mono(true)
+                .weight(700.0)
+                .color(if active { p.amber } else { p.text })
+                .render(),
+        )
+}
+
+fn strategy_section_muted(label: &'static str, p: MoonPalette) -> impl IntoElement {
+    div().h(px(24.0)).px(px(7.0)).flex().items_center().child(
+        MoonText::new(label)
+            .uppercase(false)
+            .mono(true)
+            .color(p.text_muted)
+            .render(),
+    )
+}
+
+fn strategy_field_input(
+    label: &'static str,
+    value: &'static str,
+    p: MoonPalette,
+) -> impl IntoElement {
+    h_flex()
+        .gap(px(14.0))
+        .items_center()
+        .child(strategy_form_label(label, p))
+        .child(
+            div()
+                .flex_1()
+                .child(MoonInput::new(label).default_value(value).small()),
+        )
+}
+
+fn strategy_field_select(
+    label: &'static str,
+    value: &'static str,
+    p: MoonPalette,
+) -> impl IntoElement {
+    h_flex()
+        .gap(px(14.0))
+        .items_center()
+        .child(strategy_form_label(label, p))
+        .child(
+            MoonButton::new(format!("handoff-strategy-select-{label}"))
+                .label(value)
+                .variant(MoonButtonVariant::Panel)
+                .width(180.0)
+                .render(),
+        )
+}
+
+fn strategy_field_memo(
+    label: &'static str,
+    value: &'static str,
+    p: MoonPalette,
+) -> impl IntoElement {
+    h_flex()
+        .gap(px(14.0))
+        .items_start()
+        .child(strategy_form_label(label, p))
+        .child(
+            div()
+                .flex_1()
+                .h(px(62.0))
+                .p(px(9.0))
+                .rounded(px(4.0))
+                .border_1()
+                .border_color(rgba_from(p.border, 1.0))
+                .bg(rgba_from(p.panel, 1.0))
+                .child(
+                    MoonText::new(value)
+                        .uppercase(false)
+                        .mono(true)
+                        .wrap()
+                        .font_size(10.0)
+                        .line_height(14.0)
+                        .color(p.text_soft)
+                        .render(),
+                ),
+        )
+}
+
+fn strategy_form_label(label: &'static str, p: MoonPalette) -> impl IntoElement {
+    div().w(px(150.0)).child(
+        MoonText::new(label)
+            .uppercase(false)
+            .mono(true)
+            .color(p.text_soft)
+            .render(),
+    )
+}
+
+fn handoff_scroll_area(cx: &App) -> impl IntoElement {
+    let p = MoonPalette::active(cx);
+    div()
+        .relative()
+        .w(px(360.0))
+        .h(px(136.0))
+        .overflow_hidden()
+        .rounded(px(5.0))
+        .border_1()
+        .border_color(rgba_from(p.border, 1.0))
+        .bg(rgba_from(p.shell, 1.0))
+        .child(
+            v_flex()
+                .absolute()
+                .left(px(10.0))
+                .top(px(10.0))
+                .right(px(18.0))
+                .bottom(px(18.0))
+                .p(px(10.0))
+                .gap(px(7.0))
+                .border_1()
+                .border_color(rgba_from(p.border, 0.7))
+                .bg(rgba_from(p.panel, 1.0))
+                .child(
+                    MoonText::new("MoonScrollArea")
+                        .uppercase(false)
+                        .weight(700.0)
+                        .render(),
+                )
+                .child(
+                    MoonText::new("vertical overlay")
+                        .uppercase(false)
+                        .mono(true)
+                        .color(p.text_soft)
+                        .render(),
+                )
+                .child(
+                    MoonText::new("horizontal overlay")
+                        .uppercase(false)
+                        .mono(true)
+                        .color(p.text_soft)
+                        .render(),
+                )
+                .child(
+                    MoonText::new("always visible thumb")
+                        .uppercase(false)
+                        .mono(true)
+                        .color(p.text_soft)
+                        .render(),
+                )
+                .child(
+                    MoonText::new("hover/drag states share tokens")
+                        .uppercase(false)
+                        .mono(true)
+                        .color(p.text_soft)
+                        .render(),
+                ),
+        )
+        .child(
+            div()
+                .absolute()
+                .top(px(8.0))
+                .right(px(6.0))
+                .bottom(px(16.0))
+                .w(px(7.0))
+                .rounded(px(999.0))
+                .bg(rgba_from(p.panel_head, 0.34))
+                .child(
+                    div()
+                        .absolute()
+                        .top(px(22.0))
+                        .w(px(7.0))
+                        .h(px(52.0))
+                        .rounded(px(999.0))
+                        .bg(rgba_from(p.text_soft, 0.60)),
+                ),
+        )
+        .child(
+            div()
+                .absolute()
+                .left(px(10.0))
+                .right(px(18.0))
+                .bottom(px(6.0))
+                .h(px(7.0))
+                .rounded(px(999.0))
+                .bg(rgba_from(p.panel_head, 0.34))
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(74.0))
+                        .h(px(7.0))
+                        .w(px(116.0))
+                        .rounded(px(999.0))
+                        .bg(rgba_from(p.text_soft, 0.60)),
                 ),
         )
 }

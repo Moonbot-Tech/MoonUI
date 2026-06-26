@@ -1,6 +1,5 @@
 use std::time::Instant;
 
-use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
@@ -190,6 +189,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .top(px(0.0))
                 .bottom(px(0.0))
                 .w(px(tokens.ui(8.0)))
+                .bg(track)
                 .cursor(CursorStyle::Arrow)
                 .on_hover(move |hovered, _window, cx| {
                     state_for_track_hover.update(cx, |state, cx| {
@@ -223,9 +223,9 @@ pub fn moon_scrollbar_overlay_with_palette(
             div()
                 .id(ElementId::from(SharedString::from(format!("{id}:v"))))
                 .absolute()
-                .right(px(2.0))
+                .right(px(1.0))
                 .top(px(top + 2.0))
-                .w(px(tokens.ui(4.0)))
+                .w(px(tokens.ui(6.0)))
                 .h(px((thumb_h - 4.0).max(12.0)))
                 .rounded_full()
                 .bg(
@@ -234,7 +234,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                     } else if runtime.hovered_axis == Some(MoonScrollbarDragAxis::Vertical) {
                         rgba_from(p.text_soft, 0.72 * runtime.vertical_alpha)
                     } else {
-                        rgba_from(p.text_muted, 0.58 * runtime.vertical_alpha)
+                        rgba_from(p.text_soft, 0.60 * runtime.vertical_alpha)
                     },
                 )
                 .cursor(CursorStyle::OpenHand)
@@ -329,6 +329,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .right(px(0.0))
                 .bottom(px(0.0))
                 .h(px(tokens.ui(8.0)))
+                .bg(track)
                 .cursor(CursorStyle::Arrow)
                 .on_hover(move |hovered, _window, cx| {
                     state_for_track_hover.update(cx, |state, cx| {
@@ -362,10 +363,10 @@ pub fn moon_scrollbar_overlay_with_palette(
             div()
                 .id(ElementId::from(SharedString::from(format!("{id}:h"))))
                 .absolute()
-                .left(px(left + 2.0))
-                .bottom(px(2.0))
-                .w(px((thumb_w - 4.0).max(12.0)))
-                .h(px(tokens.ui(4.0)))
+                .left(px(left + 1.0))
+                .bottom(px(1.0))
+                .w(px((thumb_w - 2.0).max(12.0)))
+                .h(px(tokens.ui(6.0)))
                 .rounded_full()
                 .bg(
                     if runtime.active_axis == Some(MoonScrollbarDragAxis::Horizontal) {
@@ -373,7 +374,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                     } else if runtime.hovered_axis == Some(MoonScrollbarDragAxis::Horizontal) {
                         rgba_from(p.text_soft, 0.72 * runtime.horizontal_alpha)
                     } else {
-                        rgba_from(p.text_muted, 0.58 * runtime.horizontal_alpha)
+                        rgba_from(p.text_soft, 0.60 * runtime.horizontal_alpha)
                     },
                 )
                 .cursor(CursorStyle::OpenHand)
@@ -441,22 +442,5 @@ pub fn moon_scrollbar_overlay_with_palette(
         );
     }
 
-    Some(
-        layer
-            .when(
-                matches!(visibility, MoonScrollbarVisibility::Always),
-                |this| {
-                    this.child(
-                        div()
-                            .absolute()
-                            .right(px(0.0))
-                            .top(px(0.0))
-                            .bottom(px(0.0))
-                            .w(px(1.0))
-                            .bg(track),
-                    )
-                },
-            )
-            .into_any_element(),
-    )
+    Some(layer.into_any_element())
 }

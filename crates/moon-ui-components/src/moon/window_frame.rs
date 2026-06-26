@@ -3,7 +3,12 @@ use std::sync::Arc;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
-use super::{foundation::h_flex, theme::MoonTheme, tokens::rgba_from};
+use super::{
+    foundation::{box_shadow, h_flex},
+    icons::MOON_ICON_WINDOW_CLOSE,
+    theme::MoonTheme,
+    tokens::rgba_from,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonWindowFrameKind {
@@ -56,14 +61,6 @@ impl MoonWindowFrameControls {
 }
 
 impl FrameButton {
-    fn label(self) -> &'static str {
-        match self {
-            Self::Minimize => "—",
-            Self::Maximize => "□",
-            Self::Close => "×",
-        }
-    }
-
     fn control_area(self) -> WindowControlArea {
         match self {
             Self::Minimize => WindowControlArea::Min,
@@ -77,6 +74,32 @@ impl FrameButton {
             Self::Minimize => window.minimize_window(),
             Self::Maximize => window.zoom_window(),
             Self::Close => window.remove_window(),
+        }
+    }
+
+    fn icon(self, default_color: Hsla, hover_color: Hsla, group: SharedString) -> AnyElement {
+        match self {
+            Self::Minimize => div()
+                .w(px(11.0))
+                .h(px(1.5))
+                .rounded_full()
+                .bg(default_color)
+                .group_hover(group.as_ref(), move |this| this.bg(hover_color))
+                .into_any_element(),
+            Self::Maximize => div()
+                .w(px(9.0))
+                .h(px(9.0))
+                .border(px(1.5))
+                .border_color(default_color)
+                .group_hover(group.as_ref(), move |this| this.border_color(hover_color))
+                .into_any_element(),
+            Self::Close => svg()
+                .w(px(12.0))
+                .h(px(12.0))
+                .external_path(MOON_ICON_WINDOW_CLOSE)
+                .text_color(default_color)
+                .group_hover(group.as_ref(), move |this| this.text_color(hover_color))
+                .into_any_element(),
         }
     }
 }
@@ -108,27 +131,27 @@ impl MoonWindowFrame {
             MoonWindowFrameKind::Main => (
                 MoonWindowFrameControls::MinimizeMaximizeClose,
                 32.0,
-                26.0,
-                22.0,
+                25.0,
+                25.0,
                 12.0,
                 Some(116.0),
             ),
             MoonWindowFrameKind::Tool | MoonWindowFrameKind::DetachedPanel => (
                 MoonWindowFrameControls::MinimizeClose,
                 32.0,
-                26.0,
-                22.0,
+                25.0,
+                25.0,
                 12.0,
                 None,
             ),
             MoonWindowFrameKind::Popup => {
-                (MoonWindowFrameControls::Close, 32.0, 26.0, 22.0, 12.0, None)
+                (MoonWindowFrameControls::Close, 32.0, 25.0, 25.0, 12.0, None)
             }
             MoonWindowFrameKind::DetachedChart | MoonWindowFrameKind::Debug => (
                 MoonWindowFrameControls::MinimizeClose,
                 34.0,
-                26.0,
-                22.0,
+                25.0,
+                25.0,
                 12.0,
                 None,
             ),
@@ -247,9 +270,9 @@ impl MoonWindowFrame {
     pub fn visual_controls(&self, cx: &App) -> Div {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
-        let h = tokens.fit_height(self.button_height, 11.0, 5.5);
+        let side = tokens.ui(self.button_width.min(self.button_height));
         let mut row = h_flex()
-            .h(px(h))
+            .h(px(side))
             .gap(px(tokens.ui(self.button_gap)))
             .font_family(tokens.font_family(true))
             .text_size(px(tokens.font(11.0)));
@@ -260,27 +283,38 @@ impl MoonWindowFrame {
 
         for button in self.controls.buttons() {
             let button = *button;
-            let color = match button {
-                FrameButton::Close => p.orange,
-                FrameButton::Minimize | FrameButton::Maximize => p.text_soft,
+            let group = SharedString::from(format!("{}:{button:?}", self.id));
+            let (default_color, hover_color) = match button {
+                FrameButton::Close => (rgba_from(p.orange, 1.0), rgba_from(p.on_accent, 1.0)),
+                FrameButton::Minimize | FrameButton::Maximize => {
+                    (rgba_from(p.text, 1.0), rgba_from(p.text, 1.0))
+                }
             };
             row = row.child(
                 div()
-                    .w(px(tokens.ui(self.button_width)))
-                    .h(px(h))
+                    .group(group.as_ref())
+                    .w(px(side))
+                    .h(px(side))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .rounded(px(tokens.ui(4.0)))
-                    .text_color(rgb(color))
+                    .rounded_full()
+                    .text_color(default_color)
                     .window_control_area(button.control_area())
                     .hover(move |s| match button {
-                        FrameButton::Close => {
-                            s.bg(rgba_from(p.red, 0.78)).text_color(rgb(p.on_accent))
-                        }
-                        FrameButton::Minimize | FrameButton::Maximize => {
-                            s.bg(rgba_from(p.overlay, 0.055)).text_color(rgb(p.text))
-                        }
+                        FrameButton::Close => s
+                            .bg(rgba_from(p.red, 0.5))
+                            .text_color(rgba_from(p.on_accent, 1.0))
+                            .shadow(vec![box_shadow(
+                                px(0.0),
+                                px(0.0),
+                                px(14.0),
+                                px(0.0),
+                                rgba_from(p.red, 0.55),
+                            )]),
+                        FrameButton::Minimize | FrameButton::Maximize => s
+                            .bg(rgba_from(p.overlay, 0.09))
+                            .text_color(rgba_from(p.text, 1.0)),
                     })
                     .when(cfg!(not(target_os = "windows")), move |this| {
                         this.on_mouse_down(MouseButton::Left, move |_event, window, cx| {
@@ -288,7 +322,7 @@ impl MoonWindowFrame {
                             button.invoke(window);
                         })
                     })
-                    .child(button.label()),
+                    .child(button.icon(default_color, hover_color, group)),
             );
         }
         row

@@ -9,6 +9,7 @@ use super::{
     background::MoonBackgroundPolicy,
     context_menu::MoonContextMenuWindowExt as _,
     dropdown::MoonMenuItem,
+    foundation::selected_background,
     scroll_area::{MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette},
     table::{MoonTableAlign, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle},
     theme::MoonTheme,
@@ -859,7 +860,7 @@ impl MoonDataTable {
                         let p = MoonPalette::active(cx);
                         style
                             .border_l(px(2.0))
-                            .border_color(rgba_from(p.blue, 0.86))
+                            .border_color(rgba_from(p.accent, 0.86))
                     })
                     .on_drop(move |drag: &MoonDataColumnDrag, _window, cx| {
                         if drag.state_id != state_id {
@@ -894,7 +895,7 @@ impl MoonDataTable {
                         .bottom(px(0.0))
                         .w(px(tokens.ui(6.0)))
                         .cursor(CursorStyle::ResizeColumn)
-                        .hover(|this| this.bg(rgba_from(p.blue, 0.14)))
+                        .hover(|this| this.bg(rgba_from(p.accent, 0.14)))
                         .on_drag(drag, |drag, _, _, cx| {
                             cx.stop_propagation();
                             cx.new(|_| drag.clone())
@@ -1239,7 +1240,7 @@ impl RenderOnce for MoonDataTable {
                                 "{rows_id_for_cell}:cell:{ix}:{column_ix}"
                             ))))
                             .when(selected_cell == Some((ix, column_ix)), |this| {
-                                this.bg(rgba_from(p.panel_high, 0.58))
+                                this.bg(selected_background(p))
                             });
 
                         if cell_selectable {
@@ -1360,6 +1361,11 @@ impl RenderOnce for MoonDataTable {
                 if row_header {
                     let state_for_header_click = state_for_rows.clone();
                     let on_select_row = on_select_row.clone();
+                    let row_header_bg: Background = if selected_row {
+                        selected_background(p)
+                    } else {
+                        rgba_from(style.body_bg, 0.0).into()
+                    };
                     row_el = row_el.child(
                         div()
                             .id(ElementId::from(SharedString::from(format!(
@@ -1381,14 +1387,7 @@ impl RenderOnce for MoonDataTable {
                                 style.header_separator,
                                 style.header_separator_alpha,
                             ))
-                            .bg(rgba_from(
-                                if selected_row {
-                                    style.selected_bg
-                                } else {
-                                    style.body_bg
-                                },
-                                if selected_row { 1.0 } else { 0.0 },
-                            ))
+                            .bg(row_header_bg)
                             .child((ix + 1).to_string())
                             .on_click(move |_, window, cx| {
                                 state_for_header_click.update(cx, |state, cx| {

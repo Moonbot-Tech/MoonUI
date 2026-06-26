@@ -6,6 +6,7 @@ use gpui::{
 use crate::{
     ActiveTheme, Disableable, Icon, IconName, Selectable, Sizable, Size, StyleSized, StyledExt,
     h_flex,
+    moon::{MoonPalette, foundation::selected_background, rgba_from},
 };
 
 /// A single row element used inside searchable-list dropdowns (Select, ComboBox, MultiComboBox).
@@ -95,6 +96,7 @@ impl Styled for SearchableListItemElement {
 
 impl RenderOnce for SearchableListItemElement {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
         h_flex()
             .id(self.id)
             .relative()
@@ -111,10 +113,32 @@ impl RenderOnce for SearchableListItemElement {
             .refine_style(&self.style)
             .when(!self.disabled, |this| {
                 this.when(!self.selected, |this| {
-                    this.hover(|this| this.bg(cx.theme().accent.alpha(0.7)))
+                    this.hover(move |this| this.bg(rgba_from(p.overlay, 0.055)))
                 })
             })
-            .when(self.selected, |this| this.bg(cx.theme().accent))
+            .when(self.selected, |this| {
+                this.bg(selected_background(p))
+                    .text_color(gpui::rgb(p.selected_fg()))
+                    .child(
+                        gpui::div()
+                            .absolute()
+                            .left(gpui::px(0.0))
+                            .top(gpui::px(3.0))
+                            .bottom(gpui::px(3.0))
+                            .w(gpui::px(3.0))
+                            .bg(gpui::rgb(p.accent)),
+                    )
+                    .child(
+                        gpui::div()
+                            .absolute()
+                            .left(gpui::px(7.0))
+                            .top(gpui::px(10.0))
+                            .w(gpui::px(4.0))
+                            .h(gpui::px(4.0))
+                            .rounded_full()
+                            .bg(gpui::rgb(p.accent)),
+                    )
+            })
             .when(self.disabled, |this| {
                 this.cursor_not_allowed()
                     .text_color(cx.theme().muted_foreground)

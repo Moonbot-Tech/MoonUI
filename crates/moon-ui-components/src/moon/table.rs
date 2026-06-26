@@ -2,6 +2,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
+    foundation::selected_background,
     text::MoonText,
     tokens::{MoonPalette, MoonTone, rgb_from, rgba_from},
 };
@@ -192,12 +193,12 @@ impl MoonTableStyle {
         Self {
             body_bg: p.table_body,
             header_bg: p.table_head,
-            selected_bg: p.table_selected,
-            selected_bar: p.amber,
+            selected_bg: p.accent,
+            selected_bar: p.accent,
             header_text: p.text_muted,
             header_separator: p.border,
             header_separator_alpha: 1.0,
-            selection_bar_width: 2.0,
+            selection_bar_width: 3.0,
         }
     }
 
@@ -252,17 +253,19 @@ impl MoonTable {
         p: MoonPalette,
         mut decorate_cell: impl FnMut(usize, Div) -> AnyElement,
     ) -> Div {
+        let row_bg: Background = if row.selected {
+            selected_background(p)
+        } else {
+            rgba_from(style.body_bg, 0.0).into()
+        };
+
         let mut row_el = div()
             .relative()
             .w_full()
             .h(px(row_height))
             .flex()
             .items_center()
-            .bg(if row.selected {
-                rgba_from(style.selected_bg, 1.0)
-            } else {
-                rgba_from(style.body_bg, 0.0)
-            });
+            .bg(row_bg);
 
         if row.selected {
             row_el = row_el.child(

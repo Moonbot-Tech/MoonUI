@@ -3,7 +3,11 @@ use gpui::{
     Styled, div, prelude::FluentBuilder as _,
 };
 
-use crate::{ActiveTheme as _, Collapsible, Selectable, StyledExt, menu::DropdownMenu};
+use crate::{
+    ActiveTheme as _, Collapsible, Selectable, StyledExt,
+    menu::DropdownMenu,
+    moon::{MoonPalette, foundation::selected_background},
+};
 
 /// Header for the [`super::Sidebar`]
 #[derive(IntoElement)]
@@ -78,6 +82,7 @@ impl DropdownMenu for SidebarHeader {}
 
 impl RenderOnce for SidebarHeader {
     fn render(self, _: &mut gpui::Window, cx: &mut gpui::App) -> impl gpui::IntoElement {
+        let p = MoonPalette::active(cx);
         self.base
             .id("sidebar-header")
             .h_flex()
@@ -88,11 +93,11 @@ impl RenderOnce for SidebarHeader {
             .rounded(cx.theme().radius)
             .refine_style(&self.style)
             .hover(|this| {
-                this.bg(cx.theme().sidebar_accent)
+                this.bg(selected_background(p))
                     .text_color(cx.theme().sidebar_accent_foreground)
             })
             .when(self.selected, |this| {
-                this.bg(cx.theme().sidebar_accent)
+                this.bg(selected_background(p))
                     .text_color(cx.theme().sidebar_accent_foreground)
             })
             .children(self.children)

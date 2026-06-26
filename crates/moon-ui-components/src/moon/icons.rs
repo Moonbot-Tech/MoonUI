@@ -7,6 +7,8 @@ pub const MOON_ICON_CARET_DOWN: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/assets/moon-caret-down.svg");
 pub const MOON_ICON_TOOLTIP_ARROW: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/assets/moon-tooltip-arrow.svg");
+pub const MOON_ICON_WINDOW_CLOSE: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/moon-window-close.svg");
 
 pub fn moon_icon(path: &'static str, size: f32, color: u32, alpha: f32) -> Svg {
     svg()

@@ -3,13 +3,14 @@ use crate::{
     button::{Button, ButtonVariants as _},
     h_flex,
     menu::{ContextMenuExt, PopupMenu},
+    moon::{MoonPalette, foundation::selected_background},
     sidebar::SidebarItem,
     v_flex,
 };
 use gpui::{
     AnyElement, App, ClickEvent, ElementId, InteractiveElement as _, IntoElement,
     ParentElement as _, SharedString, StatefulInteractiveElement as _, StyleRefinement, Styled,
-    Window, div, percentage, prelude::FluentBuilder,
+    Window, div, percentage, prelude::FluentBuilder, px,
 };
 use std::rc::Rc;
 
@@ -253,6 +254,7 @@ impl SidebarItem for SidebarMenuItem {
         let is_open = open_state
             .as_ref()
             .map_or(false, |s| !is_collapsed && *s.read(cx));
+        let p = MoonPalette::active(cx);
 
         div()
             .id(id.clone())
@@ -261,6 +263,7 @@ impl SidebarItem for SidebarMenuItem {
                 h_flex()
                     .size_full()
                     .id("item")
+                    .relative()
                     .overflow_x_hidden()
                     .flex_shrink_0()
                     .p_2()
@@ -275,13 +278,34 @@ impl SidebarItem for SidebarMenuItem {
                     })
                     .when(is_active, |this| {
                         this.font_medium()
-                            .bg(cx.theme().sidebar_accent)
+                            .bg(selected_background(p))
                             .text_color(cx.theme().sidebar_accent_foreground)
+                    })
+                    .when(is_active && !is_collapsed, |this| {
+                        this.child(
+                            div()
+                                .absolute()
+                                .left(px(0.0))
+                                .top(px(3.0))
+                                .bottom(px(3.0))
+                                .w(px(3.0))
+                                .bg(cx.theme().sidebar_primary),
+                        )
+                        .child(
+                            div()
+                                .absolute()
+                                .left(px(8.0))
+                                .top(px(12.0))
+                                .w(px(4.0))
+                                .h(px(4.0))
+                                .rounded_full()
+                                .bg(cx.theme().sidebar_primary),
+                        )
                     })
                     .when_some(self.icon.clone(), |this, icon| this.child(icon))
                     .when(is_collapsed, |this| {
                         this.justify_center().when(is_active, |this| {
-                            this.bg(cx.theme().sidebar_accent)
+                            this.bg(selected_background(p))
                                 .text_color(cx.theme().sidebar_accent_foreground)
                         })
                     })

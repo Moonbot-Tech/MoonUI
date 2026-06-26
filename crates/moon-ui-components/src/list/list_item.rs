@@ -1,9 +1,10 @@
+use crate::moon::{MoonPalette, foundation::selected_background};
 use crate::{ActiveTheme, Disableable, Icon, Selectable, Sizable as _, StyledExt, h_flex};
 use gpui::{
     AnyElement, App, ClickEvent, Div, ElementId, InteractiveElement, IntoElement, MouseButton,
     MouseDownEvent, MouseMoveEvent, ParentElement, RenderOnce, Stateful,
     StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div,
-    prelude::FluentBuilder as _,
+    prelude::FluentBuilder as _, px,
 };
 use smallvec::SmallVec;
 use std::collections::HashMap;
@@ -166,12 +167,8 @@ impl RenderOnce for ListItem {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let is_active = self.confirmed || self.selected || self.secondary_selected;
 
-        let corner_radii = self.style.corner_radii.clone();
-
-        let mut selected_style = StyleRefinement::default();
-        selected_style.corner_radii = corner_radii;
-
         let is_selectable = !(self.disabled || self.mode.is_separator());
+        let p = MoonPalette::active(cx);
 
         self.base
             .relative()
@@ -226,26 +223,20 @@ impl RenderOnce for ListItem {
             .when_some(self.suffix, |this, suffix| this.child(suffix(window, cx)))
             .map(|this| {
                 if is_selectable && (self.selected || self.secondary_selected) {
-                    let bg = if self.selected && cx.theme().list.active_highlight {
-                        cx.theme().list_active
-                    } else {
-                        cx.theme().accent
-                    };
-
-                    this.when(!self.secondary_selected, |this| this.bg(bg))
-                        .when(cx.theme().list.active_highlight, |this| {
-                            this.child(
-                                div()
-                                    .absolute()
-                                    .top_0()
-                                    .left_0()
-                                    .right_0()
-                                    .bottom_0()
-                                    .border_1()
-                                    .border_color(cx.theme().list_active_border)
-                                    .refine_style(&selected_style),
-                            )
-                        })
+                    this.when(!self.secondary_selected, |this| {
+                        this.bg(selected_background(p))
+                    })
+                    .when(cx.theme().list.active_highlight, |this| {
+                        this.child(
+                            div()
+                                .absolute()
+                                .top_0()
+                                .left_0()
+                                .bottom_0()
+                                .w(px(3.0))
+                                .bg(cx.theme().list_active_border),
+                        )
+                    })
                 } else {
                     this
                 }

@@ -1434,7 +1434,9 @@ impl RenderOnce for TabPanel {
                             })
                             .drag_over::<DockTabDrag>(|style, _, _, cx| {
                                 let p = MoonPalette::active(cx);
-                                style.border_l(px(2.0)).border_color(rgba_from(p.blue, 0.9))
+                                style
+                                    .border_l(px(2.0))
+                                    .border_color(rgba_from(p.accent, 0.9))
                             })
                             .on_drop(move |drag: &DockTabDrag, _window, cx| {
                                 if drag.dock_id != dock_entity.entity_id() {
@@ -2540,8 +2542,8 @@ impl DockArea {
                 let p = MoonPalette::active(cx);
                 if drag.dock_id == dock_id && drag.splittable {
                     style
-                        .bg(rgba_from(p.blue, 0.12))
-                        .border_color(rgba_from(p.blue, 0.88))
+                        .bg(rgba_from(p.accent, p.accent_tint_a))
+                        .border_color(rgba_from(p.accent, 0.88))
                 } else {
                     style
                 }
@@ -2958,7 +2960,7 @@ impl DockArea {
                                 .bottom(px(10.0))
                                 .w(px(tokens.ui(7.0)))
                                 .cursor(CursorStyle::ResizeLeftRight)
-                                .hover(|style| style.bg(rgba_from(p.blue, 0.16)))
+                                .hover(|style| style.bg(rgba_from(p.accent, 0.16)))
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     start_tile_drag(
@@ -2991,7 +2993,7 @@ impl DockArea {
                                 .bottom(px(0.0))
                                 .h(px(tokens.ui(7.0)))
                                 .cursor(CursorStyle::ResizeUpDown)
-                                .hover(|style| style.bg(rgba_from(p.blue, 0.16)))
+                                .hover(|style| style.bg(rgba_from(p.accent, 0.16)))
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     start_tile_drag(
@@ -3023,7 +3025,7 @@ impl DockArea {
                                 .bottom(px(0.0))
                                 .size(px(12.0))
                                 .cursor(CursorStyle::ResizeUpLeftDownRight)
-                                .hover(|style| style.bg(rgba_from(p.blue, 0.22)))
+                                .hover(|style| style.bg(rgba_from(p.accent, 0.22)))
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     start_tile_drag(

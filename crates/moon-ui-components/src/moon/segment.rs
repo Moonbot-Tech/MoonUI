@@ -2,7 +2,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
-    foundation::MoonIndexedClickHandler,
+    foundation::{MoonIndexedClickHandler, accent_underline},
     text::MoonText,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, rgba_from},
@@ -14,17 +14,6 @@ pub enum MoonAccent {
     Blue,
     Green,
     Red,
-}
-
-impl MoonAccent {
-    fn color(self, palette: MoonPalette) -> u32 {
-        match self {
-            MoonAccent::Amber => palette.amber,
-            MoonAccent::Blue => palette.blue,
-            MoonAccent::Green => palette.green,
-            MoonAccent::Red => palette.red,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -127,7 +116,7 @@ impl MoonSegmentedControl {
     }
 
     pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
-        let accent = self.accent.color(p);
+        let accent = p.accent;
         let on_click = self.on_click.clone();
 
         let mut root = div()
@@ -156,23 +145,6 @@ impl MoonSegmentedControl {
             let label_color = if selected { accent } else { p.text_muted };
             let item_click = on_click.clone();
 
-            let selected_bg = linear_gradient(
-                180.0,
-                linear_color_stop(rgba_from(accent, 0.10), 0.0),
-                linear_color_stop(rgba_from(accent, 0.016), 1.0),
-            );
-            let underline_width = (item.width - 16.0).max(1.0);
-            let underline_left = linear_gradient(
-                90.0,
-                linear_color_stop(rgba_from(accent, 0.0), 0.0),
-                linear_color_stop(rgba_from(accent, 0.92), 1.0),
-            );
-            let underline_right = linear_gradient(
-                90.0,
-                linear_color_stop(rgba_from(accent, 0.92), 0.0),
-                linear_color_stop(rgba_from(accent, 0.0), 1.0),
-            );
-
             let mut cell = div()
                 .id(("segment-item", ix))
                 .relative()
@@ -183,9 +155,7 @@ impl MoonSegmentedControl {
                 .w(px(item.width))
                 .h_full()
                 .px(px(tokens.ui(11.0)))
-                .rounded(px(tokens.ui(if selected { 4.0 } else { 0.0 })))
                 .cursor_default()
-                .when(selected, |this| this.bg(selected_bg))
                 .when(!selected && !disabled, |this| {
                     this.hover(move |this| this.bg(rgba_from(p.overlay, 0.025)))
                         .active(move |this| this.bg(rgba_from(p.overlay, 0.016)))
@@ -214,34 +184,7 @@ impl MoonSegmentedControl {
                 );
 
             if selected {
-                let shadow = super::foundation::box_shadow(
-                    px(0.0),
-                    px(0.0),
-                    px(tokens.ui(8.0)),
-                    px(0.0),
-                    rgba_from(accent, 0.72),
-                );
-                cell = cell
-                    .child(
-                        div()
-                            .absolute()
-                            .left(px(tokens.ui(8.0)))
-                            .top(px(tokens.ui(24.0)))
-                            .w(px(underline_width * 0.5))
-                            .h(px(1.0))
-                            .bg(underline_left)
-                            .shadow(vec![shadow.clone()]),
-                    )
-                    .child(
-                        div()
-                            .absolute()
-                            .left(px(tokens.ui(8.0) + underline_width * 0.5))
-                            .top(px(tokens.ui(24.0)))
-                            .w(px(underline_width * 0.5))
-                            .h(px(1.0))
-                            .bg(underline_right)
-                            .shadow(vec![shadow]),
-                    );
+                cell = cell.child(accent_underline(p, &tokens, 8.0, 8.0, 0.0));
             }
 
             if let Some(on_click) = item_click {
