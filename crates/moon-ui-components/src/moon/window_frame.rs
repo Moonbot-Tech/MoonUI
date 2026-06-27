@@ -338,13 +338,10 @@ impl MoonWindowFrame {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
         match self.resolved_brand() {
-            MoonWindowFrameBrand::Full => div()
-                .flex()
-                .items_center()
-                .child(logo_full(
-                    tokens.ui(86.0),
-                    if p.is_light() { p.text } else { 0xE7E7E7 },
-                )),
+            MoonWindowFrameBrand::Full => div().flex().items_center().child(logo_full(
+                tokens.ui(86.0),
+                if p.is_light() { p.text } else { 0xE7E7E7 },
+            )),
             MoonWindowFrameBrand::Mark => div()
                 .flex()
                 .items_center()

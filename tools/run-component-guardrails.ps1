@@ -24,6 +24,9 @@ function Run-Step {
     Write-Host ""
     Write-Host "== $Name =="
     & $Body
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Name failed with exit code $LASTEXITCODE"
+    }
 }
 
 Run-Step "cargo fmt" {
