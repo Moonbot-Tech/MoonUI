@@ -4,7 +4,7 @@ use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 use super::{
-    theme::MoonTheme,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, rgb_from},
 };
 
@@ -46,6 +46,10 @@ impl From<MoonButtonVariant> for ButtonVariant {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonButtonSize {
     Micro,
+    /// Dense terminal/header toolbar control. It keeps the toolbar visually
+    /// aligned with 26px segmented controls while still using the toolbar text
+    /// metrics and variants.
+    ToolbarCompact,
     Toolbar,
     Action,
     Pill,
@@ -230,6 +234,10 @@ impl MoonButton {
 
     pub fn medium(self) -> Self {
         self.size(MoonButtonSize::Toolbar)
+    }
+
+    pub fn toolbar_compact(self) -> Self {
+        self.size(MoonButtonSize::ToolbarCompact)
     }
 
     pub fn primary(self) -> Self {
@@ -461,11 +469,27 @@ impl RenderOnce for MoonButton {
 fn size_for(size: MoonButtonSize) -> crate::Size {
     match size {
         MoonButtonSize::Micro => crate::Size::XSmall,
+        MoonButtonSize::ToolbarCompact => crate::Size::Small,
         MoonButtonSize::Action => crate::Size::Small,
         MoonButtonSize::Toolbar => crate::Size::Medium,
         MoonButtonSize::Pill => crate::Size::Large,
         MoonButtonSize::Custom { height, .. } => crate::Size::Size(px(height)),
     }
+}
+
+pub(crate) fn height_for_size(size: MoonButtonSize, tokens: &MoonThemeTokens) -> f32 {
+    let (base_height, base_line_height) = match size {
+        MoonButtonSize::Micro => (18.0, 12.0),
+        MoonButtonSize::ToolbarCompact => (26.0, 14.0),
+        MoonButtonSize::Action => (26.0, 14.0),
+        MoonButtonSize::Toolbar => (28.0, 14.0),
+        MoonButtonSize::Pill => (30.0, 14.0),
+        MoonButtonSize::Custom { height, .. } => (height, height * 0.55),
+    };
+    let pad_y = ((base_height - base_line_height) * 0.5).max(0.0);
+    tokens
+        .ui(base_height)
+        .max(tokens.line_height(base_line_height) + tokens.ui(pad_y) * 2.0)
 }
 
 fn custom_radius(size: MoonButtonSize) -> Option<f32> {
@@ -479,6 +503,7 @@ fn custom_radius(size: MoonButtonSize) -> Option<f32> {
 fn metrics_for(size: MoonButtonSize) -> (f32, f32, f32) {
     match size {
         MoonButtonSize::Micro => (10.0, 14.0, 4.0),
+        MoonButtonSize::ToolbarCompact => (10.0, 16.0, 4.0),
         MoonButtonSize::Action => (10.5, 16.0, 5.0),
         MoonButtonSize::Toolbar => (10.0, 16.0, 4.0),
         MoonButtonSize::Pill => (11.0, 16.0, 6.0),
@@ -499,7 +524,8 @@ fn rgba_from_u32(color: u32, alpha: f32) -> Hsla {
 
 #[cfg(test)]
 mod tests {
-    use super::MoonButton;
+    use super::{MoonButton, MoonButtonSize, height_for_size, metrics_for, size_for};
+    use crate::moon::MoonThemeTokens;
 
     #[test]
     fn moon_button_width_builders_preserve_layout_intent() {
@@ -510,5 +536,19 @@ mod tests {
         let full = MoonButton::new("full").full_width();
         assert_eq!(full.width, None);
         assert!(full.full_width);
+    }
+
+    #[test]
+    fn toolbar_compact_keeps_terminal_toolbar_dense() {
+        let tokens = MoonThemeTokens::default();
+        assert_eq!(
+            metrics_for(MoonButtonSize::ToolbarCompact),
+            (10.0, 16.0, 4.0)
+        );
+        assert_eq!(size_for(MoonButtonSize::ToolbarCompact), crate::Size::Small);
+        assert_eq!(
+            height_for_size(MoonButtonSize::ToolbarCompact, &tokens),
+            26.0
+        );
     }
 }

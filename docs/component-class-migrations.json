@@ -110,6 +110,12 @@
       "reason": "Donor baseline shows reviewed base-file drift for Moon settings field style hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
     },
     {
+      "concept": "sidebar",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Donor baseline shows reviewed base-file drift for Moon sidebar footer/header/menu styling hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
       "concept": "slider",
       "from": "Mirror",
       "to": "TrackedFork",

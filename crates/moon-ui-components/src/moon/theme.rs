@@ -118,12 +118,18 @@ impl MoonThemeTokens {
 
     fn theme_colors(&self) -> ThemeColor {
         let p = self.palette;
+        let is_light = p.is_light();
         let selected_tint = selected_flat(p);
         let selected_border = rgba_from(p.accent, 1.0);
         let selected_fg = rgba_from(p.selected_fg(), 1.0);
+        let ring = if is_light { p.accent } else { p.blue };
+        let selection_alpha = if is_light { p.accent_tint_a } else { 0.32 };
+        let success = if is_light { p.green_btn } else { p.green };
+        let green_text = if is_light { p.green_text } else { p.green };
+        let danger_text = if is_light { p.red_text } else { p.red };
 
         ThemeColor {
-            background: rgba_from(p.shell, 1.0),
+            background: rgba_from(p.window, 1.0),
             foreground: rgba_from(p.text, 1.0),
             border: rgba_from(p.border, 1.0),
             accent: rgba_from(p.accent, 1.0),
@@ -163,8 +169,8 @@ impl MoonThemeTokens {
             list: rgba_from(p.panel, 1.0),
             list_active: selected_tint,
             list_active_border: selected_border,
-            list_even: rgba_from(p.chrome, 1.0),
-            list_head: rgba_from(p.table_head, 1.0),
+            list_even: rgba_from(p.row_alt, 1.0),
+            list_head: rgba_from(p.head_row, 1.0),
             list_hover: rgba_from(p.panel_head, 1.0),
             muted: rgba_from(p.panel_head, 1.0),
             muted_foreground: rgba_from(p.text_muted, 1.0),
@@ -175,7 +181,7 @@ impl MoonThemeTokens {
             primary_foreground: selected_fg,
             primary_hover: rgba_from(p.accent, 0.82),
             progress_bar: rgba_from(p.green, 1.0),
-            ring: rgba_from(p.blue, 1.0),
+            ring: rgba_from(ring, 1.0),
             scrollbar: rgba_from(p.panel_head, 0.34),
             scrollbar_thumb: rgba_from(p.text_soft, 0.60),
             scrollbar_thumb_hover: rgba_from(p.text_soft, 0.72),
@@ -183,7 +189,7 @@ impl MoonThemeTokens {
             secondary_active: rgba_from(p.panel_head, 1.0),
             secondary_foreground: rgba_from(p.text_soft, 1.0),
             secondary_hover: rgba_from(p.panel_head, 1.0),
-            selection: rgba_from(p.blue, 0.32),
+            selection: rgba_from(ring, selection_alpha),
             sidebar: rgba_from(p.chrome, 1.0),
             sidebar_accent: selected_tint,
             sidebar_accent_foreground: selected_fg,
@@ -194,28 +200,28 @@ impl MoonThemeTokens {
             skeleton: rgba_from(p.panel_head, 1.0),
             slider_bar: rgba_from(p.border, 1.0),
             slider_thumb: rgba_from(p.accent, 1.0),
-            success: rgba_from(p.green, 1.0),
-            success_foreground: rgba_from(p.text, 1.0),
-            success_hover: rgba_from(p.green, 0.72),
-            success_active: rgba_from(p.green, 0.92),
+            success: rgba_from(success, 1.0),
+            success_foreground: rgba_from(if is_light { p.on_accent } else { p.text }, 1.0),
+            success_hover: rgba_from(success, 0.72),
+            success_active: rgba_from(success, 0.92),
             switch: rgba_from(p.panel_head, 1.0),
             switch_thumb: rgba_from(p.text_soft, 1.0),
             tab: rgba_from(p.chrome, 1.0),
             tab_active: rgba_from(p.panel, 1.0),
             tab_active_foreground: rgba_from(p.text, 1.0),
-            tab_bar: rgba_from(p.chrome, 1.0),
+            tab_bar: rgba_from(p.tabbar, 1.0),
             tab_bar_segmented: rgba_from(p.panel, 1.0),
             tab_foreground: rgba_from(p.text_soft, 1.0),
-            table: rgba_from(p.table_body, 1.0),
+            table: rgba_from(p.card, 1.0),
             table_active: selected_tint,
             table_active_border: selected_border,
-            table_even: rgba_from(p.chrome, 1.0),
-            table_head: rgba_from(p.table_head, 1.0),
+            table_even: rgba_from(p.row_alt, 1.0),
+            table_head: rgba_from(p.head_row, 1.0),
             table_head_foreground: rgba_from(p.text_soft, 1.0),
-            table_foot: rgba_from(p.table_head, 1.0),
+            table_foot: rgba_from(p.head_row, 1.0),
             table_foot_foreground: rgba_from(p.text_soft, 1.0),
             table_hover: rgba_from(p.panel_high, 1.0),
-            table_row_border: rgba_from(p.border, 1.0),
+            table_row_border: rgba_from(p.row_line, 1.0),
             title_bar: rgba_from(p.chrome, 1.0),
             title_bar_border: rgba_from(p.border, 1.0),
             status_bar: rgba_from(p.chrome, 1.0),
@@ -227,10 +233,10 @@ impl MoonThemeTokens {
             warning_foreground: rgba_from(p.text, 1.0),
             overlay: rgba_from(p.shell, 0.72),
             window_border: rgba_from(p.border, 1.0),
-            red: rgba_from(p.red, 1.0),
-            red_light: rgba_from(p.red, 0.72),
-            green: rgba_from(p.green, 1.0),
-            green_light: rgba_from(p.green, 0.72),
+            red: rgba_from(danger_text, 1.0),
+            red_light: rgba_from(danger_text, 0.72),
+            green: rgba_from(green_text, 1.0),
+            green_light: rgba_from(green_text, 0.72),
             blue: rgba_from(p.blue, 1.0),
             blue_light: rgba_from(p.blue, 0.72),
             yellow: rgba_from(p.yellow, 1.0),
@@ -323,6 +329,9 @@ impl Default for MoonTheme {
 
 impl MoonTheme {
     pub fn from_config(config: MoonThemeConfig) -> Self {
+        let mut config = config;
+        config.dark.palette = config.dark.palette.with_legacy_defaults();
+        config.light.palette = config.light.palette.with_legacy_defaults();
         let tokens = match config.mode {
             ThemeMode::Light => config.light.clone(),
             ThemeMode::Dark | ThemeMode::System => config.dark.clone(),

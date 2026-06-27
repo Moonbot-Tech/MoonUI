@@ -797,12 +797,17 @@ impl ButtonVariant {
         selected: bool,
     ) -> Option<MoonButtonStyle> {
         let selected_boost = if selected { 0.08 } else { 0.0 };
+        let light = p.is_light();
+        let info = if light { p.accent } else { p.blue };
+        let success_bg = if light { p.green_btn } else { p.green };
+        let success_fg = if light { p.green_text } else { p.green };
+        let danger_fg = if light { p.red_text } else { p.red };
 
         match self {
             Self::Default => Some(MoonButtonStyle {
-                bg: 0x1F2126,
+                bg: if light { p.surface } else { 0x1F2126 },
                 bg_alpha: 1.0,
-                border: p.border,
+                border: if light { p.border_soft } else { p.border },
                 border_alpha: 1.0,
                 fg: p.text,
                 fg_alpha: 0.86,
@@ -813,9 +818,9 @@ impl ButtonVariant {
                 shadow: false,
             }),
             Self::Panel => Some(MoonButtonStyle {
-                bg: p.shell_high,
+                bg: if light { p.surface } else { p.shell_high },
                 bg_alpha: 1.0,
-                border: p.border,
+                border: if light { p.border_soft } else { p.border },
                 border_alpha: 1.0,
                 fg: p.text,
                 fg_alpha: 1.0,
@@ -826,20 +831,20 @@ impl ButtonVariant {
                 shadow: false,
             }),
             Self::Secondary | Self::Soft => Some(MoonButtonStyle {
-                bg: 0xFFFFFF,
-                bg_alpha: 0.02,
-                border: 0xFFFFFF,
-                border_alpha: 0.05,
+                bg: if light { p.surface } else { 0xFFFFFF },
+                bg_alpha: if light { 1.0 } else { 0.02 },
+                border: if light { p.border_soft } else { 0xFFFFFF },
+                border_alpha: if light { 1.0 } else { 0.05 },
                 fg: p.text_soft,
                 fg_alpha: 1.0,
-                hover_bg_alpha: 0.055,
-                active_bg_alpha: 0.035,
-                hover_border_alpha: 0.08,
-                active_border_alpha: 0.06,
+                hover_bg_alpha: if light { 1.0 } else { 0.055 },
+                active_bg_alpha: if light { 0.86 } else { 0.035 },
+                hover_border_alpha: if light { 1.0 } else { 0.08 },
+                active_border_alpha: if light { 1.0 } else { 0.06 },
                 shadow: false,
             }),
             Self::Primary | Self::Blue | Self::Info => Some(MoonButtonStyle {
-                bg: p.blue,
+                bg: info,
                 bg_alpha: if selected {
                     0.18
                 } else if outline {
@@ -847,7 +852,7 @@ impl ButtonVariant {
                 } else {
                     0.10
                 },
-                border: p.blue,
+                border: info,
                 border_alpha: if selected {
                     0.38
                 } else if outline {
@@ -855,7 +860,7 @@ impl ButtonVariant {
                 } else {
                     0.22
                 },
-                fg: p.blue,
+                fg: info,
                 fg_alpha: 1.0,
                 hover_bg_alpha: 0.18,
                 active_bg_alpha: 0.12,
@@ -913,21 +918,35 @@ impl ButtonVariant {
                 shadow: selected,
             }),
             Self::Success | Self::Green => Some(MoonButtonStyle {
-                bg: p.green,
-                bg_alpha: if outline { 0.0 } else { 0.14 + selected_boost },
-                border: p.green,
+                bg: success_bg,
+                bg_alpha: if outline {
+                    0.0
+                } else if light && selected {
+                    1.0
+                } else {
+                    0.14 + selected_boost
+                },
+                border: if light && outline {
+                    p.green
+                } else {
+                    success_bg
+                },
                 border_alpha: if outline { 0.35 } else { 0.30 },
-                fg: p.green,
+                fg: if light && selected && !outline {
+                    p.on_accent
+                } else {
+                    success_fg
+                },
                 fg_alpha: 1.0,
-                hover_bg_alpha: 0.22,
-                active_bg_alpha: 0.14,
+                hover_bg_alpha: if light && selected { 0.92 } else { 0.22 },
+                active_bg_alpha: if light && selected { 0.84 } else { 0.14 },
                 hover_border_alpha: 0.44,
                 active_border_alpha: 0.34,
                 shadow: false,
             }),
             Self::Danger | Self::Red | Self::OutlineRed => Some(MoonButtonStyle {
                 bg: if matches!(self, Self::OutlineRed) || outline {
-                    p.shell
+                    if light { p.surface } else { p.shell }
                 } else {
                     p.red
                 },
@@ -938,9 +957,13 @@ impl ButtonVariant {
                 } else {
                     0.10
                 },
-                border: p.red,
+                border: if light && (matches!(self, Self::OutlineRed) || outline) {
+                    p.red_soft_bd
+                } else {
+                    p.red
+                },
                 border_alpha: if outline { 0.40 } else { 0.38 },
-                fg: p.red,
+                fg: danger_fg,
                 fg_alpha: 1.0,
                 hover_bg_alpha: if matches!(self, Self::OutlineRed) || outline {
                     0.08
@@ -1204,6 +1227,26 @@ mod tests {
     #[test]
     fn test_moon_button_variant_tokens_match_terminal_palette() {
         let p = MoonPalette::TERMINAL;
+        let default = ButtonVariant::Default.moon_style(p, false, false).unwrap();
+        assert_eq!(default.bg, 0x1F2126);
+
+        let light = MoonPalette::LIGHT;
+        let light_default = ButtonVariant::Default
+            .moon_style(light, false, false)
+            .unwrap();
+        assert_eq!(light_default.bg, light.surface);
+        assert_eq!(light_default.border, light.border_soft);
+        assert_ne!(light_default.bg, 0x1F2126);
+
+        let light_blue = ButtonVariant::Blue.moon_style(light, false, false).unwrap();
+        assert_eq!(light_blue.bg, light.accent);
+        assert_eq!(light_blue.border, light.accent);
+
+        let light_live = ButtonVariant::Green.moon_style(light, false, true).unwrap();
+        assert_eq!(light_live.bg, light.green_btn);
+        assert_eq!(light_live.bg_alpha, 1.0);
+        assert_eq!(light_live.fg, light.on_accent);
+
         let blue = ButtonVariant::Blue.moon_style(p, false, false).unwrap();
         assert_eq!(blue.bg, p.blue);
         assert_eq!(blue.bg_alpha, 0.10);

@@ -284,10 +284,16 @@ impl MoonWindowFrame {
         for button in self.controls.buttons() {
             let button = *button;
             let group = SharedString::from(format!("{}:{button:?}", self.id));
+            let is_light = p.is_light();
             let (default_color, hover_color) = match button {
-                FrameButton::Close => (rgba_from(p.orange, 1.0), rgba_from(p.on_accent, 1.0)),
+                FrameButton::Close => (
+                    rgba_from(if is_light { p.red_text } else { p.orange }, 1.0),
+                    rgba_from(p.on_accent, 1.0),
+                ),
                 FrameButton::Minimize | FrameButton::Maximize => {
-                    (rgba_from(p.text, 1.0), rgba_from(p.text, 1.0))
+                    let control = if is_light { p.text_faint } else { p.text };
+                    let hover = if is_light { p.text_dim } else { p.text };
+                    (rgba_from(control, 1.0), rgba_from(hover, 1.0))
                 }
             };
             row = row.child(
@@ -303,18 +309,18 @@ impl MoonWindowFrame {
                     .window_control_area(button.control_area())
                     .hover(move |s| match button {
                         FrameButton::Close => s
-                            .bg(rgba_from(p.red, 0.5))
+                            .bg(rgba_from(p.red, if is_light { 0.14 } else { 0.5 }))
                             .text_color(rgba_from(p.on_accent, 1.0))
                             .shadow(vec![box_shadow(
                                 px(0.0),
                                 px(0.0),
                                 px(14.0),
                                 px(0.0),
-                                rgba_from(p.red, 0.55),
+                                rgba_from(p.red, if is_light { 0.18 } else { 0.55 }),
                             )]),
                         FrameButton::Minimize | FrameButton::Maximize => s
                             .bg(rgba_from(p.overlay, 0.09))
-                            .text_color(rgba_from(p.text, 1.0)),
+                            .text_color(rgba_from(if is_light { p.text_dim } else { p.text }, 1.0)),
                     })
                     .when(cfg!(not(target_os = "windows")), move |this| {
                         this.on_mouse_down(MouseButton::Left, move |_event, window, cx| {
@@ -330,11 +336,15 @@ impl MoonWindowFrame {
 
     pub fn visual_brand(&self, cx: &App) -> Div {
         let tokens = MoonTheme::active_tokens(cx);
+        let p = tokens.palette;
         match self.resolved_brand() {
             MoonWindowFrameBrand::Full => div()
                 .flex()
                 .items_center()
-                .child(logo_full(tokens.ui(86.0))),
+                .child(logo_full(
+                    tokens.ui(86.0),
+                    if p.is_light() { p.text } else { 0xE7E7E7 },
+                )),
             MoonWindowFrameBrand::Mark => div()
                 .flex()
                 .items_center()
@@ -430,10 +440,13 @@ impl MoonWindowFrame {
     }
 }
 
-fn logo_full(width: f32) -> impl IntoElement {
+fn logo_full(width: f32, text_color: u32) -> impl IntoElement {
+    let text_fill = format!("#{text_color:06X}");
+    let svg = MOONBOT_LOGO_SVG.replace(r##"fill="#E7E7E7""##, &format!(r##"fill="{text_fill}""##));
+
     img(Arc::new(Image::from_bytes(
         ImageFormat::Svg,
-        MOONBOT_LOGO_SVG.as_bytes().to_vec(),
+        svg.into_bytes(),
     )))
     .w(px(width))
     .h(px(width * (LOGO_SRC_H / LOGO_SRC_W)))

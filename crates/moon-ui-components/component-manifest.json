@@ -372,8 +372,8 @@
       "theme_source": "MoonTheme bridge through MoonList facade",
       "public_path": "moon_ui::MoonList",
       "upstream_ref": "Longbridge::list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon separator/list styling hook lives in base list; Longbridge list state and delegate behavior remains source-owned",
-      "donor_drift_budget": 1,
+      "fork_reason": "Reviewed TrackedFork drift: Moon list item/separator styling hooks live in base list files; Longbridge list state and delegate behavior remains source-owned",
+      "donor_drift_budget": 2,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -481,12 +481,13 @@
     },
     {
       "concept": "sidebar",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Sidebar",
       "theme_source": "MoonTheme bridge through MoonSidebar facade",
       "public_path": "moon_ui::MoonSidebar",
       "upstream_ref": "Longbridge::sidebar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed TrackedFork drift: Moon footer/header/menu styling hooks live in base sidebar; Longbridge sidebar behavior remains source-owned",
+      "donor_drift_budget": 3,
       "contracts": ["gallery.visual_coverage"]
     },
     {

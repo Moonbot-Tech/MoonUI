@@ -3,7 +3,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
-    button::{MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant},
+    button::{MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant, height_for_size},
     foundation::{MoonClickHandler, MoonSelectHandler, selected_background},
     icons::{MOON_ICON_CHECK, moon_icon},
     text::MoonText,
@@ -718,16 +718,6 @@ impl MoonDropdown {
         self
     }
 
-    fn trigger_height(&self) -> f32 {
-        match self.trigger_size {
-            MoonButtonSize::Micro => 18.0,
-            MoonButtonSize::Toolbar => 28.0,
-            MoonButtonSize::Action => 26.0,
-            MoonButtonSize::Pill => 30.0,
-            MoonButtonSize::Custom { height, .. } => height,
-        }
-    }
-
     fn render_trigger(&self) -> impl IntoElement {
         let trigger_id = SharedString::from(format!("{}:trigger", self.id));
         let mut trigger = MoonButton::new(trigger_id)
@@ -765,10 +755,8 @@ impl RenderOnce for MoonDropdown {
         let open = controlled_open.unwrap_or_else(|| state.read(cx).open);
         let on_open_change = self.on_open_change.clone();
         let parent_view = window.current_view();
-        let trigger_height = self
-            .bounds
-            .map(|bounds| bounds.h)
-            .unwrap_or_else(|| self.trigger_height());
+        let trigger_height = self.bounds.map(|bounds| bounds.h);
+        let trigger_size = self.trigger_size;
         let trigger = self.render_trigger().into_any_element();
 
         let mut root = div()
@@ -828,8 +816,11 @@ impl RenderOnce for MoonDropdown {
                     menu = menu.max_height(max_height);
                 }
 
+                let trigger_height =
+                    trigger_height.unwrap_or_else(|| height_for_size(trigger_size, &tokens));
+
                 div()
-                    .mt(px(tokens.ui(trigger_height) + tokens.ui(menu_offset_y)))
+                    .mt(px(trigger_height + tokens.ui(menu_offset_y)))
                     .ml(px(tokens.ui(menu_offset_x)))
                     .child(menu.render_with_theme(p, tokens))
             });

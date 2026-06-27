@@ -417,6 +417,7 @@ fn to_core_index(index: IndexPath) -> crate::IndexPath {
 fn size_for(trigger: MoonButtonSize, _menu: MoonMenuSize) -> Size {
     match trigger {
         MoonButtonSize::Micro => Size::XSmall,
+        MoonButtonSize::ToolbarCompact => Size::Small,
         MoonButtonSize::Action => Size::Small,
         MoonButtonSize::Toolbar => Size::Medium,
         MoonButtonSize::Pill => Size::Large,
