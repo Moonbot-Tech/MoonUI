@@ -5,7 +5,7 @@ use super::{
     foundation::box_shadow,
     text::MoonText,
     theme::MoonTheme,
-    tokens::{MoonRect, MoonTone, rgba_from},
+    tokens::{rgba_from, MoonPalette, MoonRect, MoonTone},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -206,10 +206,7 @@ impl RenderOnce for MoonToggle {
         } else {
             tokens.ui(2.0)
         };
-        let track_bg = if checked { accent } else { p.panel };
-        let track_alpha = if checked { 0.55 } else { 1.0 };
-        let border_color = if checked { accent } else { p.border };
-        let thumb_bg = if checked { p.text } else { p.text_soft };
+        let colors = toggle_colors(p, accent, checked);
 
         let switch = div()
             .relative()
@@ -217,8 +214,8 @@ impl RenderOnce for MoonToggle {
             .h(px(track_height))
             .rounded(px(track_height * 0.5))
             .border(px(tokens.ui(1.0)))
-            .border_color(rgba_from(border_color, 0.72 * control_alpha))
-            .bg(rgba_from(track_bg, track_alpha * control_alpha))
+            .border_color(rgba_from(colors.border, 0.72 * control_alpha))
+            .bg(rgba_from(colors.track, colors.track_alpha * control_alpha))
             .child(
                 div()
                     .absolute()
@@ -227,13 +224,13 @@ impl RenderOnce for MoonToggle {
                     .w(px(thumb_size))
                     .h(px(thumb_size))
                     .rounded(px(thumb_size * 0.5))
-                    .bg(rgba_from(thumb_bg, control_alpha))
+                    .bg(rgba_from(colors.thumb, control_alpha))
                     .shadow(vec![box_shadow(
                         px(0.0),
                         px(tokens.ui(1.0)),
                         px(tokens.ui(4.0)),
                         px(0.0),
-                        rgba_from(p.shadow, 0.38),
+                        rgba_from(p.shadow, colors.shadow_alpha * control_alpha),
                     )]),
             );
 
@@ -318,9 +315,49 @@ impl RenderOnce for MoonToggle {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ToggleColors {
+    track: u32,
+    track_alpha: f32,
+    border: u32,
+    thumb: u32,
+    shadow_alpha: f32,
+}
+
+fn toggle_colors(p: MoonPalette, accent: u32, checked: bool) -> ToggleColors {
+    if p.is_light() {
+        if checked {
+            ToggleColors {
+                track: accent,
+                track_alpha: 0.58,
+                border: accent,
+                thumb: p.surface,
+                shadow_alpha: 0.14,
+            }
+        } else {
+            ToggleColors {
+                track: 0xEEF9FF,
+                track_alpha: 1.0,
+                border: 0xC5DEEC,
+                thumb: 0x6AA6C8,
+                shadow_alpha: 0.12,
+            }
+        }
+    } else {
+        ToggleColors {
+            track: if checked { accent } else { p.panel },
+            track_alpha: if checked { 0.55 } else { 1.0 },
+            border: if checked { accent } else { p.border },
+            thumb: if checked { p.text } else { p.text_soft },
+            shadow_alpha: 0.38,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{MoonToggle, MoonToggleSize, moon_toggle_click_plan};
+    use super::{moon_toggle_click_plan, toggle_colors, MoonToggle, MoonToggleSize};
+    use crate::moon::MoonPalette;
 
     #[test]
     fn toggle_metrics_match_designer_reference() {
@@ -343,5 +380,21 @@ mod tests {
         let controlled = moon_toggle_click_plan(true, true, false).unwrap();
         assert!(!controlled.next_checked);
         assert!(!controlled.update_internal);
+    }
+
+    #[test]
+    fn light_toggle_uses_soft_knob_when_off() {
+        let p = MoonPalette::LIGHT;
+        let off = toggle_colors(p, p.accent, false);
+        assert_eq!(off.track, 0xEEF9FF);
+        assert_eq!(off.border, 0xC5DEEC);
+        assert_eq!(off.thumb, 0x6AA6C8);
+        assert_ne!(off.thumb, p.text);
+        assert_ne!(off.thumb, p.text_soft);
+        assert!(off.shadow_alpha < 0.20);
+
+        let on = toggle_colors(p, p.accent, true);
+        assert_eq!(on.thumb, p.surface);
+        assert!(on.shadow_alpha < 0.20);
     }
 }

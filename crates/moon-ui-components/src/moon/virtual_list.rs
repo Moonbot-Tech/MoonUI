@@ -13,6 +13,7 @@ pub type MoonVirtualListScrollHandle = UniformListScrollHandle;
 
 type MoonVirtualItemRenderer =
     Box<dyn for<'a> Fn(usize, &'a mut Window, &'a mut App) -> AnyElement>;
+type MoonVirtualRangeObserver = Box<dyn for<'a> Fn(Range<usize>, &'a mut Window, &'a mut App)>;
 
 #[derive(IntoElement)]
 pub struct MoonVirtualList {
@@ -21,6 +22,7 @@ pub struct MoonVirtualList {
     item_count: usize,
     item_height: f32,
     render_item: MoonVirtualItemRenderer,
+    on_visible_range: Option<MoonVirtualRangeObserver>,
     scroll_handle: Option<MoonVirtualListScrollHandle>,
     scrollbar_visibility: MoonScrollbarVisibility,
     surface: bool,
@@ -52,6 +54,7 @@ impl MoonVirtualList {
             item_count,
             item_height,
             render_item,
+            on_visible_range: None,
             scroll_handle: None,
             scrollbar_visibility: MoonScrollbarVisibility::Hover,
             surface: true,
@@ -71,6 +74,14 @@ impl MoonVirtualList {
 
     pub fn track_scroll(mut self, scroll_handle: &MoonVirtualListScrollHandle) -> Self {
         self.scroll_handle = Some(scroll_handle.clone());
+        self
+    }
+
+    pub fn on_visible_range(
+        mut self,
+        on_visible_range: impl 'static + Fn(Range<usize>, &mut Window, &mut App),
+    ) -> Self {
+        self.on_visible_range = Some(Box::new(on_visible_range));
         self
     }
 
@@ -153,6 +164,7 @@ impl RenderOnce for MoonVirtualList {
         });
 
         let render_item = self.render_item;
+        let on_visible_range = self.on_visible_range;
         let item_height = self.item_height;
         let mut root = div()
             .id(ElementId::from(id.clone()))
@@ -179,6 +191,9 @@ impl RenderOnce for MoonVirtualList {
 
         let list_id = ElementId::from(SharedString::from(format!("{}:list", id)));
         let mut list = uniform_list(list_id, self.item_count, move |range, window, cx| {
+            if let Some(on_visible_range) = &on_visible_range {
+                on_visible_range(range.clone(), window, cx);
+            }
             Self::render_range(&render_item, item_height, range, window, cx)
         })
         .size_full()

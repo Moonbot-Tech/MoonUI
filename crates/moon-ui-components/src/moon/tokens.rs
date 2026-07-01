@@ -1,4 +1,4 @@
-use gpui::{App, Hsla, rgb, rgba};
+use gpui::{rgb, rgba, App, Hsla};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -148,49 +148,49 @@ impl MoonPalette {
     };
 
     pub const LIGHT: Self = Self {
-        shell: 0xDED9CC,
-        shell_high: 0xF4F1EA,
-        window: 0xEFEBE2,
-        surface: 0xFAF8F3,
-        panel: 0xEFEBE2,
-        panel_high: 0xFAF8F3,
-        chrome: 0xF4F1EA,
-        tabbar: 0xE9E4D9,
-        panel_head: 0xEDE8DD,
-        gutter: 0xEBE7DD,
+        shell: 0xF3F5F7,
+        shell_high: 0xFAFBFC,
+        window: 0xF7F8FA,
+        surface: 0xFFFFFF,
+        panel: 0xF8FAFC,
+        panel_high: 0xFFFFFF,
+        chrome: 0xF5F7FA,
+        tabbar: 0xF2F5F8,
+        panel_head: 0xF5F7FA,
+        gutter: 0xEEF2F6,
         chart_bg: 0xFFFFFF,
         card: 0xFFFFFF,
-        row_alt: 0xFBF9F4,
-        head_row: 0xEDE8DD,
-        border: 0xE0DACB,
-        border_soft: 0xE2DDCF,
-        border_card: 0xE7E1D2,
-        border_hover: 0xCFC6B5,
-        row_line: 0xF0EBE0,
+        row_alt: 0xFCFDFE,
+        head_row: 0xF3F6F8,
+        border: 0xD5DBE1,
+        border_soft: 0xE1E5EA,
+        border_card: 0xDCE2E8,
+        border_hover: 0xB8C2CC,
+        row_line: 0xECEFF2,
         shadow: 0x000000,
         overlay: 0x000000,
         on_accent: 0xFFFFFF,
-        text: 0x2A2620,
-        text_soft: 0x6B655B,
-        text_dim: 0x4F4A42,
-        text_muted: 0xA39C8D,
-        text_faint: 0x9A9488,
-        table_head: 0xEDE8DD,
+        text: 0x17202A,
+        text_soft: 0x4B5865,
+        text_dim: 0x2D3945,
+        text_muted: 0x768391,
+        text_faint: 0x98A3AE,
+        table_head: 0xF3F6F8,
         table_body: 0xFFFFFF,
-        table_selected: 0xC2724A,
+        table_selected: 0x009DFF,
         green: 0x178A57,
-        green_btn: 0x15834F,
-        green_text: 0x0F6B43,
+        green_btn: 0x178A57,
+        green_text: 0x0E6E45,
         red: 0xD2483F,
-        red_text: 0xB0352E,
-        red_soft_bd: 0xE3B7AE,
-        orange: 0xC2724A,
-        amber: 0xC2724A,
-        blue: 0x4E7FA0,
-        accent: 0xC2724A,
-        accent_fg: 0xA85A36,
-        accent_tint_a: 0.12,
-        yellow: 0xC2724A,
+        red_text: 0xB7352F,
+        red_soft_bd: 0xE1B5B0,
+        orange: 0xD18A2B,
+        amber: 0xB97824,
+        blue: 0x2B6F9E,
+        accent: 0x009DFF,
+        accent_fg: 0x0A3F68,
+        accent_tint_a: 0.08,
+        yellow: 0xB8860B,
     };
 
     pub fn with_legacy_defaults(mut self) -> Self {
@@ -308,7 +308,7 @@ impl MoonTone {
             Self::Warning => palette.amber,
             Self::Info => {
                 if palette.is_light() {
-                    palette.accent
+                    palette.blue
                 } else {
                     palette.blue
                 }
@@ -320,7 +320,13 @@ impl MoonTone {
                     palette.red
                 }
             }
-            Self::Accent => palette.accent,
+            Self::Accent => {
+                if palette.is_light() {
+                    palette.accent_fg
+                } else {
+                    palette.accent
+                }
+            }
             Self::Notice => palette.yellow,
         }
     }
@@ -354,33 +360,36 @@ mod tests {
     }
 
     #[test]
-    fn light_palette_matches_warm_paper_spec() {
+    fn light_palette_matches_neutral_terminal_spec() {
         let p = MoonPalette::LIGHT;
-        assert_eq!(p.shell, 0xDED9CC);
-        assert_eq!(p.window, 0xEFEBE2);
-        assert_eq!(p.chrome, 0xF4F1EA);
-        assert_eq!(p.tabbar, 0xE9E4D9);
-        assert_eq!(p.surface, 0xFAF8F3);
+        assert_eq!(p.shell, 0xF3F5F7);
+        assert_eq!(p.window, 0xF7F8FA);
+        assert_eq!(p.chrome, 0xF5F7FA);
+        assert_eq!(p.tabbar, 0xF2F5F8);
+        assert_eq!(p.surface, 0xFFFFFF);
         assert_eq!(p.card, 0xFFFFFF);
-        assert_eq!(p.row_alt, 0xFBF9F4);
-        assert_eq!(p.head_row, 0xEDE8DD);
-        assert_eq!(p.gutter, 0xEBE7DD);
-        assert_eq!(p.border, 0xE0DACB);
-        assert_eq!(p.border_soft, 0xE2DDCF);
-        assert_eq!(p.border_card, 0xE7E1D2);
-        assert_eq!(p.row_line, 0xF0EBE0);
-        assert_eq!(p.text, 0x2A2620);
-        assert_eq!(p.text_soft, 0x6B655B);
-        assert_eq!(p.text_dim, 0x4F4A42);
-        assert_eq!(p.text_muted, 0xA39C8D);
-        assert_eq!(p.text_faint, 0x9A9488);
-        assert_eq!(p.accent, 0xC2724A);
-        assert_eq!(p.accent_fg, 0xA85A36);
-        assert_eq!(p.green_text, 0x0F6B43);
-        assert_eq!(p.green_btn, 0x15834F);
+        assert_eq!(p.row_alt, 0xFCFDFE);
+        assert_eq!(p.head_row, 0xF3F6F8);
+        assert_eq!(p.gutter, 0xEEF2F6);
+        assert_eq!(p.border, 0xD5DBE1);
+        assert_eq!(p.border_soft, 0xE1E5EA);
+        assert_eq!(p.border_card, 0xDCE2E8);
+        assert_eq!(p.row_line, 0xECEFF2);
+        assert_eq!(p.text, 0x17202A);
+        assert_eq!(p.text_soft, 0x4B5865);
+        assert_eq!(p.text_dim, 0x2D3945);
+        assert_eq!(p.text_muted, 0x768391);
+        assert_eq!(p.text_faint, 0x98A3AE);
+        assert_eq!(p.accent, 0x009DFF);
+        assert_eq!(p.accent_fg, 0x0A3F68);
+        assert_ne!(p.accent, p.accent_fg);
+        assert_eq!(MoonTone::Accent.color(p), p.accent_fg);
+        assert_eq!(MoonTone::Info.color(p), p.blue);
+        assert_eq!(p.green_text, 0x0E6E45);
+        assert_eq!(p.green_btn, 0x178A57);
         assert_eq!(p.red, 0xD2483F);
-        assert_eq!(p.red_text, 0xB0352E);
-        assert_eq!(p.red_soft_bd, 0xE3B7AE);
+        assert_eq!(p.red_text, 0xB7352F);
+        assert_eq!(p.red_soft_bd, 0xE1B5B0);
     }
 
     #[test]

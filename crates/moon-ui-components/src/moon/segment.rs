@@ -116,7 +116,7 @@ impl MoonSegmentedControl {
     }
 
     pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
-        let accent = p.accent;
+        let accent = selected_segment_text_color(p);
         let on_click = self.on_click.clone();
 
         let mut root = div()
@@ -209,4 +209,8 @@ impl RenderOnce for MoonSegmentedControl {
         let tokens = MoonTheme::active_tokens(cx);
         self.render_with_theme(MoonPalette::active(cx), tokens)
     }
+}
+
+fn selected_segment_text_color(p: MoonPalette) -> u32 {
+    if p.is_light() { p.accent_fg } else { p.accent }
 }
