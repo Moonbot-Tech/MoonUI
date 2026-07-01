@@ -1,4 +1,4 @@
-use gpui::{rgb, rgba, App, Hsla};
+use gpui::{App, Hsla, rgb, rgba};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

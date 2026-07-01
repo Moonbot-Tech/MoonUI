@@ -5,7 +5,7 @@ use super::{
     foundation::box_shadow,
     text::MoonText,
     theme::MoonTheme,
-    tokens::{rgba_from, MoonPalette, MoonRect, MoonTone},
+    tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -356,7 +356,7 @@ fn toggle_colors(p: MoonPalette, accent: u32, checked: bool) -> ToggleColors {
 
 #[cfg(test)]
 mod tests {
-    use super::{moon_toggle_click_plan, toggle_colors, MoonToggle, MoonToggleSize};
+    use super::{MoonToggle, MoonToggleSize, moon_toggle_click_plan, toggle_colors};
     use crate::moon::MoonPalette;
 
     #[test]
