@@ -447,6 +447,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn toolbar_compact(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self"
     },
     {
@@ -1123,6 +1127,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn insert_panel_beside_sibling( &mut self, panel: Rc<dyn PanelView>, sibling_names: &[&str], slot_panels: &[&str], index: usize, placement: DockSplitPlacement, panel_size: Option<f32>, sibling_size: Option<f32>, window: &mut Window, cx: &mut Context<Self>, ) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn insert_panel_into_home_tabs( &mut self, panel: Rc<dyn PanelView>, ix: usize, sibling_names: &[&str], window: &mut Window, cx: &mut Context<Self>, ) -> bool"
     },
     {
@@ -1475,6 +1483,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn accent_underline( p: MoonPalette, tokens: &MoonThemeTokens, left: f32, right: f32, bottom: f32, ) -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
       "signature": "pub fn box_shadow( x: impl Into<Pixels>, y: impl Into<Pixels>, blur: impl Into<Pixels>, spread: impl Into<Pixels>, color: Hsla, ) -> BoxShadow"
     },
     {
@@ -1484,6 +1496,14 @@
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
       "signature": "pub fn init(cx: &mut App)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn selected_background(p: MoonPalette) -> Background"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn selected_flat(p: MoonPalette) -> Hsla"
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
@@ -1664,6 +1684,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/icons.rs",
       "signature": "pub const MOON_ICON_TOOLTIP_ARROW: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/assets/moon-tooltip-arrow.svg\");"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/icons.rs",
+      "signature": "pub const MOON_ICON_WINDOW_CLOSE: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/assets/moon-window-close.svg\");"
     },
     {
       "file": "crates/moon-ui-components/src/moon/icons.rs",
@@ -2067,7 +2091,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use dock::{ DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, MoonDockPanel, Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel, };"
+      "signature": "pub use dock::{ DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, DockSplitPlacement, MoonDockPanel, Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel, };"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -3551,6 +3575,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn label(mut self, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn mono(mut self, mono: bool) -> Self"
     },
     {
@@ -3927,11 +3955,23 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub fn is_light(self) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
       "signature": "pub fn rgb_from(rgb_hex: u32) -> Hsla"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tokens.rs",
       "signature": "pub fn rgba_from(rgb_hex: u32, alpha: f32) -> Hsla"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub fn selected_fg(self) -> u32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub fn with_legacy_defaults(mut self) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tokens.rs",
@@ -4032,6 +4072,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
       "signature": "pub fn new<R>( id: impl Into<SharedString>, item_count: usize, item_height: f32, render_item: impl 'static + Fn(usize, &mut Window, &mut App) -> R, ) -> Self where R: IntoElement,"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
+      "signature": "pub fn on_visible_range( mut self, on_visible_range: impl 'static + Fn(Range<usize>, &mut Window, &mut App), ) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/virtual_list.rs",
