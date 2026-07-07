@@ -91,6 +91,11 @@ pub struct MoonDataTableColumn {
     pub resizable: bool,
     pub movable: bool,
     pub fixed_left: bool,
+    /// Ширину задал пользователь (drag-ресайз, есть запись в `state.column_widths`). Такие
+    /// колонки НЕ участвуют в авто-растяжении (`auto_width_columns`): держатся ровно на
+    /// заданной ширине, а свободное место распределяется между нетронутыми. Иначе ресайз
+    /// «прыгал» — заданную ширину домножали на scale заполнения, и соседи пересжимались.
+    pub user_sized: bool,
 }
 
 impl MoonDataTableColumn {
@@ -105,6 +110,7 @@ impl MoonDataTableColumn {
             resizable: true,
             movable: true,
             fixed_left: false,
+            user_sized: false,
         }
     }
 
@@ -661,6 +667,7 @@ impl MoonDataTable {
             .map(|mut column| {
                 if let Some(width) = state.column_widths.get(column.key.as_ref()) {
                     column.width = *width;
+                    column.user_sized = true;
                 }
                 column
             })
@@ -672,11 +679,25 @@ impl MoonDataTable {
         viewport_width: f32,
         row_header_width: f32,
     ) -> Vec<MoonDataTableColumn> {
-        let base_width = columns.iter().map(|column| column.width).sum::<f32>();
         let available = (viewport_width - row_header_width).max(0.0);
-        if base_width > 0.0 && available > base_width {
-            let scale = available / base_width;
-            for column in &mut columns {
+        // Заресайзенные пользователем колонки — фиксированы (держатся на своей ширине),
+        // авто-растяжение к заполнению распределяем ТОЛЬКО между нетронутыми. Иначе заданную
+        // drag'ом ширину домножали на общий scale → колонка прыгала больше, чем тянули, а
+        // соседи пересжимались. Все колонки тронуты (flex==0) → не растягиваем вовсе.
+        let fixed: f32 = columns
+            .iter()
+            .filter(|column| column.user_sized)
+            .map(|column| column.width)
+            .sum();
+        let flex: f32 = columns
+            .iter()
+            .filter(|column| !column.user_sized)
+            .map(|column| column.width)
+            .sum();
+        let remaining = (available - fixed).max(0.0);
+        if flex > 0.0 && remaining > flex {
+            let scale = remaining / flex;
+            for column in columns.iter_mut().filter(|column| !column.user_sized) {
                 column.width *= scale;
                 column.fill = false;
             }
@@ -884,6 +905,8 @@ impl MoonDataTable {
                     key: key_string.clone(),
                 };
                 let state_for_move = state.clone();
+                let state_for_reset = state.clone();
+                let reset_key = key_string.clone();
                 cell = cell.child(
                     div()
                         .id(ElementId::from(SharedString::from(format!(
@@ -896,6 +919,27 @@ impl MoonDataTable {
                         .w(px(tokens.ui(6.0)))
                         .cursor(CursorStyle::ResizeColumn)
                         .hover(|this| this.bg(rgba_from(p.accent, 0.14)))
+                        // Двойной клик по разделителю — сброс ширины в авто. Обычный дабл-клик:
+                        // ТОЛЬКО эта колонка (убираем её из `column_widths` → снова «нетронутая»,
+                        // растягивается авто-филлом, соседние заресайзенные стоят). Shift+дабл-клик:
+                        // ПОЛНЫЙ сброс всех ширин таблицы (Shift кроссплатформенный — Win/macOS).
+                        .on_click(move |event, _, cx| {
+                            if event.click_count() >= 2 {
+                                let full = event.modifiers().shift;
+                                state_for_reset.update(cx, |state, cx| {
+                                    let changed = if full {
+                                        let had = !state.column_widths.is_empty();
+                                        state.column_widths.clear();
+                                        had
+                                    } else {
+                                        state.column_widths.remove(&reset_key).is_some()
+                                    };
+                                    if changed {
+                                        cx.notify();
+                                    }
+                                });
+                            }
+                        })
                         .on_drag(drag, |drag, _, _, cx| {
                             cx.stop_propagation();
                             cx.new(|_| drag.clone())
@@ -908,6 +952,25 @@ impl MoonDataTable {
                                     return;
                                 }
                                 if let Some(bounds) = state.header_bounds(&drag.key) {
+                                    // Первый ресайз в таблице: фиксируем ВСЕ колонки на их
+                                    // текущей отображаемой ширине (снимок из header_bounds).
+                                    // Дальше `auto_width_columns` не растягивает нетронутые
+                                    // (все user_sized) → тянешь границу, двигается только эта
+                                    // колонка (и правые за ней), ЛЕВЫЕ стоят на месте. Визуально
+                                    // ничего не прыгает — ширины берём те, что уже отрисованы.
+                                    if state.column_widths.is_empty() {
+                                        let snapshot: Vec<(String, f32)> = state
+                                            .header_bounds
+                                            .iter()
+                                            .map(|(key, b)| (key.clone(), f32::from(b.size.width)))
+                                            .collect();
+                                        for (key, width) in snapshot {
+                                            state
+                                                .column_widths
+                                                .entry(key)
+                                                .or_insert(width.max(40.0));
+                                        }
+                                    }
                                     let width = (f32::from(event.event.position.x)
                                         - f32::from(bounds.origin.x))
                                     .max(40.0);
