@@ -977,6 +977,41 @@ impl DockItem {
         }
     }
 
+    /// Путь к НАИМЕНЬШЕМУ поддереву, содержащему ВСЕ присутствующие из `names` (относительно
+    /// self). Для восстановления сплита: соседний слот мог быть вложенным сплитом (столбец из
+    /// панелей) — его надо обернуть целиком, а не один лист внутри. `None`, если ни одна из
+    /// `names` не найдена. Отсутствующие имена игнорируются (могли открепить/закрыть).
+    fn smallest_subtree_with_all(&self, names: &[&str], cx: &App) -> Option<Vec<usize>> {
+        let present: Vec<&str> = names
+            .iter()
+            .copied()
+            .filter(|n| self.find_panel_named(n, cx).is_some())
+            .collect();
+        if present.is_empty() {
+            return None;
+        }
+        self.smallest_node_with(&present, cx)
+    }
+
+    /// Путь к наименьшему узлу, содержащему ВСЕ `names` (все обязаны присутствовать). Спускаемся
+    /// в ребёнка, который всё ещё держит все имена; если ни один не держит — этот узел и есть
+    /// наименьший (`[]`).
+    fn smallest_node_with(&self, names: &[&str], cx: &App) -> Option<Vec<usize>> {
+        if !names.iter().all(|n| self.find_panel_named(n, cx).is_some()) {
+            return None;
+        }
+        if let DockItem::Split { items, .. } = self {
+            for (i, child) in items.iter().enumerate() {
+                if let Some(mut sub) = child.smallest_node_with(names, cx) {
+                    let mut path = vec![i];
+                    path.append(&mut sub);
+                    return Some(path);
+                }
+            }
+        }
+        Some(Vec::new())
+    }
+
     /// Имя любой панели в этом узле, КРОМЕ `exclude` — «якорь» целевого слота для split:
     /// переживает схлопывание узла при take (по нему находим слот заново).
     fn first_panel_name_excluding(&self, exclude: &str, cx: &App) -> Option<String> {
@@ -1852,6 +1887,132 @@ impl DockArea {
             cx.borrow_mut(),
         );
         if ok {
+            cx.emit(DockEvent::LayoutChanged);
+            cx.notify();
+        }
+        ok
+    }
+
+    /// Restore `panel` back BESIDE its former split neighbours (side-by-side / stacked), instead
+    /// of merging it into a tab strip. Handles arbitrary NESTED splits (rows of columns etc.).
+    ///
+    /// `sibling_names` — every panel that shared the returning panel's immediate parent split (any
+    /// present one anchors that split). `slot_panels` — the panels of the ADJACENT slot the panel
+    /// sat next to (that slot may itself be a nested split). `index`/`placement` — the panel's
+    /// former position & side; `panel_size`/`sibling_size` — the pre-detach pixel slot sizes
+    /// (`None` = flex) so it returns at its old proportion.
+    ///
+    /// Two outcomes:
+    /// - the parent split of the SAME orientation still exists (panel was one of 3+ members) →
+    ///   insert `panel` as a new member at `index`, in place;
+    /// - that split collapsed (panel was one of two) → wrap the WHOLE adjacent slot subtree (the
+    ///   smallest node holding all present `slot_panels`, so a nested column-stack is wrapped as a
+    ///   unit, not one leaf inside it) into a fresh split with `panel` on `placement`.
+    ///
+    /// Returns false if neither anchor nor slot survives — the caller falls back to tab restore.
+    pub fn insert_panel_beside_sibling(
+        &mut self,
+        panel: Rc<dyn PanelView>,
+        sibling_names: &[&str],
+        slot_panels: &[&str],
+        index: usize,
+        placement: DockSplitPlacement,
+        panel_size: Option<f32>,
+        sibling_size: Option<f32>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        // Orientation implied by the target side: Left/Right → horizontal split, Top/Bottom → vertical.
+        let want_horizontal =
+            matches!(placement, DockSplitPlacement::Left | DockSplitPlacement::Right);
+
+        // Case 1: an anchor sibling still sits inside a Split of the SAME orientation — that split
+        // survived (3+ members). Insert `panel` as a new member at `index`, in place.
+        let mut anchor: Option<(DockRoot, Vec<usize>)> = None;
+        'roots: for root in [
+            DockRoot::Bottom,
+            DockRoot::Center,
+            DockRoot::Left,
+            DockRoot::Right,
+        ] {
+            if let Some(item) = self.root_item_mut(root) {
+                for name in sibling_names {
+                    if let Some(path) = item.find_panel_path(name, cx) {
+                        anchor = Some((root, path));
+                        break 'roots;
+                    }
+                }
+            }
+        }
+        if let Some((root, path)) = &anchor {
+            if let Some((_, parent_path)) = path.split_last() {
+                let parent_matches = self
+                    .root_item_mut(*root)
+                    .and_then(|it| Self::item_at_path_mut(it, parent_path))
+                    .map(|p| matches!(p, DockItem::Split { horizontal, .. } if *horizontal == want_horizontal))
+                    .unwrap_or(false);
+                if parent_matches {
+                    let weak = cx.entity().downgrade();
+                    panel.on_added_to(weak, window, cx);
+                    if let Some(DockItem::Split { items, sizes, .. }) = self
+                        .root_item_mut(*root)
+                        .and_then(|it| Self::item_at_path_mut(it, parent_path))
+                    {
+                        let ix = index.min(items.len());
+                        items.insert(ix, DockItem::Panel(panel));
+                        // Keep `sizes` aligned with `items`; give the returning slot its former size.
+                        while sizes.len() + 1 < items.len() {
+                            sizes.push(None);
+                        }
+                        sizes.insert(ix.min(sizes.len()), panel_size);
+                    }
+                    cx.emit(DockEvent::LayoutChanged);
+                    cx.notify();
+                    return true;
+                }
+            }
+        }
+
+        // Case 2: wrap the whole adjacent slot subtree (smallest node holding all present
+        // `slot_panels`) into a fresh split with `panel` on `placement`.
+        let mut wrap: Option<(DockRoot, Vec<usize>)> = None;
+        for root in [
+            DockRoot::Bottom,
+            DockRoot::Center,
+            DockRoot::Left,
+            DockRoot::Right,
+        ] {
+            if let Some(item) = self.root_item_mut(root) {
+                if let Some(path) = item.smallest_subtree_with_all(slot_panels, cx) {
+                    wrap = Some((root, path));
+                    break;
+                }
+            }
+        }
+        let Some((root, path)) = wrap else {
+            return false;
+        };
+        let weak = cx.entity().downgrade();
+        panel.on_added_to(weak, window, cx);
+        let ok = self.split_item_with_panel(root, &path, placement, panel);
+        if ok {
+            // `split_item_with_panel` orders the new panel first for Left/Top, second for
+            // Right/Bottom, with even (empty) sizes. Overwrite with the remembered proportions
+            // in that same order so the returning panel reclaims its former slot size.
+            if panel_size.is_some() || sibling_size.is_some() {
+                if let Some(DockItem::Split { sizes, .. }) = self
+                    .root_item_mut(root)
+                    .and_then(|it| Self::item_at_path_mut(it, &path))
+                {
+                    let panel_first =
+                        matches!(placement, DockSplitPlacement::Left | DockSplitPlacement::Top);
+                    *sizes = if panel_first {
+                        vec![panel_size, sibling_size]
+                    } else {
+                        vec![sibling_size, panel_size]
+                    };
+                }
+            }
             cx.emit(DockEvent::LayoutChanged);
             cx.notify();
         }

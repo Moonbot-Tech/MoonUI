@@ -102,8 +102,8 @@ pub use date_picker::{
 pub use description_list::MoonDescriptionList;
 pub use dialog::{MoonDialog, MoonDialogContent};
 pub use dock::{
-    DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, MoonDockPanel, Panel, PanelEvent,
-    PanelInfo, PanelState, PanelView, TabPanel, register_panel,
+    DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, DockSplitPlacement, MoonDockPanel,
+    Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel,
 };
 pub use dropdown::{MoonDropdown, MoonMenuItem, MoonMenuSize, MoonPopupMenu};
 pub use form::MoonFormRow;
