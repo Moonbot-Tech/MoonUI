@@ -1923,8 +1923,10 @@ impl DockArea {
         cx: &mut Context<Self>,
     ) -> bool {
         // Orientation implied by the target side: Left/Right → horizontal split, Top/Bottom → vertical.
-        let want_horizontal =
-            matches!(placement, DockSplitPlacement::Left | DockSplitPlacement::Right);
+        let want_horizontal = matches!(
+            placement,
+            DockSplitPlacement::Left | DockSplitPlacement::Right
+        );
 
         // Case 1: an anchor sibling still sits inside a Split of the SAME orientation — that split
         // survived (3+ members). Insert `panel` as a new member at `index`, in place.
@@ -2004,8 +2006,10 @@ impl DockArea {
                     .root_item_mut(root)
                     .and_then(|it| Self::item_at_path_mut(it, &path))
                 {
-                    let panel_first =
-                        matches!(placement, DockSplitPlacement::Left | DockSplitPlacement::Top);
+                    let panel_first = matches!(
+                        placement,
+                        DockSplitPlacement::Left | DockSplitPlacement::Top
+                    );
                     *sizes = if panel_first {
                         vec![panel_size, sibling_size]
                     } else {
