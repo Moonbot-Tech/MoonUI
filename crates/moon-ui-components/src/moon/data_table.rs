@@ -73,6 +73,10 @@ type MoonDataCellHandler = Rc<dyn Fn(usize, usize, &mut Window, &mut App)>;
 type MoonDataContextMenuBuilder =
     Rc<dyn Fn(&MoonDataTableContextTarget, &mut Window, &mut App) -> Vec<MoonMenuItem>>;
 
+/// Минимальная ширина колонки в логических px: пол drag-ресайза и рендер-сжатия
+/// (`downscale_columns_to_available`).
+const MIN_COLUMN_WIDTH: f32 = 40.0;
+
 #[derive(Clone)]
 pub struct MoonDataTableColumn {
     pub key: SharedString,
@@ -82,8 +86,10 @@ pub struct MoonDataTableColumn {
     /// `MoonDataTable` treats this value as both the minimum width and the
     /// proportional weight for auto-width layout. If the viewport is wider than
     /// the sum of all base widths, every column is multiplied by the same scale
-    /// factor. If the viewport is narrower, base widths are preserved and the
-    /// horizontal scrollbar owns the overflow.
+    /// factor. If the viewport is narrower, columns are proportionally shrunk at
+    /// render time down to [`MIN_COLUMN_WIDTH`] each (stored widths stay intact);
+    /// only when even the minimums do not fit does the horizontal scrollbar own
+    /// the remaining overflow.
     pub width: f32,
     pub fill: bool,
     pub align: MoonTableAlign,
@@ -383,7 +389,8 @@ impl MoonDataTableState {
     }
 
     pub fn set_column_width(&mut self, key: impl Into<String>, width: f32) {
-        self.column_widths.insert(key.into(), width.max(40.0));
+        self.column_widths
+            .insert(key.into(), width.max(MIN_COLUMN_WIDTH));
     }
 
     pub fn set_column_order(&mut self, order: impl IntoIterator<Item = SharedString>) {
@@ -680,6 +687,11 @@ impl MoonDataTable {
         row_header_width: f32,
     ) -> Vec<MoonDataTableColumn> {
         let available = (viewport_width - row_header_width).max(0.0);
+        // Вьюпорт ещё не замерен (первый кадр, канвас не отдал ширину) — оставить базовые
+        // ширины как есть, иначе downscale схлопнул бы всё к минимуму на один кадр.
+        if available <= 0.0 {
+            return columns;
+        }
         // Заресайзенные пользователем колонки — фиксированы (держатся на своей ширине),
         // авто-растяжение к заполнению распределяем ТОЛЬКО между нетронутыми. Иначе заданную
         // drag'ом ширину домножали на общий scale → колонка прыгала больше, чем тянули, а
@@ -701,6 +713,13 @@ impl MoonDataTable {
                 column.width *= scale;
                 column.fill = false;
             }
+        } else if fixed + flex > available {
+            // Вьюпорт УЖЕ суммы ширин (монитор с другим масштабом/разрешением, сжатая
+            // панель) — пропорционально ужать НА РЕНДЕРЕ, иначе хвост колонок уезжает в
+            // горизонтальный скролл и «пропадает». Стор ширин (state.column_widths) не
+            // трогаем: на широком вьюпорте пропорции восстановятся сами. Ужимаются и
+            // user_sized — осознанно: видеть все колонки важнее точной ручной ширины.
+            downscale_columns_to_available(&mut columns, available);
         }
         columns
     }
@@ -968,12 +987,12 @@ impl MoonDataTable {
                                             state
                                                 .column_widths
                                                 .entry(key)
-                                                .or_insert(width.max(40.0));
+                                                .or_insert(width.max(MIN_COLUMN_WIDTH));
                                         }
                                     }
                                     let width = (f32::from(event.event.position.x)
                                         - f32::from(bounds.origin.x))
-                                    .max(40.0);
+                                    .max(MIN_COLUMN_WIDTH);
                                     state.set_column_width(drag.key.clone(), width);
                                     cx.notify();
                                 }
@@ -1576,8 +1595,128 @@ impl RenderOnce for MoonDataTable {
     }
 }
 
+/// Пропорционально ужать колонки под доступную ширину, уважая пол [`MIN_COLUMN_WIDTH`]:
+/// колонка, падающая ниже минимума, пиннится на нём, а дефицит перераспределяется по
+/// остальным (итеративный water-fill). Если даже минимумы не влезают — все колонки на
+/// минимуме, остаток честно уходит в горизонтальный скролл. Мутирует только переданный
+/// срез (рендер-копию колонок), сохранённые пользовательские ширины не затрагивает.
+fn downscale_columns_to_available(columns: &mut [MoonDataTableColumn], available: f32) {
+    let n = columns.len();
+    if n == 0 {
+        return;
+    }
+    if available <= n as f32 * MIN_COLUMN_WIDTH {
+        for column in columns.iter_mut() {
+            column.width = MIN_COLUMN_WIDTH;
+            column.fill = false;
+        }
+        return;
+    }
+    let mut pinned = vec![false; n];
+    let mut scale = 1.0_f32;
+    // Каждый проход либо пиннит хотя бы одну новую колонку, либо финализирует scale —
+    // не больше n итераций.
+    for _ in 0..=n {
+        let pinned_sum = pinned.iter().filter(|p| **p).count() as f32 * MIN_COLUMN_WIDTH;
+        let flex_base: f32 = columns
+            .iter()
+            .zip(&pinned)
+            .filter(|(_, p)| !**p)
+            .map(|(c, _)| c.width)
+            .sum();
+        if flex_base <= 0.0 {
+            scale = 1.0;
+            break;
+        }
+        scale = ((available - pinned_sum) / flex_base).max(0.0);
+        let mut changed = false;
+        for (column, pin) in columns.iter().zip(pinned.iter_mut()) {
+            if !*pin && column.width * scale < MIN_COLUMN_WIDTH {
+                *pin = true;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    for (column, pin) in columns.iter_mut().zip(&pinned) {
+        column.width = if *pin {
+            MIN_COLUMN_WIDTH
+        } else {
+            (column.width * scale).max(MIN_COLUMN_WIDTH)
+        };
+        column.fill = false;
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    // НЕ `use super::*`: глоб затянул бы макрос `gpui::test`, и `#[test]` раскрывался
+    // бы в самого себя (recursion limit).
+    use super::{MIN_COLUMN_WIDTH, MoonDataTable, MoonDataTableColumn};
+
+    fn col(key: &str, width: f32) -> MoonDataTableColumn {
+        MoonDataTableColumn::new(key.to_string(), key.to_string(), width)
+    }
+
+    fn widths(columns: &[MoonDataTableColumn]) -> Vec<f32> {
+        columns.iter().map(|c| c.width).collect()
+    }
+
+    #[test]
+    fn auto_width_upscale_path_unchanged() {
+        // Широкий вьюпорт: нетронутые колонки растягиваются, user_sized держит ширину.
+        let mut fixed = col("a", 100.0);
+        fixed.user_sized = true;
+        let out = MoonDataTable::auto_width_columns(vec![fixed, col("b", 100.0)], 500.0, 0.0);
+        assert_eq!(widths(&out), vec![100.0, 400.0]);
+    }
+
+    #[test]
+    fn auto_width_downscale_fits_narrow_viewport() {
+        // Узкий вьюпорт: сумма ширин ужимается ровно под available, колонки не «пропадают».
+        let out = MoonDataTable::auto_width_columns(
+            vec![col("a", 200.0), col("b", 200.0), col("c", 200.0)],
+            300.0,
+            0.0,
+        );
+        let sum: f32 = widths(&out).iter().sum();
+        assert!((sum - 300.0).abs() < 0.5, "sum={sum}");
+        assert!(out.iter().all(|c| c.width >= MIN_COLUMN_WIDTH));
+    }
+
+    #[test]
+    fn auto_width_downscale_respects_min_floor_water_fill() {
+        // 500+50 при available=400: пропорционально b упал бы ниже 40 → пиннится на 40,
+        // остаток забирает a. Сумма = available.
+        let out =
+            MoonDataTable::auto_width_columns(vec![col("a", 500.0), col("b", 50.0)], 400.0, 0.0);
+        assert_eq!(widths(&out), vec![360.0, MIN_COLUMN_WIDTH]);
+    }
+
+    #[test]
+    fn auto_width_downscale_all_at_min_keeps_overflow() {
+        // Даже минимумы не влезают: все на 40, оставшийся перебор — в скролл.
+        let out = MoonDataTable::auto_width_columns(
+            vec![col("a", 300.0), col("b", 300.0), col("c", 300.0)],
+            100.0,
+            0.0,
+        );
+        assert_eq!(
+            widths(&out),
+            vec![MIN_COLUMN_WIDTH, MIN_COLUMN_WIDTH, MIN_COLUMN_WIDTH]
+        );
+    }
+
+    #[test]
+    fn auto_width_unmeasured_viewport_keeps_base_widths() {
+        // Первый кадр (вьюпорт ещё 0) — ширины не трогаем, никакого схлопывания к 40.
+        let out =
+            MoonDataTable::auto_width_columns(vec![col("a", 200.0), col("b", 120.0)], 0.0, 0.0);
+        assert_eq!(widths(&out), vec![200.0, 120.0]);
+    }
+
     #[test]
     fn data_table_context_menu_uses_root_owned_overlay_layer() {
         let source = include_str!("data_table.rs");
