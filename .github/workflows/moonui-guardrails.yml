@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# Cancel superseded runs for the same ref (e.g. new pushes to an open PR),
+# so rapid pushes don't queue up redundant Windows guardrail runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   component-guardrails:
     name: Component guardrails
