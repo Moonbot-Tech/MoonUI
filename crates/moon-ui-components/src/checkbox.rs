@@ -238,10 +238,10 @@ pub(crate) fn checkbox_check_icon(
         .size(mark_size)
         .text_color(color)
         .map(|this| match checked {
-            // Load via external_path (filesystem) like the other Moon icons — the terminal
-            // registers no gpui AssetSource, so IconName::Check.path() ("icons/check.svg")
-            // resolves to nothing and the box renders empty.
-            true => this.external_path(crate::moon::MOON_ICON_CHECK),
+            // Bundled into the binary via the embedded MoonAssets source and loaded
+            // by asset path, so the mark also renders in distributed builds (an
+            // external_path/CARGO_MANIFEST_DIR path only exists on the build machine).
+            true => this.path(crate::moon::MOON_ICON_CHECK),
             _ => this,
         })
         .map(|this| {
