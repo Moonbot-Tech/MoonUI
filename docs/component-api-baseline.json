@@ -1675,19 +1675,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/icons.rs",
-      "signature": "pub const MOON_ICON_CARET_DOWN: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/assets/moon-caret-down.svg\");"
+      "signature": "pub const MOON_ICON_CARET_DOWN: &str = \"icons/moon-caret-down.svg\";"
     },
     {
       "file": "crates/moon-ui-components/src/moon/icons.rs",
-      "signature": "pub const MOON_ICON_CHECK: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/assets/moon-check.svg\");"
+      "signature": "pub const MOON_ICON_CHECK: &str = \"icons/moon-check.svg\";"
     },
     {
       "file": "crates/moon-ui-components/src/moon/icons.rs",
-      "signature": "pub const MOON_ICON_TOOLTIP_ARROW: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/assets/moon-tooltip-arrow.svg\");"
+      "signature": "pub const MOON_ICON_TOOLTIP_ARROW: &str = \"icons/moon-tooltip-arrow.svg\";"
     },
     {
       "file": "crates/moon-ui-components/src/moon/icons.rs",
-      "signature": "pub const MOON_ICON_WINDOW_CLOSE: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/assets/moon-window-close.svg\");"
+      "signature": "pub const MOON_ICON_WINDOW_CLOSE: &str = \"icons/moon-window-close.svg\";"
     },
     {
       "file": "crates/moon-ui-components/src/moon/icons.rs",
