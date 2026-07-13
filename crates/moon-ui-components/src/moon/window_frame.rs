@@ -96,7 +96,7 @@ impl FrameButton {
             Self::Close => svg()
                 .w(px(12.0))
                 .h(px(12.0))
-                .external_path(MOON_ICON_WINDOW_CLOSE)
+                .path(MOON_ICON_WINDOW_CLOSE)
                 .text_color(default_color)
                 .group_hover(group.as_ref(), move |this| this.text_color(hover_color))
                 .into_any_element(),

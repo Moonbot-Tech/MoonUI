@@ -6656,7 +6656,7 @@ fn run_gallery() {
     let case_snapshot_dir = args.case_snapshot_dir;
     let snapshot_case_ids = args.snapshot_case_ids;
     let theme_mode = args.theme_mode;
-    application().run(move |cx: &mut App| {
+    application().with_assets(moon_ui::MoonAssets).run(move |cx: &mut App| {
         moon_ui::foundation::init(cx);
         let mut theme_config = MoonThemeConfig::moon_terminal();
         theme_config.mode = theme_mode;
