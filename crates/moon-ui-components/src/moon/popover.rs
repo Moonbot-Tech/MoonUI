@@ -35,6 +35,7 @@ pub struct MoonPopover {
     controlled_open: Option<bool>,
     disabled: bool,
     close_on_content_click: bool,
+    overlay_closable: bool,
     width: f32,
     offset_x: f32,
     offset_y: f32,
@@ -54,6 +55,7 @@ impl MoonPopover {
             controlled_open: None,
             disabled: false,
             close_on_content_click: false,
+            overlay_closable: true,
             width: 220.0,
             offset_x: 0.0,
             offset_y: 6.0,
@@ -107,6 +109,16 @@ impl MoonPopover {
 
     pub fn close_on_content_click(mut self, close: bool) -> Self {
         self.close_on_content_click = close;
+        self
+    }
+
+    /// Whether a mouse-down outside the popover dismisses it (default `true`).
+    /// Disable for popovers hosting nested overlay layers (dropdown menus, nested
+    /// popovers): those are drawn in separate deferred layers, so clicks on their
+    /// parts that extend beyond the popover bounds register as "outside" and would
+    /// close the popover mid-interaction. Pair with an explicit close control.
+    pub fn overlay_closable(mut self, closable: bool) -> Self {
+        self.overlay_closable = closable;
         self
     }
 
@@ -207,6 +219,7 @@ impl RenderOnce for MoonPopover {
             .anchor(anchor_for(self.placement))
             .appearance(false)
             .deferred_priority(MOON_POPOVER_PRIORITY)
+            .overlay_closable(self.overlay_closable)
             .open(open)
             .trigger_any(trigger)
             .child(popup);
