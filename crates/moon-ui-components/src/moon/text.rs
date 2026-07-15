@@ -71,11 +71,16 @@ impl MoonText {
         self
     }
 
+    /// Base (unscaled) font size. `MoonText` scales it with `tokens.font()` at
+    /// render time — pass design-reference values (e.g. `9.0`, `11.0`), never
+    /// values that were already scaled (e.g. via a theme-scale helper), or the UI
+    /// font scale gets applied twice.
     pub fn font_size(mut self, font_size: f32) -> Self {
         self.style.font_size = font_size;
         self
     }
 
+    /// Base (unscaled) line height — scaled at render like [`Self::font_size`].
     pub fn line_height(mut self, line_height: f32) -> Self {
         self.style.line_height = line_height;
         self

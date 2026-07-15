@@ -53,6 +53,9 @@ pub enum MoonButtonSize {
     Toolbar,
     Action,
     Pill,
+    /// All metrics are base (unscaled) values — the button scales them with the
+    /// theme tokens at render time. Pass design-reference numbers, never values
+    /// that were already scaled (double scaling).
     Custom {
         height: f32,
         radius: f32,
@@ -98,11 +101,16 @@ impl MoonButtonSegment {
         self
     }
 
+    /// Base (unscaled) font size override — scaled with `tokens.font()` at render
+    /// time (default comes from the button size). Pass design-reference values,
+    /// never pre-scaled ones (double scaling).
     pub fn font_size(mut self, font_size: f32) -> Self {
         self.font_size = Some(font_size);
         self
     }
 
+    /// Base (unscaled) line height override — scaled at render like
+    /// [`Self::font_size`].
     pub fn line_height(mut self, line_height: f32) -> Self {
         self.line_height = Some(line_height);
         self

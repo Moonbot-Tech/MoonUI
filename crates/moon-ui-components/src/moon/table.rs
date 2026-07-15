@@ -4,6 +4,7 @@ use gpui::*;
 use super::{
     foundation::selected_background,
     text::MoonText,
+    theme::MoonThemeTokens,
     tokens::{MoonPalette, MoonTone, rgb_from, rgba_from},
 };
 
@@ -117,11 +118,15 @@ impl MoonTableCell {
         self
     }
 
+    /// Base (unscaled) font size. The table scales it with `tokens.font()` at
+    /// render time — pass design-reference values (e.g. `10.5`), never values that
+    /// were already scaled, or the UI font scale gets applied twice.
     pub fn font_size(mut self, font_size: f32) -> Self {
         self.font_size = font_size;
         self
     }
 
+    /// Base (unscaled) line height — scaled at render like [`Self::font_size`].
     pub fn line_height(mut self, line_height: f32) -> Self {
         self.line_height = line_height;
         self
@@ -251,6 +256,7 @@ impl MoonTable {
         row_height: f32,
         style: MoonTableStyle,
         p: MoonPalette,
+        tokens: &MoonThemeTokens,
         mut decorate_cell: impl FnMut(usize, Div) -> AnyElement,
     ) -> Div {
         let row_bg: Background = if row.selected {
@@ -280,7 +286,7 @@ impl MoonTable {
         }
 
         for (column_ix, (column, cell)) in columns.iter().zip(row.cells).enumerate() {
-            let cell = Self::render_cell(column, cell, row.text_alpha, p);
+            let cell = Self::render_cell(column, cell, row.text_alpha, p, tokens);
             row_el = row_el.child(decorate_cell(column_ix, cell));
         }
 
@@ -292,6 +298,7 @@ impl MoonTable {
         cell: MoonTableCell,
         text_alpha: f32,
         p: MoonPalette,
+        tokens: &MoonThemeTokens,
     ) -> Div {
         let justify_right = matches!(column.align, MoonTableAlign::Right);
 
@@ -324,7 +331,20 @@ impl MoonTable {
                 );
             }
             MoonTableCellContent::Element(element) => {
-                el = el.child(element);
+                // Element cells inherit the cell's text style through the GPUI style
+                // cascade — the same style the Text branch applies explicitly. Children
+                // that set their own text properties (e.g. MoonText, MoonButton) still
+                // override it, so consumers no longer have to duplicate the table's
+                // default metrics inside every clickable cell.
+                let color = cell.color.unwrap_or_else(|| cell.tone.color(p));
+                let text_metrics = tokens.text(cell.font_size, cell.line_height);
+                el = el
+                    .font_family(tokens.font_family(true))
+                    .text_size(px(text_metrics.font_size))
+                    .line_height(px(text_metrics.line_height))
+                    .font_weight(FontWeight(cell.weight))
+                    .text_color(rgba_from(color, text_alpha))
+                    .child(element);
             }
         }
 

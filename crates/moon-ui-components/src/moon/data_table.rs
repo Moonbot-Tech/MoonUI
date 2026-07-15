@@ -157,6 +157,11 @@ impl MoonDataCell {
         }
     }
 
+    /// Custom cell content (clickable text, badges, buttons, …). The cell's text
+    /// style (font size/line height/weight, tone/color) is applied to the cell
+    /// container and reaches the content through the GPUI style cascade, so plain
+    /// text children render exactly like [`Self::text`] cells; children with
+    /// explicit text styles override it.
     pub fn element(element: impl IntoElement + 'static) -> Self {
         Self {
             cell: MoonTableCell::element(element),
@@ -178,11 +183,14 @@ impl MoonDataCell {
         self
     }
 
+    /// Base (unscaled) font size — scaled with `tokens.font()` at render time.
+    /// Pass design-reference values, never pre-scaled ones (double scaling).
     pub fn font_size(mut self, font_size: f32) -> Self {
         self.cell = self.cell.font_size(font_size);
         self
     }
 
+    /// Base (unscaled) line height — scaled at render like [`Self::font_size`].
     pub fn line_height(mut self, line_height: f32) -> Self {
         self.cell = self.cell.line_height(line_height);
         self
@@ -1310,12 +1318,14 @@ impl RenderOnce for MoonDataTable {
                 let context_menu_builder_for_cells = rows_context_builder.clone();
                 let state_for_cells = state_for_rows.clone();
 
+                let tokens = MoonTheme::active_tokens(cx);
                 let row_content = super::table::MoonTable::render_row_inline_with_cells(
                     &row_columns,
                     row.as_table_row(),
                     row_height,
                     style,
                     p,
+                    &tokens,
                     move |column_ix, cell| {
                         let mut cell = cell
                             .id(ElementId::from(SharedString::from(format!(
