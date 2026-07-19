@@ -418,7 +418,15 @@ impl RenderOnce for MoonButton {
         if self.full_width {
             button = button.w_full();
         }
-        if let Some(icon) = self.leading_icon {
+        // With no text segments there is nothing for a trailing icon to trail — it simply
+        // IS the icon. Promote it to the leading slot so `Button` sees a genuine icon-only
+        // button and can take its square path; left where it is, it would be attached as a
+        // child and defeat that path exactly like an empty segment container does.
+        let (leading_icon, trailing_icon) = match (self.leading_icon, self.trailing_icon) {
+            (None, trailing @ Some(_)) if self.segments.is_empty() => (trailing, None),
+            pair => pair,
+        };
+        if let Some(icon) = leading_icon {
             button = button.icon(icon.icon(cx));
         }
         if let Some(icon) = self.loading_icon {
@@ -436,7 +444,14 @@ impl RenderOnce for MoonButton {
 
         let (font_size, line_height, gap) = metrics_for(self.size);
         let button_mono = self.mono;
-        if self.segments.len() == 1
+        if self.segments.is_empty() {
+            // Icon-only: emit NO segment container at all. An empty one is not harmless —
+            // it keeps `Button` off its square icon-only path (which requires no label AND
+            // no children), and it becomes a second flex item, so the row's `gap` is
+            // inserted between the icon and a zero-width element. That offsets the centred
+            // content block by `gap`, leaving the glyph `gap / 2` left of true centre.
+            button
+        } else if self.segments.len() == 1
             && self.segments[0].color.is_none()
             && self.segments[0].font_size.is_none()
             && self.segments[0].line_height.is_none()
@@ -470,7 +485,10 @@ impl RenderOnce for MoonButton {
                     })),
             )
         }
-        .when_some(self.trailing_icon, |this, icon| this.child(icon.icon(cx)))
+        // Still attached whenever the trailing icon is genuinely trailing something — text
+        // segments, or a leading icon beside it. Only the trailing-ONLY case is absent here,
+        // because the promotion above moved that icon into the leading slot.
+        .when_some(trailing_icon, |this, icon| this.child(icon.icon(cx)))
     }
 }
 
@@ -532,7 +550,9 @@ fn rgba_from_u32(color: u32, alpha: f32) -> Hsla {
 
 #[cfg(test)]
 mod tests {
-    use super::{MoonButton, MoonButtonSize, height_for_size, metrics_for, size_for};
+    use super::{
+        MoonButton, MoonButtonIconSlot, MoonButtonSize, height_for_size, metrics_for, size_for,
+    };
     use crate::moon::MoonThemeTokens;
 
     #[test]
@@ -557,6 +577,138 @@ mod tests {
         assert_eq!(
             height_for_size(MoonButtonSize::ToolbarCompact, &tokens),
             26.0
+        );
+    }
+
+    /// Root view that renders one button and records the laid-out bounds of the wrapper's
+    /// direct children — i.e. the button's own box.
+    ///
+    /// A `MoonButton` cannot be drawn as a bare element: `Button::render` calls
+    /// `use_keyed_state`, which needs a real rendering view on the stack.
+    struct ButtonHarness {
+        build: Box<dyn Fn() -> MoonButton>,
+        bounds: std::rc::Rc<std::cell::RefCell<Vec<gpui::Bounds<gpui::Pixels>>>>,
+    }
+
+    impl gpui::Render for ButtonHarness {
+        fn render(
+            &mut self,
+            _window: &mut gpui::Window,
+            _cx: &mut gpui::Context<Self>,
+        ) -> impl gpui::IntoElement {
+            use gpui::{ParentElement as _, Styled as _};
+            let sink = self.bounds.clone();
+            // Start-aligned on both axes so the button shrink-wraps its content instead of
+            // being stretched by the root — the measurement must be the button's own box.
+            gpui::div()
+                .flex()
+                .flex_row()
+                .items_start()
+                .justify_start()
+                .on_children_prepainted(move |bounds, _, _| *sink.borrow_mut() = bounds)
+                .child((self.build)().render())
+        }
+    }
+
+    /// Lay the built button out in a real window and return its box.
+    fn laid_out_bounds(
+        cx: &mut gpui::TestAppContext,
+        build: impl Fn() -> MoonButton + 'static,
+    ) -> gpui::Bounds<gpui::Pixels> {
+        use gpui::AppContext as _;
+
+        cx.update(crate::init);
+        let bounds = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let sink = bounds.clone();
+        let window = cx.add_window(move |_, _| ButtonHarness {
+            build: Box::new(build),
+            bounds: sink,
+        });
+        cx.update_window(window.into(), |_, window, cx| {
+            window.draw(cx).clear();
+        })
+        .unwrap();
+
+        let out = bounds.borrow();
+        assert_eq!(out.len(), 1, "expected exactly the button as a child");
+        out[0]
+    }
+
+    /// An icon-only button must lay out as a square.
+    ///
+    /// `Button` only takes its square icon-only path when it has neither a label nor any
+    /// children, so a non-square box is the observable proof that an empty segment
+    /// container is still being emitted alongside the icon. That same phantom child also
+    /// puts a flex `gap` between the icon and a zero-width element, which is what shifts
+    /// the glyph `gap / 2` left of centre.
+    #[gpui::test]
+    fn icon_only_button_lays_out_square(cx: &mut gpui::TestAppContext) {
+        let bounds = laid_out_bounds(cx, || {
+            MoonButton::new("icon-only")
+                .size(MoonButtonSize::ToolbarCompact)
+                .leading_icon(MoonButtonIconSlot::new("icons/settings.svg"))
+        });
+
+        assert_eq!(
+            bounds.size.width, bounds.size.height,
+            "icon-only button is {:?} — not square, so the empty segment container and its \
+             phantom gap are still there",
+            bounds.size
+        );
+    }
+
+    /// A trailing-only button is icon-only too: with no segments there is nothing for the
+    /// icon to trail. It must reach the same square layout instead of being attached as a
+    /// child, which would defeat `Button`'s icon-only path just like an empty container.
+    #[gpui::test]
+    fn trailing_only_icon_button_lays_out_square(cx: &mut gpui::TestAppContext) {
+        let bounds = laid_out_bounds(cx, || {
+            MoonButton::new("trailing-only")
+                .size(MoonButtonSize::ToolbarCompact)
+                .trailing_icon(MoonButtonIconSlot::new("icons/settings.svg"))
+        });
+
+        assert_eq!(
+            bounds.size.width, bounds.size.height,
+            "trailing-only icon button is {:?} — not square, so the icon is still being \
+             attached as a child instead of filling the icon slot",
+            bounds.size
+        );
+    }
+
+    /// Two icons and no text is a genuine two-slot button, not an icon-only one — the
+    /// promotion must not collapse it into a square and swallow one of the icons.
+    #[gpui::test]
+    fn leading_and_trailing_icons_keep_both_slots(cx: &mut gpui::TestAppContext) {
+        let bounds = laid_out_bounds(cx, || {
+            MoonButton::new("two-icons")
+                .size(MoonButtonSize::ToolbarCompact)
+                .leading_icon(MoonButtonIconSlot::new("icons/settings.svg"))
+                .trailing_icon(MoonButtonIconSlot::new("icons/settings.svg"))
+        });
+
+        assert!(
+            bounds.size.width > bounds.size.height,
+            "two-icon button collapsed to {:?}",
+            bounds.size
+        );
+    }
+
+    /// The icon+label shape (the terminal's "Settings" button) carries one real segment,
+    /// so it must keep its wide box and never be pulled into the icon-only square path.
+    #[gpui::test]
+    fn icon_with_label_button_stays_wide(cx: &mut gpui::TestAppContext) {
+        let bounds = laid_out_bounds(cx, || {
+            MoonButton::new("icon-and-label")
+                .size(MoonButtonSize::ToolbarCompact)
+                .leading_icon(MoonButtonIconSlot::new("icons/settings.svg"))
+                .text_segment("Settings", 0xFFFFFF, 500.0)
+        });
+
+        assert!(
+            bounds.size.width > bounds.size.height,
+            "labelled button collapsed to {:?}",
+            bounds.size
         );
     }
 }
