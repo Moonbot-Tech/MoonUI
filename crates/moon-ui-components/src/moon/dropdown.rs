@@ -3,7 +3,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
-    button::{MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant, height_for_size},
+    button::{MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant},
     foundation::{MoonClickHandler, MoonSelectHandler, selected_background},
     icons::{MOON_ICON_CHECK, moon_icon},
     text::MoonText,
@@ -263,6 +263,7 @@ impl MoonPopupMenu {
         self.render_with_metrics(p, metrics, tokens)
     }
 
+    /// Renders the menu with precomputed layout metrics and the supplied theme tokens.
     fn render_with_metrics(
         self,
         p: MoonPalette,
@@ -281,6 +282,10 @@ impl MoonPopupMenu {
 
         let mut menu = div()
             .id(ElementId::from(self.id.clone()))
+            // Addressable from `VisualTestContext::debug_bounds` so a test can assert where the
+            // menu lands after the deferred/anchored pass. Field, setter and paint-time record are
+            // all `cfg`-gated to test builds, so this costs a release build nothing.
+            .debug_selector(|| id.to_string())
             .relative()
             .w(px(self.width))
             .p(px(tokens.ui(4.0)))
@@ -745,6 +750,7 @@ impl MoonDropdown {
 }
 
 impl RenderOnce for MoonDropdown {
+    /// Renders the trigger and, while open, its deferred anchored menu.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let state_id = ElementId::from(SharedString::from(format!("{}:moon-state", self.id)));
         let state = window.use_keyed_state(state_id, cx, |_, _| MoonDropdownState {
@@ -755,8 +761,20 @@ impl RenderOnce for MoonDropdown {
         let open = controlled_open.unwrap_or_else(|| state.read(cx).open);
         let on_open_change = self.on_open_change.clone();
         let parent_view = window.current_view();
-        let trigger_height = self.bounds.map(|bounds| bounds.h);
-        let trigger_size = self.trigger_size;
+        // How much the open menu must clear before its own gap. It depends on how the trigger is
+        // laid out, so it is decided here rather than at the `.mt(..)` that consumes it.
+        //
+        // In flow (no caller-supplied bounds) the answer is ZERO: the anchor `CorePopover` hands
+        // the menu already sits on the trigger's BOTTOM edge, because `ElementExt::on_prepaint`
+        // measures an absolutely positioned canvas appended after the trigger, and in a block
+        // container such a child takes its static position — below the preceding in-flow sibling.
+        // Adding the height here too would push the menu down by a second trigger height.
+        //
+        // With caller-supplied bounds `MoonButton::bounds` renders the trigger ABSOLUTELY, which
+        // leaves the popover host without a single in-flow child: its auto height collapses to
+        // zero, the `size_full` canvas collapses with it, and the capture lands on the trigger's
+        // TOP edge. Only there does the supplied height have to be added back.
+        let trigger_height = self.bounds.map_or(0.0, |bounds| bounds.h);
         let trigger = self.render_trigger().into_any_element();
 
         let mut root = div()
@@ -816,9 +834,6 @@ impl RenderOnce for MoonDropdown {
                     menu = menu.max_height(max_height);
                 }
 
-                let trigger_height =
-                    trigger_height.unwrap_or_else(|| height_for_size(trigger_size, &tokens));
-
                 div()
                     .mt(px(trigger_height + tokens.ui(menu_offset_y)))
                     .ml(px(tokens.ui(menu_offset_x)))
@@ -848,9 +863,152 @@ impl RenderOnce for MoonDropdown {
 #[cfg(test)]
 mod tests {
     use super::{
-        MoonDropdownSelectPlan, MoonMenuItemKind, moon_dropdown_select_plan,
-        moon_menu_item_accepts_click,
+        MoonButtonSize, MoonDropdown, MoonDropdownSelectPlan, MoonMenuItem, MoonMenuItemKind,
+        MoonRect, moon_dropdown_select_plan, moon_menu_item_accepts_click,
     };
+    use std::{cell::RefCell, rc::Rc};
+
+    const DROPDOWN_ID: &str = "geometry-probe";
+    /// `MoonDropdown::render` names its menu `{id}:menu`, and `MoonPopupMenu` registers that id as
+    /// its debug selector.
+    const MENU_SELECTOR: &str = "geometry-probe:menu";
+
+    /// Root view holding one OPEN `MoonDropdown`, recording the laid-out bounds of the
+    /// wrapper's direct children — i.e. the dropdown root's box, which is the trigger's box.
+    /// The menu is not among them: it renders into a `deferred(anchored(..))` layer, so it is
+    /// reachable only through `VisualTestContext::debug_bounds`.
+    ///
+    /// `trigger_rect` selects which of the two placement paths is exercised: `None` leaves the
+    /// dropdown in the parent's flow, `Some(..)` drives the caller-supplied-bounds path, where
+    /// the dropdown root is laid out absolutely.
+    ///
+    /// A `MoonDropdown` cannot be drawn as a bare element: it calls `use_keyed_state`, which
+    /// needs a real rendering view on the stack.
+    ///
+    /// Same measuring idiom as `ButtonHarness` in `moon/button.rs`; the two differ only in how
+    /// they drive frames, since the menu renders into a deferred layer.
+    struct DropdownHarness {
+        trigger_bounds: Rc<RefCell<Vec<gpui::Bounds<gpui::Pixels>>>>,
+        trigger_rect: Option<MoonRect>,
+    }
+
+    impl gpui::Render for DropdownHarness {
+        /// Renders the dropdown and records the trigger bounds after layout.
+        fn render(
+            &mut self,
+            _window: &mut gpui::Window,
+            _cx: &mut gpui::Context<Self>,
+        ) -> impl gpui::IntoElement {
+            use gpui::{ParentElement as _, Styled as _};
+            let sink = self.trigger_bounds.clone();
+            let mut dropdown = MoonDropdown::new(DROPDOWN_ID)
+                .label("trigger")
+                // An explicit non-default size, so the measured box is a fixed known one.
+                .trigger_size(MoonButtonSize::Action)
+                .default_open(true)
+                .item(MoonMenuItem::new("only item"));
+            if let Some(rect) = self.trigger_rect {
+                dropdown = dropdown.bounds(rect);
+            }
+            // Start-aligned on both axes so the dropdown shrink-wraps its trigger instead of
+            // being stretched by the root — the measurement must be the trigger's own box.
+            gpui::div()
+                .flex()
+                .flex_row()
+                .items_start()
+                .justify_start()
+                .on_children_prepainted(move |bounds, _, _| *sink.borrow_mut() = bounds)
+                .child(dropdown)
+        }
+    }
+
+    /// Opens a dropdown in a fresh test window and returns `(trigger box, menu box)`.
+    fn open_and_measure(
+        cx: &mut gpui::TestAppContext,
+        trigger_rect: Option<MoonRect>,
+    ) -> (gpui::Bounds<gpui::Pixels>, gpui::Bounds<gpui::Pixels>) {
+        cx.update(crate::init);
+        let bounds = Rc::new(RefCell::new(Vec::new()));
+        let sink = bounds.clone();
+        let window = cx.add_window(move |_, _| DropdownHarness {
+            trigger_bounds: sink,
+            trigger_rect,
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+
+        // `Popover` renders no content until it has captured its trigger's bounds, and asks for a
+        // fresh frame at that moment — so the menu exists only from the frame after the first
+        // layout. Drive frames until it appears; the 8 is a bounded retry, not an expected count.
+        let menu = (0..8)
+            .find_map(|_| {
+                cx.update(|window, _| window.refresh());
+                cx.run_until_parked();
+                cx.debug_bounds(MENU_SELECTOR)
+            })
+            .expect(
+                "open dropdown must render its menu; if `MoonDropdown::render` no longer names it \
+                 `{id}:menu`, MENU_SELECTOR is what went stale",
+            );
+
+        let recorded = bounds.borrow();
+        assert_eq!(
+            recorded.len(),
+            1,
+            "expected exactly the dropdown as a child"
+        );
+        (recorded[0], menu)
+    }
+
+    /// Asserts the menu hangs in the narrow band just under its trigger.
+    ///
+    /// The gap is the popover content's own `top_1` inset plus `menu_offset_y` — about a third of
+    /// the trigger's height at the default scale. Bounding it by HALF the trigger height keeps the
+    /// assertion free of any hard-coded rem size or token scale while rejecting an extra
+    /// trigger-height offset.
+    fn assert_menu_hugs_trigger(
+        trigger: gpui::Bounds<gpui::Pixels>,
+        menu: gpui::Bounds<gpui::Pixels>,
+    ) {
+        let gap = menu.origin.y - trigger.bottom();
+        assert!(
+            gap >= gpui::px(0.0) && gap < trigger.size.height * 0.5,
+            "menu must hang just below the trigger: gap {gap:?}, trigger height {:?}",
+            trigger.size.height
+        );
+        assert_eq!(
+            menu.origin.x, trigger.origin.x,
+            "menu must stay left-aligned with its trigger"
+        );
+    }
+
+    /// Verifies that an open menu hangs just under its trigger.
+    ///
+    /// The in-flow anchor already resolves to the trigger's bottom edge, so the menu offset must
+    /// contain only the intended gap and not an additional trigger height.
+    ///
+    /// This is also the tripwire for `ElementExt::on_prepaint`: if its capture is ever corrected
+    /// to report the host's true origin, the anchor moves to the trigger's TOP and this test fails
+    /// — pointing at the compensating `.mt(...)` in `MoonDropdown::render`.
+    #[gpui::test]
+    fn open_menu_hangs_just_below_its_trigger(cx: &mut gpui::TestAppContext) {
+        let (trigger, menu) = open_and_measure(cx, None);
+        assert_menu_hugs_trigger(trigger, menu);
+    }
+
+    /// Verifies the caller-supplied-bounds path described at the `trigger_height` binding in
+    /// `MoonDropdown::render`.
+    ///
+    /// This path requires conditional height compensation to keep the menu below its trigger.
+    /// Both placement paths must land the menu in the same band.
+    ///
+    /// No production call site passes `MoonDropdown::bounds` today, in this repo or in
+    /// MoonTerminal, so this pins public API that is currently speculative — which is precisely
+    /// why it needs a test rather than an argument.
+    #[gpui::test]
+    fn supplied_bounds_menu_also_hangs_just_below_its_trigger(cx: &mut gpui::TestAppContext) {
+        let (trigger, menu) = open_and_measure(cx, Some(MoonRect::new(40.0, 24.0, 120.0, 26.0)));
+        assert_menu_hugs_trigger(trigger, menu);
+    }
 
     #[test]
     fn menu_item_clickability_respects_kind_and_disabled_state() {
