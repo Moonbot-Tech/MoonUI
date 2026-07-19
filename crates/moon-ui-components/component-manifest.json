@@ -251,7 +251,7 @@
       "public_path": "moon_ui::MoonDropdown",
       "upstream_ref": null,
       "fork_reason": "Moon popup styling and density",
-      "contracts": ["dropdown.select_behavior", "gallery.visual_coverage"]
+      "contracts": ["dropdown.select_behavior", "dropdown.menu_placement", "gallery.visual_coverage"]
     },
     {
       "concept": "popup_menu",

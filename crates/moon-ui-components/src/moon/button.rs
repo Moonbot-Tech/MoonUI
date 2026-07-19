@@ -4,7 +4,7 @@ use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 use super::{
-    theme::{MoonTheme, MoonThemeTokens},
+    theme::MoonTheme,
     tokens::{MoonRect, rgb_from},
 };
 
@@ -503,21 +503,6 @@ fn size_for(size: MoonButtonSize) -> crate::Size {
     }
 }
 
-pub(crate) fn height_for_size(size: MoonButtonSize, tokens: &MoonThemeTokens) -> f32 {
-    let (base_height, base_line_height) = match size {
-        MoonButtonSize::Micro => (18.0, 12.0),
-        MoonButtonSize::ToolbarCompact => (26.0, 14.0),
-        MoonButtonSize::Action => (26.0, 14.0),
-        MoonButtonSize::Toolbar => (28.0, 14.0),
-        MoonButtonSize::Pill => (30.0, 14.0),
-        MoonButtonSize::Custom { height, .. } => (height, height * 0.55),
-    };
-    let pad_y = ((base_height - base_line_height) * 0.5).max(0.0);
-    tokens
-        .ui(base_height)
-        .max(tokens.line_height(base_line_height) + tokens.ui(pad_y) * 2.0)
-}
-
 fn custom_radius(size: MoonButtonSize) -> Option<f32> {
     match size {
         MoonButtonSize::Pill => Some(999.0),
@@ -550,10 +535,7 @@ fn rgba_from_u32(color: u32, alpha: f32) -> Hsla {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        MoonButton, MoonButtonIconSlot, MoonButtonSize, height_for_size, metrics_for, size_for,
-    };
-    use crate::moon::MoonThemeTokens;
+    use super::{MoonButton, MoonButtonIconSlot, MoonButtonSize, metrics_for, size_for};
 
     #[test]
     fn moon_button_width_builders_preserve_layout_intent() {
@@ -566,18 +548,14 @@ mod tests {
         assert!(full.full_width);
     }
 
+    /// Verifies that compact-toolbar metrics map to the dense base-button size.
     #[test]
     fn toolbar_compact_keeps_terminal_toolbar_dense() {
-        let tokens = MoonThemeTokens::default();
         assert_eq!(
             metrics_for(MoonButtonSize::ToolbarCompact),
             (10.0, 16.0, 4.0)
         );
         assert_eq!(size_for(MoonButtonSize::ToolbarCompact), crate::Size::Small);
-        assert_eq!(
-            height_for_size(MoonButtonSize::ToolbarCompact, &tokens),
-            26.0
-        );
     }
 
     /// Root view that renders one button and records the laid-out bounds of the wrapper's
@@ -632,6 +610,17 @@ mod tests {
         let out = bounds.borrow();
         assert_eq!(out.len(), 1, "expected exactly the button as a child");
         out[0]
+    }
+
+    /// The dense-toolbar height, asserted on the rendered button: the height a caller actually
+    /// gets is the one worth pinning.
+    #[gpui::test]
+    fn toolbar_compact_renders_at_dense_height(cx: &mut gpui::TestAppContext) {
+        let bounds = laid_out_bounds(cx, || {
+            MoonButton::new("dense").size(MoonButtonSize::ToolbarCompact)
+        });
+
+        assert_eq!(bounds.size.height, gpui::px(26.0));
     }
 
     /// An icon-only button must lay out as a square.

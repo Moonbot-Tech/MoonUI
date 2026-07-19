@@ -441,6 +441,9 @@ fn metric(id: &str, policy: MetricPolicy, hits: Vec<SourceHit>) -> SourceMetric 
     }
 }
 
+/// Builds the semantic component checks from the manifest, sources, and registered Rust tests.
+///
+/// Returns an error when an input cannot be read or parsed.
 fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
     let components = load_component_manifest(root)?;
     let tests = collect_rust_tests(&root.join("crates/moon-ui-components/src"))?;
@@ -599,6 +602,16 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             ],
             &tests,
             "dropdown/menu selection must ignore disabled/non-item rows and close only when configured",
+        ),
+        test_contract(
+            "dropdown.menu_placement",
+            ContractSeverity::Guardrail,
+            &[
+                "open_menu_hangs_just_below_its_trigger",
+                "supplied_bounds_menu_also_hangs_just_below_its_trigger",
+            ],
+            &tests,
+            "an open dropdown menu must hug its trigger's bottom edge on both the in-flow and the caller-supplied-bounds path; the gallery snapshots render popups closed and cannot see this",
         ),
         test_contract(
             "dock.behavior_contracts",

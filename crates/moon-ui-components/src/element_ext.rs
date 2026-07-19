@@ -37,9 +37,25 @@ impl AnyChildElement {
 pub trait ElementExt: ParentElement + Sized {
     /// Add a prepaint callback to the element.
     ///
-    /// This is a helper method to get the bounds of the element after paint.
+    /// The first argument is a bounds rect in pixels, measured at prepaint time.
     ///
-    /// The first argument is the bounds of the element in pixels.
+    /// IMPORTANT — it is not necessarily the host's own box. The measurement comes from an
+    /// absolutely positioned [`gpui::canvas`] added as a child AT THE POINT THIS IS CALLED, so
+    /// builder order decides where it sits among the host's children. `size_full` gives it the
+    /// host's SIZE, but its ORIGIN is the static position layout assigns an absolute child with
+    /// auto insets:
+    ///
+    /// - in a FLEX host: the content-box origin, so the rect does match the host;
+    /// - in a BLOCK host (gpui's default): advanced past the in-flow siblings that PRECEDE the
+    ///   canvas, on the Y axis only — X is never advanced. Call this before adding children and
+    ///   the origin is the host's top; call it after, and it is the bottom edge of what came
+    ///   before.
+    ///
+    /// Consumers therefore differ, and correcting this would not be a local cleanup. `Popover`
+    /// captures after its trigger and depends on the resulting bottom-edge origin (see
+    /// `Popover::resolved_corner` and the menu offset in `moon::dropdown`, whose geometry tests
+    /// are the tripwire). `DockArea` captures before its content and gets the top. Callers that
+    /// ignore the rect entirely, like `Root`'s sheet sizing, are unaffected either way.
     ///
     /// See also [`gpui::canvas`].
     fn on_prepaint<F>(self, f: F) -> Self
