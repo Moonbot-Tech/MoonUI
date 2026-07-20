@@ -288,7 +288,20 @@ impl MoonThemeConfig {
             .expect("bundled moon-light theme must parse")
     }
 
+    /// Set the font delta on both themes, refusing a value that cannot render.
+    ///
+    /// [`MoonScale::font_delta`] is added directly into every text metric, so a non-finite value
+    /// does not produce a visibly wrong size a caller might notice — it propagates into layout
+    /// dimensions. Such a value only ever arrives from a config file or an arithmetic slip, never
+    /// as a deliberate choice, so it is replaced by the default rather than stored.
+    ///
+    /// `0.0` is kept: it means "no adjustment", which is a real setting.
     pub fn set_font_delta(&mut self, font_delta: f32) {
+        let font_delta = if font_delta.is_finite() {
+            font_delta
+        } else {
+            MoonScale::default().font_delta
+        };
         self.dark.scale.font_delta = font_delta;
         self.light.scale.font_delta = font_delta;
     }
@@ -298,7 +311,25 @@ impl MoonThemeConfig {
         self
     }
 
+    /// Set the UI geometry scale on both themes, refusing a value that cannot be a scale.
+    ///
+    /// This one fails quietly rather than loudly, which is why it is guarded here. [`MoonScale::ui`]
+    /// multiplies control heights, gaps, paddings and hit areas alike, and [`MoonThemeTokens::ui`]
+    /// floors the factor at `0.25` — so a stored `0.0` does not blank the window or panic. It
+    /// renders the entire interface at a quarter size, with hit rectangles too small to click,
+    /// which a user reads as a frozen application rather than as a bad setting. Worse, the settings
+    /// screen that would repair it is unusable too. Zero, negatives and non-finite values are
+    /// therefore replaced by the default instead of being stored.
+    ///
+    /// Only impossible values are rejected. An unusual but positive scale is a legitimate choice
+    /// and is stored verbatim — a consumer may be persisting it, and silently rewriting it to fit
+    /// an assumed range would destroy that setting rather than protect it.
     pub fn set_ui_scale(&mut self, ui_scale: f32) {
+        let ui_scale = if ui_scale.is_finite() && ui_scale > 0.0 {
+            ui_scale
+        } else {
+            MoonScale::default().ui
+        };
         self.dark.scale.ui = ui_scale;
         self.light.scale.ui = ui_scale;
     }
@@ -450,3 +481,70 @@ impl std::fmt::Display for MoonThemeConfigError {
 }
 
 impl std::error::Error for MoonThemeConfigError {}
+
+#[cfg(test)]
+/// Guards on the scale setters: a value that cannot render must not reach the tokens.
+mod tests {
+    use super::{MoonScale, MoonThemeConfig};
+
+    /// A stored `ui_scale` of `0.0` is not hypothetical — it is what a config file written from a
+    /// derived `Default` contains, and it reached a shipped build. Because
+    /// `MoonThemeTokens::ui` floors the factor at `0.25`, nothing fails loudly: the interface
+    /// renders at a quarter size and its hit rectangles shrink past the point where clicks land,
+    /// so it reads as a frozen app. The setter has to reject it, since by render time the only
+    /// screen that could repair the setting is itself unclickable.
+    #[test]
+    fn an_impossible_ui_scale_is_replaced_rather_than_stored() {
+        for impossible in [0.0_f32, -1.0, f32::NAN, f32::INFINITY] {
+            let cfg = MoonThemeConfig::moon_terminal().with_ui_scale(impossible);
+
+            assert_eq!(
+                cfg.dark.scale.ui,
+                MoonScale::default().ui,
+                "a ui scale of {impossible} cannot be rendered; it must not be stored"
+            );
+            assert_eq!(
+                cfg.light.scale.ui,
+                MoonScale::default().ui,
+                "both themes must be guarded, not just the dark one"
+            );
+        }
+    }
+
+    /// The other half, and the half a later "hardening" pass is likely to break: the guard must
+    /// not become a range clamp. A consumer may persist whatever it reads back, so rewriting a
+    /// usable value would destroy a deliberate setting instead of protecting it.
+    #[test]
+    fn an_unusual_but_positive_ui_scale_is_stored_verbatim() {
+        for kept in [0.25_f32, 0.4, 6.0, 10.0] {
+            let cfg = MoonThemeConfig::moon_terminal().with_ui_scale(kept);
+
+            assert_eq!(
+                cfg.dark.scale.ui, kept,
+                "a positive scale of {kept} is a legitimate choice; the guard is not a clamp"
+            );
+        }
+    }
+
+    /// `font_delta` splits the other way from a scale: it is added into text metrics, so a
+    /// non-finite value spreads into layout dimensions, while `0.0` means "no adjustment" and is
+    /// a real setting that must survive.
+    #[test]
+    fn a_non_finite_font_delta_is_replaced_while_zero_is_kept() {
+        for impossible in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let cfg = MoonThemeConfig::moon_terminal().with_font_delta(impossible);
+
+            assert_eq!(
+                cfg.dark.scale.font_delta,
+                MoonScale::default().font_delta,
+                "a font delta of {impossible} reaches text metrics; it must not be stored"
+            );
+        }
+
+        let cfg = MoonThemeConfig::moon_terminal().with_font_delta(0.0);
+        assert_eq!(
+            cfg.dark.scale.font_delta, 0.0,
+            "zero font delta is 'no adjustment', a real setting — it must be kept"
+        );
+    }
+}
