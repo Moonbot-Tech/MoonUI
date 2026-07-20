@@ -51,6 +51,7 @@ pub fn selected_flat(p: MoonPalette) -> Hsla {
     rgba_from(p.accent, p.accent_tint_a)
 }
 
+/// Draw the palette accent as an inset underline with fading ends and a glow.
 pub fn accent_underline(
     p: MoonPalette,
     tokens: &MoonThemeTokens,
@@ -58,22 +59,37 @@ pub fn accent_underline(
     right: f32,
     bottom: f32,
 ) -> Div {
+    accent_underline_colored(p.accent, tokens, left, right, bottom)
+}
+
+/// Same treatment as [`accent_underline`], driven by an explicit colour.
+///
+/// Lets a per-item accent pick the bar's hue instead of the single palette-wide `accent` role.
+/// Crate-visible on purpose: `foundation::*` is publicly re-exported, so a `pub` here would
+/// enlarge the tracked API surface for a helper only the segmented control needs.
+pub(crate) fn accent_underline_colored(
+    color: u32,
+    tokens: &MoonThemeTokens,
+    left: f32,
+    right: f32,
+    bottom: f32,
+) -> Div {
     let underline_left = linear_gradient(
         90.0,
-        linear_color_stop(rgba_from(p.accent, 0.0), 0.0),
-        linear_color_stop(rgba_from(p.accent, 1.0), 1.0),
+        linear_color_stop(rgba_from(color, 0.0), 0.0),
+        linear_color_stop(rgba_from(color, 1.0), 1.0),
     );
     let underline_right = linear_gradient(
         90.0,
-        linear_color_stop(rgba_from(p.accent, 1.0), 0.0),
-        linear_color_stop(rgba_from(p.accent, 0.0), 1.0),
+        linear_color_stop(rgba_from(color, 1.0), 0.0),
+        linear_color_stop(rgba_from(color, 0.0), 1.0),
     );
     let shadow = box_shadow(
         px(0.0),
         px(0.0),
         px(tokens.ui(8.0)),
         px(0.0),
-        rgba_from(p.accent, 0.62),
+        rgba_from(color, 0.62),
     );
 
     div()
@@ -94,7 +110,7 @@ pub fn accent_underline(
             div()
                 .flex_1()
                 .h_full()
-                .bg(rgba_from(p.accent, 1.0))
+                .bg(rgba_from(color, 1.0))
                 .shadow(vec![shadow.clone()]),
         )
         .child(
