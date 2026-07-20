@@ -92,6 +92,27 @@ pub struct MoonDataTableColumn {
     /// the remaining overflow.
     pub width: f32,
     pub fill: bool,
+    /// Keep this column at its base width when the viewport is wider than the column sum.
+    ///
+    /// Auto-width normally treats every untouched column as a proportional weight, so a wide
+    /// viewport scales all of them by the same factor. A column that renders nothing of its own —
+    /// a title-less trailing actions column, say — then claims a share of the extra space and
+    /// visibly pushes its neighbours apart. `no_grow` takes such a column out of that pool.
+    ///
+    /// Three flags govern sizing. `no_grow` and [`Self::fill`] are mutually
+    /// exclusive and the builders enforce it — the later call wins — because `fill` renders as
+    /// `min_w + flex_1`, which grows regardless of what auto-width computed. `user_sized` (a real
+    /// drag-resize) exempts a column from stretching in the same auto-width pass that `no_grow`
+    /// does, and a column may carry both.
+    ///
+    /// Note the asymmetry that follows from `fill` winning at RENDER: auto-width exempts a
+    /// `user_sized` column, but `as_table_column` still emits `flex_1` for a `fill` column, so a
+    /// column that is both `fill` and `user_sized` stretches anyway and a drag-resize on it does
+    /// not stick. `no_grow` does not participate because it cannot coexist with `fill`.
+    ///
+    /// It does NOT mean "never shrink": a viewport narrower than the column sum still downscales
+    /// this column along with the rest, because seeing every column beats holding one width.
+    pub no_grow: bool,
     pub align: MoonTableAlign,
     pub sortable: bool,
     pub resizable: bool,
@@ -111,6 +132,7 @@ impl MoonDataTableColumn {
             title: title.into(),
             width,
             fill: false,
+            no_grow: false,
             align: MoonTableAlign::Left,
             sortable: false,
             resizable: true,
@@ -125,8 +147,17 @@ impl MoonDataTableColumn {
         self
     }
 
+    /// Make this column consume remaining width and clear any [`Self::no_grow`] setting.
     pub fn fill(mut self) -> Self {
         self.fill = true;
+        self.no_grow = false;
+        self
+    }
+
+    /// Opt this column out of proportional auto-width stretching and clear [`Self::fill`].
+    pub fn no_grow(mut self) -> Self {
+        self.no_grow = true;
+        self.fill = false;
         self
     }
 
@@ -704,20 +735,24 @@ impl MoonDataTable {
         // авто-растяжение к заполнению распределяем ТОЛЬКО между нетронутыми. Иначе заданную
         // drag'ом ширину домножали на общий scale → колонка прыгала больше, чем тянули, а
         // соседи пересжимались. Все колонки тронуты (flex==0) → не растягиваем вовсе.
+        // `no_grow` exempts a column the same way, but by the column AUTHOR's decision rather than
+        // the user's: a column that renders nothing of its own must not claim a share of the free
+        // space (see the field).
+        let is_pinned = |column: &MoonDataTableColumn| column.user_sized || column.no_grow;
         let fixed: f32 = columns
             .iter()
-            .filter(|column| column.user_sized)
+            .filter(|column| is_pinned(column))
             .map(|column| column.width)
             .sum();
         let flex: f32 = columns
             .iter()
-            .filter(|column| !column.user_sized)
+            .filter(|column| !is_pinned(column))
             .map(|column| column.width)
             .sum();
         let remaining = (available - fixed).max(0.0);
         if flex > 0.0 && remaining > flex {
             let scale = remaining / flex;
-            for column in columns.iter_mut().filter(|column| !column.user_sized) {
+            for column in columns.iter_mut().filter(|column| !is_pinned(column)) {
                 column.width *= scale;
                 column.fill = false;
             }
@@ -1725,6 +1760,61 @@ mod tests {
         let out =
             MoonDataTable::auto_width_columns(vec![col("a", 200.0), col("b", 120.0)], 0.0, 0.0);
         assert_eq!(widths(&out), vec![200.0, 120.0]);
+    }
+
+    #[test]
+    fn auto_width_no_grow_column_keeps_base_width_while_others_stretch() {
+        // Wide viewport: 100 + 100(no_grow) + 100 at available=600.
+        // no_grow joins `fixed` → flex=200, remaining=500, scale=2.5 → 250/100/250.
+        // The width vector is asserted WHOLE rather than as "b stayed 100 and the others grew":
+        // each of the three ways `no_grow` can go missing from the filters yields its own WRONG
+        // but still "grown" layout — 300/100/300, 166.7/100/166.7, 250/250/250 — and this
+        // assertion reddens on all three.
+        let out = MoonDataTable::auto_width_columns(
+            vec![col("a", 100.0), col("b", 100.0).no_grow(), col("c", 100.0)],
+            600.0,
+            0.0,
+        );
+        assert_eq!(widths(&out), vec![250.0, 100.0, 250.0]);
+        let sum: f32 = widths(&out).iter().sum();
+        assert!((sum - 600.0).abs() < 0.5, "sum={sum}");
+    }
+
+    #[test]
+    fn auto_width_no_grow_column_still_shrinks_on_narrow_viewport() {
+        // Pins the BOUNDARY of the flag, not the flag itself: `no_grow` means "do not stretch",
+        // never "hold this width at any cost", so a narrow viewport still downscales the column
+        // along with the rest — otherwise the tail slides off into a scrollbar.
+        //
+        // Deliberately forward-looking, so note what it does NOT do: a plain column and a
+        // `no_grow` one end identical on this input, so it cannot prove the flag participates in
+        // sizing at all. That is the sibling test's job. This one exists to redden if someone
+        // later "completes" the feature by exempting `no_grow` from the shrink path too.
+        let out = MoonDataTable::auto_width_columns(
+            vec![col("a", 200.0), col("b", 200.0).no_grow()],
+            200.0,
+            0.0,
+        );
+        let sum: f32 = widths(&out).iter().sum();
+        assert!((sum - 200.0).abs() < 0.5, "sum={sum}");
+        assert!(
+            out[1].width < 200.0,
+            "no_grow column must shrink, got {}",
+            out[1].width
+        );
+    }
+
+    #[test]
+    fn no_grow_and_fill_are_mutually_exclusive() {
+        // `fill` renders as min_w+flex_1 and grows past whatever auto-width computed, so it cannot
+        // coexist with `no_grow`. The later call wins, in both directions.
+        //
+        // Removing either builder's reset of the other flag permits the unsupported "both at once"
+        // state and reddens the corresponding assertion below.
+        let a = col("a", 100.0).fill().no_grow();
+        assert!(a.no_grow && !a.fill);
+        let b = col("b", 100.0).no_grow().fill();
+        assert!(b.fill && !b.no_grow);
     }
 
     #[test]
