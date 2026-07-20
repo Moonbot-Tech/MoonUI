@@ -3370,6 +3370,30 @@ impl Gallery {
                                 }
                             })
                             .render(),
+                    )
+                    // All four accents side by side: `gallery.visual_coverage` is the only
+                    // mechanism that catches a segment-colour regression, and a single strip
+                    // covers just one enum variant.
+                    .child(
+                        h_flex().gap_3().children(
+                            [
+                                ("segmented-amber", MoonAccent::Amber, "Amber"),
+                                ("segmented-blue", MoonAccent::Blue, "Blue"),
+                                ("segmented-green", MoonAccent::Green, "Green"),
+                                ("segmented-red", MoonAccent::Red, "Red"),
+                            ]
+                            .map(|(id, accent, label)| {
+                                MoonSegmentedControl::new(id)
+                                    .accent(accent)
+                                    .items([
+                                        MoonSegmentItem::new("S1", label)
+                                            .width(72.0)
+                                            .selected(true),
+                                        MoonSegmentItem::new("S2", "off").width(52.0),
+                                    ])
+                                    .render()
+                            }),
+                        ),
                     ),
             )
     }
