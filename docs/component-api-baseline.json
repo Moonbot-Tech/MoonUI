@@ -1303,6 +1303,22 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn fit_menu_width(mut self, min_width: f32, max_width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn fit_trigger_width(mut self, min_width: f32, max_width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn fit_width(mut self, min_width: f32, max_width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn fitted_trigger_label( cx: &App, label: &str, size: MoonButtonSize, min_width: f32, max_width: f32, ) -> (SharedString, f32)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn has_submenu(&self) -> bool"
     },
     {
@@ -1335,7 +1351,15 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn max_height_ui(mut self, max_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn menu_max_height(mut self, max_height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn menu_max_height_ui(mut self, max_height: f32) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -1348,6 +1372,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn menu_width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn menu_width_scaled(mut self, width: f32) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -1415,6 +1443,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_caret(mut self, visible: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn trigger_size(mut self, size: MoonButtonSize) -> Self"
     },
     {
@@ -1427,7 +1459,15 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_width_scaled(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn width_scaled(mut self, width: f32) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -2415,11 +2455,27 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn content_width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn content_width_font(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn content_width_ui(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
       "signature": "pub fn default_open(mut self, open: bool) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/popover.rs",
       "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn fit_content(mut self) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/popover.rs",
@@ -2711,6 +2767,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn fit_width(mut self, cx: &App, min_width: f32, max_width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn item(mut self, item: MoonSegmentItem) -> Self"
     },
     {
@@ -2735,6 +2795,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn on_scroll( mut self, handler: impl Fn(usize, &ScrollWheelEvent, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn render(self) -> impl IntoElement"
     },
     {
@@ -2747,7 +2811,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn replace_item(mut self, index: usize, replacement: impl IntoElement) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn resolved_width(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
@@ -3784,6 +3860,14 @@
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn font_family(&self, mono: bool) -> SharedString"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn font_width(&self, value: f32) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn font_width_scale(&self) -> f32"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",

@@ -614,6 +614,29 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "an open dropdown menu must hug its trigger's bottom edge on both the in-flow and the caller-supplied-bounds path; the gallery snapshots render popups closed and cannot see this",
         ),
         test_contract(
+            "dropdown.fitted_width",
+            ContractSeverity::Guardrail,
+            &[
+                "fitted_trigger_preserves_caret_at_independent_scale_extremes",
+                "scaled_trigger_uses_font_width_without_clipping_component_chrome",
+            ],
+            &tests,
+            "fitted and scaled dropdown triggers must preserve their component-owned caret and chrome across independent UI and font scales",
+        ),
+        test_contract(
+            "popup_menu.fitted_width",
+            ContractSeverity::Guardrail,
+            &[
+                "fitted_menu_accounts_for_right_label_and_its_gap",
+                "fitted_submenu_resolves_width_from_its_own_items",
+                "scaled_menu_width_retains_fitted_rows_at_independent_scale_extremes",
+                "menu_max_height_distinguishes_ui_scaled_and_rendered_values",
+                "palette_only_menu_render_rejects_measured_width_policies",
+            ],
+            &tests,
+            "fitted and scaled popup menus must reserve scaled row chrome, trailing-label geometry, maximum height, and per-level submenu sizing",
+        ),
+        test_contract(
             "dock.behavior_contracts",
             ContractSeverity::Guardrail,
             &[
@@ -688,6 +711,29 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &["test_popover_builder_chaining"],
             &tests,
             "popover open/close builder lifecycle must stay covered by Rust tests",
+        ),
+        test_contract(
+            "popover.content_width",
+            ContractSeverity::Guardrail,
+            &[
+                "content_width_policies_reserve_scaled_popup_chrome",
+                "intrinsic_popover_shrink_wraps_its_rendered_child",
+            ],
+            &tests,
+            "popover content-width policies must add component-owned chrome and intrinsic popovers must shrink-wrap rendered content",
+        ),
+        test_contract(
+            "segmented_control.fitted_interaction",
+            ContractSeverity::Guardrail,
+            &[
+                "fitted_item_preserves_the_boundary_and_ellipsizes_one_past_it",
+                "disabled_and_replaced_cells_expose_no_native_interactions",
+                "replaced_cell_releases_its_full_width_to_the_inline_editor",
+                "rendered_cells_preserve_width_and_gate_native_interactions",
+                "fitted_segment_width_survives_high_ui_low_font_render",
+            ],
+            &tests,
+            "fitted segmented cells must keep viable pre-render widths, reserve replacement width for inline content, and gate rendered native interactions",
         ),
         test_contract(
             "select.open_select_lifecycle",

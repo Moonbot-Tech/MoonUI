@@ -442,7 +442,7 @@ impl RenderOnce for MoonButton {
             button = button.on_click(move |event, window, cx| on_click(event, window, cx));
         }
 
-        let (font_size, line_height, gap) = metrics_for(self.size);
+        let (font_size, line_height, gap) = button_text_metrics(self.size);
         let button_mono = self.mono;
         if self.segments.is_empty() {
             // Icon-only: emit NO segment container at all. An empty one is not harmless —
@@ -511,7 +511,14 @@ fn custom_radius(size: MoonButtonSize) -> Option<f32> {
     }
 }
 
-fn metrics_for(size: MoonButtonSize) -> (f32, f32, f32) {
+/// Return the design-reference typography and content gap for a Moon button size.
+///
+/// Args:
+///     size: Button size whose text is rendered or measured.
+///
+/// Returns:
+///     Font size, line height, and gap in design-reference pixels.
+pub(super) fn button_text_metrics(size: MoonButtonSize) -> (f32, f32, f32) {
     match size {
         MoonButtonSize::Micro => (10.0, 14.0, 4.0),
         MoonButtonSize::ToolbarCompact => (10.0, 16.0, 4.0),
@@ -535,7 +542,7 @@ fn rgba_from_u32(color: u32, alpha: f32) -> Hsla {
 
 #[cfg(test)]
 mod tests {
-    use super::{MoonButton, MoonButtonIconSlot, MoonButtonSize, metrics_for, size_for};
+    use super::{MoonButton, MoonButtonIconSlot, MoonButtonSize, button_text_metrics, size_for};
 
     #[test]
     fn moon_button_width_builders_preserve_layout_intent() {
@@ -552,7 +559,7 @@ mod tests {
     #[test]
     fn toolbar_compact_keeps_terminal_toolbar_dense() {
         assert_eq!(
-            metrics_for(MoonButtonSize::ToolbarCompact),
+            button_text_metrics(MoonButtonSize::ToolbarCompact),
             (10.0, 16.0, 4.0)
         );
         assert_eq!(size_for(MoonButtonSize::ToolbarCompact), crate::Size::Small);

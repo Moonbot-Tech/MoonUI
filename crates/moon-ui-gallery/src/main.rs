@@ -574,8 +574,8 @@ const HANDOFF_CASES: &[HandoffCase] = &[
     },
     HandoffCase {
         id: "dropdown.open",
-        width: 260.0,
-        height: 210.0,
+        width: 540.0,
+        height: 340.0,
     },
     HandoffCase {
         id: "context_menu.basic",
@@ -1765,15 +1765,24 @@ impl CaseGallery {
                 .into_any_element(),
             "segmented.presets" => MoonSegmentedControl::new("handoff-segmented")
                 .items([
-                    MoonSegmentItem::new("F1", "0.01").width(82.0),
-                    MoonSegmentItem::new("F2", "0.025").width(82.0),
+                    MoonSegmentItem::new("F1", "0.01").fit_width(cx, 52.0, 110.0),
+                    MoonSegmentItem::new("F2", "0.025").fit_width(cx, 52.0, 110.0),
                     MoonSegmentItem::new("F3", "0.05")
-                        .width(82.0)
+                        .fit_width(cx, 52.0, 110.0)
                         .selected(true),
                     MoonSegmentItem::new("F4", "0.10")
-                        .width(82.0)
+                        .fit_width(cx, 52.0, 110.0)
                         .disabled(true),
                 ])
+                .replace_item(
+                    1,
+                    div()
+                        .size_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(MoonText::new("EDIT").uppercase(false).mono(true).render()),
+                )
                 .render()
                 .into_any_element(),
             "selector.pill" => MoonSelectorPill::new("handoff-selector-pill")
@@ -2061,10 +2070,11 @@ impl CaseGallery {
             }
             "scroll_area.overlay" => handoff_scroll_area(cx).into_any_element(),
             "popup_menu.scale" => MoonPopupMenu::new("handoff-popup-scale")
-                .width(150.0)
+                .fit_width(120.0, 240.0)
+                .max_height_ui(120.0)
                 .items([
                     MoonMenuItem::new("Auto").selected(true),
-                    MoonMenuItem::new("50%"),
+                    MoonMenuItem::new("50%").right_label("F2"),
                     MoonMenuItem::new("20%"),
                     MoonMenuItem::separator(),
                     MoonMenuItem::new("5%"),
@@ -2074,15 +2084,19 @@ impl CaseGallery {
                 .into_any_element(),
             "dropdown.open" => MoonDropdown::new("handoff-dropdown")
                 .label("Scale Auto")
-                .trigger_width(142.0)
+                .trigger_caret(true)
+                .fit_trigger_width(100.0, 180.0)
                 .default_open(true)
-                .menu_width(170.0)
+                .fit_menu_width(120.0, 240.0)
                 .items([
                     MoonMenuItem::with_key("Auto", "Auto").selected(true),
                     MoonMenuItem::with_key("50", "50%"),
                     MoonMenuItem::with_key("20", "20%").checked(true),
                     MoonMenuItem::separator(),
-                    MoonMenuItem::new("Advanced").right_label(">"),
+                    MoonMenuItem::new("Advanced").selected(true).submenu([
+                        MoonMenuItem::new("Adaptive trailing offset"),
+                        MoonMenuItem::new("Fixed risk budget").right_label("Ctrl+F"),
+                    ]),
                 ])
                 .into_any_element(),
             "context_menu.basic" => div()
@@ -2115,7 +2129,7 @@ impl CaseGallery {
                     MoonPopover::new("handoff-popover")
                         .open(true)
                         .placement(MoonPopoverPlacement::BottomStart)
-                        .width(210.0)
+                        .fit_content()
                         .trigger(
                             MoonButton::new("handoff-popover-trigger")
                                 .label("Open popover")
@@ -2124,6 +2138,7 @@ impl CaseGallery {
                         )
                         .content(
                             v_flex()
+                                .w(px(210.0))
                                 .gap(px(8.0))
                                 .child(
                                     MoonText::new("Popover content")
@@ -3345,16 +3360,19 @@ impl Gallery {
                             .accent(MoonAccent::Amber)
                             .items([
                                 MoonSegmentItem::new("F1", "0.01")
-                                    .width(82.0)
+                                    .fit_width(cx, 52.0, 110.0)
+                                    .tooltip("Select preset F1")
                                     .selected(self.segment_index == 0),
                                 MoonSegmentItem::new("F2", "0.025")
-                                    .width(82.0)
+                                    .fit_width(cx, 52.0, 110.0)
+                                    .tooltip("Select preset F2")
                                     .selected(self.segment_index == 1),
                                 MoonSegmentItem::new("F3", "0.05")
-                                    .width(82.0)
+                                    .fit_width(cx, 52.0, 110.0)
+                                    .tooltip("Select preset F3")
                                     .selected(self.segment_index == 2),
                                 MoonSegmentItem::new("F4", "0.10")
-                                    .width(82.0)
+                                    .fit_width(cx, 52.0, 110.0)
                                     .disabled(true),
                             ])
                             .on_click({
@@ -3364,6 +3382,17 @@ impl Gallery {
                                         this.segment_index = ix;
                                         this.push_event(
                                             format!("Segment selected: F{}", ix + 1),
+                                            cx,
+                                        );
+                                    });
+                                }
+                            })
+                            .on_scroll({
+                                let view = view.clone();
+                                move |ix, _, _, app| {
+                                    view.update(app, |this, cx| {
+                                        this.push_event(
+                                            format!("Segment scrolled: F{}", ix + 1),
                                             cx,
                                         );
                                     });
@@ -3594,9 +3623,10 @@ impl Gallery {
                         .child(
                             MoonDropdown::new("gallery-dropdown")
                                 .label(format!("Scale {}", self.dropdown_value))
-                                .trigger_width(142.0)
+                                .trigger_caret(true)
+                                .fit_trigger_width(100.0, 180.0)
                                 .default_open(false)
-                                .menu_width(170.0)
+                                .fit_menu_width(120.0, 240.0)
                                 .items([
                                     MoonMenuItem::with_key("Auto", "Auto")
                                         .selected(self.dropdown_value.as_ref() == "Auto"),
@@ -3634,7 +3664,7 @@ impl Gallery {
                                     }
                                 })
                                 .placement(MoonPopoverPlacement::BottomStart)
-                                .width(230.0)
+                                .content_width_ui(230.0)
                                 .background_policy(MoonBackgroundPolicy::Transparent)
                                 .trigger(
                                     MoonButton::new("popover-trigger")
@@ -3705,7 +3735,7 @@ impl Gallery {
                 .child(
                     MoonPopupMenu::new("gallery-popup-menu")
                         .width(190.0)
-                        .max_height(130.0)
+                        .max_height_ui(130.0)
                         .items([
                             MoonMenuItem::new("Popup menu"),
                             MoonMenuItem::new("Checked").checked(true),

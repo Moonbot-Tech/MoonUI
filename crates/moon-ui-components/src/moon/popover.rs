@@ -8,6 +8,41 @@ use super::{
 };
 
 const MOON_POPOVER_PRIORITY: usize = 30_000;
+const POPOVER_PADDING: f32 = 6.0;
+const POPOVER_BORDER: f32 = 1.0;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+/// Width policy for the popover's outer or content box.
+enum MoonPopoverWidth {
+    Outer(f32),
+    Content(f32),
+    UiContent(f32),
+    FontContent(f32),
+    Intrinsic,
+}
+
+impl MoonPopoverWidth {
+    /// Resolve an optional outer width for the popup border box.
+    ///
+    /// `None` leaves the box intrinsic. Content policies add the exact padding and border drawn by
+    /// the popup, keeping downstream callers independent of those private metrics.
+    ///
+    /// Args:
+    ///     tokens: Active theme tokens used by scaled content policies.
+    ///
+    /// Returns:
+    ///     Resolved outer border-box width, or `None` for intrinsic layout.
+    fn resolve(self, tokens: &super::theme::MoonThemeTokens) -> Option<f32> {
+        let chrome = tokens.ui(POPOVER_PADDING) * 2.0 + POPOVER_BORDER * 2.0;
+        match self {
+            Self::Outer(width) => Some(width),
+            Self::Content(width) => Some(width + chrome),
+            Self::UiContent(width) => Some(tokens.ui(width) + chrome),
+            Self::FontContent(width) => Some(tokens.font_width(width) + chrome),
+            Self::Intrinsic => None,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonPopoverPlacement {
@@ -25,6 +60,7 @@ struct MoonPopoverState {
 }
 
 #[derive(IntoElement)]
+/// Anchored Moon popover with explicit outer, content, scaled, or intrinsic width ownership.
 pub struct MoonPopover {
     id: SharedString,
     bounds: Option<MoonRect>,
@@ -36,7 +72,7 @@ pub struct MoonPopover {
     disabled: bool,
     close_on_content_click: bool,
     overlay_closable: bool,
-    width: f32,
+    width: MoonPopoverWidth,
     offset_x: f32,
     offset_y: f32,
     background_policy: MoonBackgroundPolicy,
@@ -44,6 +80,13 @@ pub struct MoonPopover {
 }
 
 impl MoonPopover {
+    /// Create an anchored popover with the legacy rendered outer width.
+    ///
+    /// Args:
+    ///     id: Stable identity used by the popover state and debug selector.
+    ///
+    /// Returns:
+    ///     A default popover builder.
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
@@ -56,7 +99,7 @@ impl MoonPopover {
             disabled: false,
             close_on_content_click: false,
             overlay_closable: true,
-            width: 220.0,
+            width: MoonPopoverWidth::Outer(220.0),
             offset_x: 0.0,
             offset_y: 6.0,
             background_policy: MoonBackgroundPolicy::Opaque,
@@ -122,8 +165,66 @@ impl MoonPopover {
         self
     }
 
+    /// Set a legacy rendered outer width for the popup border box.
+    ///
+    /// Prefer [`Self::content_width`], [`Self::content_width_ui`],
+    /// [`Self::content_width_font`], or [`Self::fit_content`] for new code so callers do not
+    /// reproduce the popup's padding and border.
+    ///
+    /// Args:
+    ///     width: Outer border-box width in rendered pixels.
+    ///
+    /// Returns:
+    ///     The updated popover.
     pub fn width(mut self, width: f32) -> Self {
-        self.width = width;
+        self.width = MoonPopoverWidth::Outer(width);
+        self
+    }
+
+    /// Set an already-rendered width for the popup's content box.
+    ///
+    /// MoonPopover adds its own scaled padding and fixed border to produce the outer width.
+    ///
+    /// Args:
+    ///     width: Rendered content-box width.
+    ///
+    /// Returns:
+    ///     The updated popover.
+    pub fn content_width(mut self, width: f32) -> Self {
+        self.width = MoonPopoverWidth::Content(width);
+        self
+    }
+
+    /// Set a UI-scaled design-reference width for the popup's content box.
+    ///
+    /// Args:
+    ///     width: Content width at the configured UI reference scale.
+    ///
+    /// Returns:
+    ///     The updated popover.
+    pub fn content_width_ui(mut self, width: f32) -> Self {
+        self.width = MoonPopoverWidth::UiContent(width);
+        self
+    }
+
+    /// Set a font-scaled design-reference width for the popup's content box.
+    ///
+    /// Args:
+    ///     width: Content width at the configured font reference size.
+    ///
+    /// Returns:
+    ///     The updated popover.
+    pub fn content_width_font(mut self, width: f32) -> Self {
+        self.width = MoonPopoverWidth::FontContent(width);
+        self
+    }
+
+    /// Let the popup shrink-wrap its content without imposing an explicit width.
+    ///
+    /// Returns:
+    ///     The updated popover.
+    pub fn fit_content(mut self) -> Self {
+        self.width = MoonPopoverWidth::Intrinsic;
         self
     }
 
@@ -140,6 +241,14 @@ impl MoonPopover {
 }
 
 impl RenderOnce for MoonPopover {
+    /// Render the trigger and its optionally open, width-resolved anchored popup.
+    ///
+    /// Args:
+    ///     window: Window owning the keyed open state and anchored popover.
+    ///     cx: Application context used to resolve active theme tokens.
+    ///
+    /// Returns:
+    ///     The rendered trigger and popup host.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let trigger = self.trigger.unwrap_or_else(|| div().into_any_element());
@@ -176,17 +285,21 @@ impl RenderOnce for MoonPopover {
             px(0.0),
             rgba_from(p.shadow, 0.48),
         );
+        let popup_debug_id = format!("{}:popup", self.id);
         let mut popup = div()
-            .w(px(self.width))
-            .p(px(tokens.ui(6.0)))
+            .debug_selector(move || popup_debug_id)
+            .p(px(tokens.ui(POPOVER_PADDING)))
             .rounded(px(tokens.ui(5.0)))
-            .border(px(1.0))
+            .border(px(POPOVER_BORDER))
             .border_color(rgba_from(p.border, 1.0))
             .shadow(vec![shadow])
             .occlude()
             .mt(px(self.offset_y))
             .ml(px(self.offset_x))
             .child(self.content.unwrap_or_else(|| div().into_any_element()));
+        if let Some(width) = self.width.resolve(&tokens) {
+            popup = popup.w(px(width));
+        }
 
         if self.close_on_content_click {
             popup = popup.capture_any_mouse_down({
@@ -255,3 +368,6 @@ fn anchor_for(placement: MoonPopoverPlacement) -> Anchor {
         MoonPopoverPlacement::LeftStart => Anchor::TopLeft,
     }
 }
+
+#[cfg(test)]
+mod tests;

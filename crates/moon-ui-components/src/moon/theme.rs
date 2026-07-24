@@ -89,6 +89,29 @@ impl MoonThemeTokens {
         (value * self.scale.font.max(0.25) + self.scale.font_delta).max(1.0)
     }
 
+    /// Resolve the width scale used by text containers.
+    ///
+    /// Width follows the configured monospaced body size rather than UI geometry because a
+    /// container sized for text must grow with both `font` and `font_delta`.
+    ///
+    /// Returns:
+    ///     The rendered monospaced body size divided by its design-reference size.
+    pub fn font_width_scale(&self) -> f32 {
+        let base = self.typography.mono_font_size.max(1.0);
+        self.font(base) / base
+    }
+
+    /// Scale a design-reference text-container width with the active font settings.
+    ///
+    /// Args:
+    ///     value: Width at the configured monospaced body reference size.
+    ///
+    /// Returns:
+    ///     The rendered width after applying the font scale and delta.
+    pub fn font_width(&self, value: f32) -> f32 {
+        value * self.font_width_scale()
+    }
+
     pub fn line_height(&self, value: f32) -> f32 {
         (value * self.scale.font.max(0.25) + self.scale.font_delta).max(1.0)
     }

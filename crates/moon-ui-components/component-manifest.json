@@ -251,7 +251,12 @@
       "public_path": "moon_ui::MoonDropdown",
       "upstream_ref": null,
       "fork_reason": "Moon popup styling and density",
-      "contracts": ["dropdown.select_behavior", "dropdown.menu_placement", "gallery.visual_coverage"]
+      "contracts": [
+        "dropdown.select_behavior",
+        "dropdown.menu_placement",
+        "dropdown.fitted_width",
+        "gallery.visual_coverage"
+      ]
     },
     {
       "concept": "popup_menu",
@@ -261,7 +266,7 @@
       "public_path": "moon_ui::MoonPopupMenu",
       "upstream_ref": null,
       "fork_reason": "Moon popup styling and density",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["popup_menu.fitted_width", "gallery.visual_coverage"]
     },
     {
       "concept": "form_row",
@@ -385,7 +390,11 @@
       "upstream_ref": "Longbridge::popover@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": "Reviewed TrackedFork drift: Moon placement/style hook lives in base popover; Longbridge popover lifecycle remains source-owned",
       "donor_drift_budget": 1,
-      "contracts": ["popover.open_close_lifecycle", "gallery.visual_coverage"]
+      "contracts": [
+        "popover.open_close_lifecycle",
+        "popover.content_width",
+        "gallery.visual_coverage"
+      ]
     },
     {
       "concept": "pagination",
@@ -425,7 +434,10 @@
       "public_path": "moon_ui::MoonSegmentedControl",
       "upstream_ref": null,
       "fork_reason": "MoonBot toolbar/page control styling",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": [
+        "segmented_control.fitted_interaction",
+        "gallery.visual_coverage"
+      ]
     },
     {
       "concept": "selector_pill",

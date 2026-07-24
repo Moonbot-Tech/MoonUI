@@ -301,6 +301,7 @@
       "contracts": [
         "dropdown.select_behavior",
         "dropdown.menu_placement",
+        "dropdown.fitted_width",
         "gallery.visual_coverage"
       ]
     },
@@ -535,6 +536,7 @@
       "donor_drift_budget": 1,
       "contracts": [
         "popover.open_close_lifecycle",
+        "popover.content_width",
         "gallery.visual_coverage"
       ]
     },
@@ -547,6 +549,7 @@
       "upstream_ref": null,
       "fork_reason": "Moon popup styling and density",
       "contracts": [
+        "popup_menu.fitted_width",
         "gallery.visual_coverage"
       ]
     },
@@ -648,6 +651,7 @@
       "upstream_ref": null,
       "fork_reason": "MoonBot toolbar/page control styling",
       "contracts": [
+        "segmented_control.fitted_interaction",
         "gallery.visual_coverage"
       ]
     },
@@ -1105,6 +1109,13 @@
       "details": "dock must preserve panel flags, tab creation, tab-move target resolution, self-drop guards, tile clamping, and cached panel embedding; covered by Rust test(s): moon_dock_panel_builder_flags_are_observable, dock_item_add_panel_creates_tabs_and_activates_new_panel, dock_clamps_tile_meta_inside_root_bounds, move_panel_to_tabs_resolves_target_after_take, move_panel_to_tabs_ignores_self_drop_before_take"
     },
     {
+      "id": "dropdown.fitted_width",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "fitted and scaled dropdown triggers must preserve their component-owned caret and chrome across independent UI and font scales; covered by Rust test(s): fitted_trigger_preserves_caret_at_independent_scale_extremes, scaled_trigger_uses_font_width_without_clipping_component_chrome"
+    },
+    {
       "id": "dropdown.menu_placement",
       "status": "Pass",
       "severity": "Guardrail",
@@ -1189,11 +1200,25 @@
       "details": "Mirror components have zero donor drift; TrackedFork components have reviewed donor drift within manifest budget"
     },
     {
+      "id": "popover.content_width",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "popover content-width policies must add component-owned chrome and intrinsic popovers must shrink-wrap rendered content; covered by Rust test(s): content_width_policies_reserve_scaled_popup_chrome, intrinsic_popover_shrink_wraps_its_rendered_child"
+    },
+    {
       "id": "popover.open_close_lifecycle",
       "status": "Pass",
       "severity": "Guardrail",
       "verifier": "BehavioralTest",
       "details": "popover open/close builder lifecycle must stay covered by Rust tests; covered by Rust test(s): test_popover_builder_chaining"
+    },
+    {
+      "id": "popup_menu.fitted_width",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "fitted and scaled popup menus must reserve scaled row chrome, trailing-label geometry, maximum height, and per-level submenu sizing; covered by Rust test(s): fitted_menu_accounts_for_right_label_and_its_gap, fitted_submenu_resolves_width_from_its_own_items, scaled_menu_width_retains_fitted_rows_at_independent_scale_extremes, menu_max_height_distinguishes_ui_scaled_and_rendered_values, palette_only_menu_render_rejects_measured_width_policies"
     },
     {
       "id": "radio.click_behavior",
@@ -1215,6 +1240,13 @@
       "severity": "Guardrail",
       "verifier": "StructuralSource",
       "details": "MoonRoot must be the real root type; Root may remain only as a compatibility alias"
+    },
+    {
+      "id": "segmented_control.fitted_interaction",
+      "status": "Pass",
+      "severity": "Guardrail",
+      "verifier": "BehavioralTest",
+      "details": "fitted segmented cells must keep viable pre-render widths, reserve replacement width for inline content, and gate rendered native interactions; covered by Rust test(s): fitted_item_preserves_the_boundary_and_ellipsizes_one_past_it, disabled_and_replaced_cells_expose_no_native_interactions, replaced_cell_releases_its_full_width_to_the_inline_editor, rendered_cells_preserve_width_and_gate_native_interactions, fitted_segment_width_survives_high_ui_low_font_render"
     },
     {
       "id": "select.open_select_lifecycle",

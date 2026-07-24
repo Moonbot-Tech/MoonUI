@@ -2,9 +2,121 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
-    theme::MoonTheme,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, rgba_from},
 };
+
+/// Measure text with the same font family and font scaling used by [`MoonText`].
+///
+/// The result sums individual glyph advances. It deliberately does not assume equal-width glyphs:
+/// fallback Unicode characters in a monospaced run may come from another font.
+///
+/// Args:
+///     cx: Application context providing the text system.
+///     tokens: Active theme tokens.
+///     text: Text to measure.
+///     font_size: Design-reference font size.
+///     weight: Numeric GPUI font weight.
+///     mono: Whether to use the configured monospaced family.
+///
+/// Returns:
+///     The rendered glyph-advance width in pixels.
+pub(crate) fn measure_text_width(
+    cx: &App,
+    tokens: &MoonThemeTokens,
+    text: &str,
+    font_size: f32,
+    weight: f32,
+    mono: bool,
+) -> f32 {
+    let font = Font {
+        weight: FontWeight(weight),
+        ..font(tokens.font_family(mono))
+    };
+    let font_id = cx.text_system().resolve_font(&font);
+    let size = px(tokens.font(font_size));
+    text.chars()
+        .map(|ch| f32::from(cx.text_system().layout_width(font_id, size, ch)))
+        .sum()
+}
+
+/// Fit text to a rendered-width ceiling with a trailing ellipsis when needed.
+///
+/// Args:
+///     text: Full text.
+///     max_width: Rendered width available to the result.
+///     measure: Width function matching the renderer's font, size, and weight.
+///
+/// Returns:
+///     The fitted string and its measured rendered width.
+pub(crate) fn fit_text_to_width(
+    text: &str,
+    max_width: f32,
+    measure: impl Fn(&str) -> f32,
+) -> (String, f32) {
+    const ELLIPSIS: &str = "\u{2026}";
+    let full_width = measure(text);
+    if full_width <= max_width {
+        return (text.to_string(), full_width);
+    }
+
+    let budget = (max_width - measure(ELLIPSIS)).max(0.0);
+    let mut prefix = String::new();
+    let mut used = 0.0;
+    let mut buffer = [0_u8; 4];
+    for ch in text.chars() {
+        let width = measure(ch.encode_utf8(&mut buffer));
+        if used + width > budget {
+            break;
+        }
+        used += width;
+        prefix.push(ch);
+    }
+    let fitted = format!("{}{ELLIPSIS}", prefix.trim_end());
+    let width = measure(&fitted);
+    (fitted, width)
+}
+
+/// Fit a text prefix while preserving a required suffix such as a dropdown caret.
+///
+/// Args:
+///     text: Prefix text that may be truncated.
+///     suffix: Required trailing text.
+///     max_width: Rendered width available to prefix plus suffix.
+///     measure: Width function matching the renderer.
+///
+/// Returns:
+///     The fitted text with `suffix` and its rendered width.
+pub(crate) fn fit_text_with_suffix(
+    text: &str,
+    suffix: &str,
+    max_width: f32,
+    measure: impl Fn(&str) -> f32,
+) -> (String, f32) {
+    let full = format!("{text}{suffix}");
+    let full_width = measure(&full);
+    if full_width <= max_width {
+        return (full, full_width);
+    }
+
+    const ELLIPSIS: &str = "\u{2026}";
+    let reserved = measure(&format!("{ELLIPSIS}{suffix}"));
+    let budget = (max_width - reserved).max(0.0);
+    let mut prefix = String::new();
+    let mut used = 0.0;
+    let mut buffer = [0_u8; 4];
+    for ch in text.chars() {
+        let width = measure(ch.encode_utf8(&mut buffer));
+        if used + width > budget {
+            break;
+        }
+        used += width;
+        prefix.push(ch);
+    }
+    let fitted = format!("{}{ELLIPSIS}{suffix}", prefix.trim_end());
+    let width = measure(&fitted);
+    (fitted, width)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct MoonTextStyle {

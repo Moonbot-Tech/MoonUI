@@ -3,13 +3,123 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
-    button::{MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant},
+    button::{
+        MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant, button_text_metrics,
+    },
     foundation::{MoonClickHandler, MoonSelectHandler, selected_background},
     icons::{MOON_ICON_CHECK, moon_icon},
-    text::MoonText,
+    text::{MoonText, fit_text_to_width, fit_text_with_suffix, measure_text_width},
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
+
+const MENU_PADDING: f32 = 4.0;
+const MENU_BORDER: f32 = 1.0;
+const MENU_CHECK_WIDTH: f32 = 12.0;
+const SUBMENU_OFFSET_X: f32 = 2.0;
+const DROPDOWN_TRIGGER_PAD_X: f32 = 14.0;
+const DROPDOWN_CARET: &str = " \u{25be}";
+const DROPDOWN_TRIGGER_MONO: bool = true;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+/// Width policy for one popup-menu level.
+enum MoonMenuWidth {
+    Rendered(f32),
+    Scaled(f32),
+    Fit { min: f32, max: f32 },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+/// Maximum-height policy for a popup menu.
+enum MoonMenuMaxHeight {
+    Rendered(f32),
+    Ui(f32),
+}
+
+impl MoonMenuMaxHeight {
+    /// Resolve the maximum rendered menu height.
+    ///
+    /// Args:
+    ///     tokens: Active theme tokens used by UI-scaled policies.
+    ///
+    /// Returns:
+    ///     Maximum menu height in rendered pixels.
+    fn resolve(self, tokens: &MoonThemeTokens) -> f32 {
+        match self {
+            Self::Rendered(height) => height,
+            Self::Ui(height) => tokens.ui(height),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+/// Width policy for a dropdown's plain-label trigger.
+enum MoonDropdownTriggerWidth {
+    Intrinsic,
+    Rendered(f32),
+    Scaled(f32),
+    Fit { min: f32, max: f32 },
+}
+
+/// Resolve and, when necessary, truncate one plain dropdown trigger label.
+///
+/// Args:
+///     label: Full caller-supplied label without the component-owned suffix.
+///     suffix: Required suffix, normally the dropdown caret.
+///     width: Trigger width policy.
+///     tokens: Active theme tokens.
+///     font_size: Design-reference trigger font size.
+///     measure: Width function matching the rendered trigger font.
+///
+/// Returns:
+///     The fitted label including `suffix` and an optional explicit rendered width.
+fn fit_dropdown_trigger_label(
+    label: &str,
+    suffix: &str,
+    width: MoonDropdownTriggerWidth,
+    tokens: &MoonThemeTokens,
+    font_size: f32,
+    measure: impl Fn(&str) -> f32,
+) -> (SharedString, Option<f32>) {
+    let full = format!("{label}{suffix}");
+    match width {
+        MoonDropdownTriggerWidth::Intrinsic => return (SharedString::from(full), None),
+        MoonDropdownTriggerWidth::Rendered(width) => {
+            return (SharedString::from(full), Some(width));
+        }
+        MoonDropdownTriggerWidth::Scaled(_) | MoonDropdownTriggerWidth::Fit { .. } => {}
+    }
+
+    let text_scale = tokens.font(font_size) / font_size.max(1.0);
+    let scaled = |value: f32| value * text_scale;
+    let visual_padding = tokens.ui(DROPDOWN_TRIGGER_PAD_X);
+    let minimum_text = if label.is_empty() {
+        suffix.to_string()
+    } else {
+        format!("\u{2026}{suffix}")
+    };
+    let minimum_width = visual_padding + measure(&minimum_text);
+    match width {
+        MoonDropdownTriggerWidth::Scaled(width) => {
+            let width = scaled(width).max(minimum_width);
+            let text_width = (width - visual_padding).max(0.0);
+            let fitted = fit_text_with_suffix(label, suffix, text_width, measure).0;
+            (SharedString::from(fitted), Some(width))
+        }
+        MoonDropdownTriggerWidth::Fit { min, max } => {
+            let min = scaled(min).max(minimum_width);
+            let max = scaled(max).max(min);
+            let natural = (measure(&full) + visual_padding).ceil();
+            let width = natural.clamp(min, max);
+            let text_width = (width - visual_padding).max(0.0);
+            let fitted = fit_text_with_suffix(label, suffix, text_width, measure).0;
+            (SharedString::from(fitted), Some(width))
+        }
+        MoonDropdownTriggerWidth::Intrinsic | MoonDropdownTriggerWidth::Rendered(_) => {
+            unreachable!("unmeasured trigger width handled before text measurement")
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonMenuItemKind {
@@ -43,6 +153,13 @@ struct MenuMetrics {
 }
 
 impl MenuMetrics {
+    /// Scale menu geometry while leaving font inputs in design-reference units for MoonText.
+    ///
+    /// Args:
+    ///     tokens: Active theme tokens used to scale row geometry.
+    ///
+    /// Returns:
+    ///     Menu metrics resolved for the active UI scale.
     fn scaled(self, tokens: &MoonThemeTokens) -> Self {
         let line_height = tokens.line_height(self.line_height);
         Self {
@@ -54,6 +171,252 @@ impl MenuMetrics {
             gap: tokens.ui(self.gap),
         }
     }
+}
+
+/// Return the fixed outer chrome around a menu row.
+///
+/// Args:
+///     tokens: Active theme tokens used to scale menu padding.
+///
+/// Returns:
+///     Combined menu padding and border width.
+fn menu_outer_chrome(tokens: &MoonThemeTokens) -> f32 {
+    tokens.ui(MENU_PADDING) * 2.0 + MENU_BORDER * 2.0
+}
+
+/// Return the UI-scaled check-column width rendered by every actionable menu row.
+///
+/// Args:
+///     tokens: Active theme tokens.
+///
+/// Returns:
+///     Rendered check-column width.
+fn menu_check_width(tokens: &MoonThemeTokens) -> f32 {
+    tokens.ui(MENU_CHECK_WIDTH)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+/// Natural and minimum viable outer widths for one menu level.
+struct MenuWidthRequirements {
+    natural: f32,
+    minimum: f32,
+}
+
+/// Measure natural and minimum viable widths in one pass over a menu level.
+///
+/// Args:
+///     items: Rows belonging to this menu level.
+///     metrics: Resolved row geometry.
+///     tokens: Active theme tokens.
+///     measure: Width function matching each row's text style.
+///
+/// Returns:
+///     Rounded natural and minimum viable outer widths.
+fn menu_width_requirements(
+    items: &[MoonMenuItem],
+    metrics: MenuMetrics,
+    tokens: &MoonThemeTokens,
+    mut measure: impl FnMut(&str, f32, f32) -> f32,
+) -> MenuWidthRequirements {
+    let (widest_natural, widest_minimum) = items
+        .iter()
+        .map(|item| match item.kind {
+            MoonMenuItemKind::Separator => (0.0, 0.0),
+            MoonMenuItemKind::Label => {
+                let chrome = metrics.pad_x * 2.0;
+                let natural = chrome + measure(item.label.as_ref(), metrics.font_size, 500.0);
+                let marker = if item.label.is_empty() {
+                    0.0
+                } else {
+                    measure("\u{2026}", metrics.font_size, 500.0)
+                };
+                (natural, chrome + marker)
+            }
+            MoonMenuItemKind::Item => {
+                let (trailing_natural, trailing_minimum) =
+                    if let Some(right_label) = item.right_label.as_ref() {
+                        (
+                            measure(right_label.as_ref(), metrics.font_size - 0.5, 400.0),
+                            if right_label.is_empty() {
+                                0.0
+                            } else {
+                                measure("\u{2026}", metrics.font_size - 0.5, 400.0)
+                            },
+                        )
+                    } else if item.has_submenu() {
+                        let glyph = measure("\u{203a}", metrics.font_size, 600.0);
+                        (glyph, glyph)
+                    } else {
+                        (0.0, 0.0)
+                    };
+                let has_trailing = item.right_label.is_some() || item.has_submenu();
+                let gaps = if has_trailing { 3.0 } else { 2.0 };
+                let chrome = metrics.pad_x * 2.0 + menu_check_width(tokens) + metrics.gap * gaps;
+                let label_natural = measure(item.label.as_ref(), metrics.font_size, 600.0);
+                let label_minimum = if item.label.is_empty() {
+                    0.0
+                } else {
+                    measure("\u{2026}", metrics.font_size, 600.0)
+                };
+                (
+                    chrome + label_natural + trailing_natural,
+                    chrome + label_minimum + trailing_minimum,
+                )
+            }
+        })
+        .fold((0.0_f32, 0.0_f32), |(natural, minimum), row| {
+            (natural.max(row.0), minimum.max(row.1))
+        });
+    let outer = menu_outer_chrome(tokens);
+    MenuWidthRequirements {
+        natural: (outer + widest_natural).ceil(),
+        minimum: (outer + widest_minimum).ceil(),
+    }
+}
+
+/// Return the natural outer width required by the widest item in one menu level.
+///
+/// Args:
+///     items: Rows belonging to this menu level.
+///     metrics: Resolved row geometry.
+///     tokens: Active theme tokens.
+///     measure: Width function matching each row's text style.
+///
+/// Returns:
+///     Rounded outer width required by the widest row.
+#[cfg(test)]
+fn natural_menu_width(
+    items: &[MoonMenuItem],
+    metrics: MenuMetrics,
+    tokens: &MoonThemeTokens,
+    measure: impl FnMut(&str, f32, f32) -> f32,
+) -> f32 {
+    menu_width_requirements(items, metrics, tokens, measure).natural
+}
+
+/// Truncate labels to the exact text budgets of one resolved menu level.
+///
+/// Args:
+///     items: Mutable rows belonging to this menu level.
+///     width: Resolved outer menu width.
+///     metrics: Resolved row geometry.
+///     tokens: Active theme tokens.
+///     cx: Application context used for text measurement.
+///     mono: Whether rows use the configured monospaced font.
+fn fit_menu_item_labels(
+    items: &mut [MoonMenuItem],
+    width: f32,
+    metrics: MenuMetrics,
+    tokens: &MoonThemeTokens,
+    cx: &App,
+    mono: bool,
+) {
+    let outer = menu_outer_chrome(tokens);
+    for item in items {
+        match item.kind {
+            MoonMenuItemKind::Separator => {}
+            MoonMenuItemKind::Label => {
+                let budget = (width - outer - metrics.pad_x * 2.0).max(0.0);
+                let fitted = fit_text_to_width(item.label.as_ref(), budget, |text| {
+                    measure_text_width(cx, tokens, text, metrics.font_size, 500.0, mono)
+                })
+                .0;
+                item.label = SharedString::from(fitted);
+            }
+            MoonMenuItemKind::Item => {
+                let has_submenu = item.has_submenu();
+                let trailing_gaps = if item.right_label.is_some() || has_submenu {
+                    3.0
+                } else {
+                    2.0
+                };
+                let mut text_budget = (width
+                    - outer
+                    - metrics.pad_x * 2.0
+                    - menu_check_width(tokens)
+                    - metrics.gap * trailing_gaps)
+                    .max(0.0);
+
+                if let Some(right_label) = item.right_label.take() {
+                    let main_ellipsis =
+                        measure_text_width(cx, tokens, "\u{2026}", metrics.font_size, 600.0, mono);
+                    let right_budget = (text_budget - main_ellipsis).max(0.0);
+                    let (right_label, right_width) =
+                        fit_text_to_width(right_label.as_ref(), right_budget, |text| {
+                            measure_text_width(
+                                cx,
+                                tokens,
+                                text,
+                                metrics.font_size - 0.5,
+                                400.0,
+                                mono,
+                            )
+                        });
+                    item.right_label = Some(SharedString::from(right_label));
+                    text_budget = (text_budget - right_width).max(0.0);
+                } else if has_submenu {
+                    text_budget = (text_budget
+                        - measure_text_width(
+                            cx,
+                            tokens,
+                            "\u{203a}",
+                            metrics.font_size,
+                            600.0,
+                            mono,
+                        ))
+                    .max(0.0);
+                }
+
+                let fitted = fit_text_to_width(item.label.as_ref(), text_budget, |text| {
+                    measure_text_width(cx, tokens, text, metrics.font_size, 600.0, mono)
+                })
+                .0;
+                item.label = SharedString::from(fitted);
+            }
+        }
+    }
+}
+
+/// Resolve a menu width policy and whether its labels should be bounded to the result.
+///
+/// Args:
+///     policy: Configured rendered, scaled, or fitted width policy.
+///     items: Rows belonging to this menu level.
+///     metrics: Resolved row geometry.
+///     tokens: Active theme tokens.
+///     cx: Application context used for text measurement.
+///     mono: Whether rows use the configured monospaced font.
+///
+/// Returns:
+///     Resolved outer width and whether labels must be truncated to it.
+fn resolve_menu_width(
+    policy: MoonMenuWidth,
+    items: &[MoonMenuItem],
+    metrics: MenuMetrics,
+    tokens: &MoonThemeTokens,
+    cx: &App,
+    mono: bool,
+) -> (f32, bool) {
+    if let MoonMenuWidth::Rendered(width) = policy {
+        return (width, false);
+    }
+
+    let text_scale = tokens.font(metrics.font_size) / metrics.font_size.max(1.0);
+    let requirements = menu_width_requirements(items, metrics, tokens, |text, size, weight| {
+        measure_text_width(cx, tokens, text, size, weight, mono)
+    });
+    let width = match policy {
+        MoonMenuWidth::Scaled(width) => (width * text_scale).max(requirements.minimum),
+        MoonMenuWidth::Fit { min, max } => {
+            let min = (min * text_scale).max(requirements.minimum);
+            let max = (max * text_scale).max(min);
+            requirements.natural.clamp(min, max)
+        }
+        MoonMenuWidth::Rendered(_) => {
+            unreachable!("rendered menu width handled before text measurement")
+        }
+    };
+    (width, width < requirements.natural)
 }
 
 fn moon_menu_item_accepts_click(kind: MoonMenuItemKind, disabled: bool) -> bool {
@@ -192,24 +555,32 @@ impl MoonMenuItem {
 }
 
 #[derive(IntoElement)]
+/// Moon-styled popup menu with rendered, scaled, or per-level fitted width policies.
 pub struct MoonPopupMenu {
     id: SharedString,
     headers: Vec<AnyElement>,
     items: Vec<MoonMenuItem>,
     size: MoonMenuSize,
-    width: f32,
-    max_height: Option<f32>,
+    width: MoonMenuWidth,
+    max_height: Option<MoonMenuMaxHeight>,
     mono: bool,
 }
 
 impl MoonPopupMenu {
+    /// Create a popup menu with normal rows and the legacy rendered default width.
+    ///
+    /// Args:
+    ///     id: Stable element identity used by rows and nested submenus.
+    ///
+    /// Returns:
+    ///     A default popup-menu builder.
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
             headers: Vec::new(),
             items: Vec::new(),
             size: MoonMenuSize::Normal,
-            width: 160.0,
+            width: MoonMenuWidth::Rendered(160.0),
             max_height: None,
             mono: true,
         }
@@ -235,12 +606,95 @@ impl MoonPopupMenu {
         self
     }
 
+    /// Set a legacy rendered outer width.
+    ///
+    /// Args:
+    ///     width: Outer width in rendered pixels.
+    ///
+    /// Returns:
+    ///     The updated menu.
     pub fn width(mut self, width: f32) -> Self {
+        self.width = MoonMenuWidth::Rendered(width);
+        self
+    }
+
+    /// Set a fixed design-reference width that scales with this menu's text metrics.
+    ///
+    /// Labels are truncated inside the resolved row budget, including right labels and submenu
+    /// glyphs.
+    ///
+    /// Args:
+    ///     width: Outer width at the configured font reference size.
+    ///
+    /// Returns:
+    ///     The updated menu.
+    pub fn width_scaled(mut self, width: f32) -> Self {
+        self.width = MoonMenuWidth::Scaled(width);
+        self
+    }
+
+    /// Fit this menu level to its items between font-scaled design-reference bounds.
+    ///
+    /// Each submenu resolves the same policy independently from its own items.
+    ///
+    /// Args:
+    ///     min_width: Minimum outer width at the configured font reference size.
+    ///     max_width: Maximum outer width at the configured font reference size.
+    ///
+    /// Returns:
+    ///     The updated menu.
+    pub fn fit_width(mut self, min_width: f32, max_width: f32) -> Self {
+        self.width = MoonMenuWidth::Fit {
+            min: min_width,
+            max: max_width,
+        };
+        self
+    }
+
+    /// Apply an already-selected width policy to a nested menu.
+    ///
+    /// Args:
+    ///     width: Policy inherited by the submenu and resolved against its own rows.
+    ///
+    /// Returns:
+    ///     The updated nested menu.
+    fn width_policy(mut self, width: MoonMenuWidth) -> Self {
         self.width = width;
         self
     }
 
+    /// Set a legacy maximum height in rendered pixels.
+    ///
+    /// Args:
+    ///     max_height: Maximum rendered menu height.
+    ///
+    /// Returns:
+    ///     The updated menu.
     pub fn max_height(mut self, max_height: f32) -> Self {
+        self.max_height = Some(MoonMenuMaxHeight::Rendered(max_height));
+        self
+    }
+
+    /// Set a UI-scaled design-reference maximum menu height.
+    ///
+    /// Args:
+    ///     max_height: Maximum height at the configured UI reference scale.
+    ///
+    /// Returns:
+    ///     The updated menu.
+    pub fn max_height_ui(mut self, max_height: f32) -> Self {
+        self.max_height = Some(MoonMenuMaxHeight::Ui(max_height));
+        self
+    }
+
+    /// Apply an already-selected maximum-height policy to a nested menu host.
+    ///
+    /// Args:
+    ///     max_height: Maximum-height policy inherited from a dropdown.
+    ///
+    /// Returns:
+    ///     The updated menu.
+    fn max_height_policy(mut self, max_height: MoonMenuMaxHeight) -> Self {
         self.max_height = Some(max_height);
         self
     }
@@ -254,24 +708,85 @@ impl MoonPopupMenu {
         self
     }
 
+    /// Render a legacy fixed-width menu with an explicit palette and default theme tokens.
+    ///
+    /// Measured policies require the active `App` text system and must render through
+    /// [`Self::render`] instead.
+    ///
+    /// Args:
+    ///     p: Palette used to paint the menu.
+    ///
+    /// Returns:
+    ///     The rendered fixed-width menu.
+    ///
+    /// Panics:
+    ///     Panics when called after [`Self::width_scaled`] or [`Self::fit_width`].
     pub fn render_with_palette(self, p: MoonPalette) -> AnyElement {
-        self.render_with_theme(p, MoonThemeTokens::default())
+        assert!(
+            matches!(self.width, MoonMenuWidth::Rendered(_)),
+            "scaled or fitted menu widths require RenderOnce with an App context"
+        );
+        self.render_with_theme(p, MoonThemeTokens::default(), None)
     }
 
-    fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> AnyElement {
+    /// Render with explicit palette/tokens and an optional text-measurement context.
+    ///
+    /// Args:
+    ///     p: Palette used to paint the menu.
+    ///     tokens: Tokens used to resolve menu geometry.
+    ///     cx: Optional application context; fitted policies require it for text measurement.
+    ///
+    /// Returns:
+    ///     The rendered menu.
+    fn render_with_theme(
+        self,
+        p: MoonPalette,
+        tokens: MoonThemeTokens,
+        cx: Option<&App>,
+    ) -> AnyElement {
         let metrics = self.metrics().scaled(&tokens);
-        self.render_with_metrics(p, metrics, tokens)
+        self.render_with_metrics(p, metrics, tokens, cx)
     }
 
     /// Renders the menu with precomputed layout metrics and the supplied theme tokens.
+    ///
+    /// Args:
+    ///     p: Palette used to paint the menu.
+    ///     metrics: Resolved menu row metrics.
+    ///     tokens: Active theme tokens.
+    ///     cx: Optional application context used by fitted policies.
+    ///
+    /// Returns:
+    ///     The rendered menu.
     fn render_with_metrics(
-        self,
+        mut self,
         p: MoonPalette,
         metrics: MenuMetrics,
         tokens: MoonThemeTokens,
+        cx: Option<&App>,
     ) -> AnyElement {
         let id = self.id.clone();
         let mono = self.mono;
+        let (width, truncate_labels) = if let Some(cx) = cx {
+            resolve_menu_width(self.width, &self.items, metrics, &tokens, cx, mono)
+        } else {
+            match self.width {
+                MoonMenuWidth::Rendered(width) => (width, false),
+                MoonMenuWidth::Scaled(_) | MoonMenuWidth::Fit { .. } => {
+                    unreachable!("measured menu width reached a renderer without an App context")
+                }
+            }
+        };
+        if truncate_labels {
+            fit_menu_item_labels(
+                &mut self.items,
+                width,
+                metrics,
+                &tokens,
+                cx.expect("measured menu layout requires an App context"),
+                mono,
+            );
+        }
         let shadow = super::foundation::box_shadow(
             px(0.0),
             px(8.0),
@@ -287,8 +802,8 @@ impl MoonPopupMenu {
             // all `cfg`-gated to test builds, so this costs a release build nothing.
             .debug_selector(|| id.to_string())
             .relative()
-            .w(px(self.width))
-            .p(px(tokens.ui(4.0)))
+            .w(px(width))
+            .p(px(tokens.ui(MENU_PADDING)))
             .rounded(px(tokens.ui(5.0)))
             .border(px(1.0))
             .border_color(rgba_from(p.border, 1.0))
@@ -300,7 +815,9 @@ impl MoonPopupMenu {
             .gap(px(tokens.ui(2.0)));
 
         if let Some(max_height) = self.max_height {
-            menu = menu.max_h(px(max_height)).overflow_y_scroll();
+            menu = menu
+                .max_h(px(max_height.resolve(&tokens)))
+                .overflow_y_scroll();
         }
 
         for header in self.headers {
@@ -317,21 +834,38 @@ impl MoonPopupMenu {
                 self.width,
                 p,
                 tokens.clone(),
+                cx,
             ));
         }
 
         menu.into_any_element()
     }
 
+    /// Render one menu row and recursively render its selected submenu.
+    ///
+    /// Args:
+    ///     menu_id: Parent menu identity used for stable row and submenu ids.
+    ///     mono: Whether row text uses the configured monospaced family.
+    ///     ix: Zero-based row index.
+    ///     item: Row model.
+    ///     metrics: Resolved row metrics.
+    ///     menu_width_policy: Policy each submenu resolves against its own rows.
+    ///     p: Active palette.
+    ///     tokens: Active theme tokens.
+    ///     cx: Optional application context used by fitted submenus.
+    ///
+    /// Returns:
+    ///     The rendered row element.
     fn render_item(
         menu_id: &SharedString,
         mono: bool,
         ix: usize,
         item: MoonMenuItem,
         metrics: MenuMetrics,
-        menu_width: f32,
+        menu_width_policy: MoonMenuWidth,
         p: MoonPalette,
         tokens: MoonThemeTokens,
+        cx: Option<&App>,
     ) -> AnyElement {
         let row_id = SharedString::from(format!("{}:item:{}", menu_id, ix));
 
@@ -377,7 +911,11 @@ impl MoonPopupMenu {
                 let alpha = if disabled { 0.45 } else { 1.0 };
 
                 let mut row = div()
-                    .id(ElementId::from(row_id))
+                    .id(ElementId::from(row_id.clone()))
+                    .debug_selector({
+                        let row_id = row_id.clone();
+                        move || row_id.to_string()
+                    })
                     .relative()
                     .h(px(metrics.row_height))
                     .rounded(px(metrics.radius))
@@ -393,7 +931,7 @@ impl MoonPopupMenu {
                     })
                     .child(
                         div()
-                            .w(px(12.0))
+                            .w(px(menu_check_width(&tokens)))
                             .h(px(tokens.line_height(metrics.line_height)))
                             .flex()
                             .items_center()
@@ -462,13 +1000,14 @@ impl MoonPopupMenu {
                     row = row.child(
                         div()
                             .absolute()
-                            .left(px(menu_width - 2.0))
-                            .top(px(-4.0))
+                            .left_full()
+                            .ml(px(tokens.ui(SUBMENU_OFFSET_X)))
+                            .top(px(-tokens.ui(MENU_PADDING)))
                             .child(
                                 MoonPopupMenu::new(format!("{menu_id}:submenu:{ix}"))
                                     .items(submenu)
-                                    .width(menu_width)
-                                    .render_with_metrics(p, metrics, tokens.clone()),
+                                    .width_policy(menu_width_policy)
+                                    .render_with_metrics(p, metrics, tokens.clone(), cx),
                             ),
                     );
                 }
@@ -478,6 +1017,10 @@ impl MoonPopupMenu {
         }
     }
 
+    /// Return unscaled row metrics for the configured menu size.
+    ///
+    /// Returns:
+    ///     Design-reference row metrics.
     fn metrics(&self) -> MenuMetrics {
         match self.size {
             MoonMenuSize::Compact => MenuMetrics {
@@ -516,9 +1059,16 @@ impl MoonPopupMenu {
 }
 
 impl RenderOnce for MoonPopupMenu {
+    /// Render the menu with active theme tokens and measured fitted widths.
+    ///
+    /// Args:
+    ///     cx: Application context used for active-theme resolution and text measurement.
+    ///
+    /// Returns:
+    ///     The rendered menu.
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
-        self.render_with_theme(MoonPalette::active(cx), tokens)
+        self.render_with_theme(MoonPalette::active(cx), tokens, Some(cx))
     }
 }
 
@@ -572,6 +1122,7 @@ struct MoonDropdownState {
 }
 
 #[derive(IntoElement)]
+/// Moon-styled dropdown with component-owned trigger caret and width policies.
 pub struct MoonDropdown {
     id: SharedString,
     bounds: Option<MoonRect>,
@@ -580,22 +1131,30 @@ pub struct MoonDropdown {
     items: Vec<MoonMenuItem>,
     trigger_variant: MoonButtonVariant,
     trigger_size: MoonButtonSize,
-    trigger_width: Option<f32>,
+    trigger_width: MoonDropdownTriggerWidth,
+    trigger_caret: bool,
     selected: bool,
     disabled: bool,
     default_open: bool,
     controlled_open: Option<bool>,
-    menu_width: f32,
+    menu_width: MoonMenuWidth,
     menu_offset_x: f32,
     menu_offset_y: f32,
     menu_size: MoonMenuSize,
-    menu_max_height: Option<f32>,
+    menu_max_height: Option<MoonMenuMaxHeight>,
     close_on_select: bool,
     on_select: Option<MoonSelectHandler>,
     on_open_change: Option<std::rc::Rc<dyn Fn(bool, &mut Window, &mut App)>>,
 }
 
 impl MoonDropdown {
+    /// Create a dropdown with an intrinsic trigger and legacy rendered menu width.
+    ///
+    /// Args:
+    ///     id: Stable element identity shared by the trigger and popup.
+    ///
+    /// Returns:
+    ///     A default dropdown builder.
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
@@ -605,12 +1164,13 @@ impl MoonDropdown {
             items: Vec::new(),
             trigger_variant: MoonButtonVariant::Neutral,
             trigger_size: MoonButtonSize::Toolbar,
-            trigger_width: None,
+            trigger_width: MoonDropdownTriggerWidth::Intrinsic,
+            trigger_caret: false,
             selected: false,
             disabled: false,
             default_open: false,
             controlled_open: None,
-            menu_width: 160.0,
+            menu_width: MoonMenuWidth::Rendered(160.0),
             menu_offset_x: 0.0,
             menu_offset_y: 4.0,
             menu_size: MoonMenuSize::Normal,
@@ -656,8 +1216,58 @@ impl MoonDropdown {
         self
     }
 
+    /// Set a legacy rendered trigger width.
+    ///
+    /// Args:
+    ///     width: Trigger width in rendered pixels.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
     pub fn trigger_width(mut self, width: f32) -> Self {
-        self.trigger_width = Some(width);
+        self.trigger_width = MoonDropdownTriggerWidth::Rendered(width);
+        self
+    }
+
+    /// Set a fixed design-reference trigger width scaled with the trigger's text metrics.
+    ///
+    /// Plain labels are truncated inside the resolved visual padding; segmented icon triggers
+    /// receive only the scaled width.
+    ///
+    /// Args:
+    ///     width: Trigger width at the configured font reference size.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn trigger_width_scaled(mut self, width: f32) -> Self {
+        self.trigger_width = MoonDropdownTriggerWidth::Scaled(width);
+        self
+    }
+
+    /// Fit a plain-label trigger between font-scaled design-reference bounds.
+    ///
+    /// Args:
+    ///     min_width: Minimum trigger width at the configured font reference size.
+    ///     max_width: Maximum trigger width at the configured font reference size.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn fit_trigger_width(mut self, min_width: f32, max_width: f32) -> Self {
+        self.trigger_width = MoonDropdownTriggerWidth::Fit {
+            min: min_width,
+            max: max_width,
+        };
+        self
+    }
+
+    /// Show or hide the component-owned dropdown caret on a plain-label trigger.
+    ///
+    /// Args:
+    ///     visible: Whether the caret is appended and reserved during fitting.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn trigger_caret(mut self, visible: bool) -> Self {
+        self.trigger_caret = visible;
         self
     }
 
@@ -681,8 +1291,43 @@ impl MoonDropdown {
         self
     }
 
+    /// Set a legacy rendered menu width.
+    ///
+    /// Args:
+    ///     width: Outer menu width in rendered pixels.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
     pub fn menu_width(mut self, width: f32) -> Self {
-        self.menu_width = width;
+        self.menu_width = MoonMenuWidth::Rendered(width);
+        self
+    }
+
+    /// Set a fixed design-reference menu width scaled with the selected menu size.
+    ///
+    /// Args:
+    ///     width: Outer width at the configured font reference size.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn menu_width_scaled(mut self, width: f32) -> Self {
+        self.menu_width = MoonMenuWidth::Scaled(width);
+        self
+    }
+
+    /// Fit each menu level to its own items between font-scaled design-reference bounds.
+    ///
+    /// Args:
+    ///     min_width: Minimum outer width at the configured font reference size.
+    ///     max_width: Maximum outer width at the configured font reference size.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn fit_menu_width(mut self, min_width: f32, max_width: f32) -> Self {
+        self.menu_width = MoonMenuWidth::Fit {
+            min: min_width,
+            max: max_width,
+        };
         self
     }
 
@@ -697,8 +1342,27 @@ impl MoonDropdown {
         self
     }
 
+    /// Set a legacy maximum menu height in rendered pixels.
+    ///
+    /// Args:
+    ///     max_height: Maximum rendered menu height.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
     pub fn menu_max_height(mut self, max_height: f32) -> Self {
-        self.menu_max_height = Some(max_height);
+        self.menu_max_height = Some(MoonMenuMaxHeight::Rendered(max_height));
+        self
+    }
+
+    /// Set a UI-scaled design-reference maximum menu height.
+    ///
+    /// Args:
+    ///     max_height: Maximum height at the configured UI reference scale.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn menu_max_height_ui(mut self, max_height: f32) -> Self {
+        self.menu_max_height = Some(MoonMenuMaxHeight::Ui(max_height));
         self
     }
 
@@ -723,22 +1387,105 @@ impl MoonDropdown {
         self
     }
 
-    fn render_trigger(&self) -> impl IntoElement {
+    /// Fit an external button label with the same caret, padding, and text metrics as a dropdown.
+    ///
+    /// This supports custom popover triggers that must align with a neighboring MoonDropdown
+    /// without reproducing its private geometry. The external [`MoonButton`] must use
+    /// `mono(true)` to match this measurement contract.
+    ///
+    /// Args:
+    ///     cx: Application context used for active-theme text measurement.
+    ///     label: Complete external trigger label without a caret.
+    ///     size: MoonButton size used by the external trigger.
+    ///     min_width: Minimum width at the configured font reference size.
+    ///     max_width: Maximum width at the configured font reference size.
+    ///
+    /// Returns:
+    ///     The fitted label with a component-owned caret and its rendered trigger width.
+    pub fn fitted_trigger_label(
+        cx: &App,
+        label: &str,
+        size: MoonButtonSize,
+        min_width: f32,
+        max_width: f32,
+    ) -> (SharedString, f32) {
+        let tokens = MoonTheme::active_tokens(cx);
+        let (font_size, _, _) = button_text_metrics(size);
+        let (label, width) = fit_dropdown_trigger_label(
+            label,
+            DROPDOWN_CARET,
+            MoonDropdownTriggerWidth::Fit {
+                min: min_width,
+                max: max_width,
+            },
+            &tokens,
+            font_size,
+            |text| measure_text_width(cx, &tokens, text, font_size, 400.0, DROPDOWN_TRIGGER_MONO),
+        );
+        (
+            label,
+            width.expect("fitted trigger width always resolves to a rendered value"),
+        )
+    }
+
+    /// Render the trigger after resolving its label and scaled width.
+    ///
+    /// Args:
+    ///     cx: Application context used for active-theme text measurement.
+    ///
+    /// Returns:
+    ///     The rendered MoonButton trigger.
+    fn render_trigger(&self, cx: &App) -> impl IntoElement {
         let trigger_id = SharedString::from(format!("{}:trigger", self.id));
         let mut trigger = MoonButton::new(trigger_id)
             .variant(self.trigger_variant)
             .size(self.trigger_size)
             .selected(self.selected)
             .disabled(self.disabled);
+        if self.segments.is_empty() {
+            trigger = trigger.mono(DROPDOWN_TRIGGER_MONO);
+        }
+
+        let (font_size, _, _) = button_text_metrics(self.trigger_size);
+        let tokens = MoonTheme::active_tokens(cx);
+        let suffix = if self.trigger_caret && self.segments.is_empty() {
+            DROPDOWN_CARET
+        } else {
+            ""
+        };
+        let (label, resolved_width) = if self.segments.is_empty() {
+            fit_dropdown_trigger_label(
+                self.label.as_ref(),
+                suffix,
+                self.trigger_width,
+                &tokens,
+                font_size,
+                |text| {
+                    measure_text_width(cx, &tokens, text, font_size, 400.0, DROPDOWN_TRIGGER_MONO)
+                },
+            )
+        } else {
+            let width = match self.trigger_width {
+                MoonDropdownTriggerWidth::Intrinsic => None,
+                MoonDropdownTriggerWidth::Rendered(width) => Some(width),
+                MoonDropdownTriggerWidth::Scaled(width) => {
+                    Some(width * tokens.font(font_size) / font_size.max(1.0))
+                }
+                MoonDropdownTriggerWidth::Fit { min, .. } => {
+                    Some(min * tokens.font(font_size) / font_size.max(1.0))
+                }
+            };
+            (self.label.clone(), width)
+        };
 
         if let Some(bounds) = self.bounds {
             trigger = trigger.bounds(MoonRect::new(0.0, 0.0, bounds.w, bounds.h));
-        } else if let Some(width) = self.trigger_width {
+        } else if let Some(width) = resolved_width {
             trigger = trigger.width(width);
         }
 
         if self.segments.is_empty() {
-            trigger = trigger.label(self.label.clone());
+            trigger = trigger.label(label);
         } else {
             for segment in self.segments.clone() {
                 trigger = trigger.segment(segment);
@@ -751,6 +1498,13 @@ impl MoonDropdown {
 
 impl RenderOnce for MoonDropdown {
     /// Renders the trigger and, while open, its deferred anchored menu.
+    ///
+    /// Args:
+    ///     window: Window that owns keyed dropdown state and the deferred menu.
+    ///     cx: Application context used for theme resolution and text measurement.
+    ///
+    /// Returns:
+    ///     The rendered dropdown.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let state_id = ElementId::from(SharedString::from(format!("{}:moon-state", self.id)));
         let state = window.use_keyed_state(state_id, cx, |_, _| MoonDropdownState {
@@ -775,7 +1529,7 @@ impl RenderOnce for MoonDropdown {
         // zero, the `size_full` canvas collapses with it, and the capture lands on the trigger's
         // TOP edge. Only there does the supplied height have to be added back.
         let trigger_height = self.bounds.map_or(0.0, |bounds| bounds.h);
-        let trigger = self.render_trigger().into_any_element();
+        let trigger = self.render_trigger(cx).into_any_element();
 
         let mut root = div()
             .id(ElementId::from(SharedString::from(format!(
@@ -828,16 +1582,16 @@ impl RenderOnce for MoonDropdown {
                 let mut menu = MoonPopupMenu::new(menu_id.clone())
                     .items(popup_items.clone())
                     .size(menu_size)
-                    .width(menu_width)
+                    .width_policy(menu_width)
                     .mono(true);
                 if let Some(max_height) = menu_max_height {
-                    menu = menu.max_height(max_height);
+                    menu = menu.max_height_policy(max_height);
                 }
 
                 div()
                     .mt(px(trigger_height + tokens.ui(menu_offset_y)))
                     .ml(px(tokens.ui(menu_offset_x)))
-                    .child(menu.render_with_theme(p, tokens))
+                    .child(menu.render_with_theme(p, tokens, Some(cx)))
             });
 
         {
@@ -863,9 +1617,14 @@ impl RenderOnce for MoonDropdown {
 #[cfg(test)]
 mod tests {
     use super::{
-        MoonButtonSize, MoonDropdown, MoonDropdownSelectPlan, MoonMenuItem, MoonMenuItemKind,
-        MoonRect, moon_dropdown_select_plan, moon_menu_item_accepts_click,
+        DROPDOWN_CARET, DROPDOWN_TRIGGER_PAD_X, MENU_PADDING, MenuMetrics, MoonButtonSize,
+        MoonDropdown, MoonDropdownSelectPlan, MoonDropdownTriggerWidth, MoonMenuItem,
+        MoonMenuItemKind, MoonMenuMaxHeight, MoonMenuSize, MoonMenuWidth, MoonPalette,
+        MoonPopupMenu, MoonRect, MoonThemeTokens, SUBMENU_OFFSET_X, fit_dropdown_trigger_label,
+        fit_menu_item_labels, moon_dropdown_select_plan, moon_menu_item_accepts_click,
+        natural_menu_width, resolve_menu_width,
     };
+    use crate::moon::{MoonScale, MoonTheme};
     use std::{cell::RefCell, rc::Rc};
 
     const DROPDOWN_ID: &str = "geometry-probe";
@@ -1046,6 +1805,293 @@ mod tests {
                 close_menu: false,
                 update_internal_open: false,
             }
+        );
+    }
+
+    /// `dropdown.rs:fit_dropdown_trigger_label` must preserve the caret and clamp against a
+    /// font-scaled ceiling independently of UI padding. Appending the caret downstream or scaling
+    /// the width with UI geometry makes long translated labels overflow at non-default font scale.
+    #[test]
+    fn fitted_trigger_preserves_caret_at_independent_scale_extremes() {
+        for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+            for (ui, font, font_delta) in [(0.5, 1.75, 0.0), (2.5, 0.75, 4.0)] {
+                let mut tokens = MoonThemeTokens {
+                    palette,
+                    ..MoonThemeTokens::default()
+                };
+                tokens.scale = MoonScale {
+                    ui,
+                    font,
+                    font_delta,
+                };
+                let font_size = 10.5;
+                let text_scale = tokens.font(font_size) / font_size;
+                let measure = |text: &str| text.chars().count() as f32 * 8.0 * text_scale;
+                let (label, width) = fit_dropdown_trigger_label(
+                    "a deliberately long translated selector label",
+                    DROPDOWN_CARET,
+                    MoonDropdownTriggerWidth::Fit {
+                        min: 80.0,
+                        max: 120.0,
+                    },
+                    &tokens,
+                    font_size,
+                    measure,
+                );
+                let width = width.expect("fitted trigger must resolve a rendered width");
+
+                assert_eq!(width, 120.0 * text_scale);
+                assert!(label.ends_with(DROPDOWN_CARET));
+                assert!(label.contains('\u{2026}'));
+                assert!(
+                    measure(label.as_ref()) + tokens.ui(DROPDOWN_TRIGGER_PAD_X) <= width,
+                    "fitted trigger overflowed at ui={ui}, font={font}, delta={font_delta}"
+                );
+            }
+        }
+    }
+
+    /// `dropdown.rs:MoonDropdownTriggerWidth::Scaled` must use font scaling while retaining enough
+    /// UI-scaled padding for the ellipsis and component-owned caret. Replacing either scale with
+    /// the other clips fixed Terminal selectors at independent scale extremes.
+    #[test]
+    fn scaled_trigger_uses_font_width_without_clipping_component_chrome() {
+        for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+            for (ui, font, font_delta) in [(0.5, 1.75, 0.0), (2.5, 0.75, 4.0), (2.5, 0.25, 0.0)] {
+                let mut tokens = MoonThemeTokens {
+                    palette,
+                    ..MoonThemeTokens::default()
+                };
+                tokens.scale = MoonScale {
+                    ui,
+                    font,
+                    font_delta,
+                };
+                let font_size = 10.5;
+                let text_scale = tokens.font(font_size) / font_size;
+                let measure = |text: &str| text.chars().count() as f32 * 8.0 * text_scale;
+                let (label, width) = fit_dropdown_trigger_label(
+                    "a deliberately long fixed selector label",
+                    DROPDOWN_CARET,
+                    MoonDropdownTriggerWidth::Scaled(120.0),
+                    &tokens,
+                    font_size,
+                    measure,
+                );
+                let width = width.expect("scaled trigger must resolve a rendered width");
+                let minimum = tokens.ui(DROPDOWN_TRIGGER_PAD_X)
+                    + measure(&format!("\u{2026}{DROPDOWN_CARET}"));
+
+                assert_eq!(width, (120.0 * text_scale).max(minimum));
+                assert!(label.ends_with(DROPDOWN_CARET));
+                assert!(
+                    measure(label.as_ref()) + tokens.ui(DROPDOWN_TRIGGER_PAD_X) <= width,
+                    "scaled trigger overflowed at ui={ui}, font={font}, delta={font_delta}"
+                );
+            }
+        }
+    }
+
+    /// `dropdown.rs:MoonMenuWidth::Scaled` must follow font width without shrinking below
+    /// UI-scaled row chrome. Using only either scale makes a fixed Terminal menu overflow in the
+    /// high-UI/low-font cross-product.
+    #[gpui::test]
+    fn scaled_menu_width_retains_fitted_rows_at_independent_scale_extremes(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(crate::init);
+        for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+            for (ui, font, font_delta) in [(0.5, 1.75, 0.0), (2.5, 0.75, 4.0), (2.5, 0.25, 0.0)] {
+                cx.update(|cx| {
+                    let mut tokens = MoonThemeTokens {
+                        palette,
+                        ..MoonThemeTokens::default()
+                    };
+                    tokens.scale = MoonScale {
+                        ui,
+                        font,
+                        font_delta,
+                    };
+                    let metrics = MoonPopupMenu::new("scaled-menu-test")
+                        .size(MoonMenuSize::Compact)
+                        .metrics()
+                        .scaled(&tokens);
+                    let mut items = vec![
+                        MoonMenuItem::new("a deliberately long menu label for truncation")
+                            .right_label("12:34:56"),
+                    ];
+                    let text_scale = tokens.font(metrics.font_size) / metrics.font_size;
+                    let requested = 160.0 * text_scale;
+                    let (width, truncate) = resolve_menu_width(
+                        MoonMenuWidth::Scaled(160.0),
+                        &items,
+                        metrics,
+                        &tokens,
+                        cx,
+                        true,
+                    );
+
+                    assert!(truncate);
+                    assert!(width >= requested);
+                    fit_menu_item_labels(&mut items, width, metrics, &tokens, cx, true);
+                    let fitted_natural =
+                        natural_menu_width(&items, metrics, &tokens, |text, size, weight| {
+                            super::measure_text_width(cx, &tokens, text, size, weight, true)
+                        });
+                    assert!(
+                        fitted_natural <= width,
+                        "scaled menu row overflowed at ui={ui}, font={font}, delta={font_delta}"
+                    );
+                });
+            }
+        }
+    }
+
+    /// `dropdown.rs:MoonMenuMaxHeight::Ui` must scale with UI geometry while the legacy rendered
+    /// policy remains raw. Routing either through font scaling leaves menu scroll bounds detached
+    /// from their row heights.
+    #[test]
+    fn menu_max_height_distinguishes_ui_scaled_and_rendered_values() {
+        let mut tokens = MoonThemeTokens::default();
+        tokens.scale = MoonScale {
+            ui: 2.5,
+            font: 0.25,
+            font_delta: 0.0,
+        };
+
+        assert_eq!(
+            MoonMenuMaxHeight::Ui(300.0).resolve(&tokens),
+            tokens.ui(300.0)
+        );
+        assert_eq!(MoonMenuMaxHeight::Rendered(300.0).resolve(&tokens), 300.0);
+    }
+
+    /// `dropdown.rs:MoonPopupMenu::render_with_palette` must fail loudly for widths that require
+    /// an `App` text system. Falling back to the fit minimum or default scale silently violates the
+    /// public builder contract.
+    #[test]
+    fn palette_only_menu_render_rejects_measured_width_policies() {
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _ = MoonPopupMenu::new("scaled-palette-only")
+                    .width_scaled(160.0)
+                    .render_with_palette(MoonPalette::TERMINAL);
+            })
+            .is_err()
+        );
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _ = MoonPopupMenu::new("fitted-palette-only")
+                    .fit_width(80.0, 240.0)
+                    .render_with_palette(MoonPalette::TERMINAL);
+            })
+            .is_err()
+        );
+    }
+
+    /// `dropdown.rs:natural_menu_width` must reserve both the right-label glyphs and the additional
+    /// flex gap they introduce. Omitting either clips the clock's time column at its fitted width.
+    #[test]
+    fn fitted_menu_accounts_for_right_label_and_its_gap() {
+        let tokens = MoonThemeTokens::default();
+        let metrics = MenuMetrics {
+            row_height: 20.0,
+            font_size: 9.5,
+            line_height: 12.0,
+            radius: 3.0,
+            pad_x: 6.0,
+            gap: 5.0,
+        }
+        .scaled(&tokens);
+        let plain = [MoonMenuItem::new("UTC+12")];
+        let with_right = [MoonMenuItem::new("UTC+12").right_label("12:34:56")];
+        let measure = |text: &str, _size: f32, _weight: f32| text.chars().count() as f32;
+
+        let plain_width = natural_menu_width(&plain, metrics, &tokens, measure);
+        let right_width = natural_menu_width(&with_right, metrics, &tokens, measure);
+
+        assert_eq!(
+            right_width - plain_width,
+            "12:34:56".chars().count() as f32 + metrics.gap
+        );
+    }
+
+    /// Root view containing a fitted parent menu with an immediately visible selected submenu.
+    struct FittedSubmenuHarness;
+
+    impl gpui::Render for FittedSubmenuHarness {
+        /// Render parent and submenu from deliberately different content widths.
+        ///
+        /// Args:
+        ///     _window: Test window.
+        ///     _cx: Test view context.
+        ///
+        /// Returns:
+        ///     A fitted parent menu with its selected submenu visible.
+        fn render(
+            &mut self,
+            _window: &mut gpui::Window,
+            _cx: &mut gpui::Context<Self>,
+        ) -> impl gpui::IntoElement {
+            MoonPopupMenu::new("fit-parent")
+                .size(MoonMenuSize::Compact)
+                .fit_width(80.0, 400.0)
+                .item(
+                    MoonMenuItem::new("More")
+                        .selected(true)
+                        .submenu([MoonMenuItem::new(
+                            "a submenu label that is much wider than its parent",
+                        )]),
+                )
+        }
+    }
+
+    /// `dropdown.rs:MoonPopupMenu::render_item` must pass the fit policy, not the resolved parent
+    /// width, into a submenu. Restoring `.width(menu_width)` makes this named child clip to the
+    /// narrow parent even though its own label fits below the shared maximum.
+    #[gpui::test]
+    fn fitted_submenu_resolves_width_from_its_own_items(cx: &mut gpui::TestAppContext) {
+        cx.update(crate::init);
+        let scale = MoonScale {
+            ui: 2.5,
+            font: 0.75,
+            font_delta: 4.0,
+        };
+        cx.update(|cx| {
+            MoonTheme::global_mut(cx).scale = scale;
+        });
+        let window = cx.add_window(|_, _| FittedSubmenuHarness);
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        let parent = cx
+            .debug_bounds("fit-parent")
+            .expect("fitted parent menu must render");
+        let submenu = cx
+            .debug_bounds("fit-parent:submenu:0")
+            .expect("selected submenu must render");
+        let row = cx
+            .debug_bounds("fit-parent:item:0")
+            .expect("selected submenu row must render");
+        let mut tokens = MoonThemeTokens::default();
+        tokens.scale = scale;
+
+        assert!(
+            submenu.size.width > parent.size.width,
+            "submenu width {:?} must follow its own longer label, not parent width {:?}",
+            submenu.size.width,
+            parent.size.width
+        );
+        assert_eq!(
+            submenu.origin.x - row.right(),
+            gpui::px(tokens.ui(SUBMENU_OFFSET_X)),
+            "submenu must position from the rendered row edge"
+        );
+        assert_eq!(
+            submenu.origin.y - row.origin.y,
+            gpui::px(-tokens.ui(MENU_PADDING)),
+            "submenu top overlap must follow UI scale"
         );
     }
 }
