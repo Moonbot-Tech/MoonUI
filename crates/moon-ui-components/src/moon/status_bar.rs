@@ -1,3 +1,5 @@
+//! Dense themed status-bar primitives with text, inline dots, group dividers, and edge regions.
+
 use crate::status_bar::StatusBar as CoreStatusBar;
 use gpui::*;
 
@@ -7,10 +9,15 @@ use super::{
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
 
+/// Visual roles available to an item in the compact status row.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum MoonStatusItemKind {
+    /// A monospaced label or value.
     Text,
+    /// A compact dot separating closely related values inside one group.
     Separator,
+    /// A vertical rule separating distinct semantic groups.
+    GroupSeparator,
 }
 
 #[derive(Clone, Debug)]
@@ -44,6 +51,22 @@ impl MoonStatusItem {
             color: None,
             tone: None,
             alpha: 0.74,
+            weight: 400.0,
+            gap_after: None,
+        }
+    }
+
+    /// Build a vertical rule between distinct semantic groups.
+    ///
+    /// Returns:
+    ///     A non-shrinking divider item that follows the active palette and UI scale.
+    pub fn group_separator() -> Self {
+        Self {
+            kind: MoonStatusItemKind::GroupSeparator,
+            text: SharedString::from(""),
+            color: None,
+            tone: None,
+            alpha: 1.0,
             weight: 400.0,
             gap_after: None,
         }
@@ -303,6 +326,19 @@ impl MoonStatusBar {
         root.child(status)
     }
 
+    /// Render ordered text and separator items into one edge region.
+    ///
+    /// Args:
+    ///     row: Flex row that receives the rendered items.
+    ///     items: Ordered status content for this region.
+    ///     item_gap: Default trailing gap in unscaled design units.
+    ///     font_size: Monospaced text size in unscaled design units.
+    ///     line_height: Text line height in unscaled design units.
+    ///     p: Active palette for default colors and tones.
+    ///     tokens: Active theme scaling and typography tokens.
+    ///
+    /// Returns:
+    ///     The supplied row with all status items appended.
     fn render_items(
         mut row: Div,
         items: Vec<MoonStatusItem>,
@@ -316,7 +352,10 @@ impl MoonStatusBar {
             let color = item
                 .color
                 .or_else(|| item.tone.map(|tone| tone.color(p)))
-                .unwrap_or(p.text_soft);
+                .unwrap_or(match item.kind {
+                    MoonStatusItemKind::GroupSeparator => p.border_hover,
+                    MoonStatusItemKind::Text | MoonStatusItemKind::Separator => p.text_soft,
+                });
             let gap = tokens.ui(item.gap_after.unwrap_or(item_gap));
             match item.kind {
                 MoonStatusItemKind::Text => {
@@ -341,6 +380,16 @@ impl MoonStatusBar {
                             .w(px(size))
                             .h(px(size))
                             .rounded(px(size * 0.5))
+                            .bg(rgba_from(color, item.alpha))
+                            .mr(px(gap)),
+                    );
+                }
+                MoonStatusItemKind::GroupSeparator => {
+                    row = row.child(
+                        div()
+                            .flex_none()
+                            .w(px(tokens.ui(1.0)))
+                            .h(px(tokens.ui(12.0)))
                             .bg(rgba_from(color, item.alpha))
                             .mr(px(gap)),
                     );

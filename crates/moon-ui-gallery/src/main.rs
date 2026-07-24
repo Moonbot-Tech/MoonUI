@@ -3870,6 +3870,13 @@ impl Gallery {
             )
     }
 
+    /// Render navigation, window-chrome, palette, and status-bar compositions.
+    ///
+    /// Args:
+    ///     cx: Gallery context used to read the active theme and wire interactions.
+    ///
+    /// Returns:
+    ///     The complete Navigation gallery page.
     fn render_navigation(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let view = cx.entity();
@@ -3956,6 +3963,7 @@ impl Gallery {
                                 MoonStatusItem::new("connected").tone(MoonTone::Positive),
                                 MoonStatusItem::separator(),
                                 MoonStatusItem::new("vertical scroll").tone(MoonTone::Info),
+                                MoonStatusItem::group_separator(),
                                 MoonStatusItem::new("overlay scrollbar").tone(MoonTone::Warning),
                             ])
                             .right_items([
