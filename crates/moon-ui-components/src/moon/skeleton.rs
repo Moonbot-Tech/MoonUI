@@ -19,6 +19,13 @@ pub struct MoonSkeleton {
     animated: bool,
 }
 
+/// Rendering decisions derived from the skeleton's builder controls.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct SkeletonRenderPlan {
+    alpha: f32,
+    animated: bool,
+}
+
 impl MoonSkeleton {
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
@@ -67,24 +74,43 @@ impl MoonSkeleton {
         self.animated = animated;
         self
     }
+
+    /// Resolve the effective fill alpha and whether the pulse animation is enabled.
+    ///
+    /// Returns:
+    ///     The rendering decisions consumed by [`RenderOnce::render`].
+    fn render_plan(&self) -> SkeletonRenderPlan {
+        SkeletonRenderPlan {
+            alpha: if self.secondary {
+                self.alpha * 0.5
+            } else {
+                self.alpha
+            },
+            animated: self.animated,
+        }
+    }
 }
 
 impl RenderOnce for MoonSkeleton {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+    /// Render the configured placeholder with its resolved emphasis and animation state.
+    ///
+    /// Args:
+    ///     _window: Window that owns the rendered skeleton.
+    ///     cx: Application context used to resolve active theme tokens.
+    ///
+    /// Returns:
+    ///     The styled skeleton element, optionally wrapped in its pulse animation.
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
-        let alpha = if self.secondary {
-            self.alpha * 0.5
-        } else {
-            self.alpha
-        };
+        let plan = self.render_plan();
         let mut root = div()
             .id(ElementId::from(self.id))
             .relative()
             .h(px(tokens.ui(self.height)))
             .rounded(px(tokens.ui(self.radius)))
             .overflow_hidden()
-            .bg(rgba_from(p.panel_high, alpha))
+            .bg(rgba_from(p.panel_high, plan.alpha))
             .when_some(self.width, |this, width| this.w(px(tokens.ui(width))));
 
         if let Some(bounds) = self.bounds {
@@ -97,7 +123,7 @@ impl RenderOnce for MoonSkeleton {
         }
 
         root.map(|this| {
-            if self.animated {
+            if plan.animated {
                 this.with_animation(
                     "moon-skeleton",
                     Animation::new(Duration::from_secs(2))
@@ -114,13 +140,4 @@ impl RenderOnce for MoonSkeleton {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::MoonSkeleton;
-
-    #[test]
-    fn skeleton_keeps_longbridge_secondary_and_animation_controls() {
-        let static_secondary = MoonSkeleton::new("test").secondary().animated(false);
-        assert!(static_secondary.secondary);
-        assert!(!static_secondary.animated);
-    }
-}
+mod tests;
