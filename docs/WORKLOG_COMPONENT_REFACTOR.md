@@ -792,8 +792,9 @@ paths and covered by Rust tests:
   non-positive steps.
 - `collapsible.click_behavior`: disabled and controlled headers do not mutate
   internal state.
-- `dropdown.select_behavior`: labels/separators/disabled items are not clickable,
-  and select-close behavior respects controlled/uncontrolled open state.
+- `dropdown.select_behavior`: enabled item and action-label rows are clickable,
+  static labels/separators/disabled rows are not, and select-close behavior
+  respects controlled/uncontrolled open state.
 - `rating.click_behavior`: value/max/click selection are clamped and disabled
   clicks are ignored.
 

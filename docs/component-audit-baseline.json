@@ -1127,7 +1127,7 @@
       "status": "Pass",
       "severity": "Guardrail",
       "verifier": "BehavioralTest",
-      "details": "dropdown/menu selection must ignore disabled/non-item rows and close only when configured; covered by Rust test(s): menu_item_clickability_respects_kind_and_disabled_state, dropdown_select_plan_respects_close_and_controlled_state"
+      "details": "dropdown/menu selection must accept enabled item and action-label rows, ignore disabled/static rows, and close only when configured; covered by Rust test(s): menu_item_clickability_respects_kind_and_disabled_state, rendered_action_label_dispatches_while_static_label_stays_inert, dropdown_select_plan_respects_close_and_controlled_state"
     },
     {
       "id": "gallery.manifest_coverage",
