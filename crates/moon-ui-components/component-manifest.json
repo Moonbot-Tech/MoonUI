@@ -69,7 +69,7 @@
       "public_path": "moon_ui::MoonButton",
       "upstream_ref": "Longbridge::button@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": "Reviewed TrackedFork drift: Moon width/mono/style hooks and regression tests live in base button files; Longbridge button behavior remains source-owned",
-      "donor_drift_budget": 2,
+      "donor_drift_budget": 3,
       "contracts": ["button.click", "button.width_api", "button.mono_font", "gallery.visual_coverage"]
     },
     {

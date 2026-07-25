@@ -5,7 +5,7 @@ use crate::{
     StyledExt,
     button::ButtonIcon,
     h_flex,
-    moon::{MoonPalette, MoonTheme, foundation::selected_flat, rgba_from},
+    moon::{MoonPalette, MoonTheme, rgba_from},
     tooltip::{ManagedTooltipExt as _, Tooltip},
 };
 use gpui::{
@@ -564,11 +564,16 @@ impl InteractiveElement for Button {
 }
 
 impl RenderOnce for Button {
+    /// Render the configured button with theme-resolved resting and pointer-interaction states.
+    ///
+    /// The window supplies focus state, the app supplies theme tokens, and the returned element
+    /// owns all mouse, focus, tooltip, and click wiring for this one-shot button.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let style: ButtonVariant = self.variant;
         let clickable = self.clickable();
         let is_disabled = self.disabled;
         let hoverable = self.hoverable();
+        let pointer_feedback = pointer_feedback_enabled(self.disabled, self.loading);
         let metrics = MoonButtonMetrics::for_size(self.size, cx);
         let normal_style = style.normal(self.outline, cx);
         let icon_size = Size::Size(px((metrics.font_size.as_f32() + 1.0).clamp(10.0, 14.0)));
@@ -638,22 +643,38 @@ impl RenderOnce for Button {
                 this.bg(selected_style.bg)
                     .border_color(selected_style.border)
                     .text_color(selected_style.fg)
+                    .when(pointer_feedback, |this| {
+                        this.hover(|this| {
+                            let hover_style = style.selected_hovered(self.outline, cx);
+                            this.bg(hover_style.bg)
+                                .border_color(hover_style.border)
+                                .text_color(hover_style.fg)
+                        })
+                        .active(|this| {
+                            let active_style = style.selected_active(self.outline, cx);
+                            this.bg(active_style.bg)
+                                .border_color(active_style.border)
+                                .text_color(active_style.fg)
+                        })
+                    })
             })
             .when(!self.disabled && !self.selected, |this| {
                 this.border_color(normal_style.border)
                     .bg(normal_style.bg)
                     .when(normal_style.underline, |this| this.text_decoration_1())
-                    .hover(|this| {
-                        let hover_style = style.hovered(self.outline, cx);
-                        this.bg(hover_style.bg)
-                            .border_color(hover_style.border)
-                            .text_color(hover_style.fg)
-                    })
-                    .active(|this| {
-                        let active_style = style.active(self.outline, cx);
-                        this.bg(active_style.bg)
-                            .border_color(active_style.border)
-                            .text_color(active_style.fg)
+                    .when(pointer_feedback, |this| {
+                        this.hover(|this| {
+                            let hover_style = style.hovered(self.outline, cx);
+                            this.bg(hover_style.bg)
+                                .border_color(hover_style.border)
+                                .text_color(hover_style.fg)
+                        })
+                        .active(|this| {
+                            let active_style = style.active(self.outline, cx);
+                            this.bg(active_style.bg)
+                                .border_color(active_style.border)
+                                .text_color(active_style.fg)
+                        })
                     })
             })
             .when(self.disabled, |this| {
@@ -776,16 +797,55 @@ pub(crate) struct MoonButtonStyle {
     pub(crate) shadow: bool,
 }
 
+/// Internal visual states used to resolve one button variant.
 #[derive(Clone, Copy)]
 enum ButtonVisualState {
     Normal,
     Hovered,
     Active,
     Selected,
+    SelectedHovered,
+    SelectedActive,
     Disabled,
 }
 
+impl ButtonVisualState {
+    /// Return whether this state belongs to a selected button.
+    fn is_selected(self) -> bool {
+        matches!(
+            self,
+            Self::Selected | Self::SelectedHovered | Self::SelectedActive
+        )
+    }
+
+    /// Return whether this state represents pointer hover.
+    fn is_hovered(self) -> bool {
+        matches!(self, Self::Hovered | Self::SelectedHovered)
+    }
+
+    /// Return whether this state represents a pressed pointer.
+    fn is_active(self) -> bool {
+        matches!(self, Self::Active | Self::SelectedActive)
+    }
+}
+
+/// Return whether a button may show pointer interaction feedback.
+///
+/// Disabled and loading controls deliberately remain visually inert even when a wrapper owns the
+/// click handler, so eligibility cannot depend on `Button::on_click` alone.
+fn pointer_feedback_enabled(disabled: bool, loading: bool) -> bool {
+    !disabled && !loading
+}
+
 impl ButtonVariant {
+    /// Return whether the variant uses the shared neutral interaction surface.
+    fn uses_neutral_interaction_surface(&self) -> bool {
+        matches!(
+            self,
+            Self::Default | Self::Panel | Self::Secondary | Self::Soft | Self::Ghost | Self::Bare
+        )
+    }
+
     fn underline(&self, _: &App) -> bool {
         matches!(self, Self::Link)
     }
@@ -1017,12 +1077,98 @@ impl ButtonVariant {
         }
     }
 
+    /// Resolve a built-in Moon variant against an explicit palette.
+    ///
+    /// Keeping this palette-driven makes the dark and light interaction states independently
+    /// testable instead of relying on whichever global theme happens to be active.
+    fn resolve_moon(
+        &self,
+        p: MoonPalette,
+        outline: bool,
+        state: ButtonVisualState,
+    ) -> ButtonVariantStyle {
+        if matches!(state, ButtonVisualState::Disabled) {
+            return ButtonVariantStyle {
+                bg: rgba_from(p.panel, 0.32),
+                border: rgba_from(p.border, 0.42),
+                fg: rgba_from(p.text_muted, 0.54),
+                underline: matches!(self, Self::Link),
+                shadow: false,
+            };
+        }
+
+        let selected = state.is_selected();
+
+        if matches!(self, Self::Default) && selected {
+            let bg_alpha = if state.is_hovered() {
+                p.accent_tint_a + 0.06
+            } else if state.is_active() {
+                p.accent_tint_a + 0.03
+            } else {
+                p.accent_tint_a
+            };
+            return ButtonVariantStyle {
+                bg: rgba_from(p.accent, bg_alpha.min(1.0)),
+                border: rgba_from(p.accent, 1.0),
+                fg: rgba_from(p.selected_fg(), 1.0),
+                underline: false,
+                shadow: false,
+            };
+        }
+
+        let style = self
+            .moon_style(p, outline, selected)
+            .unwrap_or_else(|| unreachable!("custom variants are resolved above"));
+
+        let (mut bg, mut border, mut bg_alpha, mut border_alpha) = match state {
+            ButtonVisualState::Normal | ButtonVisualState::Selected => {
+                (style.bg, style.border, style.bg_alpha, style.border_alpha)
+            }
+            ButtonVisualState::Hovered | ButtonVisualState::SelectedHovered => (
+                style.bg,
+                style.border,
+                style.hover_bg_alpha,
+                style.hover_border_alpha,
+            ),
+            ButtonVisualState::Active | ButtonVisualState::SelectedActive => (
+                style.bg,
+                style.border,
+                style.active_bg_alpha,
+                style.active_border_alpha,
+            ),
+            ButtonVisualState::Disabled => unreachable!(),
+        };
+
+        if self.uses_neutral_interaction_surface() && (state.is_hovered() || state.is_active()) {
+            bg = p.overlay;
+            border = p.border_hover;
+            if state.is_hovered() {
+                bg_alpha = if p.is_light() { 0.07 } else { 0.10 };
+            } else {
+                bg_alpha = if p.is_light() { 0.11 } else { 0.06 };
+            }
+            border_alpha = 1.0;
+        }
+
+        ButtonVariantStyle {
+            bg: rgba_from(bg, bg_alpha),
+            border: rgba_from(border, border_alpha),
+            fg: rgba_from(style.fg, style.fg_alpha),
+            underline: matches!(self, Self::Link),
+            shadow: style.shadow,
+        }
+    }
+
+    /// Resolve custom colors or delegate a built-in variant to the active Moon palette.
     fn resolve(&self, outline: bool, state: ButtonVisualState, cx: &mut App) -> ButtonVariantStyle {
         if let Self::Custom(colors) = self {
             let bg = match state {
                 ButtonVisualState::Normal => colors.color,
                 ButtonVisualState::Hovered => colors.hover,
-                ButtonVisualState::Active | ButtonVisualState::Selected => colors.active,
+                ButtonVisualState::Active
+                | ButtonVisualState::Selected
+                | ButtonVisualState::SelectedHovered
+                | ButtonVisualState::SelectedActive => colors.active,
                 ButtonVisualState::Disabled => colors.color.opacity(0.15),
             };
             let fg = if matches!(state, ButtonVisualState::Disabled) {
@@ -1032,7 +1178,13 @@ impl ButtonVariant {
             };
             return ButtonVariantStyle {
                 bg,
-                border: if outline {
+                border: if matches!(state, ButtonVisualState::SelectedHovered) {
+                    if outline {
+                        colors.hover.opacity(0.4)
+                    } else {
+                        colors.hover
+                    }
+                } else if outline {
                     colors.color.opacity(0.4)
                 } else {
                     colors.color
@@ -1043,230 +1195,44 @@ impl ButtonVariant {
             };
         }
 
-        if matches!(state, ButtonVisualState::Disabled) {
-            let p = MoonPalette::active(cx);
-            return ButtonVariantStyle {
-                bg: rgba_from(p.panel, 0.32),
-                border: rgba_from(p.border, 0.42),
-                fg: rgba_from(p.text_muted, 0.54),
-                underline: self.underline(cx),
-                shadow: false,
-            };
-        }
-
-        let selected = matches!(state, ButtonVisualState::Selected);
-        let p = MoonPalette::active(cx);
-
-        if matches!(self, Self::Default)
-            && matches!(
-                state,
-                ButtonVisualState::Active | ButtonVisualState::Selected
-            )
-        {
-            return ButtonVariantStyle {
-                bg: selected_flat(p),
-                border: rgba_from(p.accent, 1.0),
-                fg: rgba_from(p.selected_fg(), 1.0),
-                underline: self.underline(cx),
-                shadow: false,
-            };
-        }
-
-        let style = self
-            .moon_style(p, outline, selected)
-            .unwrap_or_else(|| unreachable!("custom variants are resolved above"));
-
-        let (bg_alpha, border_alpha) = match state {
-            ButtonVisualState::Normal | ButtonVisualState::Selected => {
-                (style.bg_alpha, style.border_alpha)
-            }
-            ButtonVisualState::Hovered => (style.hover_bg_alpha, style.hover_border_alpha),
-            ButtonVisualState::Active => (style.active_bg_alpha, style.active_border_alpha),
-            ButtonVisualState::Disabled => unreachable!(),
-        };
-
-        ButtonVariantStyle {
-            bg: rgba_from(style.bg, bg_alpha),
-            border: rgba_from(style.border, border_alpha),
-            fg: rgba_from(style.fg, style.fg_alpha),
-            underline: self.underline(cx),
-            shadow: style.shadow,
-        }
+        self.resolve_moon(MoonPalette::active(cx), outline, state)
     }
 
+    /// Resolve the resting, unselected style.
     fn normal(&self, outline: bool, cx: &mut App) -> ButtonVariantStyle {
         self.resolve(outline, ButtonVisualState::Normal, cx)
     }
 
+    /// Resolve the hovered, unselected style.
     fn hovered(&self, outline: bool, cx: &mut App) -> ButtonVariantStyle {
         self.resolve(outline, ButtonVisualState::Hovered, cx)
     }
 
+    /// Resolve the pressed, unselected style.
     fn active(&self, outline: bool, cx: &mut App) -> ButtonVariantStyle {
         self.resolve(outline, ButtonVisualState::Active, cx)
     }
 
+    /// Resolve the resting, selected style.
     fn selected(&self, outline: bool, cx: &mut App) -> ButtonVariantStyle {
         self.resolve(outline, ButtonVisualState::Selected, cx)
     }
 
+    /// Resolve the hovered, selected style without losing selection feedback.
+    fn selected_hovered(&self, outline: bool, cx: &mut App) -> ButtonVariantStyle {
+        self.resolve(outline, ButtonVisualState::SelectedHovered, cx)
+    }
+
+    /// Resolve the pressed, selected style without losing selection feedback.
+    fn selected_active(&self, outline: bool, cx: &mut App) -> ButtonVariantStyle {
+        self.resolve(outline, ButtonVisualState::SelectedActive, cx)
+    }
+
+    /// Resolve the disabled style.
     fn disabled(&self, outline: bool, cx: &mut App) -> ButtonVariantStyle {
         self.resolve(outline, ButtonVisualState::Disabled, cx)
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[gpui::test]
-    fn test_button_builder(_cx: &mut gpui::TestAppContext) {
-        let button = Button::new("complex-button")
-            .label("Save Changes")
-            .primary()
-            .outline()
-            .large()
-            .tooltip("Click to save")
-            .compact()
-            .loading(false)
-            .disabled(false)
-            .selected(false)
-            .tab_index(1)
-            .tab_stop(true)
-            .dropdown_caret(false)
-            .rounded(ButtonRounded::Medium)
-            .on_click(|_, _, _| {});
-
-        assert_eq!(button.label, Some("Save Changes".into()));
-        assert_eq!(button.variant, ButtonVariant::Primary);
-        assert!(button.outline);
-        assert_eq!(button.size, Size::Large);
-        assert!(button.tooltip.is_some());
-        assert!(button.compact);
-        assert!(!button.loading);
-        assert!(!button.disabled);
-        assert!(!button.selected);
-        assert_eq!(button.tab_index, 1);
-        assert!(button.tab_stop);
-        assert!(!button.dropdown_caret);
-        assert!(matches!(button.rounded, ButtonRounded::Medium));
-    }
-
-    #[gpui::test]
-    fn test_button_clickable_logic(_cx: &mut gpui::TestAppContext) {
-        // Button with click handler should be clickable
-        let clickable = Button::new("test").on_click(|_, _, _| {});
-        assert!(clickable.clickable());
-
-        // Disabled button should not be clickable
-        let disabled = Button::new("test").disabled(true).on_click(|_, _, _| {});
-        assert!(!disabled.clickable());
-
-        // Loading button should not be clickable
-        let loading = Button::new("test").loading(true).on_click(|_, _, _| {});
-        assert!(!loading.clickable());
-    }
-
-    #[gpui::test]
-    fn test_button_variant_methods(_cx: &mut gpui::TestAppContext) {
-        // Test variant check methods
-        assert!(ButtonVariant::Link.is_link());
-        assert!(ButtonVariant::Text.is_text());
-        assert!(ButtonVariant::Ghost.is_ghost());
-
-        // Test no_padding logic
-        assert!(ButtonVariant::Link.no_padding());
-        assert!(ButtonVariant::Text.no_padding());
-        assert!(!ButtonVariant::Ghost.no_padding());
-    }
-
-    #[gpui::test]
-    fn test_outline_selected_uses_outline_active_style(cx: &mut gpui::TestAppContext) {
-        cx.update(crate::init);
-        let window = cx.add_empty_window();
-        window.update(|_, cx| {
-            let variant = ButtonVariant::Danger;
-            let p = MoonPalette::active(cx);
-            let active_style = variant.active(true, cx);
-            let selected_style = variant.selected(true, cx);
-
-            assert_eq!(selected_style.bg.a, 0.0);
-            assert_eq!(selected_style.border, rgba_from(p.red, 0.40));
-            assert_eq!(selected_style.fg, rgba_from(p.red, 1.0));
-            assert_ne!(selected_style.bg, active_style.bg);
-        });
-    }
-
-    #[test]
-    fn test_moon_button_metrics_match_terminal_palette() {
-        let micro = MoonButtonMetrics::base_for_size(Size::XSmall);
-        assert_eq!(micro.height, px(18.));
-        assert_eq!(micro.radius, px(4.));
-        assert_eq!(micro.font_size, px(9.));
-        assert_eq!(micro.line_height, px(12.));
-        assert_eq!(micro.gap, px(4.));
-        assert_eq!(micro.pad_x, px(7.));
-
-        let action = MoonButtonMetrics::base_for_size(Size::Small);
-        assert_eq!(action.height, px(26.));
-        assert_eq!(action.radius, px(4.));
-        assert_eq!(action.font_size, px(10.5));
-        assert_eq!(action.line_height, px(14.));
-        assert_eq!(action.gap, px(6.));
-        assert_eq!(action.pad_x, px(0.));
-
-        let toolbar = MoonButtonMetrics::base_for_size(Size::Medium);
-        assert_eq!(toolbar.height, px(28.));
-        assert_eq!(toolbar.radius, px(4.));
-
-        let pill = MoonButtonMetrics::base_for_size(Size::Large);
-        assert_eq!(pill.height, px(30.));
-        assert_eq!(pill.radius, px(15.));
-    }
-
-    #[test]
-    fn test_moon_button_variant_tokens_match_terminal_palette() {
-        let p = MoonPalette::TERMINAL;
-        let default = ButtonVariant::Default.moon_style(p, false, false).unwrap();
-        assert_eq!(default.bg, 0x1F2126);
-
-        let light = MoonPalette::LIGHT;
-        let light_default = ButtonVariant::Default
-            .moon_style(light, false, false)
-            .unwrap();
-        assert_eq!(light_default.bg, light.surface);
-        assert_eq!(light_default.border, light.border_soft);
-        assert_ne!(light_default.bg, 0x1F2126);
-
-        let light_blue = ButtonVariant::Blue.moon_style(light, false, false).unwrap();
-        assert_eq!(light_blue.bg, light.accent);
-        assert_eq!(light_blue.border, light.accent);
-
-        let light_live = ButtonVariant::Green.moon_style(light, false, true).unwrap();
-        assert_eq!(light_live.bg, light.green_btn);
-        assert_eq!(light_live.bg_alpha, 1.0);
-        assert_eq!(light_live.fg, light.on_accent);
-
-        let blue = ButtonVariant::Blue.moon_style(p, false, false).unwrap();
-        assert_eq!(blue.bg, p.blue);
-        assert_eq!(blue.bg_alpha, 0.10);
-        assert_eq!(blue.border_alpha, 0.22);
-        assert_eq!(blue.hover_bg_alpha, 0.18);
-
-        let selected_blue = ButtonVariant::Blue.moon_style(p, false, true).unwrap();
-        assert_eq!(selected_blue.bg_alpha, 0.18);
-        assert_eq!(selected_blue.border_alpha, 0.38);
-
-        let outline_red = ButtonVariant::OutlineRed
-            .moon_style(p, false, false)
-            .unwrap();
-        assert_eq!(outline_red.bg_alpha, 0.0);
-        assert_eq!(outline_red.border, p.red);
-        assert_eq!(outline_red.fg, p.red);
-
-        let soft = ButtonVariant::Soft.moon_style(p, false, false).unwrap();
-        assert_eq!(soft.bg, 0xFFFFFF);
-        assert_eq!(soft.bg_alpha, 0.02);
-        assert_eq!(soft.hover_bg_alpha, 0.055);
-    }
-}
+mod tests;

@@ -62,12 +62,17 @@
       "local_paths": [
         "button"
       ],
-      "local_hash": "eef9f41a6bb5a0bc",
+      "local_hash": "07c93c93561c6053",
       "local_files": [
         {
           "path": "button/button.rs",
-          "hash": "4870e1961bf222ea",
-          "bytes": 42000
+          "hash": "e5afc729e1c87b76",
+          "bytes": 41076
+        },
+        {
+          "path": "button/button/tests.rs",
+          "hash": "a82b0bdd58043fe7",
+          "bytes": 9930
         },
         {
           "path": "button/button_group.rs",
@@ -130,6 +135,7 @@
       ],
       "donor_changed_files": [
         "button/button.rs",
+        "button/button/tests.rs",
         "button/dropdown_button.rs"
       ]
     },
