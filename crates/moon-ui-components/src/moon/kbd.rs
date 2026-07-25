@@ -262,42 +262,4 @@ impl RenderOnce for MoonKbd {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{MoonKbd, MoonKbdSize};
-    use gpui::Keystroke;
-
-    #[test]
-    fn kbd_metrics_match_designer_reference() {
-        let compact = MoonKbd::new("Esc").size(MoonKbdSize::Compact);
-        assert_eq!(compact.metrics().height, 17.0);
-        let normal = MoonKbd::new("Ctrl+K");
-        assert_eq!(normal.metrics().height, 20.0);
-    }
-
-    #[test]
-    fn kbd_formats_keystrokes_like_longbridge() {
-        #[cfg(target_os = "macos")]
-        {
-            assert_eq!(
-                MoonKbd::format_keystroke(&Keystroke::parse("cmd-enter").unwrap()),
-                "⌘⏎"
-            );
-            assert_eq!(
-                MoonKbd::format_keystroke(&Keystroke::parse("cmd-ctrl-shift-a").unwrap()),
-                "⌃⇧⌘A"
-            );
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        {
-            assert_eq!(
-                MoonKbd::format_keystroke(&Keystroke::parse("ctrl-a").unwrap()),
-                "Ctrl+A"
-            );
-            assert_eq!(
-                MoonKbd::format_keystroke(&Keystroke::parse("ctrl-alt-shift-a").unwrap()),
-                "Ctrl+Alt+Shift+A"
-            );
-        }
-    }
-}
+mod tests;

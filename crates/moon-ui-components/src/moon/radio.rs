@@ -235,22 +235,4 @@ impl RenderOnce for MoonRadio {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{MoonRadio, MoonRadioSize, moon_radio_click_value};
-
-    #[test]
-    fn radio_metrics_match_designer_reference() {
-        let compact = MoonRadio::new("compact").size(MoonRadioSize::Compact);
-        assert_eq!(compact.metrics().outer_size, 12.0);
-        assert_eq!(compact.metrics().inner_size, 5.0);
-        let normal = MoonRadio::new("normal");
-        assert_eq!(normal.metrics().outer_size, 14.0);
-        assert_eq!(normal.metrics().inner_size, 6.0);
-    }
-
-    #[test]
-    fn radio_click_value_respects_disabled_state() {
-        assert_eq!(moon_radio_click_value(false), Some(true));
-        assert_eq!(moon_radio_click_value(true), None);
-    }
-}
+mod tests;
