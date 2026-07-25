@@ -2825,6 +2825,22 @@ impl Gallery {
             DockEvent::PanelCloseRequested { panel_name } => {
                 this.push_event(format!("Dock close requested: {panel_name}"), cx);
             }
+            // The dock owns no tab menu: it reports the right-click and the host decides. The
+            // gallery has no per-panel switches to offer, so it only shows that the event lands —
+            // right-click a dock tab and the event log records the panel and the click position.
+            DockEvent::TabContextMenu {
+                panel_name,
+                position,
+            } => {
+                this.push_event(
+                    format!(
+                        "Dock tab menu requested: {panel_name} at {:.0},{:.0}",
+                        f32::from(position.x),
+                        f32::from(position.y)
+                    ),
+                    cx,
+                );
+            }
         })
         .detach();
 
@@ -5781,55 +5797,68 @@ impl Render for Gallery {
 
 fn gallery_dock_panels() -> Vec<Rc<dyn PanelView>> {
     vec![
-        dock_panel("gallery-dock-orders", "Orders", MoonTone::Info),
-        dock_panel("gallery-dock-log", "Log", MoonTone::Warning),
-        dock_panel("gallery-dock-assets", "Assets", MoonTone::Positive),
+        // Log carries a tab suffix so the dock's badge slot is visible in the gallery: announcing
+        // unread work on a tab is what `Panel::title_suffix` exists for. The dock asks only the
+        // BACKGROUND tabs, so selecting Log makes its own badge go away.
+        Rc::new(dock_panel("gallery-dock-orders", "Orders", MoonTone::Info)),
+        Rc::new(
+            dock_panel("gallery-dock-log", "Log", MoonTone::Warning).tab_suffix(|_, _| {
+                MoonBadge::new("")
+                    .count(7)
+                    .size(MoonBadgeSize::Tiny)
+                    .variant(MoonBadgeVariant::Solid)
+                    .tone(MoonTone::Warning)
+                    .render()
+                    .into_any_element()
+            }),
+        ),
+        Rc::new(dock_panel(
+            "gallery-dock-assets",
+            "Assets",
+            MoonTone::Positive,
+        )),
     ]
 }
 
 fn gallery_tab_panels() -> Vec<Rc<dyn PanelView>> {
     vec![
-        dock_panel("gallery-tab-alpha", "Alpha", MoonTone::Accent),
-        dock_panel("gallery-tab-beta", "Beta", MoonTone::Info),
+        Rc::new(dock_panel("gallery-tab-alpha", "Alpha", MoonTone::Accent)),
+        Rc::new(dock_panel("gallery-tab-beta", "Beta", MoonTone::Info)),
     ]
 }
 
-fn dock_panel(name: &'static str, title: &'static str, tone: MoonTone) -> Rc<dyn PanelView> {
-    Rc::new(
-        MoonDockPanel::new(name, title, move |_, app| {
-            let p = MoonPalette::active(app);
-            v_flex()
-                .size_full()
-                .p(px(10.0))
-                .gap(px(8.0))
-                .child(
-                    MoonText::new(format!("{title} panel"))
-                        .uppercase(false)
-                        .mono(true)
-                        .color(tone.color(p))
-                        .font_size(12.0)
-                        .line_height(15.0)
-                        .weight(600.0)
-                        .render(),
-                )
-                .child(
-                    MoonText::new(
-                        "MoonDockPanel content with panel controls and background policy.",
-                    )
+fn dock_panel(name: &'static str, title: &'static str, tone: MoonTone) -> MoonDockPanel {
+    MoonDockPanel::new(name, title, move |_, app| {
+        let p = MoonPalette::active(app);
+        v_flex()
+            .size_full()
+            .p(px(10.0))
+            .gap(px(8.0))
+            .child(
+                MoonText::new(format!("{title} panel"))
+                    .uppercase(false)
+                    .mono(true)
+                    .color(tone.color(p))
+                    .font_size(12.0)
+                    .line_height(15.0)
+                    .weight(600.0)
+                    .render(),
+            )
+            .child(
+                MoonText::new("MoonDockPanel content with panel controls and background policy.")
                     .uppercase(false)
                     .mono(true)
                     .wrap()
                     .color(p.text_soft)
                     .render(),
-                )
-                .into_any_element()
-        })
-        .detachable(true)
-        .show_dock_header(true)
-        .closable(false)
-        .zoomable(true)
-        .background_policy(MoonBackgroundPolicy::Opaque),
-    )
+            )
+            .into_any_element()
+    })
+    .detachable(true)
+    .show_dock_header(true)
+    .closable(false)
+    .zoomable(true)
+    .background_policy(MoonBackgroundPolicy::Opaque)
 }
 
 fn section(title: &'static str, cx: &App) -> gpui::Div {

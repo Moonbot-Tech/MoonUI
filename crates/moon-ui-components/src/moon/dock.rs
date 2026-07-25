@@ -32,6 +32,17 @@ pub enum DockEvent {
     PanelCloseRequested {
         panel_name: SharedString,
     },
+    /// A dock tab was right-clicked, at `position` in window coordinates.
+    ///
+    /// The dock carries no menu of its own: what a tab offers on right-click is host policy
+    /// (per-panel display switches, for instance), so the host opens its own context menu.
+    /// Mirrors the `DetachRequested` route taken by a double-click on the same tab, `panel_name`
+    /// included — like that event, it identifies the tab only as far as panel names are unique
+    /// within the dock, which is what the registry-based hosts guarantee.
+    TabContextMenu {
+        panel_name: SharedString,
+        position: Point<Pixels>,
+    },
 }
 
 pub enum PanelEvent {
@@ -481,6 +492,9 @@ pub struct MoonDockPanel {
     panel_name: SharedString,
     title: SharedString,
     render: MoonPanelRender,
+    /// Optional element drawn on this panel's dock tab, right of its label — an unread badge, a
+    /// status dot. Absent by default, which renders the tab exactly as before.
+    tab_suffix: Option<MoonPanelRender>,
     background_policy: MoonBackgroundPolicy,
     closable: bool,
     zoomable: bool,
@@ -501,6 +515,7 @@ impl MoonDockPanel {
             panel_name: panel_name.into(),
             title: title.into(),
             render: Rc::new(render),
+            tab_suffix: None,
             background_policy: MoonBackgroundPolicy::Opaque,
             closable: true,
             zoomable: true,
@@ -508,6 +523,18 @@ impl MoonDockPanel {
             show_dock_header: false,
             visible: true,
         }
+    }
+
+    /// Draw `suffix` on this panel's dock tab, right of the label.
+    ///
+    /// Takes a closure, not a finished element, because the tab is rebuilt on every frame: a
+    /// counter passed by value would freeze at whatever it was when the panel was constructed.
+    pub fn tab_suffix(
+        mut self,
+        suffix: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        self.tab_suffix = Some(Rc::new(suffix));
+        self
     }
 
     pub fn background_policy(mut self, policy: MoonBackgroundPolicy) -> Self {
@@ -563,8 +590,8 @@ impl PanelView for MoonDockPanel {
             .into_any_element()
     }
 
-    fn title_suffix(&self, _window: &mut Window, _cx: &mut App) -> Option<AnyElement> {
-        None
+    fn title_suffix(&self, window: &mut Window, cx: &mut App) -> Option<AnyElement> {
+        self.tab_suffix.as_ref().map(|suffix| suffix(window, cx))
     }
 
     fn render_panel(&self, window: &mut Window, cx: &mut App) -> AnyElement {
@@ -1258,6 +1285,13 @@ where
 #[derive(Default)]
 struct MoonTabPanelRuntimeState {
     active_ix: usize,
+    /// What this tab group last announced through `Panel::set_active`, as `(front panel name, tab
+    /// count)`, so the call stays an EDGE notification instead of a per-frame poll.
+    ///
+    /// The name identifies the front tab across an insertion or removal that shifts indices under a
+    /// panel that never moved; the count is what catches a tab joining or leaving while the front
+    /// tab stays put — that new tab has never been told it is hidden.
+    notified_active: Option<(Option<SharedString>, usize)>,
 }
 
 #[derive(IntoElement)]
@@ -1344,6 +1378,7 @@ impl RenderOnce for TabPanel {
             cx,
             |_, _| MoonTabPanelRuntimeState {
                 active_ix: self.active_ix,
+                notified_active: None,
             },
         );
         let active_ix = state
@@ -1360,8 +1395,24 @@ impl RenderOnce for TabPanel {
             })
             .unwrap_or(MoonBackgroundPolicy::Opaque);
         let parent_view = window.current_view();
-        if let Some(panel) = active_panel.as_ref() {
-            panel.set_active(true, window, cx);
+        // Announce the front tab ON CHANGE, and tell the tabs behind it that they are hidden.
+        //
+        // Both halves are edge-triggered: `render` runs every frame, so notifying unconditionally
+        // would turn a state change into a 60 Hz poll and lease every panel entity per frame. The
+        // inherited dock notifies on transition too — the two docks in this crate must not disagree
+        // about what `Panel::set_active` means. A panel that is hidden the whole time is told once,
+        // which is what an unread indicator needs to distinguish "on screen" from "behind a tab".
+        let announced = (
+            active_panel.as_ref().map(|panel| panel.panel_name(cx)),
+            self.items.len(),
+        );
+        if state.read(cx).notified_active.as_ref() != Some(&announced) {
+            for (ix, panel) in self.items.iter().enumerate() {
+                panel.set_active(ix == active_ix, window, cx);
+            }
+            state.update(cx, |state, _| {
+                state.notified_active = Some(announced.clone());
+            });
         }
 
         let mut root = div()
@@ -1401,6 +1452,17 @@ impl RenderOnce for TabPanel {
                 let dock_path = self.dock_path.clone();
                 let panel_name = panel.panel_name(cx);
                 let tab_label = panel.tab_name(cx).unwrap_or_else(|| panel.panel_name(cx));
+                // The panel's own element right of the label (an unread badge, a status dot). The
+                // inherited dock already renders `title_suffix` in its tab bar; the Moon dock did
+                // not, so a Moon-hosted panel had no way to put anything on its tab.
+                //
+                // Asked of the BACKGROUND tabs only. A suffix announces what the user is not
+                // looking at, and the dock is where "not looking at it" is already known — leaving
+                // it to each panel would make every one of them mirror this flag to answer a
+                // question its caller had in hand.
+                let tab_suffix = (!selected)
+                    .then(|| panel.title_suffix(window, cx))
+                    .flatten();
                 // Вид вкладки = как у верхних (MoonTabStrip): высота 28, mono-текст,
                 // активная подсвечивается янтарным underline снизу, а не фоном Panel.
                 // drag/drop/double-click ниже навешиваются на этот же tab_host — поэтому
@@ -1432,6 +1494,15 @@ impl RenderOnce for TabPanel {
                                 .render(),
                         ),
                     )
+                    .children(tab_suffix.map(|suffix| {
+                        div()
+                            .mt(px(tokens.ui(2.0)))
+                            .ml(px(tokens.ui(5.0)))
+                            .flex()
+                            .flex_none()
+                            .items_center()
+                            .child(suffix)
+                    }))
                     .on_click(move |_, _, cx| {
                         state.update(cx, |state, _| state.active_ix = ix);
                         if let (Some(dock_area), Some(root)) = (dock_area.as_ref(), dock_root) {
@@ -1443,6 +1514,29 @@ impl RenderOnce for TabPanel {
                             });
                         }
                         cx.notify(parent_view);
+                    })
+                    // Right-click hands the tab to the host, which owns whatever menu a tab
+                    // offers. Propagation stops here so the click cannot also reach a
+                    // window-level handler behind the header.
+                    .on_mouse_down(MouseButton::Right, {
+                        let dock_area = self.dock_area.clone();
+                        let panel_name = panel_name.clone();
+                        move |event: &MouseDownEvent, _window, cx| {
+                            if let Some(dock_area) =
+                                dock_area.as_ref().and_then(|area| area.upgrade())
+                            {
+                                dock_area.update(cx, |_dock, cx| {
+                                    cx.emit(DockEvent::TabContextMenu {
+                                        panel_name: panel_name.clone(),
+                                        position: event.position,
+                                    });
+                                });
+                            }
+                            // Consumed either way: the tab owns right-click, so a teardown-time
+                            // click with the dock already gone must not fall through to whatever
+                            // sits behind the header.
+                            cx.stop_propagation();
+                        }
                     });
                 if selected {
                     // Точный underline активной вкладки из палитры (тот же, что у верхних).
@@ -3487,13 +3581,19 @@ mod tests {
 
     #[test]
     fn moon_dock_panel_builder_flags_are_observable() {
+        let bare = MoonDockPanel::new("orders", "Orders", |_, _| div().into_any_element());
+        // A panel that was given no suffix must report none: the dock renders a tab badge only
+        // when the panel hands one over, so a builder that dropped it would fail silently.
+        assert!(bare.tab_suffix.is_none());
+
         let panel = MoonDockPanel::new("orders", "Orders", |_, _| div().into_any_element())
             .background_policy(MoonBackgroundPolicy::NoFill)
             .closable(false)
             .zoomable(false)
             .detachable(true)
             .show_dock_header(true)
-            .visible(false);
+            .visible(false)
+            .tab_suffix(|_, _| div().into_any_element());
 
         assert_eq!(panel.background_policy, MoonBackgroundPolicy::NoFill);
         assert!(!panel.closable);
@@ -3501,6 +3601,7 @@ mod tests {
         assert!(panel.detachable);
         assert!(panel.show_dock_header);
         assert!(!panel.visible);
+        assert!(panel.tab_suffix.is_some());
     }
 
     #[test]
