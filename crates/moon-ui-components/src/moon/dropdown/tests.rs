@@ -126,21 +126,148 @@ fn supplied_bounds_menu_also_hangs_just_below_its_trigger(cx: &mut gpui::TestApp
     assert_menu_hugs_trigger(trigger, menu);
 }
 
-/// Catches accepting disabled, label, or separator rows in
-/// `dropdown.rs:moon_menu_item_accepts_click`, which would fire selection callbacks for
-/// non-actionable menu content.
+/// `dropdown.rs:MoonMenuItem::action_label` must retain the label visual role while explicitly
+/// opting into clicks. Returning a normal item would reintroduce item typography and its check
+/// gutter; treating every enabled label as actionable would make static section headings
+/// interactive after `.disabled(false)`.
 #[test]
 fn menu_item_clickability_respects_kind_and_disabled_state() {
-    assert!(moon_menu_item_accepts_click(MoonMenuItemKind::Item, false));
-    assert!(!moon_menu_item_accepts_click(MoonMenuItemKind::Item, true));
+    let action_label = MoonMenuItem::action_label("action", "Action label");
+    assert_eq!(action_label.kind, MoonMenuItemKind::Label);
+    assert!(!action_label.disabled);
+    assert!(action_label.actionable);
+
+    assert!(moon_menu_item_accepts_click(
+        MoonMenuItemKind::Item,
+        false,
+        false
+    ));
+    assert!(!moon_menu_item_accepts_click(
+        MoonMenuItemKind::Item,
+        true,
+        true
+    ));
+    assert!(moon_menu_item_accepts_click(
+        MoonMenuItemKind::Label,
+        false,
+        true
+    ));
     assert!(!moon_menu_item_accepts_click(
         MoonMenuItemKind::Label,
+        false,
         false
+    ));
+    assert!(!moon_menu_item_accepts_click(
+        MoonMenuItemKind::Label,
+        true,
+        true
     ));
     assert!(!moon_menu_item_accepts_click(
         MoonMenuItemKind::Separator,
-        false
+        false,
+        true
     ));
+}
+
+/// Open dropdown containing enabled and static label rows for native interaction checks.
+struct LabelInteractionHarness {
+    action_clicks: Rc<RefCell<usize>>,
+    static_clicks: Rc<RefCell<usize>>,
+}
+
+impl gpui::Render for LabelInteractionHarness {
+    /// Render one action label and one static label in an open dropdown.
+    ///
+    /// Args:
+    ///     _window: Test window receiving pointer events.
+    ///     _cx: Test view context.
+    ///
+    /// Returns:
+    ///     The rendered open dropdown.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        let action_clicks = self.action_clicks.clone();
+        let static_clicks = self.static_clicks.clone();
+        MoonDropdown::new("label-interaction")
+            .label("trigger")
+            .default_open(true)
+            .close_on_select(false)
+            .item(
+                MoonMenuItem::action_label("action", "Action label").on_click(move |_, _, _| {
+                    *action_clicks.borrow_mut() += 1;
+                }),
+            )
+            .item(
+                MoonMenuItem::label("Static label")
+                    .disabled(false)
+                    .on_click(move |_, _, _| {
+                        *static_clicks.borrow_mut() += 1;
+                    }),
+            )
+    }
+}
+
+/// Render and click both label row states under one palette.
+///
+/// Args:
+///     cx: GPUI test application context.
+///     palette: Palette used to render the dropdown.
+///
+/// Returns:
+///     Nothing; callback counts are asserted after simulated clicks.
+fn assert_rendered_label_interactions(cx: &mut gpui::TestAppContext, palette: MoonPalette) {
+    cx.update(|cx| {
+        MoonTheme::global_mut(cx).palette = palette;
+    });
+    let action_clicks = Rc::new(RefCell::new(0));
+    let static_clicks = Rc::new(RefCell::new(0));
+    let window = cx.add_window({
+        let action_clicks = action_clicks.clone();
+        let static_clicks = static_clicks.clone();
+        move |_, _| LabelInteractionHarness {
+            action_clicks,
+            static_clicks,
+        }
+    });
+    let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+    let (action, static_label) = (0..8)
+        .find_map(|_| {
+            cx.update(|window, _| window.refresh());
+            cx.run_until_parked();
+            Some((
+                cx.debug_bounds("label-interaction:menu:item:0")?,
+                cx.debug_bounds("label-interaction:menu:item:1")?,
+            ))
+        })
+        .expect("both label rows must register rendered bounds");
+
+    cx.simulate_click(action.center(), gpui::Modifiers::default());
+    assert_eq!(
+        *action_clicks.borrow(),
+        1,
+        "enabled action label must dispatch its callback"
+    );
+
+    cx.simulate_click(static_label.center(), gpui::Modifiers::default());
+    assert_eq!(
+        *static_clicks.borrow(),
+        0,
+        "ordinary label must remain inert even when a handler is attached"
+    );
+}
+
+/// `dropdown.rs:MoonPopupMenu::render_item` must wire enabled label rows into GPUI's native click
+/// path. Removing the label click branch leaves visually correct exchange headings that no longer
+/// toggle their grouped menu items.
+#[gpui::test]
+fn rendered_action_label_dispatches_while_static_label_stays_inert(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        assert_rendered_label_interactions(cx, palette);
+    }
 }
 
 /// Catches closing keep-open rows or mutating controlled state in

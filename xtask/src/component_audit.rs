@@ -598,10 +598,11 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             ContractSeverity::Guardrail,
             &[
                 "menu_item_clickability_respects_kind_and_disabled_state",
+                "rendered_action_label_dispatches_while_static_label_stays_inert",
                 "dropdown_select_plan_respects_close_and_controlled_state",
             ],
             &tests,
-            "dropdown/menu selection must ignore disabled/non-item rows and close only when configured",
+            "dropdown/menu selection must accept enabled item and action-label rows, ignore disabled/static rows, and close only when configured",
         ),
         test_contract(
             "dropdown.menu_placement",

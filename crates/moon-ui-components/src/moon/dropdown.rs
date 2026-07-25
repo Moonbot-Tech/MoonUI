@@ -419,8 +419,26 @@ fn resolve_menu_width(
     (width, width < requirements.natural)
 }
 
-fn moon_menu_item_accepts_click(kind: MoonMenuItemKind, disabled: bool) -> bool {
-    matches!(kind, MoonMenuItemKind::Item) && !disabled
+/// Return whether a menu row kind is allowed to dispatch click handlers.
+///
+/// Args:
+///     kind: Visual role of the menu row.
+///     disabled: Whether interaction is disabled for the row.
+///     label_actionable: Whether a label explicitly opted into action behavior.
+///
+/// Returns:
+///     `true` for enabled items and explicitly actionable enabled labels.
+fn moon_menu_item_accepts_click(
+    kind: MoonMenuItemKind,
+    disabled: bool,
+    label_actionable: bool,
+) -> bool {
+    !disabled
+        && match kind {
+            MoonMenuItemKind::Item => true,
+            MoonMenuItemKind::Label => label_actionable,
+            MoonMenuItemKind::Separator => false,
+        }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -449,6 +467,7 @@ pub struct MoonMenuItem {
     selected: bool,
     checked: bool,
     disabled: bool,
+    actionable: bool,
     submenu: Vec<MoonMenuItem>,
     on_click: Option<MoonClickHandler>,
 }
@@ -465,6 +484,7 @@ impl MoonMenuItem {
             selected: false,
             checked: false,
             disabled: false,
+            actionable: true,
             submenu: Vec::new(),
             on_click: None,
         }
@@ -480,6 +500,7 @@ impl MoonMenuItem {
             selected: false,
             checked: false,
             disabled: false,
+            actionable: true,
             submenu: Vec::new(),
             on_click: None,
         }
@@ -489,6 +510,21 @@ impl MoonMenuItem {
         let mut item = Self::new(label);
         item.kind = MoonMenuItemKind::Label;
         item.disabled = true;
+        item.actionable = false;
+        item
+    }
+
+    /// Create an enabled section label that preserves label typography while accepting clicks.
+    ///
+    /// Args:
+    ///     key: Stable selection key reported by dropdown callbacks.
+    ///     label: Text rendered with section-label geometry and typography.
+    ///
+    /// Returns:
+    ///     An enabled label row ready for an [`Self::on_click`] handler.
+    pub fn action_label(key: impl Into<SharedString>, label: impl Into<SharedString>) -> Self {
+        let mut item = Self::with_key(key, label);
+        item.kind = MoonMenuItemKind::Label;
         item
     }
 
@@ -502,6 +538,7 @@ impl MoonMenuItem {
             selected: false,
             checked: false,
             disabled: true,
+            actionable: false,
             submenu: Vec::new(),
             on_click: None,
         }
@@ -877,24 +914,54 @@ impl MoonPopupMenu {
                 .my(px(3.0))
                 .bg(rgba_from(p.border, 0.82))
                 .into_any_element(),
-            MoonMenuItemKind::Label => div()
-                .id(ElementId::from(row_id))
-                .h(px(metrics.row_height))
-                .px(px(metrics.pad_x))
-                .flex()
-                .items_center()
-                .child(
-                    MoonText::new(item.label)
-                        .color(p.text_muted)
-                        .alpha(0.88)
-                        .font_size(metrics.font_size)
-                        .line_height(metrics.line_height)
-                        .weight(500.0)
-                        .mono(mono)
-                        .uppercase(false)
-                        .render(),
-                )
-                .into_any_element(),
+            MoonMenuItemKind::Label => {
+                let disabled = item.disabled;
+                let actionable = moon_menu_item_accepts_click(
+                    MoonMenuItemKind::Label,
+                    disabled,
+                    item.actionable,
+                );
+                let mut row = div()
+                    .id(ElementId::from(row_id.clone()))
+                    .debug_selector({
+                        let row_id = row_id.clone();
+                        move || row_id.to_string()
+                    })
+                    .h(px(metrics.row_height))
+                    .rounded(px(metrics.radius))
+                    .px(px(metrics.pad_x))
+                    .flex()
+                    .items_center()
+                    .when(actionable, |this| {
+                        this.hover(move |this| this.bg(rgba_from(p.overlay, 0.055)))
+                            .active(move |this| this.bg(rgba_from(p.overlay, 0.032)))
+                    })
+                    .child(
+                        MoonText::new(item.label)
+                            .color(p.text_muted)
+                            .alpha(0.88)
+                            .font_size(metrics.font_size)
+                            .line_height(metrics.line_height)
+                            .weight(500.0)
+                            .mono(mono)
+                            .uppercase(false)
+                            .render(),
+                    );
+
+                if actionable {
+                    if let Some(on_click) = item.on_click {
+                        row = row
+                            .on_mouse_down(MouseButton::Left, move |_, _, cx| {
+                                cx.stop_propagation();
+                            })
+                            .on_click(move |event, window, cx| {
+                                on_click(event, window, cx);
+                            });
+                    }
+                }
+
+                row.into_any_element()
+            }
             MoonMenuItemKind::Item => {
                 let disabled = item.disabled;
                 let selected = item.selected;
@@ -984,7 +1051,7 @@ impl MoonPopupMenu {
                     );
                 }
 
-                if moon_menu_item_accepts_click(MoonMenuItemKind::Item, disabled) {
+                if moon_menu_item_accepts_click(MoonMenuItemKind::Item, disabled, false) {
                     if let Some(on_click) = item.on_click {
                         row = row
                             .on_mouse_down(MouseButton::Left, move |_, _, cx| {
@@ -1084,7 +1151,7 @@ fn wire_dropdown_items(
     items
         .into_iter()
         .map(|mut item| {
-            if moon_menu_item_accepts_click(item.kind, item.disabled) {
+            if moon_menu_item_accepts_click(item.kind, item.disabled, item.actionable) {
                 let key = item.key.clone();
                 let existing_handler = item.on_click.clone();
                 let on_select = on_select.clone();
