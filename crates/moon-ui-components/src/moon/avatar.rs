@@ -235,12 +235,4 @@ fn initials(text: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::initials;
-
-    #[test]
-    fn avatar_initials_match_common_names() {
-        assert_eq!(initials("Jason Lee"), "JL");
-        assert_eq!(initials("huacnlee"), "HU");
-    }
-}
+mod tests;

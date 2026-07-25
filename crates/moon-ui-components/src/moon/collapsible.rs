@@ -226,20 +226,4 @@ impl RenderOnce for MoonCollapsible {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::moon_collapsible_header_click_next;
-
-    #[test]
-    fn collapsible_header_click_respects_disabled_and_controlled_state() {
-        assert_eq!(
-            moon_collapsible_header_click_next(false, false, false),
-            Some(true)
-        );
-        assert_eq!(
-            moon_collapsible_header_click_next(true, false, false),
-            Some(false)
-        );
-        assert_eq!(moon_collapsible_header_click_next(false, true, false), None);
-        assert_eq!(moon_collapsible_header_click_next(false, false, true), None);
-    }
-}
+mod tests;

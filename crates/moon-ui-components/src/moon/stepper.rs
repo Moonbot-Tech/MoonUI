@@ -329,31 +329,4 @@ impl RenderOnce for MoonStepper {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{MoonStepper, MoonStepperDirection, MoonStepperSize, moon_stepper_next_value};
-
-    #[test]
-    fn stepper_metrics_match_designer_reference() {
-        let compact = MoonStepper::new("compact").size(MoonStepperSize::Compact);
-        assert_eq!(compact.metrics().height, 22.0);
-        assert_eq!(compact.metrics().button_width, 24.0);
-        let normal = MoonStepper::new("normal");
-        assert_eq!(normal.metrics().height, 26.0);
-        assert_eq!(normal.metrics().value_width, 64.0);
-    }
-
-    #[test]
-    fn stepper_next_value_clamps_to_range_and_positive_step() {
-        assert_eq!(
-            moon_stepper_next_value(9.5, 0.0, 10.0, 2.0, MoonStepperDirection::Increment),
-            10.0
-        );
-        assert_eq!(
-            moon_stepper_next_value(0.5, 0.0, 10.0, 2.0, MoonStepperDirection::Decrement),
-            0.0
-        );
-        assert!(
-            moon_stepper_next_value(1.0, 0.0, 10.0, -1.0, MoonStepperDirection::Increment) > 1.0
-        );
-    }
-}
+mod tests;
