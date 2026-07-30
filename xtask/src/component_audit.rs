@@ -561,6 +561,13 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &tests,
             "radio click handling must select true and ignore disabled clicks",
         ),
+        test_contract(
+            "status_bar.click_behavior",
+            ContractSeverity::Guardrail,
+            &["interactive_text_item_dispatches_click_without_external_hitbox"],
+            &tests,
+            "status-bar text actions must dispatch from their rendered bounds while static labels and separators remain inert",
+        ),
         pass_if(
             "data_table.text_clipping",
             ContractSeverity::Critical,

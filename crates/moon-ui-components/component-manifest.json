@@ -594,7 +594,7 @@
       "public_path": "moon_ui::MoonStatusBar",
       "upstream_ref": null,
       "fork_reason": "MoonBot terminal status density",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["status_bar.click_behavior", "gallery.visual_coverage"]
     },
     {
       "concept": "surface",

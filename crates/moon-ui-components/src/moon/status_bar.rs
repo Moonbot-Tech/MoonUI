@@ -1,12 +1,16 @@
 //! Dense themed status-bar primitives with text, inline dots, group dividers, and edge regions.
 
+use std::fmt;
+
 use crate::status_bar::StatusBar as CoreStatusBar;
 use gpui::*;
 
 use super::{
+    foundation::MoonClickHandler,
     text::MoonText,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
+    tooltip::MoonTooltipView,
 };
 
 /// Visual roles available to an item in the compact status row.
@@ -20,39 +24,87 @@ enum MoonStatusItemKind {
     GroupSeparator,
 }
 
-#[derive(Clone, Debug)]
+/// One status-bar label, compact separator, or semantic group divider.
+///
+/// Text items may own their stable identity, tooltip, and click handler so applications do not
+/// need overlay hitboxes whose geometry can drift from the rendered label.
+#[derive(Clone)]
 pub struct MoonStatusItem {
     kind: MoonStatusItemKind,
+    id: Option<SharedString>,
     text: SharedString,
     color: Option<u32>,
     tone: Option<MoonTone>,
     alpha: f32,
     weight: f32,
     gap_after: Option<f32>,
+    tooltip: Option<SharedString>,
+    on_click: Option<MoonClickHandler>,
+}
+
+impl fmt::Debug for MoonStatusItem {
+    /// Format the item without attempting to print its opaque callback.
+    ///
+    /// Args:
+    ///     f: Debug formatter receiving the visible configuration and interaction presence.
+    ///
+    /// Returns:
+    ///     The formatter result.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MoonStatusItem")
+            .field("kind", &self.kind)
+            .field("id", &self.id)
+            .field("text", &self.text)
+            .field("color", &self.color)
+            .field("tone", &self.tone)
+            .field("alpha", &self.alpha)
+            .field("weight", &self.weight)
+            .field("gap_after", &self.gap_after)
+            .field("tooltip", &self.tooltip)
+            .field("interactive", &self.on_click.is_some())
+            .finish()
+    }
 }
 
 impl MoonStatusItem {
+    /// Build a non-interactive text item.
+    ///
+    /// Args:
+    ///     text: Monospaced label or value rendered in the status row.
+    ///
+    /// Returns:
+    ///     A text item that can optionally receive identity, tooltip, and click behavior.
     pub fn new(text: impl Into<SharedString>) -> Self {
         Self {
             kind: MoonStatusItemKind::Text,
+            id: None,
             text: text.into(),
             color: None,
             tone: None,
             alpha: 1.0,
             weight: 400.0,
             gap_after: None,
+            tooltip: None,
+            on_click: None,
         }
     }
 
+    /// Build the compact dot used between closely related status values.
+    ///
+    /// Returns:
+    ///     A non-interactive separator item.
     pub fn separator() -> Self {
         Self {
             kind: MoonStatusItemKind::Separator,
+            id: None,
             text: SharedString::from(""),
             color: None,
             tone: None,
             alpha: 0.74,
             weight: 400.0,
             gap_after: None,
+            tooltip: None,
+            on_click: None,
         }
     }
 
@@ -63,13 +115,28 @@ impl MoonStatusItem {
     pub fn group_separator() -> Self {
         Self {
             kind: MoonStatusItemKind::GroupSeparator,
+            id: None,
             text: SharedString::from(""),
             color: None,
             tone: None,
             alpha: 1.0,
             weight: 400.0,
             gap_after: None,
+            tooltip: None,
+            on_click: None,
         }
+    }
+
+    /// Set a stable element and debug-selector identity for this item.
+    ///
+    /// Args:
+    ///     id: Identity used by GPUI interaction state and rendered-geometry probes.
+    ///
+    /// Returns:
+    ///     The updated item.
+    pub fn id(mut self, id: impl Into<SharedString>) -> Self {
+        self.id = Some(id.into());
+        self
     }
 
     pub fn color(mut self, color: u32) -> Self {
@@ -94,6 +161,37 @@ impl MoonStatusItem {
 
     pub fn gap_after(mut self, gap_after: f32) -> Self {
         self.gap_after = Some(gap_after);
+        self
+    }
+
+    /// Attach a Moon tooltip to a text item.
+    ///
+    /// Separators keep their visual-only role and ignore this setting.
+    ///
+    /// Args:
+    ///     tooltip: Text shown while the pointer hovers the rendered item.
+    ///
+    /// Returns:
+    ///     The updated item.
+    pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+
+    /// Make a text item dispatch native click events from its rendered bounds.
+    ///
+    /// Separators keep their visual-only role and ignore this setting.
+    ///
+    /// Args:
+    ///     handler: Callback invoked for a click on the rendered text item.
+    ///
+    /// Returns:
+    ///     The updated item.
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(std::rc::Rc::new(handler));
         self
     }
 }
@@ -255,6 +353,7 @@ impl MoonStatusBar {
             border
         };
 
+        let item_id_prefix = id.to_string();
         let mut root = div().id(id).relative().overflow_hidden().h(px(height));
 
         if let Some(bounds) = bounds {
@@ -293,6 +392,8 @@ impl MoonStatusBar {
         let left_row = Self::render_items(
             left_row,
             items,
+            &item_id_prefix,
+            "left",
             item_gap,
             font_size,
             line_height,
@@ -314,6 +415,8 @@ impl MoonStatusBar {
             let right_row = Self::render_items(
                 div().mr(px(right_offset)).h_full().flex().items_center(),
                 right_items,
+                &item_id_prefix,
+                "right",
                 item_gap,
                 font_size,
                 line_height,
@@ -331,6 +434,8 @@ impl MoonStatusBar {
     /// Args:
     ///     row: Flex row that receives the rendered items.
     ///     items: Ordered status content for this region.
+    ///     status_bar_id: Parent identity used to scope fallback item identities.
+    ///     region: Stable edge-region name used by fallback item identities.
     ///     item_gap: Default trailing gap in unscaled design units.
     ///     font_size: Monospaced text size in unscaled design units.
     ///     line_height: Text line height in unscaled design units.
@@ -342,13 +447,15 @@ impl MoonStatusBar {
     fn render_items(
         mut row: Div,
         items: Vec<MoonStatusItem>,
+        status_bar_id: &str,
+        region: &'static str,
         item_gap: f32,
         font_size: f32,
         line_height: f32,
         p: MoonPalette,
         tokens: &MoonThemeTokens,
     ) -> Div {
-        for item in items {
+        for (index, item) in items.into_iter().enumerate() {
             let color = item
                 .color
                 .or_else(|| item.tone.map(|tone| tone.color(p)))
@@ -359,40 +466,78 @@ impl MoonStatusBar {
             let gap = tokens.ui(item.gap_after.unwrap_or(item_gap));
             match item.kind {
                 MoonStatusItemKind::Text => {
-                    row = row.child(
-                        div().mr(px(gap)).child(
-                            MoonText::new(item.text)
-                                .uppercase(false)
-                                .mono(true)
-                                .color(color)
-                                .alpha(item.alpha)
-                                .font_size(font_size)
-                                .line_height(line_height)
-                                .weight(item.weight)
-                                .render(),
-                        ),
+                    let text_item = div().mr(px(gap)).child(
+                        MoonText::new(item.text)
+                            .uppercase(false)
+                            .mono(true)
+                            .color(color)
+                            .alpha(item.alpha)
+                            .font_size(font_size)
+                            .line_height(line_height)
+                            .weight(item.weight)
+                            .render(),
                     );
+                    let id = item.id.or_else(|| {
+                        (item.tooltip.is_some() || item.on_click.is_some()).then(|| {
+                            SharedString::from(format!("{status_bar_id}:item:{region}:{index}"))
+                        })
+                    });
+                    if let Some(id) = id {
+                        let debug_id = id.to_string();
+                        let mut interactive_item = text_item
+                            .id(ElementId::from(id))
+                            .debug_selector(move || debug_id.clone());
+                        if let Some(tooltip) = item.tooltip {
+                            interactive_item = interactive_item.tooltip(move |_window, cx| {
+                                cx.new(|_| MoonTooltipView::new(tooltip.clone())).into()
+                            });
+                        }
+                        if let Some(on_click) = item.on_click {
+                            interactive_item = interactive_item
+                                .cursor_pointer()
+                                .on_click(move |event, window, cx| on_click(event, window, cx));
+                        }
+                        row = row.child(interactive_item);
+                    } else {
+                        row = row.child(text_item);
+                    }
                 }
                 MoonStatusItemKind::Separator => {
                     let size = tokens.ui(2.0);
-                    row = row.child(
-                        div()
-                            .w(px(size))
-                            .h(px(size))
-                            .rounded(px(size * 0.5))
-                            .bg(rgba_from(color, item.alpha))
-                            .mr(px(gap)),
-                    );
+                    let separator = div()
+                        .w(px(size))
+                        .h(px(size))
+                        .rounded(px(size * 0.5))
+                        .bg(rgba_from(color, item.alpha))
+                        .mr(px(gap));
+                    if let Some(id) = item.id {
+                        let debug_id = id.to_string();
+                        row = row.child(
+                            separator
+                                .id(ElementId::from(id))
+                                .debug_selector(move || debug_id.clone()),
+                        );
+                    } else {
+                        row = row.child(separator);
+                    }
                 }
                 MoonStatusItemKind::GroupSeparator => {
-                    row = row.child(
-                        div()
-                            .flex_none()
-                            .w(px(tokens.ui(1.0)))
-                            .h(px(tokens.ui(12.0)))
-                            .bg(rgba_from(color, item.alpha))
-                            .mr(px(gap)),
-                    );
+                    let separator = div()
+                        .flex_none()
+                        .w(px(tokens.ui(1.0)))
+                        .h(px(tokens.ui(12.0)))
+                        .bg(rgba_from(color, item.alpha))
+                        .mr(px(gap));
+                    if let Some(id) = item.id {
+                        let debug_id = id.to_string();
+                        row = row.child(
+                            separator
+                                .id(ElementId::from(id))
+                                .debug_selector(move || debug_id.clone()),
+                        );
+                    } else {
+                        row = row.child(separator);
+                    }
                 }
             }
         }
@@ -406,3 +551,6 @@ impl RenderOnce for MoonStatusBar {
         self.render_with_theme(MoonPalette::active(cx), tokens)
     }
 }
+
+#[cfg(test)]
+mod tests;

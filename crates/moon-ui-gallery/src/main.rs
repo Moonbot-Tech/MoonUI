@@ -3933,7 +3933,8 @@ impl Gallery {
     ///     The complete Navigation gallery page.
     fn render_navigation(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = MoonPalette::active(cx);
-        let view = cx.entity();
+        let tab_view = cx.entity();
+        let status_view = cx.entity();
         section("Navigation / Status / Tokens", cx)
             .child(
                 card("Tabs", cx).child(
@@ -3949,7 +3950,7 @@ impl Gallery {
                             MoonTabItem::new("Disabled").disabled(true),
                         ])
                         .on_click(move |ix, _, _, app| {
-                            view.update(app, |this, cx| {
+                            tab_view.update(app, |this, cx| {
                                 this.tab_index = ix;
                                 this.push_event(format!("Tab selected: {ix}"), cx);
                             });
@@ -4021,7 +4022,15 @@ impl Gallery {
                                 MoonStatusItem::new("overlay scrollbar").tone(MoonTone::Warning),
                             ])
                             .right_items([
-                                MoonStatusItem::new("MoonPalette").color(p.amber),
+                                MoonStatusItem::new("MoonPalette")
+                                    .id("gallery-status-action")
+                                    .color(p.amber)
+                                    .tooltip("Click to record a status action")
+                                    .on_click(move |_, _, app| {
+                                        status_view.update(app, |this, cx| {
+                                            this.push_event("Status action clicked", cx);
+                                        });
+                                    }),
                                 MoonStatusItem::new(format!(
                                     "{} components",
                                     COMPONENT_COVERAGE.len()
