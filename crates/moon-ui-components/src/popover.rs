@@ -283,13 +283,23 @@ impl PopoverState {
         }
     }
 
-    fn toggle_open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let opening = !self.open;
-        if opening {
-            // Save the focused element before opening, so we can restore it on close.
-            self.previous_focus_handle = window.focused(cx);
-        }
-        self.set_open(opening, cx);
+    /// Remember what had focus before this popover takes it, so closing can hand it back.
+    ///
+    /// Must run while the popover is still CLOSED and from a synchronous path: reading it later
+    /// (for example from a deferred callback, after a sibling popover in the same frame already
+    /// focused itself) captures that sibling's handle instead of the real previous focus.
+    pub(crate) fn remember_previous_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.previous_focus_handle = window.focused(cx);
+    }
+
+    /// Apply the focus and dismiss-subscription work that belongs to the CURRENT value of `open`.
+    ///
+    /// Split out of `toggle_open` because a CONTROLLED popover (`Popover::open(bool)`, driven by a
+    /// caller-held flag) never went through it: `render` flipped the flag with `set_open` alone,
+    /// which left focus parked on the popover's about-to-be-removed handle and the dismiss
+    /// subscription alive. That emptied the window's focus path, so element-level key handlers fell
+    /// off the dispatch tree and application hotkeys stopped arriving until the user clicked.
+    pub(crate) fn sync_open_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.open {
             let state = cx.entity();
             let focus_handle = if let Some(tracked_focus_handle) = self.tracked_focus_handle.clone()
@@ -311,13 +321,30 @@ impl PopoverState {
                 );
         } else {
             self._dismiss_subscription = None;
-            // Restore focus to the element that was focused before the popover opened.
+            // Hand focus back. `focus_contains` rather than `contains_focused`: focus may sit on a
+            // DESCENDANT of the popover (an input, a list row) or on a tracked handle, and on the
+            // deferred close path the popover is already gone from the rendered frame.
+            let holds_focus = window
+                .focused(cx)
+                .is_some_and(|focused| focused == self.focus_handle);
             if let Some(prev) = self.previous_focus_handle.take() {
-                if self.focus_handle.contains_focused(window, cx) {
-                    prev.focus(window, cx);
-                }
+                prev.focus(window, cx);
+            } else if holds_focus {
+                // Nothing to restore — the common case for a header or strip gear opened while
+                // nothing was focused. Blur explicitly: leaving focus on the handle that is about
+                // to stop rendering is exactly what strands the dispatch path and kills hotkeys.
+                window.blur();
             }
         }
+    }
+
+    fn toggle_open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let opening = !self.open;
+        if opening {
+            self.remember_previous_focus(window, cx);
+        }
+        self.set_open(opening, cx);
+        self.sync_open_focus(window, cx);
 
         if let Some(callback) = self.on_open_change.as_ref() {
             callback(&self.open, window, cx);
@@ -394,15 +421,26 @@ impl RenderOnce for Popover {
             PopoverState::new(default_open, cx)
         });
 
-        state.update(cx, |state, cx| {
+        state.update(cx, |state, _| {
             if let Some(tracked_focus_handle) = tracked_focus_handle {
                 state.tracked_focus_handle = Some(tracked_focus_handle);
             }
             state.on_open_change = self.on_open_change.clone();
-            if let Some(force_open) = force_open {
-                state.set_open(force_open, cx);
-            }
         });
+
+        // Controlled mode: flip the flag NOW so this frame already renders the new state, and note
+        // the previously focused element while we are still synchronous. The focus move itself is
+        // deferred below — focusing mid-render is not safe — but skipping it entirely is what used
+        // to strand the window's focus (see `sync_open_focus`).
+        let open_changed = force_open.is_some_and(|force_open| state.read(cx).open != force_open);
+        if let Some(force_open) = force_open {
+            state.update(cx, |state, cx| {
+                if open_changed && force_open {
+                    state.remember_previous_focus(window, cx);
+                }
+                state.set_open(force_open, cx);
+            });
+        }
 
         let open = state.read(cx).open;
         let focus_handle = state.read(cx).focus_handle.clone();
@@ -412,6 +450,15 @@ impl RenderOnce for Popover {
         let Some(trigger) = self.trigger else {
             return div().id("empty");
         };
+
+        // Deferred only now: a triggerless popover returns above, so it can never take focus onto a
+        // handle that no element carries.
+        if open_changed {
+            let state = state.clone();
+            window.defer(cx, move |window, cx| {
+                state.update(cx, |state, cx| state.sync_open_focus(window, cx));
+            });
+        }
 
         let parent_view_id = window.current_view();
 
