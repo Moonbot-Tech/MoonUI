@@ -177,12 +177,14 @@ impl MoonButtonIconSlot {
     }
 }
 
+/// Theme-aware Moon button with semantic variants, scaled geometry, and rich content slots.
 #[derive(IntoElement)]
 pub struct MoonButton {
     id: ElementId,
     bounds: Option<MoonRect>,
     width: Option<f32>,
     full_width: bool,
+    padding_x: Option<f32>,
     segments: Vec<MoonButtonSegment>,
     variant: MoonButtonVariant,
     size: MoonButtonSize,
@@ -202,12 +204,20 @@ pub struct MoonButton {
 }
 
 impl MoonButton {
+    /// Create a button with the default toolbar size and neutral variant.
+    ///
+    /// Args:
+    ///     id: Stable element identity used for focus and interaction state.
+    ///
+    /// Returns:
+    ///     A default Moon button builder.
     pub fn new(id: impl Into<ElementId>) -> Self {
         Self {
             id: id.into(),
             bounds: None,
             width: None,
             full_width: false,
+            padding_x: None,
             segments: Vec::new(),
             variant: MoonButtonVariant::Neutral,
             size: MoonButtonSize::Toolbar,
@@ -310,6 +320,21 @@ impl MoonButton {
         self
     }
 
+    /// Override horizontal content padding in UI-scaled design units.
+    ///
+    /// The override leaves the size preset's height, typography, and icon gap unchanged. Omitting
+    /// it preserves the preset's native padding.
+    ///
+    /// Args:
+    ///     padding_x: Horizontal inset on each side at the reference UI scale.
+    ///
+    /// Returns:
+    ///     The updated button.
+    pub fn padding_x(mut self, padding_x: f32) -> Self {
+        self.padding_x = Some(padding_x.max(0.0));
+        self
+    }
+
     pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self {
         self.tooltip = Some(tooltip.into());
         self
@@ -390,6 +415,14 @@ impl MoonButton {
 }
 
 impl RenderOnce for MoonButton {
+    /// Render the configured button with theme-scaled geometry and interaction handlers.
+    ///
+    /// Args:
+    ///     _window: Window that owns the rendered button.
+    ///     cx: Application context used to resolve active Moon theme tokens.
+    ///
+    /// Returns:
+    ///     The rendered one-shot button element.
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let mut button = Button::new(self.id)
@@ -417,6 +450,9 @@ impl RenderOnce for MoonButton {
         }
         if self.full_width {
             button = button.w_full();
+        }
+        if let Some(padding_x) = self.padding_x {
+            button = button.px(px(tokens.ui(padding_x)));
         }
         // With no text segments there is nothing for a trailing icon to trail — it simply
         // IS the icon. Promote it to the leading slot so `Button` sees a genuine icon-only

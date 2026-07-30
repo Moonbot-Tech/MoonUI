@@ -1,6 +1,9 @@
 //! Regression coverage for Moon button sizing and icon-slot rendering.
 
-use super::{MoonButton, MoonButtonIconSlot, MoonButtonSize, button_text_metrics, size_for};
+use super::super::MoonPalette;
+use super::{
+    MoonButton, MoonButtonIconSlot, MoonButtonSize, MoonTheme, button_text_metrics, size_for,
+};
 
 /// Catches ignoring `button.rs:MoonButton::width` or `full_width` during rendering, which would
 /// make fixed controls use content width or prevent full-row actions from filling their parent.
@@ -11,6 +14,41 @@ fn moon_button_width_builders_preserve_layout_intent(cx: &mut gpui::TestAppConte
 
     assert_eq!(fixed.size.width, gpui::px(42.0));
     assert_eq!(full.size.width, gpui::px(200.0));
+}
+
+/// Catches removing the scaled `Button::px` refinement from
+/// `button.rs:MoonButton::render`, which would put localized Action-button text flush against its
+/// outline again. The paired default/padded geometry independently proves the seven-unit inset on
+/// both sides at two UI scales and in both supported themes.
+#[gpui::test]
+fn explicit_horizontal_padding_adds_scaled_insets_in_both_themes(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        for (ui_scale, expected_delta) in [(1.0, 14.0), (2.0, 28.0)] {
+            cx.update(|cx| {
+                let theme = MoonTheme::global_mut(cx);
+                theme.palette = palette;
+                theme.scale.ui = ui_scale;
+            });
+            let default = laid_out_bounds(cx, || {
+                MoonButton::new("action-default")
+                    .label("Action")
+                    .size(MoonButtonSize::Action)
+            });
+            let padded = laid_out_bounds(cx, || {
+                MoonButton::new("action-padded")
+                    .label("Action")
+                    .size(MoonButtonSize::Action)
+                    .padding_x(7.0)
+            });
+
+            assert_eq!(
+                padded.size.width - default.size.width,
+                gpui::px(expected_delta),
+                "horizontal padding delta is wrong for ui_scale={ui_scale}"
+            );
+        }
+    }
 }
 
 /// Catches changing the compact values in `button.rs:button_text_metrics` or `size_for`, which
