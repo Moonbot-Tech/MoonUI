@@ -275,6 +275,13 @@ impl PopoverState {
     }
 
     fn set_open(&mut self, open: bool, cx: &mut Context<Self>) {
+        // Only touch the global registry on an actual transition. A CONTROLLED popover runs this
+        // from `render` on every frame, and `GlobalState::global_mut` schedules a global-observer
+        // notification (plus a key allocation) each time — enough, on a popover living in a
+        // high-frequency host like a chart tab strip, to feed a repaint loop back into itself.
+        if self.open == open {
+            return;
+        }
         self.open = open;
         if self.open {
             GlobalState::global_mut(cx).register_deferred_popover(&self.focus_handle);
