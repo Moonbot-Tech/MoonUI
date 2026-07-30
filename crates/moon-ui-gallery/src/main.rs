@@ -3116,6 +3116,13 @@ impl Gallery {
         body
     }
 
+    /// Render the controls gallery with interactive button, input, and selector examples.
+    ///
+    /// Args:
+    ///     cx: Gallery context used for theme lookup and interaction listeners.
+    ///
+    /// Returns:
+    ///     The complete controls section.
     fn render_controls(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let view = cx.entity();
@@ -3205,6 +3212,7 @@ impl Gallery {
                                 MoonButton::new("btn-action")
                                     .label("Action")
                                     .size(MoonButtonSize::Action)
+                                    .padding_x(7.0)
                                     .render(),
                             )
                             .child(
