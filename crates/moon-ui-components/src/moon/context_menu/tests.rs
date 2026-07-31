@@ -1,6 +1,25 @@
 //! Regression coverage for MoonContextMenu viewport clamping.
 
-use super::{context_menu_clamped_origin, context_menu_max_height};
+use super::{MoonContextMenuOverlay, context_menu_clamped_origin, context_menu_max_height};
+use crate::moon::dropdown::{MoonMenuItem, take_menu_item_clone_probe_count};
+
+/// Catches changing `MoonContextMenuOverlay::items` back to an owned row vector. That edit makes
+/// the root overlay closure deep-clone every dynamic context-menu row on each rebuild.
+#[test]
+fn retained_context_menu_level_clones_without_cloning_rows() {
+    let overlay = MoonContextMenuOverlay::new("shared-context-menu").items(
+        (0..1_000).map(|ix| MoonMenuItem::new(format!("moon-menu-clone-probe-context-{ix:04}"))),
+    );
+    _ = take_menu_item_clone_probe_count();
+
+    let _retained_repaint_level = overlay.items.clone();
+
+    assert_eq!(
+        take_menu_item_clone_probe_count(),
+        0,
+        "cloning retained context-menu storage must not clone its 1,000 rows"
+    );
+}
 
 /// Catches removing the edge clamps in `context_menu.rs:context_menu_clamped_origin`, which would
 /// let menus opened near a viewport edge render partially off-screen.
