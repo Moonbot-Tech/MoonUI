@@ -73,9 +73,18 @@ type MoonDataCellHandler = Rc<dyn Fn(usize, usize, &mut Window, &mut App)>;
 type MoonDataContextMenuBuilder =
     Rc<dyn Fn(&MoonDataTableContextTarget, &mut Window, &mut App) -> Vec<MoonMenuItem>>;
 
-/// Минимальная ширина колонки в логических px: пол drag-ресайза и рендер-сжатия
-/// (`downscale_columns_to_available`).
+/// Minimum logical column width used by drag resizing and render-time fitting.
 const MIN_COLUMN_WIDTH: f32 = 40.0;
+
+/// Policy for reconciling declared column widths with the current viewport.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MoonDataTableWidthPolicy {
+    /// Grow or shrink columns to fit the viewport whenever the minimum-width floor permits.
+    #[default]
+    Fit,
+    /// Preserve widths when their sum exceeds the viewport and expose the overflow to scrolling.
+    Preserve,
+}
 
 #[derive(Clone)]
 pub struct MoonDataTableColumn {
@@ -83,13 +92,10 @@ pub struct MoonDataTableColumn {
     pub title: SharedString,
     /// Base column width in logical design pixels.
     ///
-    /// `MoonDataTable` treats this value as both the minimum width and the
-    /// proportional weight for auto-width layout. If the viewport is wider than
-    /// the sum of all base widths, every column is multiplied by the same scale
-    /// factor. If the viewport is narrower, columns are proportionally shrunk at
-    /// render time down to [`MIN_COLUMN_WIDTH`] each (stored widths stay intact);
-    /// only when even the minimums do not fit does the horizontal scrollbar own
-    /// the remaining overflow.
+    /// `MoonDataTable` treats this value as both the minimum width and the proportional weight for
+    /// auto-width layout. A wider viewport scales eligible columns up. A narrower viewport follows
+    /// [`MoonDataTableWidthPolicy`]: fit mode shrinks render copies toward [`MIN_COLUMN_WIDTH`],
+    /// while preserve mode leaves the declared or retained widths to horizontal scrolling.
     pub width: f32,
     pub fill: bool,
     /// Keep this column at its base width when the viewport is wider than the column sum.
@@ -110,18 +116,19 @@ pub struct MoonDataTableColumn {
     /// column that is both `fill` and `user_sized` stretches anyway and a drag-resize on it does
     /// not stick. `no_grow` does not participate because it cannot coexist with `fill`.
     ///
-    /// It does NOT mean "never shrink": a viewport narrower than the column sum still downscales
-    /// this column along with the rest, because seeing every column beats holding one width.
+    /// It does not mean "never shrink": fit mode still downscales this column with the rest.
+    /// Preserve mode, independently of `no_grow`, keeps every overflowing column width.
     pub no_grow: bool,
     pub align: MoonTableAlign,
     pub sortable: bool,
     pub resizable: bool,
     pub movable: bool,
     pub fixed_left: bool,
-    /// Ширину задал пользователь (drag-ресайз, есть запись в `state.column_widths`). Такие
-    /// колонки НЕ участвуют в авто-растяжении (`auto_width_columns`): держатся ровно на
-    /// заданной ширине, а свободное место распределяется между нетронутыми. Иначе ресайз
-    /// «прыгал» — заданную ширину домножали на scale заполнения, и соседи пересжимались.
+    /// Whether the retained width came from a user drag.
+    ///
+    /// User-sized columns do not participate in auto-growth: they hold the dragged width while
+    /// untouched columns share spare space. Fit mode may still shrink their render copies in a
+    /// narrow viewport; preserve mode leaves them unchanged for horizontal scrolling.
     pub user_sized: bool,
 }
 
@@ -493,6 +500,8 @@ pub struct MoonDataTable {
     column_selectable: bool,
     row_header: bool,
     row_header_width: f32,
+    width_policy: MoonDataTableWidthPolicy,
+    horizontal_scrollbar_visibility: MoonScrollbarVisibility,
     on_select_row: Option<MoonDataRowHandler>,
     on_double_click_row: Option<MoonDataRowHandler>,
     on_right_click_row: Option<MoonDataRowHandler>,
@@ -527,6 +536,8 @@ impl MoonDataTable {
             column_selectable: true,
             row_header: false,
             row_header_width: 28.0,
+            width_policy: MoonDataTableWidthPolicy::Fit,
+            horizontal_scrollbar_visibility: MoonScrollbarVisibility::Hover,
             on_select_row: None,
             on_double_click_row: None,
             on_right_click_row: None,
@@ -597,6 +608,30 @@ impl MoonDataTable {
 
     pub fn row_header_width(mut self, width: f32) -> Self {
         self.row_header_width = width.max(18.0);
+        self
+    }
+
+    /// Set how column widths behave when their sum exceeds the viewport.
+    ///
+    /// Args:
+    ///     policy: Fit-to-viewport or scrollable preserve-width behavior.
+    ///
+    /// Returns:
+    ///     The updated table builder.
+    pub fn width_policy(mut self, policy: MoonDataTableWidthPolicy) -> Self {
+        self.width_policy = policy;
+        self
+    }
+
+    /// Set the horizontal scrollbar presentation policy.
+    ///
+    /// Args:
+    ///     visibility: Shared MoonUI scrollbar visibility mode.
+    ///
+    /// Returns:
+    ///     The updated table builder.
+    pub fn horizontal_scrollbar_visibility(mut self, visibility: MoonScrollbarVisibility) -> Self {
+        self.horizontal_scrollbar_visibility = visibility;
         self
     }
 
@@ -720,24 +755,29 @@ impl MoonDataTable {
             .collect()
     }
 
+    /// Compute render widths without mutating retained user widths.
+    ///
+    /// Args:
+    ///     columns: Ordered columns carrying declared or retained widths.
+    ///     viewport_width: Measured horizontal viewport width.
+    ///     row_header_width: Width reserved for the optional row header.
+    ///     width_policy: Fit or preserve behavior for narrow viewports.
+    ///
+    /// Returns:
+    ///     Render-only column copies with the selected sizing policy applied.
     fn auto_width_columns(
         mut columns: Vec<MoonDataTableColumn>,
         viewport_width: f32,
         row_header_width: f32,
+        width_policy: MoonDataTableWidthPolicy,
     ) -> Vec<MoonDataTableColumn> {
         let available = (viewport_width - row_header_width).max(0.0);
-        // Вьюпорт ещё не замерен (первый кадр, канвас не отдал ширину) — оставить базовые
-        // ширины как есть, иначе downscale схлопнул бы всё к минимуму на один кадр.
+        // Keep base widths on the first frame before the viewport canvas has measured itself.
         if available <= 0.0 {
             return columns;
         }
-        // Заресайзенные пользователем колонки — фиксированы (держатся на своей ширине),
-        // авто-растяжение к заполнению распределяем ТОЛЬКО между нетронутыми. Иначе заданную
-        // drag'ом ширину домножали на общий scale → колонка прыгала больше, чем тянули, а
-        // соседи пересжимались. Все колонки тронуты (flex==0) → не растягиваем вовсе.
-        // `no_grow` exempts a column the same way, but by the column AUTHOR's decision rather than
-        // the user's: a column that renders nothing of its own must not claim a share of the free
-        // space (see the field).
+        // User-sized and author-fixed columns keep their widths while untouched columns share
+        // extra space. When every column is fixed, no stretching is needed.
         let is_pinned = |column: &MoonDataTableColumn| column.user_sized || column.no_grow;
         let fixed: f32 = columns
             .iter()
@@ -756,12 +796,9 @@ impl MoonDataTable {
                 column.width *= scale;
                 column.fill = false;
             }
-        } else if fixed + flex > available {
-            // Вьюпорт УЖЕ суммы ширин (монитор с другим масштабом/разрешением, сжатая
-            // панель) — пропорционально ужать НА РЕНДЕРЕ, иначе хвост колонок уезжает в
-            // горизонтальный скролл и «пропадает». Стор ширин (state.column_widths) не
-            // трогаем: на широком вьюпорте пропорции восстановятся сами. Ужимаются и
-            // user_sized — осознанно: видеть все колонки важнее точной ручной ширины.
+        } else if fixed + flex > available && width_policy == MoonDataTableWidthPolicy::Fit {
+            // Fit mode scales render copies only; retained user widths remain unchanged and return
+            // when the viewport widens. Preserve mode leaves the excess to horizontal scrolling.
             downscale_columns_to_available(&mut columns, available);
         }
         columns
@@ -981,10 +1018,9 @@ impl MoonDataTable {
                         .w(px(tokens.ui(6.0)))
                         .cursor(CursorStyle::ResizeColumn)
                         .hover(|this| this.bg(rgba_from(p.accent, 0.14)))
-                        // Двойной клик по разделителю — сброс ширины в авто. Обычный дабл-клик:
-                        // ТОЛЬКО эта колонка (убираем её из `column_widths` → снова «нетронутая»,
-                        // растягивается авто-филлом, соседние заресайзенные стоят). Shift+дабл-клик:
-                        // ПОЛНЫЙ сброс всех ширин таблицы (Shift кроссплатформенный — Win/macOS).
+                        // Double-clicking a divider restores automatic width. A plain double-click
+                        // resets only this column, so it rejoins auto-fill while other resized
+                        // columns stay fixed. Shift+double-click resets every table width.
                         .on_click(move |event, _, cx| {
                             if event.click_count() >= 2 {
                                 let full = event.modifiers().shift;
@@ -1014,12 +1050,10 @@ impl MoonDataTable {
                                     return;
                                 }
                                 if let Some(bounds) = state.header_bounds(&drag.key) {
-                                    // Первый ресайз в таблице: фиксируем ВСЕ колонки на их
-                                    // текущей отображаемой ширине (снимок из header_bounds).
-                                    // Дальше `auto_width_columns` не растягивает нетронутые
-                                    // (все user_sized) → тянешь границу, двигается только эта
-                                    // колонка (и правые за ней), ЛЕВЫЕ стоят на месте. Визуально
-                                    // ничего не прыгает — ширины берём те, что уже отрисованы.
+                                    // On the first resize, retain every column at its current
+                                    // rendered width from `header_bounds`. All columns then count as
+                                    // user-sized, so dragging one divider moves that column and the
+                                    // columns to its right without shifting left-side columns.
                                     if state.column_widths.is_empty() {
                                         let snapshot: Vec<(String, f32)> = state
                                             .header_bounds
@@ -1117,6 +1151,8 @@ impl RenderOnce for MoonDataTable {
         let viewport_from_scroll = f32::from(horizontal_scroll_handle.bounds().size.width).max(0.0);
         let viewport_from_state = state.read(cx).viewport_width();
         let viewport_width = viewport_from_scroll.max(viewport_from_state);
+        let width_policy = self.width_policy;
+        let horizontal_scrollbar_visibility = self.horizontal_scrollbar_visibility;
         // Original column order (by key) BEFORE reordering — `render_row` returns cells in
         // this order. After columns are reordered (drag), the body cells must be permuted to
         // match, otherwise only the header moves while cell content stays in place.
@@ -1129,6 +1165,7 @@ impl RenderOnce for MoonDataTable {
             Self::ordered_columns(self.columns, state.read(cx)),
             viewport_width,
             row_header_width,
+            width_policy,
         );
         // Permutation: displayed column position -> index of that column in the original
         // (render_row) order. Used to reorder each row's cells in lockstep with the header.
@@ -1628,7 +1665,7 @@ impl RenderOnce for MoonDataTable {
             SharedString::from(format!("{id}:h-scrollbar")),
             &horizontal_scroll_handle,
             MoonScrollAxis::Horizontal,
-            MoonScrollbarVisibility::Hover,
+            horizontal_scrollbar_visibility,
             p,
             window,
             cx,
@@ -1640,11 +1677,16 @@ impl RenderOnce for MoonDataTable {
     }
 }
 
-/// Пропорционально ужать колонки под доступную ширину, уважая пол [`MIN_COLUMN_WIDTH`]:
-/// колонка, падающая ниже минимума, пиннится на нём, а дефицит перераспределяется по
-/// остальным (итеративный water-fill). Если даже минимумы не влезают — все колонки на
-/// минимуме, остаток честно уходит в горизонтальный скролл. Мутирует только переданный
-/// срез (рендер-копию колонок), сохранённые пользовательские ширины не затрагивает.
+/// Proportionally shrink render-only column copies to the available width with a water-fill
+/// minimum. Columns that would fall below [`MIN_COLUMN_WIDTH`] pin there and redistribute the
+/// remaining deficit; if even all minimums overflow, the horizontal scroller owns the remainder.
+///
+/// Args:
+///     columns: Render-only columns to resize.
+///     available: Width available after the optional row header.
+///
+/// Returns:
+///     Nothing; the supplied render copies are updated in place.
 fn downscale_columns_to_available(columns: &mut [MoonDataTableColumn], available: f32) {
     let n = columns.len();
     if n == 0 {
@@ -1659,8 +1701,8 @@ fn downscale_columns_to_available(columns: &mut [MoonDataTableColumn], available
     }
     let mut pinned = vec![false; n];
     let mut scale = 1.0_f32;
-    // Каждый проход либо пиннит хотя бы одну новую колонку, либо финализирует scale —
-    // не больше n итераций.
+    // Each pass either pins at least one new column or finalizes the scale, so at most `n + 1`
+    // passes are required.
     for _ in 0..=n {
         let pinned_sum = pinned.iter().filter(|p| **p).count() as f32 * MIN_COLUMN_WIDTH;
         let flex_base: f32 = columns
