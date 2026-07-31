@@ -2,7 +2,11 @@
 
 // Do not use `super::*`: the glob would import the `gpui::test` macro, causing `#[test]` to
 // recursively expand into itself.
-use super::{MIN_COLUMN_WIDTH, MoonDataTable, MoonDataTableColumn, MoonDataTableWidthPolicy};
+use super::{
+    MIN_COLUMN_WIDTH, MoonDataTable, MoonDataTableColumn, MoonDataTableWidthPolicy,
+    is_select_all_shortcut,
+};
+use gpui::Modifiers;
 
 /// Build a test column with matching key and label.
 fn col(key: &str, width: f32) -> MoonDataTableColumn {
@@ -194,4 +198,51 @@ fn data_table_context_menu_uses_root_owned_overlay_layer() {
             && !implementation.contains("MoonContextMenu::new("),
         "MoonDataTable must open context menus through the Root-owned window layer, not render local menu overlays as table children"
     );
+}
+
+/// Catches removing any controlled-selection guard from
+/// `data_table.rs:MoonDataTable::controlled_row_selection`. That regression would let header,
+/// cell, row, row-header, or keyboard navigation paint a second selection that the owning view's
+/// actions do not target.
+#[test]
+fn controlled_row_selection_owns_every_internal_selection_path() {
+    let source = include_str!("../data_table.rs");
+    let implementation = source.split("#[cfg(test)]").next().unwrap_or(source);
+    let normalized = implementation
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    for required in [
+        "if column_selectable { if !controlled_row_selection",
+        "if controlled_row_selection { return;",
+        "let selected_row = !controlled_row_selection",
+        "let selected_cell = if controlled_row_selection",
+        "if !controlled_row_selection { state.select_cell",
+        "if !controlled_row_selection { state.select_row",
+        "if !controlled_row_selection { state_for_header_click.update",
+        "let row_header_bg: Background = if row_selected",
+    ] {
+        assert!(
+            normalized.contains(required),
+            "controlled row selection must cover every retained selection and highlight path: {required}"
+        );
+    }
+}
+
+/// Catches weakening `data_table.rs:is_select_all_shortcut` to accept any modified A key. That
+/// regression would make Shift+Ctrl+A or Alt+Ctrl+A replace the owning view's row selection.
+#[test]
+fn select_all_shortcut_requires_the_exact_platform_secondary_modifier() {
+    let secondary = Modifiers::secondary_key();
+    let mut with_shift = secondary;
+    with_shift.shift = true;
+    let mut with_alt = secondary;
+    with_alt.alt = true;
+
+    assert!(is_select_all_shortcut("a", secondary));
+    assert!(!is_select_all_shortcut("b", secondary));
+    assert!(!is_select_all_shortcut("a", Modifiers::default()));
+    assert!(!is_select_all_shortcut("a", with_shift));
+    assert!(!is_select_all_shortcut("a", with_alt));
 }

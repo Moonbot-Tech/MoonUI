@@ -70,11 +70,27 @@ pub enum MoonDataTableEvent {
 type MoonDataRowHandler = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 type MoonDataColumnHandler = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 type MoonDataCellHandler = Rc<dyn Fn(usize, usize, &mut Window, &mut App)>;
+/// Callback for a table-wide action that carries no row or column index.
+type MoonDataActionHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 type MoonDataContextMenuBuilder =
     Rc<dyn Fn(&MoonDataTableContextTarget, &mut Window, &mut App) -> Vec<MoonMenuItem>>;
 
 /// Minimum logical column width used by drag resizing and render-time fitting.
 const MIN_COLUMN_WIDTH: f32 = 40.0;
+
+/// Return whether one keystroke is the platform's exact Select All shortcut.
+///
+/// # Arguments
+///
+/// * `key` - Normalized GPUI key name.
+/// * `modifiers` - Modifiers carried by the same key-down event.
+///
+/// # Returns
+///
+/// `true` for Ctrl+A on Windows/Linux or Command+A on macOS, without extra modifiers.
+fn is_select_all_shortcut(key: &str, modifiers: Modifiers) -> bool {
+    key == "a" && modifiers == Modifiers::secondary_key()
+}
 
 /// Policy for reconciling declared column widths with the current viewport.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -484,6 +500,7 @@ impl Default for MoonDataTableState {
 }
 
 #[derive(IntoElement)]
+/// A virtualized data table with configurable selection ownership and column layout.
 pub struct MoonDataTable {
     id: SharedString,
     bounds: Option<MoonRect>,
@@ -496,6 +513,7 @@ pub struct MoonDataTable {
     scroll_handle: Option<MoonVirtualListScrollHandle>,
     style: Option<MoonTableStyle>,
     background_policy: MoonBackgroundPolicy,
+    controlled_row_selection: bool,
     cell_selectable: bool,
     column_selectable: bool,
     row_header: bool,
@@ -503,6 +521,7 @@ pub struct MoonDataTable {
     width_policy: MoonDataTableWidthPolicy,
     horizontal_scrollbar_visibility: MoonScrollbarVisibility,
     on_select_row: Option<MoonDataRowHandler>,
+    on_select_all_rows: Option<MoonDataActionHandler>,
     on_double_click_row: Option<MoonDataRowHandler>,
     on_right_click_row: Option<MoonDataRowHandler>,
     on_select_column: Option<MoonDataColumnHandler>,
@@ -515,6 +534,17 @@ pub struct MoonDataTable {
 }
 
 impl MoonDataTable {
+    /// Create a data table backed by a lazy row renderer.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Stable element identity used for retained table state.
+    /// * `row_count` - Number of rows available to the virtual list.
+    /// * `render_row` - Callback that constructs a row when it enters the visible range.
+    ///
+    /// # Returns
+    ///
+    /// A table with default styling, selection, and layout policies.
     pub fn new(
         id: impl Into<SharedString>,
         row_count: usize,
@@ -532,6 +562,7 @@ impl MoonDataTable {
             scroll_handle: None,
             style: None,
             background_policy: MoonBackgroundPolicy::Opaque,
+            controlled_row_selection: false,
             cell_selectable: false,
             column_selectable: true,
             row_header: false,
@@ -539,6 +570,7 @@ impl MoonDataTable {
             width_policy: MoonDataTableWidthPolicy::Fit,
             horizontal_scrollbar_visibility: MoonScrollbarVisibility::Hover,
             on_select_row: None,
+            on_select_all_rows: None,
             on_double_click_row: None,
             on_right_click_row: None,
             on_select_column: None,
@@ -591,6 +623,22 @@ impl MoonDataTable {
         self
     }
 
+    /// Let rendered [`MoonDataRow::selected`] values exclusively own row highlighting.
+    ///
+    /// Controlled tables still emit click, double-click, sort, and context-menu callbacks, but
+    /// they neither render nor mutate the retained row/cell selection and leave navigation keys
+    /// available to the owning view.
+    ///
+    /// Args:
+    ///     controlled: Whether the caller owns the complete row-selection state.
+    ///
+    /// Returns:
+    ///     The updated table builder.
+    pub fn controlled_row_selection(mut self, controlled: bool) -> Self {
+        self.controlled_row_selection = controlled;
+        self
+    }
+
     pub fn cell_selectable(mut self, selectable: bool) -> Self {
         self.cell_selectable = selectable;
         self
@@ -640,6 +688,23 @@ impl MoonDataTable {
         handler: impl Fn(usize, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_select_row = Some(Rc::new(handler));
+        self
+    }
+
+    /// Handle the platform's Select All shortcut while this table owns focus.
+    ///
+    /// The table prevents the default action and stops propagation only after invoking the
+    /// callback. Tables without this callback leave Ctrl+A or Command+A available to their parent.
+    ///
+    /// # Arguments
+    ///
+    /// * `handler` - Callback that selects rows in caller-owned state.
+    ///
+    /// # Returns
+    ///
+    /// The updated table builder.
+    pub fn on_select_all_rows(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_select_all_rows = Some(Rc::new(handler));
         self
     }
 
@@ -716,7 +781,16 @@ impl MoonDataTable {
         self
     }
 
-    fn ordered_columns(
+    /// Resolve columns in the exact order the table renders, including retained drag order,
+    /// fixed-left precedence, and user widths.
+    ///
+    /// Args:
+    ///     columns: Current caller-provided column descriptors in source order.
+    ///     state: Retained table state containing drag order and resized widths.
+    ///
+    /// Returns:
+    ///     Render-ordered descriptors suitable for matching auxiliary projections to the table.
+    pub fn ordered_columns(
         columns: Vec<MoonDataTableColumn>,
         state: &MoonDataTableState,
     ) -> Vec<MoonDataTableColumn> {
@@ -804,6 +878,28 @@ impl MoonDataTable {
         columns
     }
 
+    /// Render the header using the resolved visual column order.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Stable table identity used to derive header element IDs.
+    /// * `columns` - Columns in their resolved visual order.
+    /// * `state` - Retained table state for sorting, widths, and drag interactions.
+    /// * `height` - Header height in pixels.
+    /// * `left_offset` - Horizontal offset reserved for the row-header gutter.
+    /// * `style` - Resolved table style.
+    /// * `column_selectable` - Whether header clicks select columns.
+    /// * `controlled_row_selection` - Whether the caller owns all selection highlights.
+    /// * `on_select_column` - Optional column-selection callback.
+    /// * `on_right_click_column` - Optional column context callback.
+    /// * `context_menu_builder` - Optional context-menu content builder.
+    /// * `on_sort` - Optional sort-change callback.
+    /// * `window` - Active GPUI window.
+    /// * `cx` - Application context.
+    ///
+    /// # Returns
+    ///
+    /// The complete header element.
     fn render_header(
         id: &SharedString,
         columns: &[MoonDataTableColumn],
@@ -812,6 +908,7 @@ impl MoonDataTable {
         left_offset: f32,
         style: MoonTableStyle,
         column_selectable: bool,
+        controlled_row_selection: bool,
         on_select_column: Option<MoonDataColumnHandler>,
         on_right_click_column: Option<MoonDataColumnHandler>,
         context_menu_builder: Option<MoonDataContextMenuBuilder>,
@@ -917,10 +1014,12 @@ impl MoonDataTable {
                     .hover(|this| this.bg(rgba_from(p.panel_high, 0.72)))
                     .on_click(move |_, window, cx| {
                         if column_selectable {
-                            state.update(cx, |state, cx| {
-                                state.select_column(Some(column_ix), cx);
-                                cx.notify();
-                            });
+                            if !controlled_row_selection {
+                                state.update(cx, |state, cx| {
+                                    state.select_column(Some(column_ix), cx);
+                                    cx.notify();
+                                });
+                            }
                             if let Some(on_select_column) = &on_select_column {
                                 on_select_column(column_ix, window, cx);
                             }
@@ -1119,6 +1218,16 @@ impl MoonDataTable {
 }
 
 impl RenderOnce for MoonDataTable {
+    /// Render the configured table into the active GPUI window.
+    ///
+    /// # Arguments
+    ///
+    /// * `window` - Active GPUI window.
+    /// * `cx` - Application context.
+    ///
+    /// # Returns
+    ///
+    /// The complete virtualized table element.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let tokens = MoonTheme::active_tokens(cx);
@@ -1188,6 +1297,7 @@ impl RenderOnce for MoonDataTable {
         let columns_min_width = columns.iter().map(|column| column.width).sum::<f32>();
         let table_min_width = (columns_min_width + row_header_width).max(1.0);
         let on_select_row = self.on_select_row.clone();
+        let on_select_all_rows = self.on_select_all_rows.clone();
         let on_double_click_row = self.on_double_click_row.clone();
         let on_right_click_row = self.on_right_click_row.clone();
         let on_select_column = self.on_select_column.clone();
@@ -1197,6 +1307,7 @@ impl RenderOnce for MoonDataTable {
         let on_right_click_cell = self.on_right_click_cell.clone();
         let context_menu_builder = self.context_menu_builder.clone();
         let on_sort = self.on_sort.clone();
+        let controlled_row_selection = self.controlled_row_selection;
         let scroll_handle = self.scroll_handle.unwrap_or_else(|| {
             window
                 .use_keyed_state(
@@ -1250,6 +1361,17 @@ impl RenderOnce for MoonDataTable {
                 );
             })
             .on_key_down(move |event, window, cx| {
+                if is_select_all_shortcut(event.keystroke.key.as_str(), event.keystroke.modifiers)
+                    && let Some(on_select_all_rows) = &on_select_all_rows
+                {
+                    on_select_all_rows(window, cx);
+                    window.prevent_default();
+                    cx.stop_propagation();
+                    return;
+                }
+                if controlled_row_selection {
+                    return;
+                }
                 let key = event.keystroke.key.as_str();
                 let page_rows = {
                     let viewport_h =
@@ -1371,9 +1493,15 @@ impl RenderOnce for MoonDataTable {
                         .map(|&i| taken[i].take().unwrap_or_else(|| MoonDataCell::text("")))
                         .collect();
                 }
-                let selected_row = state_for_rows.read(cx).selected_row == Some(ix);
-                let selected_cell = state_for_rows.read(cx).selected_cell;
+                let selected_row =
+                    !controlled_row_selection && state_for_rows.read(cx).selected_row == Some(ix);
+                let selected_cell = if controlled_row_selection {
+                    None
+                } else {
+                    state_for_rows.read(cx).selected_cell
+                };
                 row.selected = row.selected || selected_row;
+                let row_selected = row.selected;
 
                 let state_for_row_click = state_for_rows.clone();
                 let state_for_row_right = state_for_rows.clone();
@@ -1419,15 +1547,19 @@ impl RenderOnce for MoonDataTable {
                             cell = cell
                                 .cursor_pointer()
                                 .on_click(move |event, window, cx| {
-                                    state_for_cell_click.update(cx, |state, cx| {
-                                        state.select_cell(ix, column_ix, cx);
-                                        if event.click_count() == 2 {
-                                            cx.emit(MoonDataTableEvent::DoubleClickedCell(
-                                                ix, column_ix,
-                                            ));
-                                        }
-                                        cx.notify();
-                                    });
+                                    if !controlled_row_selection || event.click_count() == 2 {
+                                        state_for_cell_click.update(cx, |state, cx| {
+                                            if !controlled_row_selection {
+                                                state.select_cell(ix, column_ix, cx);
+                                            }
+                                            if event.click_count() == 2 {
+                                                cx.emit(MoonDataTableEvent::DoubleClickedCell(
+                                                    ix, column_ix,
+                                                ));
+                                            }
+                                            cx.notify();
+                                        });
+                                    }
                                     if let Some(on_select_cell) = &on_select_cell {
                                         on_select_cell(ix, column_ix, window, cx);
                                     }
@@ -1483,13 +1615,17 @@ impl RenderOnce for MoonDataTable {
                     .on_click({
                         let on_select_row = on_select_row.clone();
                         move |event, window, cx| {
-                            state_for_row_click.update(cx, |state, cx| {
-                                state.select_row(Some(ix), cx);
-                                if event.click_count() == 2 {
-                                    cx.emit(MoonDataTableEvent::DoubleClickedRow(ix));
-                                }
-                                cx.notify();
-                            });
+                            if !controlled_row_selection || event.click_count() == 2 {
+                                state_for_row_click.update(cx, |state, cx| {
+                                    if !controlled_row_selection {
+                                        state.select_row(Some(ix), cx);
+                                    }
+                                    if event.click_count() == 2 {
+                                        cx.emit(MoonDataTableEvent::DoubleClickedRow(ix));
+                                    }
+                                    cx.notify();
+                                });
+                            }
                             if let Some(on_select_row) = &on_select_row {
                                 on_select_row(ix, window, cx);
                             }
@@ -1525,7 +1661,7 @@ impl RenderOnce for MoonDataTable {
                 if row_header {
                     let state_for_header_click = state_for_rows.clone();
                     let on_select_row = on_select_row.clone();
-                    let row_header_bg: Background = if selected_row {
+                    let row_header_bg: Background = if row_selected {
                         selected_background(p)
                     } else {
                         rgba_from(style.body_bg, 0.0).into()
@@ -1554,10 +1690,12 @@ impl RenderOnce for MoonDataTable {
                             .bg(row_header_bg)
                             .child((ix + 1).to_string())
                             .on_click(move |_, window, cx| {
-                                state_for_header_click.update(cx, |state, cx| {
-                                    state.select_row(Some(ix), cx);
-                                    cx.notify();
-                                });
+                                if !controlled_row_selection {
+                                    state_for_header_click.update(cx, |state, cx| {
+                                        state.select_row(Some(ix), cx);
+                                        cx.notify();
+                                    });
+                                }
                                 if let Some(on_select_row) = &on_select_row {
                                     on_select_row(ix, window, cx);
                                 }
@@ -1590,6 +1728,7 @@ impl RenderOnce for MoonDataTable {
                 row_header_width,
                 style,
                 column_selectable,
+                controlled_row_selection,
                 on_select_column,
                 on_right_click_column,
                 context_menu_builder.clone(),
