@@ -11,11 +11,19 @@ pub(crate) enum RowEntry {
     SectionFooter(usize),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// Uniform row dimensions plus optional section chrome presence for one list layout pass.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct MeasuredEntrySize {
+    /// Shared size of every selectable item.
     pub(crate) item_size: Size<Pixels>,
+    /// Shared size of each section header that is present.
     pub(crate) section_header_size: Size<Pixels>,
+    /// Shared size of each section footer that is present.
     pub(crate) section_footer_size: Size<Pixels>,
+    /// Whether each section contributes a header row to the virtual list.
+    pub(crate) section_headers: Vec<bool>,
+    /// Whether each section contributes a footer row to the virtual list.
+    pub(crate) section_footers: Vec<bool>,
 }
 
 impl RowEntry {
@@ -164,6 +172,16 @@ impl RowsCache {
         path
     }
 
+    /// Rebuild flattened virtual rows when section counts or measured geometry change.
+    ///
+    /// Args:
+    ///     sections_count: Number of source sections to inspect.
+    ///     measured_size: Uniform dimensions and per-section optional chrome presence.
+    ///     cx: Application context passed to the row-count callback.
+    ///     rows_count_f: Callback returning the item count for one section.
+    ///
+    /// Returns:
+    ///     Nothing; cached entities and virtual row sizes are replaced only when needed.
     pub(crate) fn prepare_if_needed<F>(
         &mut self,
         sections_count: usize,
@@ -186,35 +204,49 @@ impl RowsCache {
 
         let mut entries_sizes = vec![];
         let mut total_items_count = 0;
-        self.measured_size = measured_size;
         self.sections = Rc::new(new_sections);
-        self.entities = Rc::new(
-            self.sections
-                .iter()
-                .enumerate()
-                .flat_map(|(section, items_count)| {
-                    total_items_count += items_count;
-                    let mut children = vec![];
-                    if *items_count == 0 {
-                        return children;
-                    }
+        let entities = self
+            .sections
+            .iter()
+            .enumerate()
+            .flat_map(|(section, items_count)| {
+                total_items_count += items_count;
+                let mut children = vec![];
+                if *items_count == 0 {
+                    return children;
+                }
 
+                if measured_size
+                    .section_headers
+                    .get(section)
+                    .copied()
+                    .unwrap_or(false)
+                {
                     children.push(RowEntry::SectionHeader(section));
                     entries_sizes.push(measured_size.section_header_size);
-                    for row in 0..*items_count {
-                        children.push(RowEntry::Entry(IndexPath {
-                            section,
-                            row,
-                            ..Default::default()
-                        }));
-                        entries_sizes.push(measured_size.item_size);
-                    }
+                }
+                for row in 0..*items_count {
+                    children.push(RowEntry::Entry(IndexPath {
+                        section,
+                        row,
+                        ..Default::default()
+                    }));
+                    entries_sizes.push(measured_size.item_size);
+                }
+                if measured_size
+                    .section_footers
+                    .get(section)
+                    .copied()
+                    .unwrap_or(false)
+                {
                     children.push(RowEntry::SectionFooter(section));
                     entries_sizes.push(measured_size.section_footer_size);
-                    children
-                })
-                .collect(),
-        );
+                }
+                children
+            })
+            .collect();
+        self.measured_size = measured_size;
+        self.entities = Rc::new(entities);
         self.entries_sizes = Rc::new(entries_sizes);
         self.items_count = total_items_count;
     }

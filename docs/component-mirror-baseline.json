@@ -828,22 +828,27 @@
       "local_paths": [
         "list"
       ],
-      "local_hash": "aef9d9d212d15e2f",
+      "local_hash": "ad8914702317fa18",
       "local_files": [
         {
           "path": "list/cache.rs",
-          "hash": "54ed8ade3b1d69aa",
-          "bytes": 11900
+          "hash": "b43547a70c6c9109",
+          "bytes": 13276
         },
         {
           "path": "list/delegate.rs",
-          "hash": "bbb28ccc5c2a3277",
-          "bytes": 5217
+          "hash": "af02f78bf9b5a303",
+          "bytes": 6071
         },
         {
           "path": "list/list.rs",
-          "hash": "2bd926b2ebbe2a75",
-          "bytes": 25759
+          "hash": "4867689acbd4bd3a",
+          "bytes": 26406
+        },
+        {
+          "path": "list/list/tests.rs",
+          "hash": "af6d792dd1a5a37c",
+          "bytes": 8154
         },
         {
           "path": "list/list_item.rs",
@@ -905,6 +910,10 @@
         }
       ],
       "donor_changed_files": [
+        "list/cache.rs",
+        "list/delegate.rs",
+        "list/list.rs",
+        "list/list/tests.rs",
         "list/list_item.rs",
         "list/separator_item.rs"
       ]
