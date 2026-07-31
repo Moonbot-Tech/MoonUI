@@ -92,6 +92,7 @@ pub use combobox::{
     MoonSearchableListDelegate, MoonSearchableListItem, MoonSearchableListState, MoonSearchableVec,
 };
 pub use context_menu::{MoonContextMenu, MoonContextMenuOverlay, MoonContextMenuWindowExt};
+pub use data_table::MoonDataTableWidthPolicy;
 pub use data_table::{
     MoonDataCell, MoonDataRow, MoonDataTable, MoonDataTableColumn, MoonDataTableState,
 };
