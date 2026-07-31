@@ -4,16 +4,17 @@ use crate::WindowExt as _;
 use gpui::*;
 
 use super::{
-    dropdown::{MoonMenuItem, MoonPopupMenu},
-    tokens::{MoonPalette, MoonRect},
+    dropdown::{MoonMenuItem, MoonMenuLevel, MoonPopupMenu},
+    tokens::MoonRect,
 };
 
 #[derive(IntoElement)]
+/// Positioned Moon popup level used inside the root-owned context-menu overlay.
 pub struct MoonContextMenu {
     id: SharedString,
     bounds: Option<MoonRect>,
     position: Option<Point<Pixels>>,
-    items: Vec<MoonMenuItem>,
+    items: MoonMenuLevel,
     open: bool,
     width: f32,
     max_height: Option<f32>,
@@ -22,11 +23,12 @@ pub struct MoonContextMenu {
 type MoonContextDismissHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 #[derive(IntoElement)]
+/// Full-window dismiss layer that owns one positioned Moon context menu.
 pub struct MoonContextMenuOverlay {
     id: SharedString,
     bounds: Option<MoonRect>,
     position: Option<Point<Pixels>>,
-    items: Vec<MoonMenuItem>,
+    items: MoonMenuLevel,
     open: bool,
     width: f32,
     max_height: Option<f32>,
@@ -55,12 +57,19 @@ pub trait MoonContextMenuWindowExt {
 }
 
 impl MoonContextMenu {
+    /// Create a closed context menu with empty shared row storage.
+    ///
+    /// Args:
+    ///     id: Stable identity used by the menu and retained virtual-list state.
+    ///
+    /// Returns:
+    ///     A default context-menu builder.
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
             bounds: None,
             position: None,
-            items: Vec::new(),
+            items: MoonMenuLevel::new([]),
             open: false,
             width: 180.0,
             max_height: None,
@@ -79,13 +88,39 @@ impl MoonContextMenu {
         self
     }
 
+    /// Append one context-menu row without a later layout scan.
+    ///
+    /// Args:
+    ///     item: Row to append.
+    ///
+    /// Returns:
+    ///     The updated menu.
     pub fn item(mut self, item: MoonMenuItem) -> Self {
-        self.items.push(item);
+        self.items.extend([item]);
         self
     }
 
+    /// Append context-menu rows while accumulating their layout signature.
+    ///
+    /// Args:
+    ///     items: Rows in display order.
+    ///
+    /// Returns:
+    ///     The updated menu.
     pub fn items(mut self, items: impl IntoIterator<Item = MoonMenuItem>) -> Self {
         self.items.extend(items);
+        self
+    }
+
+    /// Install a retained menu level without cloning its rows.
+    ///
+    /// Args:
+    ///     items: Shared row storage and layout signature.
+    ///
+    /// Returns:
+    ///     The updated menu.
+    fn shared_items(mut self, items: MoonMenuLevel) -> Self {
+        self.items = items;
         self
     }
 
@@ -106,12 +141,19 @@ impl MoonContextMenu {
 }
 
 impl MoonContextMenuOverlay {
+    /// Create a closed root-owned context-menu overlay.
+    ///
+    /// Args:
+    ///     id: Stable overlay identity.
+    ///
+    /// Returns:
+    ///     A default overlay builder.
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
             bounds: None,
             position: None,
-            items: Vec::new(),
+            items: MoonMenuLevel::new([]),
             open: false,
             width: 180.0,
             max_height: None,
@@ -131,13 +173,39 @@ impl MoonContextMenuOverlay {
         self
     }
 
+    /// Append one overlay menu row without a later layout scan.
+    ///
+    /// Args:
+    ///     item: Row to append.
+    ///
+    /// Returns:
+    ///     The updated overlay.
     pub fn item(mut self, item: MoonMenuItem) -> Self {
-        self.items.push(item);
+        self.items.extend([item]);
         self
     }
 
+    /// Append overlay menu rows while accumulating their layout signature.
+    ///
+    /// Args:
+    ///     items: Rows in display order.
+    ///
+    /// Returns:
+    ///     The updated overlay.
     pub fn items(mut self, items: impl IntoIterator<Item = MoonMenuItem>) -> Self {
         self.items.extend(items);
+        self
+    }
+
+    /// Install a retained menu level without cloning its rows.
+    ///
+    /// Args:
+    ///     items: Shared row storage and layout signature.
+    ///
+    /// Returns:
+    ///     The updated overlay.
+    fn shared_items(mut self, items: MoonMenuLevel) -> Self {
+        self.items = items;
         self
     }
 
@@ -163,6 +231,17 @@ impl MoonContextMenuOverlay {
 }
 
 impl MoonContextMenuWindowExt for Window {
+    /// Open a root-owned context menu using shared retained row storage.
+    ///
+    /// Args:
+    ///     cx: Application context used to install the overlay.
+    ///     id: Stable context-menu identity.
+    ///     position: Requested viewport origin.
+    ///     items: Menu rows in display order.
+    ///     width: Rendered menu width.
+    ///
+    /// Returns:
+    ///     Nothing; the menu is installed in the window overlay.
     fn open_moon_context_menu(
         &mut self,
         cx: &mut App,
@@ -176,6 +255,18 @@ impl MoonContextMenuWindowExt for Window {
         });
     }
 
+    /// Open a root-owned context menu with a custom dismissal callback.
+    ///
+    /// Args:
+    ///     cx: Application context used to install the overlay.
+    ///     id: Stable context-menu identity.
+    ///     position: Requested viewport origin.
+    ///     items: Menu rows captured once into shared retained storage.
+    ///     width: Rendered menu width.
+    ///     on_dismiss: Callback invoked after escape or an outside click.
+    ///
+    /// Returns:
+    ///     Nothing; the menu is installed in the window overlay.
     fn open_moon_context_menu_with_dismiss(
         &mut self,
         cx: &mut App,
@@ -186,12 +277,13 @@ impl MoonContextMenuWindowExt for Window {
         on_dismiss: impl Fn(&mut Window, &mut App) + 'static,
     ) {
         let id = id.into();
+        let items = MoonMenuLevel::new(items);
         let on_dismiss = Rc::new(on_dismiss);
         self.open_context_menu(cx, move |_window, _cx| {
             let on_dismiss = on_dismiss.clone();
             MoonContextMenuOverlay::new(id.clone())
                 .position(position)
-                .items(items.clone())
+                .shared_items(items.clone())
                 .open(true)
                 .width(width)
                 .on_dismiss(move |window, cx| on_dismiss(window, cx))
@@ -201,8 +293,15 @@ impl MoonContextMenuWindowExt for Window {
 }
 
 impl RenderOnce for MoonContextMenu {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let p = MoonPalette::active(cx);
+    /// Render the clamped menu and delegate large-list handling to [`MoonPopupMenu`].
+    ///
+    /// Args:
+    ///     window: Owning window used for viewport bounds and popup retained state.
+    ///     _cx: Application context consumed by nested elements.
+    ///
+    /// Returns:
+    ///     The positioned context-menu root.
+    fn render(self, window: &mut Window, _cx: &mut App) -> impl IntoElement {
         let viewport = window.viewport_size();
         let viewport_w = f32::from(viewport.width);
         let viewport_h = f32::from(viewport.height);
@@ -242,21 +341,42 @@ impl RenderOnce for MoonContextMenu {
         if self.open {
             root = root.child(
                 MoonPopupMenu::new(format!("{}:popup", self.id))
-                    .items(self.items)
+                    .shared_level(self.items)
                     .width(self.width)
                     .max_height(max_height)
-                    .render_with_palette(p),
+                    .render(),
             );
         }
         root
     }
 }
 
+/// Resolve a context menu's outer height limit.
+///
+/// Args:
+///     viewport_h: Current viewport height.
+///     requested_max_height: Optional caller-supplied limit.
+///
+/// Returns:
+///     The requested limit or the viewport-safe default.
 fn context_menu_max_height(viewport_h: f32, requested_max_height: Option<f32>) -> f32 {
     let margin = 6.0;
     requested_max_height.unwrap_or((viewport_h - margin * 2.0).max(80.0))
 }
 
+/// Clamp a context-menu origin inside the viewport using its estimated bounded height.
+///
+/// Args:
+///     viewport_w: Current viewport width.
+///     viewport_h: Current viewport height.
+///     requested_x: Requested horizontal origin.
+///     requested_y: Requested vertical origin.
+///     width: Rendered menu width.
+///     max_height: Resolved outer height limit.
+///     items: Number of menu rows.
+///
+/// Returns:
+///     Viewport-safe `(x, y)` coordinates.
 fn context_menu_clamped_origin(
     viewport_w: f32,
     viewport_h: f32,
@@ -277,6 +397,13 @@ fn context_menu_clamped_origin(
     (x, y)
 }
 
+/// Estimate eager menu height for viewport clamping.
+///
+/// Args:
+///     items: Number of rows.
+///
+/// Returns:
+///     Estimated rendered height including gaps and menu chrome.
 fn context_menu_estimated_height(items: usize) -> f32 {
     let rows = items as f32;
     let gaps = items.saturating_sub(1) as f32;
@@ -284,6 +411,14 @@ fn context_menu_estimated_height(items: usize) -> f32 {
 }
 
 impl RenderOnce for MoonContextMenuOverlay {
+    /// Render the root-owned dismiss layer and its shared positioned menu.
+    ///
+    /// Args:
+    ///     window: Window used for retained focus and popup list state.
+    ///     cx: Application context used for callbacks and retained state.
+    ///
+    /// Returns:
+    ///     The full-window overlay, or an empty root while closed.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let id = self.id.clone();
         let mut root = div().id(ElementId::from(id.clone())).absolute();
@@ -337,7 +472,7 @@ impl RenderOnce for MoonContextMenuOverlay {
                 } else {
                     menu = menu.bounds(self.bounds.unwrap_or(MoonRect::new(0.0, 0.0, 0.0, 0.0)));
                 }
-                let menu = menu.items(self.items).open(true).width(self.width);
+                let menu = menu.shared_items(self.items).open(true).width(self.width);
                 if let Some(max_height) = self.max_height {
                     menu.max_height(max_height)
                 } else {
