@@ -417,6 +417,14 @@ where
         self.select_item(next_ix, window, cx);
     }
 
+    /// Measure uniform row geometry and record optional chrome for every section.
+    ///
+    /// Args:
+    ///     window: Window used to lay out the first actual item, header, and footer.
+    ///     cx: List context used to query delegate sections and rebuild the virtual cache.
+    ///
+    /// Returns:
+    ///     Nothing; the row cache is refreshed when counts, presence, or dimensions change.
     fn prepare_items_if_needed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let sections_count = self.delegate.sections_count(cx).max(1);
         let mut measured_size = MeasuredEntrySize::default();
@@ -428,19 +436,28 @@ where
             .into_any_element()
             .layout_as_root(available_space, window, cx);
 
-        if let Some(mut el) = self
-            .delegate
-            .render_section_header(0, window, cx)
-            .map(|r| r.into_any_element())
-        {
-            measured_size.section_header_size = el.layout_as_root(available_space, window, cx);
-        }
-        if let Some(mut el) = self
-            .delegate
-            .render_section_footer(0, window, cx)
-            .map(|r| r.into_any_element())
-        {
-            measured_size.section_footer_size = el.layout_as_root(available_space, window, cx);
+        let mut header_measured = false;
+        let mut footer_measured = false;
+        for section_ix in 0..sections_count {
+            let header = self
+                .delegate
+                .render_section_header(section_ix, window, cx)
+                .map(|r| r.into_any_element());
+            measured_size.section_headers.push(header.is_some());
+            if !header_measured && let Some(mut el) = header {
+                measured_size.section_header_size = el.layout_as_root(available_space, window, cx);
+                header_measured = true;
+            }
+
+            let footer = self
+                .delegate
+                .render_section_footer(section_ix, window, cx)
+                .map(|r| r.into_any_element());
+            measured_size.section_footers.push(footer.is_some());
+            if !footer_measured && let Some(mut el) = footer {
+                measured_size.section_footer_size = el.layout_as_root(available_space, window, cx);
+                footer_measured = true;
+            }
         }
 
         self.rows_cache
@@ -528,10 +545,6 @@ where
                                     window,
                                     cx,
                                 );
-
-                                // NOTE: Here the v_virtual_list would not able to have gap_y,
-                                // because the section header, footer is always have rendered as a empty child item,
-                                // even the delegate give a None result.
 
                                 visible_range
                                     .map(|ix| {
@@ -759,3 +772,6 @@ where
             .child(self.state.clone())
     }
 }
+
+#[cfg(test)]
+mod tests;

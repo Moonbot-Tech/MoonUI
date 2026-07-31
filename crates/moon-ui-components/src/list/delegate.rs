@@ -46,9 +46,18 @@ pub trait ListDelegate: Sized + 'static {
         cx: &mut Context<ListState<Self>>,
     ) -> Option<Self::Item>;
 
-    /// Render the section header at the given index, default is None.
+    /// Render the section header at the given index.
     ///
-    /// NOTE: Every header should have same height.
+    /// Returning `None` omits the header's virtual row entirely. Every present header must have
+    /// the same height because the list measures only the first present header.
+    ///
+    /// Args:
+    ///     section: Source section whose optional header is requested.
+    ///     window: Window used to construct the header element.
+    ///     cx: List context available to the delegate.
+    ///
+    /// Returns:
+    ///     The section header, or `None` when the section has no header row.
     fn render_section_header(
         &mut self,
         section: usize,
@@ -58,9 +67,18 @@ pub trait ListDelegate: Sized + 'static {
         None::<AnyElement>
     }
 
-    /// Render the section footer at the given index, default is None.
+    /// Render the section footer at the given index.
     ///
-    /// NOTE: Every footer should have same height.
+    /// Returning `None` omits the footer's virtual row entirely. Every present footer must have
+    /// the same height because the list measures only the first present footer.
+    ///
+    /// Args:
+    ///     section: Source section whose optional footer is requested.
+    ///     window: Window used to construct the footer element.
+    ///     cx: List context available to the delegate.
+    ///
+    /// Returns:
+    ///     The section footer, or `None` when the section has no footer row.
     fn render_section_footer(
         &mut self,
         section: usize,
