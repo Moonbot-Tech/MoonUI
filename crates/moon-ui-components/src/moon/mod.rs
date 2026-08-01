@@ -87,8 +87,8 @@ pub use checkbox::{MoonCheckbox, MoonCheckboxSize};
 pub use collapsible::MoonCollapsible;
 pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};
 pub use combobox::{
-    MoonCombobox, MoonComboboxChange, MoonComboboxEvent, MoonComboboxState, MoonComboboxTriggerCtx,
-    MoonComponentIndexPath, MoonSearchableGroup, MoonSearchableListChange,
+    MoonCombobox, MoonComboboxChange, MoonComboboxEvent, MoonComboboxMenuChrome, MoonComboboxState,
+    MoonComboboxTriggerCtx, MoonComponentIndexPath, MoonSearchableGroup, MoonSearchableListChange,
     MoonSearchableListDelegate, MoonSearchableListItem, MoonSearchableListState, MoonSearchableVec,
 };
 pub use context_menu::{MoonContextMenu, MoonContextMenuOverlay, MoonContextMenuWindowExt};
@@ -106,6 +106,7 @@ pub use dock::{
     DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, DockSplitPlacement, MoonDockPanel,
     Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel,
 };
+pub(crate) use dropdown::{MENU_CHECK_WIDTH, menu_row_metrics};
 pub use dropdown::{MoonDropdown, MoonMenuItem, MoonMenuSize, MoonPopupMenu};
 pub use form::MoonFormRow;
 pub use foundation::{StyledExt, ThemeMode, h_flex, init, v_flex};

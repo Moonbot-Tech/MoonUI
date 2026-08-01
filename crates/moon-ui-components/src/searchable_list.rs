@@ -8,6 +8,6 @@ mod vec;
 pub(crate) use adapter::SearchableListAdapter;
 pub use change::SearchableListChange;
 pub use delegate::{SearchableListDelegate, SearchableListItem};
-pub use item::SearchableListItemElement;
+pub use item::{SearchableListItemElement, SearchableListRowLook};
 pub use state::SearchableListState;
 pub use vec::{SearchableGroup, SearchableVec};

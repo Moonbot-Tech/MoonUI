@@ -20,7 +20,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 const MENU_PADDING: f32 = 4.0;
 const MENU_BORDER: f32 = 1.0;
 const MENU_GAP: f32 = 2.0;
-const MENU_CHECK_WIDTH: f32 = 12.0;
+pub(crate) const MENU_CHECK_WIDTH: f32 = 12.0;
 const SUBMENU_OFFSET_X: f32 = 2.0;
 const DROPDOWN_TRIGGER_PAD_X: f32 = 14.0;
 const DROPDOWN_CARET: &str = " \u{25be}";
@@ -285,13 +285,25 @@ pub enum MoonMenuSize {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 /// Resolved per-row geometry for one menu size and theme scale.
-struct MenuMetrics {
-    row_height: f32,
-    font_size: f32,
-    line_height: f32,
-    radius: f32,
-    pad_x: f32,
-    gap: f32,
+pub(crate) struct MenuMetrics {
+    pub(crate) row_height: f32,
+    pub(crate) font_size: f32,
+    pub(crate) line_height: f32,
+    pub(crate) radius: f32,
+    pub(crate) pad_x: f32,
+    pub(crate) gap: f32,
+}
+
+/// Return the row metrics of a menu of this size, resolved for the active scale.
+///
+/// Crate-visible so a list that must READ as a menu draws its rows on the menu's own geometry
+/// rather than approximating it — the searchable combobox popup, which opens in the same rows as
+/// dropdown menus and would otherwise differ in row height and label size.
+pub(crate) fn menu_row_metrics(size: MoonMenuSize, tokens: &MoonThemeTokens) -> MenuMetrics {
+    MoonPopupMenu::new("menu-metrics")
+        .size(size)
+        .metrics()
+        .scaled(tokens)
 }
 
 /// Shared immutable inputs used to render every row in one menu level.

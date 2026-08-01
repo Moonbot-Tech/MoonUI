@@ -12,13 +12,15 @@ use crate::{
     ActiveTheme, Disableable, ElementExt as _, Icon, IconName, IndexPath, Sizable, Size,
     StyleSized, StyledExt,
     actions::{Cancel, Confirm, SelectDown, SelectUp},
+    button::{ButtonVariant, MoonButtonMetrics, MoonButtonStyle},
     global_state::GlobalState,
     h_flex,
     input::{clear_button, input_style},
     list::{List, ListState},
+    moon::{MoonPalette, rgba_from},
     searchable_list::{
         SearchableListAdapter, SearchableListChange, SearchableListDelegate, SearchableListItem,
-        SearchableListState,
+        SearchableListRowLook, SearchableListState,
     },
     v_flex,
 };
@@ -55,6 +57,21 @@ pub struct ComboboxTriggerCtx<'a, D: SearchableListDelegate + 'static> {
 /// Back-compat alias — new code should use [`SearchableListChange`] directly.
 pub type ComboboxChange = SearchableListChange;
 
+// MARK: ComboboxMenuChrome
+
+/// Surface a combobox popup is painted on.
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub enum ComboboxMenuChrome {
+    /// The window background, as an input's own drop-down — the historical look.
+    #[default]
+    Panel,
+    /// The popup-menu surface, matching a dropdown's menu.
+    ///
+    /// For a combobox standing among dropdown buttons: its popup is a menu to the user, and two
+    /// menus of different colours opening from one row read as two different controls.
+    Menu,
+}
+
 // MARK: ComboboxOptions
 
 struct ComboboxOptions {
@@ -65,8 +82,11 @@ struct ComboboxOptions {
     search_placeholder: Option<SharedString>,
     menu_width: Length,
     menu_max_h: Length,
+    menu_chrome: ComboboxMenuChrome,
     disabled: bool,
     appearance: bool,
+    trigger_variant: Option<ButtonVariant>,
+    trigger_size: Option<Size>,
     trigger_icon: Option<Icon>,
     check_icon: Option<Icon>,
 }
@@ -81,8 +101,11 @@ impl Default for ComboboxOptions {
             search_placeholder: None,
             menu_width: Length::Auto,
             menu_max_h: rems(20.).into(),
+            menu_chrome: ComboboxMenuChrome::default(),
             disabled: false,
             appearance: true,
+            trigger_variant: None,
+            trigger_size: None,
             trigger_icon: None,
             check_icon: None,
         }
@@ -101,6 +124,9 @@ where
     // Combobox-specific fields
     multiple: bool,
     searchable: bool,
+    menu_chrome: ComboboxMenuChrome,
+    trigger_variant: Option<ButtonVariant>,
+    trigger_size: Option<Size>,
     trigger_icon: Option<Icon>,
     check_icon: Option<Icon>,
     render_trigger:
@@ -250,6 +276,9 @@ where
             state,
             multiple: false,
             searchable: false,
+            menu_chrome: ComboboxMenuChrome::default(),
+            trigger_variant: None,
+            trigger_size: None,
             trigger_icon: None,
             check_icon: None,
             render_trigger: None,
@@ -569,15 +598,32 @@ where
         let show_clean = self.state.cleanable && !self.state.selection.is_empty();
         let bounds = self.state.bounds;
         let allow_open = !(self.state.open || self.state.disabled);
-        let outline_visible = self.state.open || (is_focused && !self.state.disabled);
         let disabled = self.state.disabled;
 
-        let (bg, fg) = input_style(disabled, cx);
+        // A button-styled trigger answers focus and open state with the variant's own hover/press
+        // ramp, so the input focus ring is suppressed: no Moon button draws one.
+        let trigger_style = self
+            .trigger_variant
+            .and_then(|variant| variant.moon_style(MoonPalette::active(cx), false, false));
+        let outline_visible =
+            trigger_style.is_none() && (self.state.open || (is_focused && !self.state.disabled));
+        let trigger_metrics = self
+            .trigger_size
+            .map(|size| MoonButtonMetrics::for_size(size, cx));
 
+        let (input_bg, input_fg) = input_style(disabled, cx);
+        let bg = trigger_style.map_or(input_bg, |style| rgba_from(style.bg, style.bg_alpha));
+        let fg = trigger_style.map_or(input_fg, |style| rgba_from(style.fg, style.fg_alpha));
+
+        let row_look = match self.menu_chrome {
+            ComboboxMenuChrome::Panel => SearchableListRowLook::Input,
+            ComboboxMenuChrome::Menu => SearchableListRowLook::Menu,
+        };
         self.state.list.update(cx, |list, cx| {
             list.set_searchable(searchable, cx);
             list.delegate_mut().size = self.state.size;
             list.delegate_mut().check_icon = self.check_icon.clone();
+            list.delegate_mut().look = row_look;
         });
 
         let selection = &self.state.selection;
@@ -651,6 +697,8 @@ where
                 &self.state.style,
                 bg,
                 fg,
+                trigger_style,
+                trigger_metrics,
                 outline_visible,
                 allow_open,
                 trigger_body,
@@ -667,6 +715,7 @@ where
                         self.state.search_placeholder.clone(),
                         self.state.size,
                         self.state.menu_max_h,
+                        self.menu_chrome,
                         bounds,
                         footer_el,
                         dismiss_handler,
@@ -750,6 +799,36 @@ where
     /// Set the maximum height of the dropdown menu.
     pub fn menu_max_h(mut self, max_h: impl Into<Length>) -> Self {
         self.options.menu_max_h = max_h.into();
+        self
+    }
+
+    /// Choose the surface the popup is painted on.
+    ///
+    /// Defaults to [`ComboboxMenuChrome::Panel`] — an input's own drop-down. Pass
+    /// [`ComboboxMenuChrome::Menu`] when the combobox stands among dropdown buttons and its popup
+    /// must read as one of their menus.
+    pub fn menu_chrome(mut self, chrome: ComboboxMenuChrome) -> Self {
+        self.options.menu_chrome = chrome;
+        self
+    }
+
+    /// Draw the trigger as a Moon button of this variant instead of as an input.
+    ///
+    /// Takes the variant's fill, border, text colour AND its hover/press ramp, and drops the input
+    /// focus ring: a button has no such ring, so keeping it is what gives away a combobox sitting
+    /// in a row of buttons. Accepts `MoonButtonVariant` directly.
+    pub fn trigger_variant(mut self, variant: impl Into<ButtonVariant>) -> Self {
+        self.options.trigger_variant = Some(variant.into());
+        self
+    }
+
+    /// Size the trigger as a Moon button of this size.
+    ///
+    /// Height, corner radius, horizontal padding and label size all come from the button metrics,
+    /// so the control lines up with buttons of that size at every Font-slider position. Accepts
+    /// `MoonButtonSize` directly. Independent of `with_size`, which sizes the popup list.
+    pub fn trigger_size(mut self, size: impl Into<Size>) -> Self {
+        self.options.trigger_size = Some(size.into());
         self
     }
 
@@ -871,6 +950,9 @@ where
             this.state.menu_max_h = opts.menu_max_h;
             this.state.disabled = opts.disabled;
             this.state.appearance = opts.appearance;
+            this.menu_chrome = opts.menu_chrome;
+            this.trigger_variant = opts.trigger_variant;
+            this.trigger_size = opts.trigger_size;
             this.trigger_icon = opts.trigger_icon;
             this.check_icon = opts.check_icon;
             this.render_trigger = render_trigger;
@@ -899,6 +981,10 @@ where
 // MARK: Rendering helpers
 
 /// Renders the styled trigger container.
+///
+/// With `trigger_style` set the container stops being an input: it takes the button variant's
+/// fill, border and hover/press ramp, drops the input's shadow, and its geometry comes from
+/// `trigger_metrics` when the caller named a button size.
 #[allow(clippy::too_many_arguments)]
 fn render_trigger_container(
     disabled: bool,
@@ -907,6 +993,8 @@ fn render_trigger_container(
     style: &StyleRefinement,
     bg: Hsla,
     fg: Hsla,
+    trigger_style: Option<MoonButtonStyle>,
+    trigger_metrics: Option<MoonButtonMetrics>,
     outline_visible: bool,
     allow_open: bool,
     trigger_body: AnyElement,
@@ -915,6 +1003,10 @@ fn render_trigger_container(
     prepaint_handler: Box<dyn Fn(Bounds<Pixels>, &mut Window, &mut App) + 'static>,
     cx: &mut App,
 ) -> impl IntoElement {
+    let border = trigger_style.map_or_else(
+        || cx.theme().input,
+        |style| rgba_from(style.border, style.border_alpha),
+    );
     div()
         .id("input")
         .relative()
@@ -927,15 +1019,36 @@ fn render_trigger_container(
             this.bg(bg)
                 .text_color(fg)
                 .when(disabled, |this| this.opacity(0.5))
-                .border_color(cx.theme().input)
+                .border_color(border)
                 .rounded(cx.theme().radius)
-                .when(cx.theme().shadow, |this| this.shadow_xs())
+                .when(cx.theme().shadow && trigger_style.is_none(), |this| {
+                    this.shadow_xs()
+                })
         })
         .map(|this| if disabled { this.shadow_none() } else { this })
         .overflow_hidden()
         .input_size(size)
         .input_text_size(size)
+        .when_some(trigger_metrics, |this, metrics| {
+            this.h(metrics.height)
+                .rounded(metrics.radius)
+                .px(metrics.pad_x)
+                .text_size(metrics.font_size)
+                .line_height(metrics.line_height)
+        })
         .refine_style(style)
+        .when(!disabled, |this| {
+            this.when_some(trigger_style, |this, style| {
+                this.hover(move |this| {
+                    this.bg(rgba_from(style.bg, style.hover_bg_alpha))
+                        .border_color(rgba_from(style.border, style.hover_border_alpha))
+                })
+                .active(move |this| {
+                    this.bg(rgba_from(style.bg, style.active_bg_alpha))
+                        .border_color(rgba_from(style.border, style.active_border_alpha))
+                })
+            })
+        })
         .when(outline_visible, |this| this.focused_border(cx))
         .when(allow_open, |this| {
             this.when_some(toggle_handler, |this, handler| this.on_click(handler))
@@ -961,6 +1074,7 @@ fn render_popup_shell<D: SearchableListDelegate + 'static>(
     search_placeholder: Option<SharedString>,
     size: Size,
     menu_max_h: Length,
+    menu_chrome: ComboboxMenuChrome,
     bounds: Bounds<Pixels>,
     footer_el: Option<AnyElement>,
     dismiss_handler: Box<dyn Fn(&MouseDownEvent, &mut Window, &mut App) + 'static>,
@@ -968,6 +1082,15 @@ fn render_popup_shell<D: SearchableListDelegate + 'static>(
 ) -> AnyElement {
     let has_footer = footer_el.is_some();
     let popup_radius = cx.theme().radius.min(px(8.));
+    // The menu surface is the one a popup menu paints, so a combobox opening beside dropdowns does
+    // not introduce a second menu colour in the same row.
+    let (surface_bg, surface_border) = match menu_chrome {
+        ComboboxMenuChrome::Panel => (cx.theme().background, cx.theme().border),
+        ComboboxMenuChrome::Menu => {
+            let p = MoonPalette::active(cx);
+            (rgba_from(p.shell_high, 0.98), rgba_from(p.border, 1.0))
+        }
+    };
 
     anchored()
         .snap_to_window_with_margin(px(8.))
@@ -982,9 +1105,9 @@ fn render_popup_shell<D: SearchableListDelegate + 'static>(
                     v_flex()
                         .occlude()
                         .mt_1p5()
-                        .bg(cx.theme().background)
+                        .bg(surface_bg)
                         .border_1()
-                        .border_color(cx.theme().border)
+                        .border_color(surface_border)
                         .rounded(popup_radius)
                         .shadow_md()
                         .child(

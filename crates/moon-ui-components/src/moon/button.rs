@@ -529,13 +529,23 @@ impl RenderOnce for MoonButton {
 }
 
 fn size_for(size: MoonButtonSize) -> crate::Size {
-    match size {
-        MoonButtonSize::Micro => crate::Size::XSmall,
-        MoonButtonSize::ToolbarCompact => crate::Size::Small,
-        MoonButtonSize::Action => crate::Size::Small,
-        MoonButtonSize::Toolbar => crate::Size::Medium,
-        MoonButtonSize::Pill => crate::Size::Large,
-        MoonButtonSize::Custom { height, .. } => crate::Size::Size(px(height)),
+    size.into()
+}
+
+/// Resolve a Moon button size to the base size its geometry is keyed by.
+///
+/// Public because a non-button control may need to line up with a button: it names the button
+/// size it stands beside, and the widget resolves the same metrics the button would draw.
+impl From<MoonButtonSize> for crate::Size {
+    fn from(size: MoonButtonSize) -> Self {
+        match size {
+            MoonButtonSize::Micro => crate::Size::XSmall,
+            MoonButtonSize::ToolbarCompact => crate::Size::Small,
+            MoonButtonSize::Action => crate::Size::Small,
+            MoonButtonSize::Toolbar => crate::Size::Medium,
+            MoonButtonSize::Pill => crate::Size::Large,
+            MoonButtonSize::Custom { height, .. } => crate::Size::Size(px(height)),
+        }
     }
 }
 
