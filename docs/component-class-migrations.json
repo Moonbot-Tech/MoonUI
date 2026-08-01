@@ -132,6 +132,12 @@
       "from": "Mirror",
       "to": "TrackedFork",
       "reason": "Donor baseline shows reviewed base-file drift for Moon tree surface/style hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
+    },
+    {
+      "concept": "combobox",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Moon trigger variant/size and menu-look popup hooks are reviewed base-file drift: they let a combobox take a Moon button trigger and a menu-surfaced popup so it can stand in a row of Moon dropdowns. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
     }
   ]
 }

@@ -145,12 +145,13 @@
     },
     {
       "concept": "combobox",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Combobox/SearchableList",
       "theme_source": "MoonTheme bridge through MoonCombobox facade",
       "public_path": "moon_ui::MoonCombobox",
       "upstream_ref": "Longbridge::combobox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed TrackedFork drift: Moon trigger variant/size and menu-look popup hooks live in the base combobox and searchable-list rows, so a combobox can stand in a row of Moon dropdowns; Longbridge combobox behavior remains source-owned",
+      "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
     },
     {

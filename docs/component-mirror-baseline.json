@@ -221,7 +221,7 @@
     },
     {
       "concept": "combobox",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonCombobox",
       "upstream_ref": "Longbridge::combobox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
