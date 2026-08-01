@@ -3647,6 +3647,9 @@ impl Gallery {
                         .child(
                             MoonDropdown::new("gallery-dropdown")
                                 .label(format!("Scale {}", self.dropdown_value))
+                                .trigger_leading_icon(MoonButtonIconSlot::new(
+                                    moon_ui::MOON_ICON_CHECK,
+                                ))
                                 .trigger_caret(true)
                                 .fit_trigger_width(100.0, 180.0)
                                 .default_open(false)

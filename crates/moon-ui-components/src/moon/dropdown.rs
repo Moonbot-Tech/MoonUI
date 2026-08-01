@@ -4,7 +4,8 @@ use gpui::*;
 
 use super::{
     button::{
-        MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant, button_text_metrics,
+        MoonButton, MoonButtonIconSlot, MoonButtonSegment, MoonButtonSize, MoonButtonVariant,
+        button_leading_icon_reservation, button_text_metrics,
     },
     foundation::{MoonClickHandler, MoonSelectHandler, selected_background},
     icons::{MOON_ICON_CHECK, moon_icon},
@@ -91,6 +92,7 @@ enum MoonDropdownTriggerWidth {
 ///     width: Trigger width policy.
 ///     tokens: Active theme tokens.
 ///     font_size: Design-reference trigger font size.
+///     reserved_content_width: Rendered leading content and gap width excluded from text fitting.
 ///     measure: Width function matching the rendered trigger font.
 ///
 /// Returns:
@@ -101,6 +103,7 @@ fn fit_dropdown_trigger_label(
     width: MoonDropdownTriggerWidth,
     tokens: &MoonThemeTokens,
     font_size: f32,
+    reserved_content_width: f32,
     measure: impl Fn(&str) -> f32,
 ) -> (SharedString, Option<f32>) {
     let full = format!("{label}{suffix}");
@@ -114,7 +117,7 @@ fn fit_dropdown_trigger_label(
 
     let text_scale = tokens.font(font_size) / font_size.max(1.0);
     let scaled = |value: f32| value * text_scale;
-    let visual_padding = tokens.ui(DROPDOWN_TRIGGER_PAD_X);
+    let visual_padding = tokens.ui(DROPDOWN_TRIGGER_PAD_X) + reserved_content_width;
     let minimum_text = if label.is_empty() {
         suffix.to_string()
     } else {
@@ -1891,6 +1894,7 @@ pub struct MoonDropdown {
     menu_layout: MenuLayoutFingerprint,
     trigger_variant: MoonButtonVariant,
     trigger_size: MoonButtonSize,
+    trigger_leading_icon: Option<MoonButtonIconSlot>,
     trigger_width: MoonDropdownTriggerWidth,
     trigger_caret: bool,
     selected: bool,
@@ -1925,6 +1929,7 @@ impl MoonDropdown {
             menu_layout: MenuLayoutFingerprint::new(),
             trigger_variant: MoonButtonVariant::Neutral,
             trigger_size: MoonButtonSize::Toolbar,
+            trigger_leading_icon: None,
             trigger_width: MoonDropdownTriggerWidth::Intrinsic,
             trigger_caret: false,
             selected: false,
@@ -1992,6 +1997,29 @@ impl MoonDropdown {
 
     pub fn trigger_size(mut self, size: MoonButtonSize) -> Self {
         self.trigger_size = size;
+        self
+    }
+
+    /// Set the trigger's leading icon from an asset path.
+    ///
+    /// Args:
+    ///     path: Static asset path resolved by the Moon icon renderer.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn trigger_icon(self, path: &'static str) -> Self {
+        self.trigger_leading_icon(MoonButtonIconSlot::new(path))
+    }
+
+    /// Set the trigger's leading icon slot.
+    ///
+    /// Args:
+    ///     icon: Configured Moon button icon slot rendered before trigger content.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn trigger_leading_icon(mut self, icon: MoonButtonIconSlot) -> Self {
+        self.trigger_leading_icon = Some(icon);
         self
     }
 
@@ -2199,6 +2227,7 @@ impl MoonDropdown {
             },
             &tokens,
             font_size,
+            0.0,
             |text| measure_text_width(cx, &tokens, text, font_size, 400.0, DROPDOWN_TRIGGER_MONO),
         );
         (
@@ -2227,6 +2256,9 @@ impl MoonDropdown {
 
         let (font_size, _, _) = button_text_metrics(self.trigger_size);
         let tokens = MoonTheme::active_tokens(cx);
+        let reserved_content_width = self.trigger_leading_icon.map_or(0.0, |_| {
+            button_leading_icon_reservation(self.trigger_size, &tokens)
+        });
         let suffix = if self.trigger_caret && self.segments.is_empty() {
             DROPDOWN_CARET
         } else {
@@ -2239,6 +2271,7 @@ impl MoonDropdown {
                 self.trigger_width,
                 &tokens,
                 font_size,
+                reserved_content_width,
                 |text| {
                     measure_text_width(cx, &tokens, text, font_size, 400.0, DROPDOWN_TRIGGER_MONO)
                 },
@@ -2263,8 +2296,16 @@ impl MoonDropdown {
             trigger = trigger.width(width);
         }
 
+        if let Some(icon) = self.trigger_leading_icon {
+            trigger = trigger.leading_icon(icon);
+        }
+
         if self.segments.is_empty() {
-            trigger = trigger.label(label);
+            // Leave a truly empty icon trigger childless so MoonButton uses its square icon-only
+            // layout instead of reserving text padding and a phantom content gap.
+            if !label.is_empty() || self.trigger_leading_icon.is_none() {
+                trigger = trigger.label(label);
+            }
         } else {
             for segment in self.segments.clone() {
                 trigger = trigger.segment(segment);

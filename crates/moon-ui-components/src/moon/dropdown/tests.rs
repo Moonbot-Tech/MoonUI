@@ -1,15 +1,16 @@
 //! Regression coverage for dropdown placement, sizing, selection, and submenu behavior.
 
+use super::button_leading_icon_reservation;
 use super::{
     DROPDOWN_CARET, DROPDOWN_TRIGGER_PAD_X, MENU_CLONE_PROBE_PREFIX,
     MENU_DROPDOWN_HANDLER_PROBE_PREFIX, MENU_MEASUREMENT_PROBE_PREFIX, MENU_PADDING,
-    MENU_PALETTE_PROBE_PREFIX, MenuMetrics, MoonButtonSize, MoonDropdown, MoonDropdownSelectPlan,
-    MoonDropdownTriggerWidth, MoonMenuItem, MoonMenuItemKind, MoonMenuMaxHeight, MoonMenuSize,
-    MoonMenuWidth, MoonPalette, MoonPopupMenu, MoonRect, MoonThemeTokens, SUBMENU_OFFSET_X,
-    capped_menu_items_height, fit_dropdown_trigger_label, fit_menu_item_labels,
-    menu_measurement_probe_count, moon_dropdown_select_plan, moon_menu_item_accepts_click,
-    natural_menu_width, resolve_menu_width, take_dropdown_handler_probe_count,
-    take_menu_item_clone_probe_count, take_palette_probe_shell,
+    MENU_PALETTE_PROBE_PREFIX, MenuMetrics, MoonButtonIconSlot, MoonButtonSize, MoonDropdown,
+    MoonDropdownSelectPlan, MoonDropdownTriggerWidth, MoonMenuItem, MoonMenuItemKind,
+    MoonMenuMaxHeight, MoonMenuSize, MoonMenuWidth, MoonPalette, MoonPopupMenu, MoonRect,
+    MoonThemeTokens, SUBMENU_OFFSET_X, capped_menu_items_height, fit_dropdown_trigger_label,
+    fit_menu_item_labels, menu_measurement_probe_count, moon_dropdown_select_plan,
+    moon_menu_item_accepts_click, natural_menu_width, resolve_menu_width,
+    take_dropdown_handler_probe_count, take_menu_item_clone_probe_count, take_palette_probe_shell,
 };
 use crate::moon::{MoonScale, MoonTheme, ThemeMode};
 use gpui::{ParentElement as _, Styled as _};
@@ -160,6 +161,165 @@ fn open_and_measure(
         "expected exactly the dropdown as a child"
     );
     (recorded[0], menu)
+}
+
+/// Root view that renders one closed dropdown and records its laid-out trigger bounds.
+struct ClosedDropdownHarness {
+    build: Box<dyn Fn() -> MoonDropdown>,
+    bounds: Rc<RefCell<Vec<gpui::Bounds<gpui::Pixels>>>>,
+}
+
+impl gpui::Render for ClosedDropdownHarness {
+    /// Render the configured dropdown and record its final child bounds.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{ParentElement as _, Styled as _};
+
+        let sink = self.bounds.clone();
+        gpui::div()
+            .w(gpui::px(200.0))
+            .flex()
+            .flex_row()
+            .items_start()
+            .justify_start()
+            .on_children_prepainted(move |bounds, _, _| *sink.borrow_mut() = bounds)
+            .child((self.build)())
+    }
+}
+
+/// Lay a closed dropdown out in a real window and return its trigger box.
+fn laid_out_trigger_bounds(
+    cx: &mut gpui::TestAppContext,
+    build: impl Fn() -> MoonDropdown + 'static,
+) -> gpui::Bounds<gpui::Pixels> {
+    use gpui::AppContext as _;
+
+    cx.update(crate::init);
+    let bounds = Rc::new(RefCell::new(Vec::new()));
+    let sink = bounds.clone();
+    let window = cx.add_window(move |_, _| ClosedDropdownHarness {
+        build: Box::new(build),
+        bounds: sink,
+    });
+    cx.update_window(window.into(), |_, window, cx| {
+        window.draw(cx).clear();
+    })
+    .unwrap();
+
+    let out = bounds.borrow();
+    assert_eq!(out.len(), 1, "expected exactly the dropdown as a child");
+    out[0]
+}
+
+/// Catches removing the `MoonButton::leading_icon` forwarding call from
+/// `dropdown.rs:MoonDropdown::render_trigger`. That edit would silently hide configured trigger
+/// icons while leaving labelled dropdowns otherwise functional.
+#[gpui::test]
+fn labelled_trigger_icon_adds_width_in_both_palettes(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+        let plain = laid_out_trigger_bounds(cx, || {
+            MoonDropdown::new("plain-labelled-trigger")
+                .label("Settings")
+                .trigger_size(MoonButtonSize::Action)
+        });
+        let with_icon = laid_out_trigger_bounds(cx, || {
+            MoonDropdown::new("icon-labelled-trigger")
+                .label("Settings")
+                .trigger_size(MoonButtonSize::Action)
+                .trigger_leading_icon(MoonButtonIconSlot::new("icons/settings.svg"))
+        });
+
+        assert!(
+            with_icon.size.width > plain.size.width,
+            "configured icon did not widen the labelled trigger in {palette:?}: plain {:?}, icon {:?}",
+            plain.size,
+            with_icon.size
+        );
+    }
+}
+
+/// Catches removing `reserved_content_width` from
+/// `dropdown.rs:fit_dropdown_trigger_label`. That edit would fit a long translated label into the
+/// icon's space and let the non-shrinking trigger content paint beyond its configured width.
+#[gpui::test]
+fn fitted_labelled_trigger_reserves_rendered_icon_chrome_in_both_palettes(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+        let plain = laid_out_trigger_bounds(cx, || {
+            MoonDropdown::new("plain-icon-reservation-probe")
+                .label("Settings")
+                .trigger_size(MoonButtonSize::Action)
+        });
+        let with_icon = laid_out_trigger_bounds(cx, || {
+            MoonDropdown::new("icon-reservation-probe")
+                .label("Settings")
+                .trigger_size(MoonButtonSize::Action)
+                .trigger_icon("icons/settings.svg")
+        });
+        let rendered_icon_chrome = with_icon.size.width - plain.size.width;
+        let tokens = MoonThemeTokens {
+            palette,
+            ..MoonThemeTokens::default()
+        };
+        let font_size = 10.5;
+        let measure = |text: &str| text.chars().count() as f32 * 8.0;
+        let reservation = button_leading_icon_reservation(MoonButtonSize::Action, &tokens);
+        let (label, width) = fit_dropdown_trigger_label(
+            "a deliberately long translated settings label",
+            DROPDOWN_CARET,
+            MoonDropdownTriggerWidth::Fit {
+                min: 100.0,
+                max: 100.0,
+            },
+            &tokens,
+            font_size,
+            reservation,
+            measure,
+        );
+        let width = width.expect("fitted trigger must resolve a rendered width");
+        let fitted_content_width =
+            gpui::px(measure(label.as_ref()) + tokens.ui(DROPDOWN_TRIGGER_PAD_X))
+                + rendered_icon_chrome;
+
+        assert!(
+            gpui::px(reservation + 0.01) >= rendered_icon_chrome,
+            "reserved icon chrome is narrower than real layout in {palette:?}"
+        );
+        assert!(
+            fitted_content_width <= gpui::px(width + 0.01),
+            "fitted icon trigger content exceeds its width in {palette:?}: content {fitted_content_width:?}, width {width}"
+        );
+    }
+}
+
+/// Catches restoring the unconditional empty `MoonButton::label` call in
+/// `dropdown.rs:MoonDropdown::render_trigger`. That edit would add text padding and a phantom gap,
+/// turning toolbar icon dropdowns into off-center rectangular controls.
+#[gpui::test]
+fn icon_only_trigger_stays_square_in_both_palettes(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+        let bounds = laid_out_trigger_bounds(cx, || {
+            MoonDropdown::new("icon-only-trigger")
+                .trigger_size(MoonButtonSize::Action)
+                .trigger_icon("icons/settings.svg")
+        });
+
+        assert_eq!(
+            bounds.size.width, bounds.size.height,
+            "icon-only dropdown trigger is not square in {palette:?}: {:?}",
+            bounds.size
+        );
+    }
 }
 
 /// Assert that the menu hangs in the narrow band immediately below its trigger.
@@ -414,6 +574,7 @@ fn fitted_trigger_preserves_caret_at_independent_scale_extremes() {
                 },
                 &tokens,
                 font_size,
+                0.0,
                 measure,
             );
             let width = width.expect("fitted trigger must resolve a rendered width");
@@ -454,6 +615,7 @@ fn scaled_trigger_uses_font_width_without_clipping_component_chrome() {
                 MoonDropdownTriggerWidth::Scaled(120.0),
                 &tokens,
                 font_size,
+                0.0,
                 measure,
             );
             let width = width.expect("scaled trigger must resolve a rendered width");
