@@ -197,8 +197,16 @@ impl RenderOnce for SearchableListItemElement {
                         )
                     })
             })
-            .when(group_row && !self.selected, |this| {
+            .when(group_row && !self.selected && !self.checked, |this| {
                 this.text_color(rgba_from(p.text_muted, 0.88))
+            })
+            // A menu states the choice itself, not just the tick beside it: a checked row carries
+            // the selected fill, colour and weight. In a drop-down the tick is the whole signal,
+            // and `selected` there is the keyboard cursor, which is a different thing entirely.
+            .when(menu_look && self.checked && !self.disabled, |this| {
+                this.bg(selected_background(p))
+                    .text_color(gpui::rgb(p.selected_fg()))
+                    .font_weight(gpui::FontWeight::SEMIBOLD)
             })
             .when(self.disabled, |this| {
                 this.cursor_not_allowed()
