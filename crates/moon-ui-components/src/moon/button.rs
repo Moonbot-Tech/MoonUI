@@ -4,7 +4,7 @@ use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 use super::{
-    theme::MoonTheme,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, rgb_from},
 };
 
@@ -568,6 +568,33 @@ pub(super) fn button_text_metrics(size: MoonButtonSize) -> (f32, f32, f32) {
             ..
         } => (font_size, line_height, gap),
     }
+}
+
+/// Resolve the rendered width occupied by a native leading icon and its following gap.
+///
+/// The underlying Button clamps its icon from the native size preset's font metrics and scales its
+/// gap with UI geometry. Dropdown text fitting uses this helper before Button layout exists so its
+/// bounded labels leave the same amount of room.
+///
+/// Args:
+///     size: Moon button size mapped to the native Button preset.
+///     tokens: Active theme tokens used by the native icon and gap metrics.
+///
+/// Returns:
+///     Rendered width reserved before the button's label content.
+pub(super) fn button_leading_icon_reservation(
+    size: MoonButtonSize,
+    tokens: &MoonThemeTokens,
+) -> f32 {
+    let (native_font_size, native_gap) = match size {
+        MoonButtonSize::Micro => (9.0, 4.0),
+        MoonButtonSize::ToolbarCompact | MoonButtonSize::Action => (10.5, 6.0),
+        MoonButtonSize::Toolbar => (11.0, 6.0),
+        MoonButtonSize::Pill => (11.5, 6.0),
+        MoonButtonSize::Custom { height, .. } => (height * 0.4, 6.0),
+    };
+    let icon_size = (tokens.font(native_font_size) + 1.0).clamp(10.0, 14.0);
+    icon_size + tokens.ui(native_gap)
 }
 
 fn rgba_from_u32(color: u32, alpha: f32) -> Hsla {
