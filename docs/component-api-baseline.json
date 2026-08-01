@@ -399,6 +399,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn padding_x(mut self, padding_x: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn primary(self) -> Self"
     },
     {
@@ -635,7 +639,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/combobox.rs",
-      "signature": "pub use crate::combobox::{ Combobox as MoonCombobox, ComboboxChange as MoonComboboxChange, ComboboxEvent as MoonComboboxEvent, ComboboxState as MoonComboboxState, ComboboxTriggerCtx as MoonComboboxTriggerCtx, };"
+      "signature": "pub use crate::combobox::{ Combobox as MoonCombobox, ComboboxChange as MoonComboboxChange, ComboboxEvent as MoonComboboxEvent, ComboboxMenuChrome as MoonComboboxMenuChrome, ComboboxState as MoonComboboxState, ComboboxTriggerCtx as MoonComboboxTriggerCtx, };"
     },
     {
       "file": "crates/moon-ui-components/src/moon/combobox.rs",
@@ -695,6 +699,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub enum MoonDataTableWidthPolicy"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn apply_selection_delta( &mut self, row_delta: isize, column_delta: isize, rows: usize, columns: usize, ) -> Option<(usize, usize)>"
     },
     {
@@ -727,6 +735,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn controlled_row_selection(mut self, controlled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn element(element: impl IntoElement + 'static) -> Self"
     },
     {
@@ -748,6 +760,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn horizontal_scroll_handle(&self) -> ScrollHandle"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn horizontal_scrollbar_visibility(mut self, visibility: MoonScrollbarVisibility) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
@@ -779,6 +795,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn no_grow(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn on_double_click_cell( mut self, handler: impl Fn(usize, usize, &mut Window, &mut App) + 'static, ) -> Self"
     },
     {
@@ -799,6 +819,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn on_select_all_rows(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn on_select_cell( mut self, handler: impl Fn(usize, usize, &mut Window, &mut App) + 'static, ) -> Self"
     },
     {
@@ -816,6 +840,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn open_context_menu( &mut self, target: MoonDataTableContextTarget, position: Point<Pixels>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn ordered_columns( columns: Vec<MoonDataTableColumn>, state: &MoonDataTableState, ) -> Vec<MoonDataTableColumn>"
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
@@ -904,6 +932,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn weight(mut self, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn width_policy(mut self, policy: MoonDataTableWidthPolicy) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
@@ -1211,6 +1243,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn tab_suffix( mut self, suffix: impl Fn(&mut Window, &mut App) -> AnyElement + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn tabs( items: Vec<Rc<dyn PanelView>>, dock_area: &WeakEntity<DockArea>, window: &mut Window, cx: &mut App, ) -> Self"
     },
     {
@@ -1283,6 +1319,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn action_label(key: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
     },
     {
@@ -1332,6 +1372,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn items(mut self, items: impl IntoIterator<Item = MoonMenuItem>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn items(mut self, new_items: impl IntoIterator<Item = MoonMenuItem>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -1444,6 +1488,14 @@
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn trigger_caret(mut self, visible: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_icon(self, path: &'static str) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_leading_icon(mut self, icon: MoonButtonIconSlot) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -2103,7 +2155,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use combobox::{ MoonCombobox, MoonComboboxChange, MoonComboboxEvent, MoonComboboxState, MoonComboboxTriggerCtx, MoonComponentIndexPath, MoonSearchableGroup, MoonSearchableListChange, MoonSearchableListDelegate, MoonSearchableListItem, MoonSearchableListState, MoonSearchableVec, };"
+      "signature": "pub use combobox::{ MoonCombobox, MoonComboboxChange, MoonComboboxEvent, MoonComboboxMenuChrome, MoonComboboxState, MoonComboboxTriggerCtx, MoonComponentIndexPath, MoonSearchableGroup, MoonSearchableListChange, MoonSearchableListDelegate, MoonSearchableListItem, MoonSearchableListState, MoonSearchableVec, };"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -2112,6 +2164,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use crate::scroll::ScrollableElement as MoonScrollableElement;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use data_table::MoonDataTableWidthPolicy;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -3263,6 +3319,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn group_separator() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn id(mut self, id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
       "signature": "pub fn indicator(mut self, indicator: MoonStatusIndicator) -> Self"
     },
     {
@@ -3288,6 +3352,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/status_bar.rs",
       "signature": "pub fn new(text: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn on_click( mut self, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, ) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/status_bar.rs",
@@ -3324,6 +3392,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/status_bar.rs",
       "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/status_bar.rs",
+      "signature": "pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/status_bar.rs",
