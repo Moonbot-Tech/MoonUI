@@ -8,8 +8,8 @@
 pub use crate::IndexPath as MoonComponentIndexPath;
 pub use crate::combobox::{
     Combobox as MoonCombobox, ComboboxChange as MoonComboboxChange,
-    ComboboxEvent as MoonComboboxEvent, ComboboxState as MoonComboboxState,
-    ComboboxTriggerCtx as MoonComboboxTriggerCtx,
+    ComboboxEvent as MoonComboboxEvent, ComboboxMenuChrome as MoonComboboxMenuChrome,
+    ComboboxState as MoonComboboxState, ComboboxTriggerCtx as MoonComboboxTriggerCtx,
 };
 pub use crate::searchable_list::{
     SearchableGroup as MoonSearchableGroup, SearchableListChange as MoonSearchableListChange,

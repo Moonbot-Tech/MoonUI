@@ -229,18 +229,23 @@ impl ButtonVariant {
     }
 }
 
+/// Rendered geometry of a Moon button at one size.
+///
+/// Crate-visible because a control that must line up with a button cannot reproduce this by hand:
+/// the height is `max(ui(base), line_height + ui(pad_y) * 2)`, and only the second term carries the
+/// Font slider's delta, so any outside re-derivation drifts the moment the slider leaves zero.
 #[derive(Clone, Copy)]
-struct MoonButtonMetrics {
-    height: Pixels,
-    radius: Pixels,
-    font_size: Pixels,
-    line_height: Pixels,
+pub(crate) struct MoonButtonMetrics {
+    pub(crate) height: Pixels,
+    pub(crate) radius: Pixels,
+    pub(crate) font_size: Pixels,
+    pub(crate) line_height: Pixels,
     gap: Pixels,
-    pad_x: Pixels,
+    pub(crate) pad_x: Pixels,
 }
 
 impl MoonButtonMetrics {
-    fn for_size(size: Size, cx: &App) -> Self {
+    pub(crate) fn for_size(size: Size, cx: &App) -> Self {
         Self::base_for_size(size).scaled(cx)
     }
 

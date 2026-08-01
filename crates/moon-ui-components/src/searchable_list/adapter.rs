@@ -7,7 +7,7 @@ use crate::{
 
 use super::{
     delegate::{SearchableListDelegate, SearchableListItem as _},
-    item::SearchableListItemElement,
+    item::{SearchableListItemElement, SearchableListRowLook},
 };
 
 /// Bridges a [`SearchableListDelegate`] into the [`ListDelegate`] protocol.
@@ -31,8 +31,10 @@ pub(crate) struct SearchableListAdapter<D: SearchableListDelegate + 'static> {
     /// Renders the empty-state placeholder.
     on_render_empty: Box<dyn Fn(&mut Window, &mut App) -> AnyElement + 'static>,
     pub(crate) size: Size,
-    /// Override the trailing check icon; defaults to `IconName::Check`.
+    /// Override the check icon; defaults to `IconName::Check`.
     pub(crate) check_icon: Option<Icon>,
+    /// Whether rows are drawn as drop-down rows or as menu rows.
+    pub(crate) look: SearchableListRowLook,
 }
 
 impl<D: SearchableListDelegate + 'static> SearchableListAdapter<D> {
@@ -52,6 +54,7 @@ impl<D: SearchableListDelegate + 'static> SearchableListAdapter<D> {
             on_render_empty: Box::new(on_render_empty),
             size: Size::default(),
             check_icon: None,
+            look: SearchableListRowLook::default(),
         }
     }
 
@@ -113,6 +116,7 @@ impl<D: SearchableListDelegate + 'static> ListDelegate for SearchableListAdapter
             .delegate
             .is_item_checked(ix, item, &self.selection_snapshot, cx);
         let disabled = !self.delegate.is_item_enabled(ix, item, cx);
+        let group = self.delegate.is_group_row(ix, item, cx);
         let size = self.size;
 
         if let Some(el) = self.delegate.render_item(ix, item, is_checked, window, cx) {
@@ -120,6 +124,8 @@ impl<D: SearchableListDelegate + 'static> ListDelegate for SearchableListAdapter
                 SearchableListItemElement::new(ix.row)
                     .disabled(disabled)
                     .with_size(size)
+                    .look(self.look)
+                    .group(group)
                     .child(el),
             );
         }
@@ -137,6 +143,8 @@ impl<D: SearchableListDelegate + 'static> ListDelegate for SearchableListAdapter
             SearchableListItemElement::new(ix.row)
                 .checked(is_checked)
                 .check_icon(check_icon)
+                .look(self.look)
+                .group(group)
                 .disabled(disabled)
                 .with_size(size)
                 .child(content.into_any_element()),

@@ -125,6 +125,18 @@ pub trait SearchableListDelegate: Sized + 'static {
         !item.disabled()
     }
 
+    /// Whether the item at `ix` heads a group rather than being one of its members.
+    ///
+    /// Only a menu-look list draws the distinction, and it draws it as a menu does: the group row
+    /// takes no check column — so it sits flush left while its members are indented past theirs —
+    /// and its label is muted. It stays clickable: in both the core selector and the Report
+    /// strategy filter the group row is what toggles the whole group.
+    ///
+    /// Default: `false`, a flat list of members.
+    fn is_group_row(&self, _ix: IndexPath, _item: &Self::Item, _cx: &App) -> bool {
+        false
+    }
+
     /// Whether the item at `ix` should show a checkmark.
     ///
     /// `current_selection` is the slice of currently selected `(IndexPath, Item)` pairs.
