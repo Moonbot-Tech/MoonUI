@@ -5,33 +5,46 @@ use super::{MoonPalette, MoonTone, contrast_ratio};
 /// WCAG floor for normal-size text. Selected rows print small labels, so the strict bar applies.
 const SELECTED_TEXT_CONTRAST_FLOOR: f32 = 4.5;
 
-/// Catches `tokens.rs:MoonPalette::selected_fg` going back to picking ink by theme instead of by
-/// measured contrast. The dark palette's accent is a light orange, so the theme-shaped answer
-/// (`accent_fg`, `#FFCF94`) lands at 1.24:1 and every selected surface — menu row, calendar day,
-/// time drum — turns into one unreadable blob.
+/// Catches choosing `tokens.rs:MoonPalette::selected_fg` by contrast against the **accent**.
+///
+/// The fill it pairs with is `selected_background`, an 11% accent tint fading to nothing, so this
+/// ink lands on the panel underneath. Measuring it against the accent picks a near-black ink for
+/// the dark palette, which is black text on a dark panel — every selected list, menu and dropdown
+/// row unreadable. Shipped once; this is the guard.
 #[test]
-fn selected_ink_stays_readable_on_the_accent_in_both_palettes() {
+fn selected_row_ink_stays_readable_on_the_panel_it_is_tinted_over() {
     for (name, p) in [
         ("dark", MoonPalette::TERMINAL),
         ("light", MoonPalette::LIGHT),
     ] {
-        let ratio = contrast_ratio(p.selected_fg(), p.accent);
+        let ratio = contrast_ratio(p.selected_fg(), p.panel);
         assert!(
             ratio >= SELECTED_TEXT_CONTRAST_FLOOR,
-            "{name} palette: selected ink #{:06X} on accent #{:06X} is {ratio:.2}:1, below {SELECTED_TEXT_CONTRAST_FLOOR}",
+            "{name} palette: selected-row ink #{:06X} on panel #{:06X} is {ratio:.2}:1, below {SELECTED_TEXT_CONTRAST_FLOOR}",
             p.selected_fg(),
-            p.accent
+            p.panel
         );
     }
 }
 
-/// Catches the dark palette silently losing the dark selected ink: the value is what makes the
-/// selected calendar day and the selected time value legible on the amber accent.
+/// Catches `tokens.rs:MoonPalette::ink_on` answering by theme instead of by measurement. A solid
+/// accent fill is light in the dark palette and dark in the light one, so the readable ink is the
+/// opposite of what the theme suggests.
 #[test]
-fn the_dark_palette_prints_dark_ink_on_its_light_accent() {
-    let p = MoonPalette::TERMINAL;
-    assert_eq!(p.selected_fg(), p.shell);
-    assert_eq!(MoonPalette::LIGHT.selected_fg(), MoonPalette::LIGHT.text);
+fn ink_on_a_solid_fill_is_readable_in_both_palettes() {
+    for (name, p) in [
+        ("dark", MoonPalette::TERMINAL),
+        ("light", MoonPalette::LIGHT),
+    ] {
+        for (fill_name, fill) in [("accent", p.accent), ("panel", p.panel)] {
+            let ratio = contrast_ratio(p.ink_on(fill), fill);
+            assert!(
+                ratio >= SELECTED_TEXT_CONTRAST_FLOOR,
+                "{name} palette: ink #{:06X} on {fill_name} #{fill:06X} is {ratio:.2}:1, below {SELECTED_TEXT_CONTRAST_FLOOR}",
+                p.ink_on(fill),
+            );
+        }
+    }
 }
 
 /// Catches changing `tokens.rs:MoonPalette::TERMINAL` away from the released dark-palette

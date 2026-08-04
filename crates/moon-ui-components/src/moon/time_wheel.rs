@@ -210,7 +210,9 @@ pub(crate) fn moon_time_wheel(
                 .child(
                     MoonText::new(format!("{value:02}"))
                         .color(if is_selected {
-                            p.selected_fg()
+                            // This row's fill IS the solid accent, unlike a tinted selected list
+                            // row, so the ink is measured against it.
+                            p.ink_on(p.accent)
                         } else {
                             p.text_muted
                         })
