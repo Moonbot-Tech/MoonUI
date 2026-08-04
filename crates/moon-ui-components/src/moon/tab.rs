@@ -132,6 +132,17 @@ impl MoonTabStrip {
         self.render_with_theme(p, MoonThemeTokens::default())
     }
 
+    /// Renders the strip with explicit palette and scale tokens.
+    ///
+    /// The label owns the flexible centre space inside each fixed-width tab, preventing its badge
+    /// and close button from shifting inward when the text grows or clips.
+    ///
+    /// Args:
+    ///     p: Palette used for the strip and item states.
+    ///     tokens: Scale tokens used for tab geometry.
+    ///
+    /// Returns:
+    ///     The themed tab-strip element.
     pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
         let mut root = div()
             .id(self.id)
@@ -184,17 +195,29 @@ impl MoonTabStrip {
                         .active(move |this| this.bg(rgba_from(p.overlay, 0.012)))
                 })
                 .child(
-                    div().mt(px(tokens.ui(2.0))).child(
-                        MoonText::new(item.label)
-                            .color(fg)
-                            .alpha(fg_alpha)
-                            .font_size(10.0)
-                            .line_height(13.0)
-                            .weight(if active { 600.0 } else { 400.0 })
-                            .mono(true)
-                            .uppercase(false)
-                            .render(),
-                    ),
+                    // The label is the only child allowed to yield: `flex_1 + min_w_0` lets a long
+                    // label clip inside the fixed-width tab instead of pushing the badge and the
+                    // close button out of it, and `justify_center` centres it in whatever space is
+                    // left. Centring here rather than on the tab row itself is deliberate — on the
+                    // row it would centre the whole label+badge+close cluster and drag the close
+                    // button inward. No top margin: the row is already `items_center`, so an extra
+                    // one only pushes the text off the vertical axis.
+                    super::foundation::h_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .justify_center()
+                        .overflow_hidden()
+                        .child(
+                            MoonText::new(item.label)
+                                .color(fg)
+                                .alpha(fg_alpha)
+                                .font_size(10.0)
+                                .line_height(13.0)
+                                .weight(if active { 600.0 } else { 400.0 })
+                                .mono(true)
+                                .uppercase(false)
+                                .render(),
+                        ),
                 );
 
             if let Some(on_click) = self.on_click.clone()
@@ -218,7 +241,9 @@ impl MoonTabStrip {
                         .bg_alpha(if active { 0.80 } else { 0.06 })
                         .text_color(if active { p.shell } else { p.text_soft })
                         .weight(600.0)
-                        .margin_top(2.0)
+                        // No top margin: the badge shares the row's `items_center` axis with the
+                        // label and the close button, and one would reintroduce the offset the
+                        // label just lost.
                         .disabled(disabled)
                         .render_with_theme(p, tokens.clone()),
                 );
