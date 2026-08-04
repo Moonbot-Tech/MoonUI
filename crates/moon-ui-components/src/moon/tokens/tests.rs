@@ -1,6 +1,38 @@
 //! Regression coverage for the published terminal palette contracts.
 
-use super::{MoonPalette, MoonTone};
+use super::{MoonPalette, MoonTone, contrast_ratio};
+
+/// WCAG floor for normal-size text. Selected rows print small labels, so the strict bar applies.
+const SELECTED_TEXT_CONTRAST_FLOOR: f32 = 4.5;
+
+/// Catches `tokens.rs:MoonPalette::selected_fg` going back to picking ink by theme instead of by
+/// measured contrast. The dark palette's accent is a light orange, so the theme-shaped answer
+/// (`accent_fg`, `#FFCF94`) lands at 1.24:1 and every selected surface — menu row, calendar day,
+/// time drum — turns into one unreadable blob.
+#[test]
+fn selected_ink_stays_readable_on_the_accent_in_both_palettes() {
+    for (name, p) in [
+        ("dark", MoonPalette::TERMINAL),
+        ("light", MoonPalette::LIGHT),
+    ] {
+        let ratio = contrast_ratio(p.selected_fg(), p.accent);
+        assert!(
+            ratio >= SELECTED_TEXT_CONTRAST_FLOOR,
+            "{name} palette: selected ink #{:06X} on accent #{:06X} is {ratio:.2}:1, below {SELECTED_TEXT_CONTRAST_FLOOR}",
+            p.selected_fg(),
+            p.accent
+        );
+    }
+}
+
+/// Catches the dark palette silently losing the dark selected ink: the value is what makes the
+/// selected calendar day and the selected time value legible on the amber accent.
+#[test]
+fn the_dark_palette_prints_dark_ink_on_its_light_accent() {
+    let p = MoonPalette::TERMINAL;
+    assert_eq!(p.selected_fg(), p.shell);
+    assert_eq!(MoonPalette::LIGHT.selected_fg(), MoonPalette::LIGHT.text);
+}
 
 /// Catches changing `tokens.rs:MoonPalette::TERMINAL` away from the released dark-palette
 /// specification, which would unexpectedly recolor existing MoonTerminal screens.

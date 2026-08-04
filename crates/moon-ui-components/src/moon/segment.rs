@@ -6,7 +6,7 @@ use super::{
     foundation::{MoonIndexedClickHandler, accent_underline_colored},
     text::{MoonText, fit_text_to_width, measure_text_width},
     theme::{MoonTheme, MoonThemeTokens},
-    tokens::{MoonPalette, MoonRect, rgba_from},
+    tokens::{MoonPalette, MoonRect, contrast_ratio, rgba_from},
     tooltip::MoonTooltipView,
 };
 
@@ -192,32 +192,6 @@ impl MoonAccent {
             .unwrap_or(p.text);
         AccentColors { text, underline }
     }
-}
-
-/// WCAG 2.x relative luminance of an `0xRRGGBB` colour.
-///
-/// Deliberately not routed through this crate's other sRGB decode (`theme::color`'s oklab path):
-/// that one uses the sRGB spec's 0.04045 knee, while WCAG 2.x specifies 0.03928. The two agree to
-/// well within a rounding step for every colour in the palettes, but this function exists to answer
-/// a WCAG question, so it follows the WCAG definition rather than borrowing a near-neighbour.
-fn relative_luminance(color: u32) -> f32 {
-    let channel = |shift: u32| {
-        let c = ((color >> shift) & 0xFF) as f32 / 255.0;
-        if c <= 0.03928 {
-            c / 12.92
-        } else {
-            ((c + 0.055) / 1.055).powf(2.4)
-        }
-    };
-    0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
-}
-
-/// WCAG 2.x contrast ratio between two opaque `0xRRGGBB` colours, from 1.0 to 21.0.
-///
-/// Symmetric in its arguments — the brighter colour is found, not assumed to be either one.
-fn contrast_ratio(a: u32, b: u32) -> f32 {
-    let (la, lb) = (relative_luminance(a), relative_luminance(b));
-    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
 }
 
 #[derive(Clone, Debug)]
