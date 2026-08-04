@@ -21,26 +21,26 @@ use moon_ui::{
     MoonCheckbox, MoonCheckboxSize, MoonCollapsible, MoonColorPicker, MoonColorPickerState,
     MoonCombobox, MoonComboboxState, MoonComponentIndexPath, MoonContextMenu, MoonDataCell,
     MoonDataRow, MoonDataTable, MoonDataTableColumn, MoonDataTableState, MoonDatePicker,
-    MoonDatePickerState, MoonDescriptionList, MoonDockPanel, MoonDropdown, MoonFormRow,
-    MoonGroupBox, MoonHotkeyInput, MoonHoverCard, MoonInput, MoonInputMaskPattern, MoonKbd,
-    MoonKbdSize, MoonLabel, MoonLink, MoonList, MoonListDelegate, MoonListItem, MoonListState,
-    MoonMenuItem, MoonMenuSize, MoonNativeMenu, MoonNotification, MoonNumberFieldOptions,
-    MoonPagination, MoonPalette, MoonPlacement, MoonPopover, MoonPopoverPlacement, MoonPopupMenu,
-    MoonPresetItem, MoonPresetStrip, MoonProgress, MoonProgressCircle, MoonProgressCircleSize,
-    MoonRadio, MoonRadioSize, MoonRating, MoonResizablePanelGroup, MoonScrollableElement,
-    MoonScrollbarVisibility, MoonSearchableVec, MoonSegmentItem, MoonSegmentedControl, MoonSelect,
-    MoonSelectItem, MoonSelectState, MoonSelectorPill, MoonSelectorSegment, MoonSeparator,
-    MoonSettingField, MoonSettingGroup, MoonSettingItem, MoonSettingPage, MoonSettings,
-    MoonSidebar, MoonSidebarGroup, MoonSidebarMenu, MoonSidebarMenuItem, MoonSidebarToggleButton,
-    MoonSkeleton, MoonSlider, MoonSliderState, MoonSpinner, MoonSpinnerSize, MoonStatusBar,
-    MoonStatusIndicator, MoonStatusItem, MoonStepper, MoonSurface, MoonSurfaceVariant, MoonSwitch,
-    MoonTabItem, MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle,
-    MoonTag, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonToggle, MoonToggleSize,
-    MoonTone, MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree,
-    MoonTreeItem, MoonTreeSelectionMode, MoonTreeState, MoonVirtualList,
-    MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand,
-    MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex, moon_h_resizable,
-    moon_resizable_panel, rgba_from, v_flex,
+    MoonDatePickerState, MoonDateTimePicker, MoonDateTimePickerState, MoonDescriptionList,
+    MoonDockPanel, MoonDropdown, MoonFormRow, MoonGroupBox, MoonHotkeyInput, MoonHoverCard,
+    MoonInput, MoonInputMaskPattern, MoonKbd, MoonKbdSize, MoonLabel, MoonLink, MoonList,
+    MoonListDelegate, MoonListItem, MoonListState, MoonMenuItem, MoonMenuSize, MoonNativeMenu,
+    MoonNotification, MoonNumberFieldOptions, MoonPagination, MoonPalette, MoonPlacement,
+    MoonPopover, MoonPopoverPlacement, MoonPopupMenu, MoonPresetItem, MoonPresetStrip,
+    MoonProgress, MoonProgressCircle, MoonProgressCircleSize, MoonRadio, MoonRadioSize, MoonRating,
+    MoonResizablePanelGroup, MoonScrollableElement, MoonScrollbarVisibility, MoonSearchableVec,
+    MoonSegmentItem, MoonSegmentedControl, MoonSelect, MoonSelectItem, MoonSelectState,
+    MoonSelectorPill, MoonSelectorSegment, MoonSeparator, MoonSettingField, MoonSettingGroup,
+    MoonSettingItem, MoonSettingPage, MoonSettings, MoonSidebar, MoonSidebarGroup, MoonSidebarMenu,
+    MoonSidebarMenuItem, MoonSidebarToggleButton, MoonSkeleton, MoonSlider, MoonSliderState,
+    MoonSpinner, MoonSpinnerSize, MoonStatusBar, MoonStatusIndicator, MoonStatusItem, MoonStepper,
+    MoonSurface, MoonSurfaceVariant, MoonSwitch, MoonTabItem, MoonTabStrip, MoonTableCell,
+    MoonTableColumn, MoonTableRow, MoonTableStyle, MoonTag, MoonText, MoonTextArea, MoonTheme,
+    MoonThemeConfig, MoonTimePicker, MoonTimePickerState, MoonToggle, MoonToggleSize, MoonTone,
+    MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem,
+    MoonTreeSelectionMode, MoonTreeState, MoonVirtualList, MoonVirtualListScrollHandle,
+    MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, PanelView,
+    Root, TabPanel, ThemeMode, h_flex, moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
 };
 
 const COMPONENT_COVERAGE: &[&str] = &[
@@ -63,6 +63,8 @@ const COMPONENT_COVERAGE: &[&str] = &[
     "MoonDataTable",
     "MoonCalendar",
     "MoonDatePicker",
+    "MoonDateTimePicker",
+    "MoonTimePicker",
     "MoonDescriptionList",
     "MoonDialog",
     "MoonDockPanel",
@@ -144,6 +146,8 @@ struct Gallery {
     snapshot: Option<SnapshotRun>,
     button_clicks: usize,
     alerts_enabled: bool,
+    /// Opt-in for the indeterminate progress demo; see the comment at its render site.
+    progress_loading_demo: bool,
     compact_checked: bool,
     new_toggle_checked: bool,
     new_radio_index: usize,
@@ -166,6 +170,8 @@ struct Gallery {
     select_state: Entity<MoonSelectState<SharedString>>,
     combobox_state: Entity<MoonComboboxState<MoonSearchableVec<&'static str>>>,
     date_picker_state: Entity<MoonDatePickerState>,
+    date_time_picker_state: Entity<MoonDateTimePickerState>,
+    time_picker_state: Entity<MoonTimePickerState>,
     calendar_state: Entity<MoonCalendarState>,
     list_state: Entity<MoonListState<GalleryListDelegate>>,
     tree_state: Entity<MoonTreeState>,
@@ -548,6 +554,31 @@ const HANDOFF_CASES: &[HandoffCase] = &[
         height: 74.0,
     },
     HandoffCase {
+        id: "date_time_picker.trigger",
+        width: 340.0,
+        height: 74.0,
+    },
+    HandoffCase {
+        id: "date_time_picker.open",
+        width: 340.0,
+        height: 420.0,
+    },
+    HandoffCase {
+        id: "time_picker.trigger",
+        width: 340.0,
+        height: 74.0,
+    },
+    HandoffCase {
+        id: "time_picker.open",
+        width: 340.0,
+        height: 220.0,
+    },
+    HandoffCase {
+        id: "pickers.parity",
+        width: 340.0,
+        height: 150.0,
+    },
+    HandoffCase {
         id: "dock.area",
         width: 520.0,
         height: 260.0,
@@ -851,6 +882,10 @@ struct CaseGallery {
     select_state: Entity<MoonSelectState<SharedString>>,
     combobox_state: Entity<MoonComboboxState<MoonSearchableVec<&'static str>>>,
     date_picker_state: Entity<MoonDatePickerState>,
+    date_time_picker_state: Entity<MoonDateTimePickerState>,
+    open_date_time_picker_state: Entity<MoonDateTimePickerState>,
+    time_picker_state: Entity<MoonTimePickerState>,
+    open_time_picker_state: Entity<MoonTimePickerState>,
     calendar_state: Entity<MoonCalendarState>,
     list_state: Entity<MoonListState<GalleryListDelegate>>,
     tree_state: Entity<MoonTreeState>,
@@ -879,6 +914,19 @@ impl CaseGallery {
         });
         window.resize(size(px(first_case.width), px(first_case.height)));
 
+        let date_time_picker_state = cx.new(|cx| MoonDateTimePickerState::new(window, cx));
+        // A specimen of the popup itself: the calendar and the time drums of one control.
+        let open_date_time_picker_state = cx.new(|cx| {
+            let mut state = MoonDateTimePickerState::new(window, cx);
+            state.set_open(true, cx);
+            state
+        });
+        let time_picker_state = cx.new(|cx| MoonTimePickerState::new(cx));
+        let open_time_picker_state = cx.new(|cx| {
+            let mut state = MoonTimePickerState::new(cx);
+            state.set_open(true, cx);
+            state
+        });
         let slider_58_state = cx.new(|_| {
             MoonSliderState::new()
                 .min(0.0)
@@ -986,6 +1034,10 @@ impl CaseGallery {
             select_state,
             combobox_state,
             date_picker_state,
+            date_time_picker_state,
+            open_date_time_picker_state,
+            time_picker_state,
+            open_time_picker_state,
             calendar_state,
             list_state,
             tree_state,
@@ -1986,6 +2038,62 @@ impl CaseGallery {
                         .number_of_months(1),
                 )
                 .into_any_element(),
+            "date_time_picker.trigger" => div()
+                .w(px(280.0))
+                .child(
+                    MoonDateTimePicker::new("case-date-time-picker", &self.date_time_picker_state)
+                        .placeholder("Pick session date and time")
+                        .number_of_months(1)
+                        .render(),
+                )
+                .into_any_element(),
+            "date_time_picker.open" => div()
+                .w(px(280.0))
+                .child(
+                    MoonDateTimePicker::new(
+                        "case-date-time-picker-open",
+                        &self.open_date_time_picker_state,
+                    )
+                    .placeholder("Pick session date and time")
+                    .number_of_months(1)
+                    .render(),
+                )
+                .into_any_element(),
+            "time_picker.trigger" => div()
+                .w(px(280.0))
+                .child(MoonTimePicker::new("case-time-picker", &self.time_picker_state).render())
+                .into_any_element(),
+            "time_picker.open" => div()
+                .w(px(280.0))
+                .child(
+                    MoonTimePicker::new("case-time-picker-open", &self.open_time_picker_state)
+                        .render(),
+                )
+                .into_any_element(),
+            // The three picker fields stacked: they must share one background, border, radius and
+            // height, because they sit next to each other in real forms.
+            "pickers.parity" => v_flex()
+                .w(px(280.0))
+                .gap(px(10.0))
+                .child(
+                    MoonDatePicker::new(&self.date_picker_state)
+                        .placeholder("Pick session date")
+                        .number_of_months(1),
+                )
+                .child(
+                    MoonDateTimePicker::new(
+                        "case-parity-date-time-picker",
+                        &self.date_time_picker_state,
+                    )
+                    .placeholder("Pick session date and time")
+                    .number_of_months(1)
+                    .render(),
+                )
+                .child(
+                    MoonTimePicker::new("case-parity-time-picker", &self.time_picker_state)
+                        .render(),
+                )
+                .into_any_element(),
             "dock.area" => div()
                 .w(px(500.0))
                 .h(px(240.0))
@@ -2749,6 +2857,9 @@ impl Gallery {
                     .child(MoonTreeItem::new("runtime.theme", "Theme bridge")),
             ])
         });
+        let date_time_picker_state = cx.new(|cx| MoonDateTimePickerState::new(window, cx));
+        // Every minute: the standalone control is the one people set an exact time in.
+        let time_picker_state = cx.new(|cx| MoonTimePickerState::new(cx));
         let controlled_tree_state = cx.new(|cx| {
             MoonTreeState::new(cx).items([
                 MoonTreeItem::new("core.1", "server 1")
@@ -2857,6 +2968,7 @@ impl Gallery {
             }),
             button_clicks: 0,
             alerts_enabled: true,
+            progress_loading_demo: false,
             compact_checked: true,
             new_toggle_checked: true,
             new_radio_index: 1,
@@ -2879,6 +2991,8 @@ impl Gallery {
             select_state,
             combobox_state,
             date_picker_state,
+            date_time_picker_state,
+            time_picker_state,
             calendar_state,
             list_state,
             tree_state,
@@ -3321,11 +3435,36 @@ impl Gallery {
                             .child(
                                 div().w(px(160.0)).child(
                                     MoonProgress::new("moon-progress-loading")
-                                        .loading(true)
+                                        // Opt-in: an endlessly repeating animation forces a full
+                                        // window re-render on every vsync for as long as it is on
+                                        // screen. Measured on this page in a debug build, leaving
+                                        // it always-on cost ~1.2 cores at idle and starved the
+                                        // input handling of the landing page.
+                                        .loading(self.progress_loading_demo)
+                                        .value(if self.progress_loading_demo { 0.0 } else { 42.0 })
                                         .tone(MoonTone::Info)
                                         .height(5.0)
                                         .render(),
                                 ),
+                            )
+                            .child(
+                                MoonCheckbox::new("check-progress-loading")
+                                    .label("animate")
+                                    .size(MoonCheckboxSize::Compact)
+                                    .checked(self.progress_loading_demo)
+                                    .on_change({
+                                        let view = view.clone();
+                                        move |checked, _, app| {
+                                            let checked = *checked;
+                                            view.update(app, |this, cx| {
+                                                this.progress_loading_demo = checked;
+                                                this.push_event(
+                                                    format!("Progress loading animation: {checked}"),
+                                                    cx,
+                                                );
+                                            });
+                                        }
+                                    }),
                             ),
                     )
                     .child(
@@ -4778,6 +4917,23 @@ impl Gallery {
                                     .number_of_months(1),
                             )
                             .child(
+                                MoonDateTimePicker::new(
+                                    "new-controls-date-time-picker",
+                                    &self.date_time_picker_state,
+                                )
+                                .placeholder("Pick session date and time")
+                                .cleanable(true)
+                                .number_of_months(1)
+                                .render(),
+                            )
+                            .child(
+                                MoonTimePicker::new(
+                                    "new-controls-time-picker",
+                                    &self.time_picker_state,
+                                )
+                                .render(),
+                            )
+                            .child(
                                 MoonHoverCard::new("new-controls-hover-card")
                                     .open_delay(Duration::from_millis(120))
                                     .close_delay(Duration::from_millis(120))
@@ -5961,7 +6117,7 @@ fn handoff_chart_stack(cx: &App) -> impl IntoElement {
                         .weight(700.0)
                         .render(),
                 )
-                .child(MoonBadge::new("default · BTCUSDT").render())
+                .child(MoonBadge::new("default В· BTCUSDT").render())
                 .child(MoonBadge::new("Live").tone(MoonTone::Positive).render())
                 .child(div().flex_1())
                 .child(
@@ -6017,9 +6173,9 @@ fn handoff_chart_stack(cx: &App) -> impl IntoElement {
                         .top(px(8.0))
                         .right(px(16.0))
                         .gap(px(8.0))
-                        .child(handoff_chart_panel("Chart 1 · BTCUSDT", p.blue, p))
-                        .child(handoff_chart_panel("Chart 2 · ETHUSDT", p.green, p))
-                        .child(handoff_chart_panel("Chart 3 · SOLUSDT", p.amber, p)),
+                        .child(handoff_chart_panel("Chart 1 В· BTCUSDT", p.blue, p))
+                        .child(handoff_chart_panel("Chart 2 В· ETHUSDT", p.green, p))
+                        .child(handoff_chart_panel("Chart 3 В· SOLUSDT", p.amber, p)),
                 )
                 .child(
                     div()
@@ -6079,8 +6235,8 @@ fn handoff_chart_panel(title: &'static str, tone: u32, p: MoonPalette) -> impl I
                         .border_color(rgba_from(tone, 0.86))
                         .child(
                             MoonText::new(match title {
-                                "Chart 1 · BTCUSDT" => "01",
-                                "Chart 2 · ETHUSDT" => "02",
+                                "Chart 1 В· BTCUSDT" => "01",
+                                "Chart 2 В· ETHUSDT" => "02",
                                 _ => "03",
                             })
                             .uppercase(false)

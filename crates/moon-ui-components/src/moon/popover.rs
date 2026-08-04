@@ -1,5 +1,5 @@
-use crate::popover::Popover as CorePopover;
-use gpui::*;
+use crate::{ActiveTheme as _, popover::Popover as CorePopover};
+use gpui::{prelude::FluentBuilder as _, *};
 
 use super::{
     background::MoonBackgroundPolicy,
@@ -44,6 +44,20 @@ impl MoonPopoverWidth {
     }
 }
 
+/// Which surface the popup box paints.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum MoonPopoverChrome {
+    /// Moon chrome: compact scaled padding on the shell-high surface. The default.
+    #[default]
+    Moon,
+    /// The chrome the Longbridge pickers draw: the theme `popover` surface, `p_3` padding, the
+    /// doubled radius and a soft shadow.
+    ///
+    /// Use it for a popup that opens next to a Mirror picker's popup — a date picker and a
+    /// date+time picker in the same form must not show two different popup backgrounds.
+    Picker,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonPopoverPlacement {
     BottomStart,
@@ -76,6 +90,7 @@ pub struct MoonPopover {
     offset_x: f32,
     offset_y: f32,
     background_policy: MoonBackgroundPolicy,
+    chrome: MoonPopoverChrome,
     on_open_change: Option<std::rc::Rc<dyn Fn(bool, &mut Window, &mut App)>>,
 }
 
@@ -103,8 +118,15 @@ impl MoonPopover {
             offset_x: 0.0,
             offset_y: 6.0,
             background_policy: MoonBackgroundPolicy::Opaque,
+            chrome: MoonPopoverChrome::default(),
             on_open_change: None,
         }
+    }
+
+    /// Choose the surface the popup box paints; see [`MoonPopoverChrome`].
+    pub fn chrome(mut self, chrome: MoonPopoverChrome) -> Self {
+        self.chrome = chrome;
+        self
     }
 
     pub fn bounds(mut self, bounds: MoonRect) -> Self {
@@ -286,16 +308,28 @@ impl RenderOnce for MoonPopover {
             rgba_from(p.shadow, 0.48),
         );
         let popup_debug_id = format!("{}:popup", self.id);
+        let chrome = self.chrome;
         let mut popup = div()
             .debug_selector(move || popup_debug_id)
-            .p(px(tokens.ui(POPOVER_PADDING)))
-            .rounded(px(tokens.ui(5.0)))
             .border(px(POPOVER_BORDER))
             .border_color(rgba_from(p.border, 1.0))
-            .shadow(vec![shadow])
             .occlude()
             .mt(px(self.offset_y))
             .ml(px(self.offset_x))
+            .map(|this| match chrome {
+                MoonPopoverChrome::Moon => this
+                    .p(px(tokens.ui(POPOVER_PADDING)))
+                    .rounded(px(tokens.ui(5.0)))
+                    .shadow(vec![shadow]),
+                // The exact box the Longbridge pickers draw, so a Moon popup can sit next to a
+                // Mirror picker's popup without a second surface colour showing up in the form.
+                MoonPopoverChrome::Picker => this
+                    .p_3()
+                    .rounded((cx.theme().radius * 2.).min(px(8.)))
+                    .shadow_lg()
+                    .bg(cx.theme().popover)
+                    .text_color(cx.theme().popover_foreground),
+            })
             .child(self.content.unwrap_or_else(|| div().into_any_element()));
         if let Some(width) = self.width.resolve(&tokens) {
             popup = popup.w(px(width));
@@ -326,7 +360,9 @@ impl RenderOnce for MoonPopover {
             });
         }
 
-        popup = self.background_policy.apply(popup, p.shell_high, 0.98);
+        if matches!(chrome, MoonPopoverChrome::Moon) {
+            popup = self.background_policy.apply(popup, p.shell_high, 0.98);
+        }
 
         let mut popover = CorePopover::new(ElementId::from(self.id.clone()))
             .anchor(anchor_for(self.placement))

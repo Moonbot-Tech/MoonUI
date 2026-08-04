@@ -14,6 +14,7 @@ mod combobox;
 mod context_menu;
 mod data_table;
 mod date_picker;
+mod date_time_picker;
 mod description_list;
 mod dialog;
 mod dock;
@@ -33,6 +34,7 @@ mod list;
 mod menu;
 mod notification;
 mod pagination;
+mod picker_field;
 mod placement;
 mod popover;
 mod preset;
@@ -63,6 +65,8 @@ mod tag;
 mod text;
 mod text_area;
 mod theme;
+mod time_picker;
+mod time_wheel;
 mod toggle;
 mod tokens;
 mod tooltip;
@@ -100,6 +104,7 @@ pub use date_picker::{
     MoonCalendar, MoonCalendarEvent, MoonCalendarState, MoonDate, MoonDateMatcher, MoonDatePicker,
     MoonDatePickerEvent, MoonDatePickerState, MoonDateRangePreset, MoonDateRangePresetValue,
 };
+pub use date_time_picker::{MoonDateTimePicker, MoonDateTimePickerEvent, MoonDateTimePickerState};
 pub use description_list::MoonDescriptionList;
 pub use dialog::{MoonDialog, MoonDialogContent};
 pub use dock::{
@@ -131,6 +136,9 @@ pub use notification::MoonNotification;
 pub use pagination::MoonPagination;
 pub use placement::MoonPlacement;
 pub use popover::{MoonPopover, MoonPopoverPlacement};
+// Exported on its own line so the recorded API item above stays byte-identical: the API guard
+// compares whole re-export statements, and widening one reads as changing it.
+pub use popover::MoonPopoverChrome;
 pub use preset::{MoonPresetItem, MoonPresetStrip};
 pub use progress::MoonProgress;
 pub use progress_circle::{MoonProgressCircle, MoonProgressCircleSize};
@@ -176,6 +184,7 @@ pub use theme::{
     MoonScale, MoonTextMetrics, MoonTheme, MoonThemeConfig, MoonThemeConfigError, MoonThemeTokens,
     MoonTypography,
 };
+pub use time_picker::{MoonTimePicker, MoonTimePickerEvent, MoonTimePickerState};
 pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleSize};
 pub use tokens::{MoonMetrics, MoonPalette, MoonRect, MoonTone, rgba_from};
 pub use tooltip::{MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView};

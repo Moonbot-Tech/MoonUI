@@ -252,13 +252,50 @@ impl MoonPalette {
         (0.2126 * r + 0.7152 * g + 0.0722 * b) >= 128.0
     }
 
+    /// The ink to print on top of [`Self::accent`].
+    ///
+    /// Chosen by measured contrast rather than by "which theme is this": the dark palette's accent
+    /// is a *light* orange, so following the theme and printing `accent_fg` (`#FFCF94`) on it lands
+    /// at **1.24:1** — the selected menu row, the selected calendar day and the selected time value
+    /// all read as one solid blob. The candidates are the palette's own inks, and the one with the
+    /// best contrast against the accent wins, so a custom palette gets the same treatment.
+    ///
+    /// Returns:
+    ///     The `0xRRGGBB` ink with the highest contrast against `accent`.
     pub fn selected_fg(self) -> u32 {
-        if self.is_light() {
-            self.text
-        } else {
-            self.accent_fg
-        }
+        [self.on_accent, self.shell, self.text, self.accent_fg]
+            .into_iter()
+            .max_by(|a, b| {
+                contrast_ratio(*a, self.accent).total_cmp(&contrast_ratio(*b, self.accent))
+            })
+            .unwrap_or(self.on_accent)
     }
+}
+
+/// WCAG 2.x relative luminance of an `0xRRGGBB` colour.
+///
+/// Deliberately not routed through this crate's other sRGB decode (`theme::color`'s oklab path):
+/// that one uses the sRGB spec's 0.04045 knee, while WCAG 2.x specifies 0.03928. The two agree to
+/// well within a rounding step for every colour in the palettes, but this function exists to answer
+/// a WCAG question, so it follows the WCAG definition rather than borrowing a near-neighbour.
+pub(crate) fn relative_luminance(color: u32) -> f32 {
+    let channel = |shift: u32| {
+        let c = ((color >> shift) & 0xFF) as f32 / 255.0;
+        if c <= 0.03928 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+}
+
+/// WCAG 2.x contrast ratio between two opaque `0xRRGGBB` colours, from 1.0 to 21.0.
+///
+/// Symmetric in its arguments — the brighter colour is found, not assumed to be either one.
+pub(crate) fn contrast_ratio(a: u32, b: u32) -> f32 {
+    let (la, lb) = (relative_luminance(a), relative_luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
 }
 
 impl Default for MoonPalette {

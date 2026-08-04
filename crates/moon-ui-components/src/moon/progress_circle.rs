@@ -37,6 +37,11 @@ impl MoonProgressCircle {
         self
     }
 
+    /// Show the indeterminate rotating arc instead of `value`.
+    ///
+    /// **Cost:** this is an endlessly repeating animation, and every animation frame re-renders
+    /// the whole hosting window, not just the circle — see [`super::MoonProgress::loading`] for
+    /// the measured numbers. Use it for a genuinely pending operation, not as decoration.
     pub fn loading(mut self, loading: bool) -> Self {
         self.inner = self.inner.loading(loading);
         self
