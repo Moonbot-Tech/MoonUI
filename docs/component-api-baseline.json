@@ -2295,7 +2295,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use scroll_area::{MoonScrollAxis, MoonScrollbarVisibility};"
+      "signature": "pub use scroll_area::{ MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette, };"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
