@@ -70,6 +70,12 @@ impl MoonSkeleton {
         self
     }
 
+    /// Enable the pulsing placeholder animation.
+    ///
+    /// **Cost:** the pulse repeats forever, and every animation frame re-renders the whole hosting
+    /// window, not just the placeholder — see [`super::MoonProgress::loading`] for the measured
+    /// numbers. A screen full of skeletons pays that cost once per frame, not once per skeleton,
+    /// but it pays it for as long as they are on screen: turn them off once real content arrives.
     pub fn animated(mut self, animated: bool) -> Self {
         self.animated = animated;
         self

@@ -36,6 +36,15 @@ impl MoonProgress {
         self
     }
 
+    /// Show the indeterminate sliding bar instead of `value`.
+    ///
+    /// **Cost:** the indeterminate bar is an endlessly repeating animation. Every animation frame
+    /// resolves to `cx.notify(..)`, and GPUI re-renders the window's whole uncached view tree per
+    /// drawn frame, so this repaints **the entire hosting window** on every vsync for as long as
+    /// it is visible — not just the bar. Measured in the component gallery (debug build): a single
+    /// always-on bar cost ~1.2 cores at idle and starved input handling; the same page idled at
+    /// ~0% with it off. Use it for a genuinely pending operation and stop it when the operation
+    /// ends; never leave one on as permanent page decoration.
     pub fn loading(mut self, loading: bool) -> Self {
         self.loading = loading;
         self
