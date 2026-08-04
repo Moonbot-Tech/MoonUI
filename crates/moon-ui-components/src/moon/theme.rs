@@ -144,7 +144,15 @@ impl MoonThemeTokens {
         let is_light = p.is_light();
         let selected_tint = selected_flat(p);
         let selected_border = rgba_from(p.accent, 1.0);
+        // Two different questions, and answering them with one value is how a selected calendar day
+        // ended up unreadable while a selected menu row was fine.
+        //
+        // `selected_fg` is the ink for a row marked by `selected_background`: an 11% accent tint, so
+        // the ink lands on the panel underneath and must stay light in a dark theme. `ink_on_accent`
+        // is the ink for a surface actually FILLED with the accent — a calendar day, a pill tab, a
+        // checked stepper, a primary tag — where the amber is light and the ink must be dark.
         let selected_fg = rgba_from(p.selected_fg(), 1.0);
+        let ink_on_accent = rgba_from(p.ink_on(p.accent), 1.0);
         let ring = if is_light { p.accent } else { p.blue };
         let selection_alpha = if is_light { p.accent_tint_a } else { 0.32 };
         let success = if is_light { p.green_btn } else { p.green };
@@ -156,12 +164,12 @@ impl MoonThemeTokens {
             foreground: rgba_from(p.text, 1.0),
             border: rgba_from(p.border, 1.0),
             accent: rgba_from(p.accent, 1.0),
-            accent_foreground: selected_fg,
+            accent_foreground: ink_on_accent,
             accordion: rgba_from(p.panel, 1.0),
             accordion_hover: rgba_from(p.panel_head, 1.0),
             button_primary: rgba_from(p.accent, 1.0),
             button_primary_active: rgba_from(p.accent, 0.92),
-            button_primary_foreground: selected_fg,
+            button_primary_foreground: ink_on_accent,
             button_primary_hover: rgba_from(p.accent, 0.82),
             group_box: rgba_from(p.panel, 1.0),
             group_box_foreground: rgba_from(p.text, 1.0),
@@ -201,7 +209,7 @@ impl MoonThemeTokens {
             popover_foreground: rgba_from(p.text, 1.0),
             primary: rgba_from(p.accent, 1.0),
             primary_active: rgba_from(p.accent, 0.92),
-            primary_foreground: selected_fg,
+            primary_foreground: ink_on_accent,
             primary_hover: rgba_from(p.accent, 0.82),
             progress_bar: rgba_from(p.green, 1.0),
             ring: rgba_from(ring, 1.0),
@@ -219,7 +227,7 @@ impl MoonThemeTokens {
             sidebar_border: rgba_from(p.border, 1.0),
             sidebar_foreground: rgba_from(p.text_soft, 1.0),
             sidebar_primary: rgba_from(p.accent, 1.0),
-            sidebar_primary_foreground: selected_fg,
+            sidebar_primary_foreground: ink_on_accent,
             skeleton: rgba_from(p.panel_head, 1.0),
             slider_bar: rgba_from(p.border, 1.0),
             slider_thumb: rgba_from(p.accent, 1.0),
