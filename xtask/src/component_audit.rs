@@ -768,6 +768,33 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "MoonSlider diffused visual state must be covered by committed gallery golden snapshots",
         ),
         test_contract(
+            "date_time_picker.time_behavior",
+            ContractSeverity::Guardrail,
+            &[
+                "picking_a_day_keeps_the_popup_open_for_the_time_drums",
+                "spinning_the_time_keeps_the_day",
+                "the_drums_wrap_without_disturbing_the_day",
+                "clearing_resets_both_halves_of_the_value",
+            ],
+            &tests,
+            "picking a day must keep the popup open for the time drums, spinning the clock must keep the day and never roll it, and clearing must reset both halves",
+        ),
+        test_contract(
+            "time_picker.wheel_behavior",
+            ContractSeverity::Guardrail,
+            &[
+                "a_drum_wraps_in_both_directions",
+                "scrolling_up_walks_the_drum_backwards",
+                "one_wheel_notch_moves_exactly_one_row",
+                "one_wheel_notch_changes_exactly_one_minute",
+                "sub_row_movement_accumulates_instead_of_vanishing",
+                "the_minute_drum_walks_whole_steps",
+                "the_value_reads_back_as_zero_padded_hh_mm",
+            ],
+            &tests,
+            "time drums must wrap in both directions, follow the platform scroll direction, move exactly one value per wheel notch regardless of the system lines-per-scroll setting, accumulate sub-row trackpad movement, walk whole minute steps, and read back as zero-padded hh:mm",
+        ),
+        test_contract(
             "stepper.value_behavior",
             ContractSeverity::Guardrail,
             &["stepper_next_value_clamps_to_range_and_positive_step"],

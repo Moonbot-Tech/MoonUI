@@ -195,6 +195,26 @@
       "contracts": ["gallery.visual_coverage"]
     },
     {
+      "concept": "date_time_picker",
+      "class": "Forged",
+      "behavior_source": "Moon day and clock-time selection sharing one trigger and one popup",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonDateTimePicker",
+      "upstream_ref": null,
+      "fork_reason": "Longbridge has no time selection, and the Mirror date picker must keep zero donor drift",
+      "contracts": ["date_time_picker.time_behavior", "gallery.visual_coverage"]
+    },
+    {
+      "concept": "time_picker",
+      "class": "Forged",
+      "behavior_source": "Moon clock-time selection on spinnable hour and minute drums",
+      "theme_source": "MoonTheme tokens through the shared Moon picker field",
+      "public_path": "moon_ui::MoonTimePicker",
+      "upstream_ref": null,
+      "fork_reason": "Longbridge has no time selection at all; the field is shared with the date pickers so a form row stays one family",
+      "contracts": ["time_picker.wheel_behavior", "gallery.visual_coverage"]
+    },
+    {
       "concept": "description_list",
       "class": "Mirror",
       "behavior_source": "Longbridge DescriptionList",
