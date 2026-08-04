@@ -34,9 +34,15 @@ enum MoonScrollbarDragAxis {
     Horizontal,
 }
 
+/// The in-flight drag of one scrollbar thumb.
+///
+/// It carries the overlay's id because `on_drag_move` fires on every listener whose drag type
+/// matches, regardless of where the gesture started, so a bar must ignore drags that are not its
+/// own; the axis distinguishes the two bars of one overlay.
 #[derive(Clone, Debug)]
 struct MoonScrollbarDrag {
     axis: MoonScrollbarDragAxis,
+    id: SharedString,
 }
 
 impl Render for MoonScrollbarDrag {
@@ -124,6 +130,24 @@ impl MoonScrollbarRuntimeState {
     }
 }
 
+/// Build the Moon scrollbar overlay for a scroll handle, as an absolute layer over its viewport.
+///
+/// The overlay is a SIBLING of the scrolling container, never its child: a scroll container
+/// prepaints its children under its own offset, so a scrollbar placed inside would slide away with
+/// the content. An axis whose handle has nothing to scroll draws nothing, so a caller may ask for
+/// both and get only the bar that is needed.
+///
+/// Args:
+///     id: Stable identity of the overlay; its tracks and thumbs derive their ids from it.
+///     scroll_handle: Handle whose offset, viewport bounds, and max offset drive the bars.
+///     axis: Which bars to draw.
+///     visibility: When the thumb is opaque — always, on hover, while scrolling, or never.
+///     p: Active palette the track and thumb take their colours from.
+///     window: Window the overlay's drag state and listeners live in.
+///     cx: Application context.
+///
+/// Returns:
+///     The overlay layer, or `None` when `visibility` is `Hidden`.
 pub fn moon_scrollbar_overlay_with_palette(
     id: impl Into<SharedString>,
     scroll_handle: &ScrollHandle,
@@ -180,7 +204,9 @@ pub fn moon_scrollbar_overlay_with_palette(
         let scroll_bounds = bounds;
         let drag = MoonScrollbarDrag {
             axis: MoonScrollbarDragAxis::Vertical,
+            id: id.clone(),
         };
+        let drag_id = drag.id.clone();
         layer = layer.child(
             div()
                 .id(ElementId::from(SharedString::from(format!("{id}:v-track"))))
@@ -284,7 +310,8 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .on_drag_move(window.listener_for(
                     &state_for_move,
                     move |state, event: &DragMoveEvent<MoonScrollbarDrag>, _, cx| {
-                        if event.drag(cx).axis != MoonScrollbarDragAxis::Vertical {
+                        let drag = event.drag(cx);
+                        if drag.axis != MoonScrollbarDragAxis::Vertical || drag.id != drag_id {
                             return;
                         }
                         let track_len = (viewport - thumb_h).max(1.0);
@@ -320,7 +347,9 @@ pub fn moon_scrollbar_overlay_with_palette(
         let scroll_bounds = bounds;
         let drag = MoonScrollbarDrag {
             axis: MoonScrollbarDragAxis::Horizontal,
+            id: id.clone(),
         };
+        let drag_id = drag.id.clone();
         layer = layer.child(
             div()
                 .id(ElementId::from(SharedString::from(format!("{id}:h-track"))))
@@ -424,7 +453,8 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .on_drag_move(window.listener_for(
                     &state_for_move,
                     move |state, event: &DragMoveEvent<MoonScrollbarDrag>, _, cx| {
-                        if event.drag(cx).axis != MoonScrollbarDragAxis::Horizontal {
+                        let drag = event.drag(cx);
+                        if drag.axis != MoonScrollbarDragAxis::Horizontal || drag.id != drag_id {
                             return;
                         }
                         let track_len = (viewport - thumb_w).max(1.0);

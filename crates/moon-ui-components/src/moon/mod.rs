@@ -141,7 +141,9 @@ pub use resizable::{
     moon_h_resizable, moon_resizable_panel, moon_v_resizable,
 };
 pub use root::{MoonRoot, MoonRoot as Root};
-pub use scroll_area::{MoonScrollAxis, MoonScrollbarVisibility};
+pub use scroll_area::{
+    MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette,
+};
 pub use segment::{MoonAccent, MoonSegmentItem, MoonSegmentedControl};
 pub use select::{MoonSelect, MoonSelectEvent, MoonSelectItem, MoonSelectState};
 pub use selector::{MoonSelectorPill, MoonSelectorSegment};
