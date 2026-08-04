@@ -252,22 +252,39 @@ impl MoonPalette {
         (0.2126 * r + 0.7152 * g + 0.0722 * b) >= 128.0
     }
 
-    /// The ink to print on top of [`Self::accent`].
+    /// The ink for a row marked as selected by [`selected_background`].
+    ///
+    /// That fill is an accent *tint* — 11% accent fading to nothing — so this ink lands on the
+    /// panel underneath, not on the accent. Do not "fix" it by measuring against the accent: a
+    /// dark ink chosen for the accent is black text on a dark panel, which is every selected list,
+    /// menu and dropdown row turned unreadable. When the fill really is solid, ask [`Self::ink_on`].
+    ///
+    /// [`selected_background`]: super::foundation::selected_background
+    pub fn selected_fg(self) -> u32 {
+        if self.is_light() {
+            self.text
+        } else {
+            self.accent_fg
+        }
+    }
+
+    /// The ink to print on top of a **solid** `fill`.
     ///
     /// Chosen by measured contrast rather than by "which theme is this": the dark palette's accent
-    /// is a *light* orange, so following the theme and printing `accent_fg` (`#FFCF94`) on it lands
-    /// at **1.24:1** — the selected menu row, the selected calendar day and the selected time value
-    /// all read as one solid blob. The candidates are the palette's own inks, and the one with the
-    /// best contrast against the accent wins, so a custom palette gets the same treatment.
+    /// is a *light* orange, so the theme-shaped answer (`accent_fg`, `#FFCF94`) on a solid accent
+    /// lands at 1.24:1. Candidates are the palette's own inks, so a custom palette gets the same
+    /// treatment instead of the same assumption.
+    ///
+    /// Args:
+    ///     fill: The `0xRRGGBB` background the text is painted on. Only pass an opaque fill —
+    ///         a translucent one is not the colour the eye sees.
     ///
     /// Returns:
-    ///     The `0xRRGGBB` ink with the highest contrast against `accent`.
-    pub fn selected_fg(self) -> u32 {
+    ///     The palette ink with the highest contrast against `fill`.
+    pub fn ink_on(self, fill: u32) -> u32 {
         [self.on_accent, self.shell, self.text, self.accent_fg]
             .into_iter()
-            .max_by(|a, b| {
-                contrast_ratio(*a, self.accent).total_cmp(&contrast_ratio(*b, self.accent))
-            })
+            .max_by(|a, b| contrast_ratio(*a, fill).total_cmp(&contrast_ratio(*b, fill)))
             .unwrap_or(self.on_accent)
     }
 }
