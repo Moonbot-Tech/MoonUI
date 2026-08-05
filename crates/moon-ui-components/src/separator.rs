@@ -25,9 +25,14 @@ pub struct Separator {
 
 impl Separator {
     /// Creates a vertical separator.
+    ///
+    /// The base carries no height of its own: it takes the flex line's cross size through
+    /// `align_self: stretch`. A percentage height (`h_full`) resolves to zero against the
+    /// content-height row a vertical rule normally divides, which drew the separator invisible.
+    /// A caller-supplied `.h(...)` still wins — [`RenderOnce::render`] applies `refine_style` last.
     pub fn vertical() -> Self {
         Self {
-            base: div().h_full(),
+            base: div().self_stretch(),
             axis: Axis::Vertical,
             label: None,
             color: None,
@@ -122,6 +127,9 @@ impl Styled for Separator {
         &mut self.style
     }
 }
+
+#[cfg(test)]
+mod tests;
 
 impl RenderOnce for Separator {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {

@@ -60,8 +60,14 @@ impl MoonSeparator {
     }
 }
 
-impl RenderOnce for MoonSeparator {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+impl MoonSeparator {
+    /// Build the rule itself — the whole of this component's layout.
+    ///
+    /// Split out of [`RenderOnce::render`] so the sizing can be asserted directly: `render`'s
+    /// `impl IntoElement` return cannot be inspected, and a separator that silently collapses to
+    /// zero along the axis it spans is invisible rather than wrong-looking, so nothing else would
+    /// catch it.
+    pub(crate) fn line(self, cx: &App) -> Div {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
         let mut line = div()
@@ -71,7 +77,17 @@ impl RenderOnce for MoonSeparator {
 
         line = match self.axis {
             MoonSeparatorAxis::Horizontal => line.w_full().h(px(tokens.ui(self.thickness))),
-            MoonSeparatorAxis::Vertical => line.h_full().w(px(tokens.ui(self.thickness))),
+            // Cross-axis size comes from `self_stretch`, not `h_full`. A vertical rule separates
+            // groups laid out in a ROW, and such a row is almost always content-height: a
+            // percentage resolved against an indefinite parent gives zero, so `h_full` drew a
+            // hairline of no height and the separator silently disappeared. `align_self: stretch`
+            // takes the flex line's cross size instead, and overrides the row's `items_center`
+            // for this one item without the caller having to know the row's height.
+            //
+            // Stretch needs the separator to be a DIRECT child of that row; wrapped in a
+            // content-sized div it collapses again, and `bounds` below is the escape hatch for
+            // that case (and for a non-flex parent, where `align_self` does nothing).
+            MoonSeparatorAxis::Vertical => line.self_stretch().w(px(tokens.ui(self.thickness))),
         };
 
         if let Some(bounds) = self.bounds {
@@ -86,3 +102,12 @@ impl RenderOnce for MoonSeparator {
         line
     }
 }
+
+impl RenderOnce for MoonSeparator {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        self.line(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests;
