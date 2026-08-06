@@ -17,6 +17,7 @@ mod date_picker;
 mod date_time_picker;
 mod description_list;
 mod dialog;
+mod disclosure;
 mod dock;
 mod dropdown;
 mod form;
@@ -107,6 +108,7 @@ pub use date_picker::{
 pub use date_time_picker::{MoonDateTimePicker, MoonDateTimePickerEvent, MoonDateTimePickerState};
 pub use description_list::MoonDescriptionList;
 pub use dialog::{MoonDialog, MoonDialogContent};
+pub use disclosure::{MoonDisclosure, MoonDisclosureDirection};
 pub use dock::{
     DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, DockSplitPlacement, MoonDockPanel,
     Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel,

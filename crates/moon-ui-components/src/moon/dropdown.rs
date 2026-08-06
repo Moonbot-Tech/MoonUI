@@ -23,6 +23,10 @@ const MENU_GAP: f32 = 2.0;
 pub(crate) const MENU_CHECK_WIDTH: f32 = 12.0;
 const SUBMENU_OFFSET_X: f32 = 2.0;
 const DROPDOWN_TRIGGER_PAD_X: f32 = 14.0;
+// Keep this caret as a text suffix rather than a `MoonDisclosure` element: its text advance is part
+// of the width measured by `fit_dropdown_trigger_label` and exposed through
+// `MoonDropdown::fitted_trigger_label`. An element has no text advance and therefore cannot satisfy
+// the fitted-label width contract.
 const DROPDOWN_CARET: &str = " \u{25be}";
 const DROPDOWN_TRIGGER_MONO: bool = true;
 const VIRTUAL_MENU_ITEM_THRESHOLD: usize = 64;

@@ -502,6 +502,13 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "collapsible header click must respect disabled and controlled state",
         ),
         test_contract(
+            "disclosure.click_behavior",
+            ContractSeverity::Guardrail,
+            &["disclosure_click_is_inert_without_an_id_or_when_disabled"],
+            &tests,
+            "a passive disclosure caret must never consume its parent row's click",
+        ),
+        test_contract(
             "input.utf8_boundary_clamp",
             ContractSeverity::Critical,
             &["test_clamp_to_char_boundary_never_returns_middle_of_utf8_codepoint"],
