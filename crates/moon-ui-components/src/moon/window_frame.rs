@@ -364,13 +364,21 @@ impl MoonWindowFrame {
             })
     }
 
+    /// Build a shrinkable single-line title beside the configured brand mark.
+    ///
+    /// Args:
+    ///     title: Window title displayed after the brand cluster.
+    ///     cx: Application context supplying active theme tokens.
+    ///
+    /// Returns:
+    ///     Draggable title cluster that truncates overflow with an ellipsis instead of wrapping.
     pub fn title_cluster(&self, title: impl Into<SharedString>, cx: &App) -> Div {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
         self.brand_cluster(cx).child(
             div()
                 .min_w_0()
-                .overflow_hidden()
+                .truncate()
                 .font_family(tokens.font_family(true))
                 .text_size(px(tokens.font(11.0)))
                 .text_color(rgb(p.text_soft))
@@ -481,3 +489,6 @@ fn drag_region_div() -> Div {
             }
         })
 }
+
+#[cfg(test)]
+mod tests;
