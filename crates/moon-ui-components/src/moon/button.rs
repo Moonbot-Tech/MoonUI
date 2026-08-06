@@ -4,6 +4,8 @@ use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 use super::{
+    disclosure::{MoonDisclosureDirection, moon_disclosure_rotation_turns},
+    icons::MOON_ICON_CARET_DOWN,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, rgb_from},
 };
@@ -138,6 +140,8 @@ pub struct MoonButtonIconSlot {
     size: f32,
     color: Option<u32>,
     alpha: f32,
+    /// Clockwise turns folded into one revolution; zero preserves the untransformed icon path.
+    rotation: f32,
 }
 
 impl MoonButtonIconSlot {
@@ -147,11 +151,67 @@ impl MoonButtonIconSlot {
             size: 12.0,
             color: None,
             alpha: 1.0,
+            rotation: 0.0,
         }
     }
 
+    /// Build the shared disclosure caret in the pose selected by its direction and state.
+    ///
+    /// Reusing the disclosure asset and pose mapping keeps button-based expand/collapse controls
+    /// aligned with [`MoonDisclosure`](super::MoonDisclosure).
+    ///
+    /// The slot retains its own default glyph size, subject to the placement-specific override
+    /// described by [`Self::size`].
+    ///
+    /// Args:
+    ///     direction: The collapsed/expanded pose pair this control renders.
+    ///     expanded: Whether the disclosed content is currently open.
+    ///
+    /// Returns:
+    ///     An icon slot carrying the caret asset already rotated into its pose.
+    pub fn caret(direction: MoonDisclosureDirection, expanded: bool) -> Self {
+        Self::new(MOON_ICON_CARET_DOWN)
+            .rotation(moon_disclosure_rotation_turns(direction, expanded))
+    }
+
+    /// Set the base, unscaled glyph edge length.
+    ///
+    /// For leading and loading slots, the inherited `Button::render` derives an icon size from the
+    /// button's text metrics and applies it through `ButtonIconVariant::with_size`, replacing this
+    /// value. A genuine trailing icon is added as a child instead and retains this size; a lone
+    /// trailing icon is promoted to the leading slot and receives the derived size.
+    ///
+    /// Args:
+    ///     size: Unscaled design-reference glyph edge length.
+    ///
+    /// Returns:
+    ///     This icon slot with the requested glyph size.
     pub fn size(mut self, size: f32) -> Self {
         self.size = size;
+        self
+    }
+
+    /// Rotate the glyph clockwise in turns; `0.25` is a quarter turn and `0.5` is a half turn.
+    ///
+    /// GPUI's `percentage` represents a fraction of one full circle and debug-asserts that its
+    /// input is in `0.0..=1.0`. Folding finite input into `[0.0, 1.0)` therefore accepts equivalent
+    /// negative and multi-turn poses without passing an out-of-range value to `percentage`.
+    /// Non-finite input cannot describe a pose and is reset to zero.
+    ///
+    /// When this slot supplies a button's loading icon, `Spinner::render` replaces its static SVG
+    /// transformation with the animated rotation on every frame.
+    ///
+    /// Args:
+    ///     rotation: Clockwise turns applied to the glyph.
+    ///
+    /// Returns:
+    ///     This icon slot with the requested rotation.
+    pub fn rotation(mut self, rotation: f32) -> Self {
+        self.rotation = if rotation.is_finite() {
+            rotation.rem_euclid(1.0)
+        } else {
+            0.0
+        };
         self
     }
 
@@ -165,6 +225,16 @@ impl MoonButtonIconSlot {
         self
     }
 
+    /// Resolve the slot into a theme-scaled icon.
+    ///
+    /// A zero rotation deliberately skips `Icon::rotate` so existing unrotated slots retain the
+    /// same SVG path without an attached transformation.
+    ///
+    /// Args:
+    ///     cx: Application context used to resolve the active Moon scale.
+    ///
+    /// Returns:
+    ///     The configured icon with scaling, colour, alpha, and any non-zero rotation applied.
     fn icon(self, cx: &App) -> Icon {
         let tokens = MoonTheme::active_tokens(cx);
         let mut icon = Icon::default()
@@ -172,6 +242,9 @@ impl MoonButtonIconSlot {
             .size(px(tokens.ui(self.size)));
         if let Some(color) = self.color {
             icon = icon.text_color(rgba_from_u32(color, self.alpha));
+        }
+        if self.rotation != 0.0 {
+            icon = icon.rotate(percentage(self.rotation));
         }
         icon
     }

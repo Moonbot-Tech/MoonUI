@@ -1,6 +1,6 @@
 //! Regression coverage for Moon button sizing and icon-slot rendering.
 
-use super::super::MoonPalette;
+use super::super::{MoonDisclosureDirection, MoonPalette};
 use super::{
     MoonButton, MoonButtonIconSlot, MoonButtonSize, MoonTheme, button_text_metrics, size_for,
 };
@@ -200,4 +200,53 @@ fn icon_with_label_button_stays_wide(cx: &mut gpui::TestAppContext) {
         "labelled button collapsed to {:?}",
         bounds.size
     );
+}
+
+/// Catches `button.rs:MoonButtonIconSlot::rotation` dropping its `rem_euclid(1.0)` fold, which
+/// would carry a negative turn value straight to `percentage()` and trip that call's
+/// `0.0..=1.0` debug assertion instead of drawing the pose the caller named.
+#[test]
+fn rotation_folds_a_negative_turn_into_its_positive_pose() {
+    let slot = MoonButtonIconSlot::new("icons/settings.svg").rotation(-0.25);
+
+    assert_eq!(
+        slot.rotation, 0.75,
+        "-0.25 turns is three quarters clockwise, folded positive"
+    );
+}
+
+/// Catches `button.rs:MoonButtonIconSlot::rotation` dropping its `is_finite` guard, which would
+/// leave `f32::NAN` stored. Rendering would then trip `percentage()`'s debug assertion or, in a
+/// release build, pass the invalid value into the SVG transformation matrix.
+#[test]
+fn rotation_drops_a_non_finite_value_to_zero() {
+    let slot = MoonButtonIconSlot::new("icons/settings.svg").rotation(f32::NAN);
+
+    assert_eq!(
+        slot.rotation, 0.0,
+        "a non-finite turn cannot name a pose and must be dropped"
+    );
+}
+
+/// Catches `button.rs:MoonButtonIconSlot::caret` hard-coding its turns (or inverting `expanded`)
+/// instead of delegating to `disclosure::moon_disclosure_rotation_turns`, which would point a
+/// `MoonButton` collapse control the opposite way from the `MoonDisclosure` carets beside it in
+/// the same window. Expected turns are the pose mapping's own literals, not a call back into the
+/// function under test.
+#[test]
+fn caret_matches_the_shared_disclosure_pose_mapping() {
+    let cases = [
+        (MoonDisclosureDirection::RightDown, false, 0.75),
+        (MoonDisclosureDirection::RightDown, true, 0.0),
+        (MoonDisclosureDirection::DownUp, false, 0.0),
+        (MoonDisclosureDirection::DownUp, true, 0.5),
+    ];
+
+    for (direction, expanded, expected_turns) in cases {
+        let slot = MoonButtonIconSlot::caret(direction, expanded);
+        assert_eq!(
+            slot.rotation, expected_turns,
+            "caret({direction:?}, {expanded}) drifted from the shared disclosure pose mapping"
+        );
+    }
 }
