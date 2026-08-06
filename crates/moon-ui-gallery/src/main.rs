@@ -22,25 +22,26 @@ use moon_ui::{
     MoonCombobox, MoonComboboxState, MoonComponentIndexPath, MoonContextMenu, MoonDataCell,
     MoonDataRow, MoonDataTable, MoonDataTableColumn, MoonDataTableState, MoonDatePicker,
     MoonDatePickerState, MoonDateTimePicker, MoonDateTimePickerState, MoonDescriptionList,
-    MoonDockPanel, MoonDropdown, MoonFormRow, MoonGroupBox, MoonHotkeyInput, MoonHoverCard,
-    MoonInput, MoonInputMaskPattern, MoonKbd, MoonKbdSize, MoonLabel, MoonLink, MoonList,
-    MoonListDelegate, MoonListItem, MoonListState, MoonMenuItem, MoonMenuSize, MoonNativeMenu,
-    MoonNotification, MoonNumberFieldOptions, MoonPagination, MoonPalette, MoonPlacement,
-    MoonPopover, MoonPopoverPlacement, MoonPopupMenu, MoonPresetItem, MoonPresetStrip,
-    MoonProgress, MoonProgressCircle, MoonProgressCircleSize, MoonRadio, MoonRadioSize, MoonRating,
-    MoonResizablePanelGroup, MoonScrollableElement, MoonScrollbarVisibility, MoonSearchableVec,
-    MoonSegmentItem, MoonSegmentedControl, MoonSelect, MoonSelectItem, MoonSelectState,
-    MoonSelectorPill, MoonSelectorSegment, MoonSeparator, MoonSettingField, MoonSettingGroup,
-    MoonSettingItem, MoonSettingPage, MoonSettings, MoonSidebar, MoonSidebarGroup, MoonSidebarMenu,
-    MoonSidebarMenuItem, MoonSidebarToggleButton, MoonSkeleton, MoonSlider, MoonSliderState,
-    MoonSpinner, MoonSpinnerSize, MoonStatusBar, MoonStatusIndicator, MoonStatusItem, MoonStepper,
-    MoonSurface, MoonSurfaceVariant, MoonSwitch, MoonTabItem, MoonTabStrip, MoonTableCell,
-    MoonTableColumn, MoonTableRow, MoonTableStyle, MoonTag, MoonText, MoonTextArea, MoonTheme,
-    MoonThemeConfig, MoonTimePicker, MoonTimePickerState, MoonToggle, MoonToggleSize, MoonTone,
-    MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem,
-    MoonTreeSelectionMode, MoonTreeState, MoonVirtualList, MoonVirtualListScrollHandle,
-    MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, PanelView,
-    Root, TabPanel, ThemeMode, h_flex, moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
+    MoonDisclosure, MoonDisclosureDirection, MoonDockPanel, MoonDropdown, MoonFormRow,
+    MoonGroupBox, MoonHotkeyInput, MoonHoverCard, MoonInput, MoonInputMaskPattern, MoonKbd,
+    MoonKbdSize, MoonLabel, MoonLink, MoonList, MoonListDelegate, MoonListItem, MoonListState,
+    MoonMenuItem, MoonMenuSize, MoonNativeMenu, MoonNotification, MoonNumberFieldOptions,
+    MoonPagination, MoonPalette, MoonPlacement, MoonPopover, MoonPopoverPlacement, MoonPopupMenu,
+    MoonPresetItem, MoonPresetStrip, MoonProgress, MoonProgressCircle, MoonProgressCircleSize,
+    MoonRadio, MoonRadioSize, MoonRating, MoonResizablePanelGroup, MoonScrollableElement,
+    MoonScrollbarVisibility, MoonSearchableVec, MoonSegmentItem, MoonSegmentedControl, MoonSelect,
+    MoonSelectItem, MoonSelectState, MoonSelectorPill, MoonSelectorSegment, MoonSeparator,
+    MoonSettingField, MoonSettingGroup, MoonSettingItem, MoonSettingPage, MoonSettings,
+    MoonSidebar, MoonSidebarGroup, MoonSidebarMenu, MoonSidebarMenuItem, MoonSidebarToggleButton,
+    MoonSkeleton, MoonSlider, MoonSliderState, MoonSpinner, MoonSpinnerSize, MoonStatusBar,
+    MoonStatusIndicator, MoonStatusItem, MoonStepper, MoonSurface, MoonSurfaceVariant, MoonSwitch,
+    MoonTabItem, MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle,
+    MoonTag, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonTimePicker,
+    MoonTimePickerState, MoonToggle, MoonToggleSize, MoonTone, MoonTooltip, MoonTooltipPlacement,
+    MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem, MoonTreeSelectionMode, MoonTreeState,
+    MoonVirtualList, MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame,
+    MoonWindowFrameBrand, MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex,
+    moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
 };
 
 const COMPONENT_COVERAGE: &[&str] = &[
@@ -67,6 +68,7 @@ const COMPONENT_COVERAGE: &[&str] = &[
     "MoonTimePicker",
     "MoonDescriptionList",
     "MoonDialog",
+    "MoonDisclosure",
     "MoonDockPanel",
     "DockArea",
     "TabPanel",
@@ -156,6 +158,7 @@ struct Gallery {
     new_rating_value: usize,
     new_pagination_page: usize,
     new_sidebar_collapsed: bool,
+    disclosure_expanded: bool,
     settings_enabled: Rc<Cell<bool>>,
     settings_symbol: Rc<RefCell<SharedString>>,
     settings_mode: Rc<RefCell<SharedString>>,
@@ -2977,6 +2980,7 @@ impl Gallery {
             new_rating_value: 3,
             new_pagination_page: 4,
             new_sidebar_collapsed: false,
+            disclosure_expanded: false,
             settings_enabled: Rc::new(Cell::new(true)),
             settings_symbol: Rc::new(RefCell::new(SharedString::from("BTCUSDT"))),
             settings_mode: Rc::new(RefCell::new(SharedString::from("paper"))),
@@ -4588,6 +4592,97 @@ impl Gallery {
                                                     .color(p.text_soft)
                                                     .render(),
                                                 ),
+                                            )
+                                            .child(
+                                                h_flex()
+                                                    .gap(px(8.0))
+                                                    .items_center()
+                                                    .child(
+                                                        MoonDisclosure::button(
+                                                            "new-controls-disclosure",
+                                                            self.disclosure_expanded,
+                                                        )
+                                                        .box_size(14.0)
+                                                        .hover_color(p.text)
+                                                        .tooltip(if self.disclosure_expanded {
+                                                            "Collapse"
+                                                        } else {
+                                                            "Expand"
+                                                        })
+                                                        .on_toggle({
+                                                            let view = view.clone();
+                                                            move |next, _, app| {
+                                                                let next = *next;
+                                                                view.update(app, |this, cx| {
+                                                                    this.disclosure_expanded = next;
+                                                                    this.push_event(
+                                                                        format!(
+                                                                            "MoonDisclosure expanded: {next}"
+                                                                        ),
+                                                                        cx,
+                                                                    );
+                                                                });
+                                                            }
+                                                        }),
+                                                    )
+                                                    .child(
+                                                        MoonText::new(if self.disclosure_expanded {
+                                                            "MoonDisclosure — interactive, expanded"
+                                                        } else {
+                                                            "MoonDisclosure — interactive, collapsed"
+                                                        })
+                                                        .uppercase(false)
+                                                        .mono(true)
+                                                        .color(p.text_soft)
+                                                        .render(),
+                                                    )
+                                                    // The row owns this passive caret's click so
+                                                    // pressing the glyph exercises event pass-through;
+                                                    // an accidental caret hitbox would prevent that
+                                                    // press from toggling the row.
+                                                    .child(
+                                                        h_flex()
+                                                            .id("new-controls-disclosure-row")
+                                                            .gap(px(6.0))
+                                                            .items_center()
+                                                            .cursor_pointer()
+                                                            .on_click({
+                                                                let view = view.clone();
+                                                                move |_, _, app| {
+                                                                    view.update(app, |this, cx| {
+                                                                        this.disclosure_expanded =
+                                                                            !this
+                                                                                .disclosure_expanded;
+                                                                        this.push_event(
+                                                                            "MoonDisclosure passive row clicked".to_string(),
+                                                                            cx,
+                                                                        );
+                                                                    });
+                                                                }
+                                                            })
+                                                            .child(
+                                                                MoonDisclosure::glyph(
+                                                                    self.disclosure_expanded,
+                                                                )
+                                                                .box_size(14.0),
+                                                            )
+                                                            .child(
+                                                                MoonDisclosure::glyph(
+                                                                    self.disclosure_expanded,
+                                                                )
+                                                                .direction(
+                                                                    MoonDisclosureDirection::DownUp,
+                                                                )
+                                                                .box_size(14.0),
+                                                            )
+                                                            .child(
+                                                                MoonText::new("passive — click me")
+                                                                    .uppercase(false)
+                                                                    .mono(true)
+                                                                    .color(p.text_soft)
+                                                                    .render(),
+                                                            ),
+                                                    ),
                                             )
                                             .child(
                                                 MoonPresetStrip::new(

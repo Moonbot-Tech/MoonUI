@@ -235,6 +235,16 @@
       "contracts": ["dock.behavior_contracts", "gallery.visual_coverage"]
     },
     {
+      "concept": "disclosure",
+      "class": "Forged",
+      "behavior_source": "Moon shared expand/collapse caret renderer",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonDisclosure",
+      "upstream_ref": null,
+      "fork_reason": "one caret for collapsible, selector and the MoonBot terminal's disclosure rows",
+      "contracts": ["disclosure.click_behavior", "gallery.visual_coverage"]
+    },
+    {
       "concept": "dock",
       "class": "Forged",
       "behavior_source": "Moon custom dock engine",

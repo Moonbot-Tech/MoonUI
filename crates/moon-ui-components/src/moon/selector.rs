@@ -2,8 +2,8 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
+    disclosure::{MoonDisclosure, MoonDisclosureDirection},
     foundation::box_shadow,
-    icons::{MOON_ICON_CARET_DOWN, moon_icon},
     text::MoonText,
     theme::MoonTheme,
     tokens::{MoonRect, rgba_from},
@@ -182,6 +182,14 @@ impl MoonSelectorPill {
 }
 
 impl RenderOnce for MoonSelectorPill {
+    /// Render the selector pill and its optional decorative caret.
+    ///
+    /// Args:
+    ///     _window: Window context unused by this renderer.
+    ///     cx: Application context used to resolve active theme tokens.
+    ///
+    /// Returns:
+    ///     The rendered selector pill.
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
@@ -254,16 +262,20 @@ impl RenderOnce for MoonSelectorPill {
         }
 
         if self.caret {
+            // The pill's caret is decorative and permanently collapsed, so `DownUp` selects the
+            // unrotated down-pointing pose. The absolute offsets belong to the pill's geometry,
+            // not the caret's, and therefore stay on this wrapper.
             root = root.child(
-                moon_icon(
-                    MOON_ICON_CARET_DOWN,
-                    tokens.ui(8.0),
-                    p.text_muted,
-                    if disabled { 0.45 } else { 1.0 },
-                )
-                .absolute()
-                .right(px(tokens.ui(self.caret_right)))
-                .top(px(tokens.ui(self.caret_top))),
+                div()
+                    .absolute()
+                    .right(px(tokens.ui(self.caret_right)))
+                    .top(px(tokens.ui(self.caret_top)))
+                    .child(
+                        MoonDisclosure::glyph(false)
+                            .direction(MoonDisclosureDirection::DownUp)
+                            .size(8.0)
+                            .disabled(disabled),
+                    ),
             );
         }
 

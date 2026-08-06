@@ -2,7 +2,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
-    icons::{MOON_ICON_CARET_DOWN, moon_icon},
+    disclosure::MoonDisclosure,
     text::MoonText,
     theme::MoonTheme,
     tokens::{MoonRect, rgba_from},
@@ -108,6 +108,14 @@ impl ParentElement for MoonCollapsible {
 }
 
 impl RenderOnce for MoonCollapsible {
+    /// Render the controlled or internally stateful collapsible section.
+    ///
+    /// Args:
+    ///     window: Window used to retain uncontrolled open state and dispatch header clicks.
+    ///     cx: Application context used for state and active-theme access.
+    ///
+    /// Returns:
+    ///     The collapsible header and its content when open.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
@@ -177,19 +185,13 @@ impl RenderOnce for MoonCollapsible {
                     }
                 }
             })
+            // The header owns the click, so a passive glyph keeps the caret area inside the
+            // header's hit target instead of intercepting that event with a child hitbox.
             .child(
-                div()
-                    .w(px(tokens.ui(12.0)))
-                    .h(px(tokens.ui(12.0)))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child(moon_icon(
-                        MOON_ICON_CARET_DOWN,
-                        tokens.ui(11.0),
-                        p.text_muted,
-                        if disabled { 0.45 } else { 1.0 },
-                    )),
+                MoonDisclosure::glyph(open)
+                    .size(11.0)
+                    .box_size(12.0)
+                    .disabled(disabled),
             );
 
         if self.header.is_empty() {
