@@ -1,4 +1,12 @@
-use std::{borrow::BorrowMut, collections::HashMap, rc::Rc};
+//! Live dock topology, panel lifecycle, persistence state, and user layout interactions.
+//!
+//! Name-based projections share topology while retaining each dock's local panel identities.
+
+use std::{
+    borrow::BorrowMut,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use gpui::prelude::FluentBuilder;
 use gpui::*;
@@ -78,6 +86,22 @@ enum DockRoot {
     Bottom,
 }
 
+/// Identifies how a named panel participates in one live dock node.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DockPanelSlot {
+    Panel,
+    Tab(usize),
+    Tile(usize),
+}
+
+/// Locates a named panel without exposing the dock's private topology to consumers.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DockPanelLocation {
+    root: DockRoot,
+    path: Vec<usize>,
+    slot: DockPanelSlot,
+}
+
 #[derive(Clone, Debug)]
 enum DockResizeTarget {
     OuterLeft,
@@ -113,6 +137,35 @@ struct DockTabDrag {
     /// the target slot are splittable — so e.g. a bottom dock panel can split the bottom
     /// strip but cannot be dropped into the chart slot.
     splittable: bool,
+}
+
+/// Interaction capabilities for one dock tab under the current edit policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct TabInteractionPolicy {
+    draggable: bool,
+    accepts_drop: bool,
+    detachable: bool,
+}
+
+/// Keep pinned tabs fixed while leaving them available as reorder destinations.
+///
+/// Args:
+///     layout_editable: Whether structural dock edits are enabled.
+///     pinned: Whether this tab belongs to the leading pinned prefix.
+///     detach_allowed: Whether the host permits native-window detachment.
+///
+/// Returns:
+///     The independent drag-source, drop-target, and detach capabilities for the tab.
+fn tab_interaction_policy(
+    layout_editable: bool,
+    pinned: bool,
+    detach_allowed: bool,
+) -> TabInteractionPolicy {
+    TabInteractionPolicy {
+        draggable: layout_editable && !pinned,
+        accepts_drop: layout_editable,
+        detachable: layout_editable && !pinned && detach_allowed,
+    }
 }
 
 impl Render for DockTabDrag {
@@ -213,6 +266,289 @@ pub struct TileMeta {
     pub w: f32,
     pub h: f32,
     pub z_index: usize,
+}
+
+/// Serializable panel-name topology for sharing one layout across independent docks.
+///
+/// The projection contains geometry, side placement, tab order, and sizes. It deliberately
+/// excludes panel payloads, active tabs, zoom state, group identifiers, and live panel instances.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DockTopologyByName {
+    pub center: DockTopologyNode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub left: Option<DockTopologySide>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub right: Option<DockTopologySide>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bottom: Option<DockTopologySide>,
+}
+
+/// One optional side root in a name-based dock topology.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DockTopologySide {
+    pub item: DockTopologyNode,
+    pub size: f32,
+    pub open: bool,
+}
+
+/// One serializable node in a name-based dock topology.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DockTopologyNode {
+    Empty,
+    Panel {
+        name: String,
+    },
+    Tabs {
+        names: Vec<String>,
+    },
+    Tiles {
+        names: Vec<String>,
+        metas: Vec<TileMeta>,
+    },
+    Split {
+        horizontal: bool,
+        items: Vec<DockTopologyNode>,
+        sizes: Vec<Option<f32>>,
+    },
+}
+
+impl Default for DockTopologyByName {
+    /// Create an empty center topology with no side roots.
+    fn default() -> Self {
+        Self {
+            center: DockTopologyNode::Empty,
+            left: None,
+            right: None,
+            bottom: None,
+        }
+    }
+}
+
+impl PartialEq for DockTopologyByName {
+    /// Compare canonical topology while ignoring representational empty, duplicate, and size noise.
+    fn eq(&self, other: &Self) -> bool {
+        let left = self.normalized();
+        let right = other.normalized();
+        left.center == right.center
+            && left.left == right.left
+            && left.right == right.right
+            && left.bottom == right.bottom
+    }
+}
+
+impl DockTopologyByName {
+    /// Build a deterministic single-strip topology from the supplied preferred panel names.
+    pub fn tab_preset<I, S>(names: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let names = names.into_iter().map(Into::into).collect::<Vec<_>>();
+        Self {
+            center: DockTopologyNode::Tabs { names },
+            left: None,
+            right: None,
+            bottom: None,
+        }
+        .normalized()
+    }
+
+    /// Return every unique panel name in normalized topology traversal order.
+    pub fn panel_names(&self) -> Vec<String> {
+        let topology = self.normalized();
+        let mut names = Vec::new();
+        topology.center.append_names(&mut names);
+        for side in [&topology.left, &topology.right, &topology.bottom]
+            .into_iter()
+            .flatten()
+        {
+            side.item.append_names(&mut names);
+        }
+        names
+    }
+
+    /// Return a deterministic topology suitable for equality checks and persistence.
+    pub fn normalized(&self) -> Self {
+        let mut seen = HashSet::new();
+        let center = self.center.normalized(&mut seen);
+        let left = Self::normalized_side(self.left.as_ref(), &mut seen);
+        let right = Self::normalized_side(self.right.as_ref(), &mut seen);
+        let bottom = Self::normalized_side(self.bottom.as_ref(), &mut seen);
+        Self {
+            center,
+            left,
+            right,
+            bottom,
+        }
+    }
+
+    /// Normalize a side root and discard it when no named panel survives.
+    fn normalized_side(
+        side: Option<&DockTopologySide>,
+        seen: &mut HashSet<String>,
+    ) -> Option<DockTopologySide> {
+        let side = side?;
+        let item = side.item.normalized(seen);
+        if matches!(item, DockTopologyNode::Empty) {
+            return None;
+        }
+        Some(DockTopologySide {
+            item,
+            size: normalized_positive(side.size).unwrap_or(0.0),
+            open: side.open,
+        })
+    }
+}
+
+impl DockTopologyNode {
+    /// Append the node's panel names in topology traversal order.
+    fn append_names(&self, names: &mut Vec<String>) {
+        match self {
+            Self::Empty => {}
+            Self::Panel { name } => names.push(name.clone()),
+            Self::Tabs { names: node_names }
+            | Self::Tiles {
+                names: node_names, ..
+            } => {
+                names.extend(node_names.iter().cloned());
+            }
+            Self::Split { items, .. } => {
+                for item in items {
+                    item.append_names(names);
+                }
+            }
+        }
+    }
+
+    /// Normalize one node while retaining the first global occurrence of every panel name.
+    fn normalized(&self, seen: &mut HashSet<String>) -> Self {
+        match self {
+            Self::Empty => Self::Empty,
+            Self::Panel { name } => {
+                if name.is_empty() || !seen.insert(name.clone()) {
+                    Self::Empty
+                } else {
+                    Self::Panel { name: name.clone() }
+                }
+            }
+            Self::Tabs { names } => {
+                let names = unique_names(names, seen);
+                match names.as_slice() {
+                    [] => Self::Empty,
+                    [name] => Self::Panel { name: name.clone() },
+                    _ => Self::Tabs { names },
+                }
+            }
+            Self::Tiles { names, metas } => {
+                let mut kept_names = Vec::new();
+                let mut kept_metas = Vec::new();
+                for (ix, name) in names.iter().enumerate() {
+                    if !name.is_empty() && seen.insert(name.clone()) {
+                        kept_names.push(name.clone());
+                        kept_metas.push(normalized_tile_meta(
+                            metas
+                                .get(ix)
+                                .copied()
+                                .unwrap_or_else(|| default_tile_meta(ix)),
+                        ));
+                    }
+                }
+                match kept_names.as_slice() {
+                    [] => Self::Empty,
+                    [name] => Self::Panel { name: name.clone() },
+                    _ => Self::Tiles {
+                        names: kept_names,
+                        metas: kept_metas,
+                    },
+                }
+            }
+            Self::Split {
+                horizontal,
+                items,
+                sizes,
+            } => {
+                let mut kept_items = Vec::new();
+                let mut kept_sizes = Vec::new();
+                for (ix, item) in items.iter().enumerate() {
+                    let item = item.normalized(seen);
+                    if !matches!(item, Self::Empty) {
+                        kept_items.push(item);
+                        kept_sizes.push(
+                            sizes
+                                .get(ix)
+                                .copied()
+                                .flatten()
+                                .and_then(normalized_positive),
+                        );
+                    }
+                }
+                match kept_items.len() {
+                    0 => Self::Empty,
+                    1 => kept_items.remove(0),
+                    _ => Self::Split {
+                        horizontal: *horizontal,
+                        items: kept_items,
+                        sizes: kept_sizes,
+                    },
+                }
+            }
+        }
+    }
+}
+
+/// In-memory name-based layout that also retains local active-tab and zoom state.
+///
+/// Unlike [`DockTopologyByName`], this type is intentionally not serializable or owner-bound. It
+/// is used to restore one dock's local runtime state without retaining opaque panel instances.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DockNamedLayout {
+    topology: DockTopologyByName,
+    active_tabs: HashMap<String, String>,
+    zoomed_panel: Option<String>,
+}
+
+impl DockNamedLayout {
+    /// Return every panel name captured by this exact local runtime layout.
+    pub fn panel_names(&self) -> Vec<String> {
+        self.topology.panel_names()
+    }
+}
+
+/// Retain unique non-empty names in traversal order.
+fn unique_names(names: &[String], seen: &mut HashSet<String>) -> Vec<String> {
+    names
+        .iter()
+        .filter(|name| !name.is_empty() && seen.insert((*name).clone()))
+        .cloned()
+        .collect()
+}
+
+/// Keep only finite positive geometry values and canonicalize all invalid values to absent.
+fn normalized_positive(value: f32) -> Option<f32> {
+    (value.is_finite() && value > 0.0).then_some(value)
+}
+
+/// Build the deterministic fallback geometry for a tile without stored metadata.
+fn default_tile_meta(ix: usize) -> TileMeta {
+    TileMeta {
+        x: 12.0 + ix as f32 * 18.0,
+        y: 12.0 + ix as f32 * 18.0,
+        w: 320.0,
+        h: 200.0,
+        z_index: ix,
+    }
+}
+
+/// Canonicalize invalid tile geometry without changing valid persisted coordinates.
+fn normalized_tile_meta(meta: TileMeta) -> TileMeta {
+    TileMeta {
+        x: meta.x.is_finite().then_some(meta.x).unwrap_or(0.0),
+        y: meta.y.is_finite().then_some(meta.y).unwrap_or(0.0),
+        w: normalized_positive(meta.w).unwrap_or(DOCK_TILE_MIN_W),
+        h: normalized_positive(meta.h).unwrap_or(DOCK_TILE_MIN_H),
+        z_index: meta.z_index,
+    }
 }
 
 impl Default for PanelInfo {
@@ -1004,6 +1340,240 @@ impl DockItem {
         }
     }
 
+    /// Find a named panel and record the live node that owns its activation state.
+    fn panel_location(
+        &self,
+        panel_name: &str,
+        cx: &App,
+        path: &mut Vec<usize>,
+    ) -> Option<(Vec<usize>, DockPanelSlot)> {
+        match self {
+            DockItem::Empty => None,
+            DockItem::Panel(panel) => (panel.panel_name(cx).as_ref() == panel_name)
+                .then(|| (path.clone(), DockPanelSlot::Panel)),
+            DockItem::Tabs { items, .. } => items
+                .iter()
+                .position(|panel| panel.panel_name(cx).as_ref() == panel_name)
+                .map(|ix| (path.clone(), DockPanelSlot::Tab(ix))),
+            DockItem::Tiles { items, .. } => items
+                .iter()
+                .position(|panel| panel.panel_name(cx).as_ref() == panel_name)
+                .map(|ix| (path.clone(), DockPanelSlot::Tile(ix))),
+            DockItem::Split { items, .. } => {
+                for (ix, item) in items.iter().enumerate() {
+                    path.push(ix);
+                    let found = item.panel_location(panel_name, cx, path);
+                    path.pop();
+                    if found.is_some() {
+                        return found;
+                    }
+                }
+                None
+            }
+        }
+    }
+
+    /// Append every live panel identity once while retaining topology traversal order.
+    fn append_unique_panels(&self, panels: &mut Vec<Rc<dyn PanelView>>) {
+        let mut append = |panel: &Rc<dyn PanelView>| {
+            if !panels.iter().any(|known| Rc::ptr_eq(known, panel)) {
+                panels.push(panel.clone());
+            }
+        };
+        match self {
+            DockItem::Empty => {}
+            DockItem::Panel(panel) => append(panel),
+            DockItem::Tabs { items, .. } | DockItem::Tiles { items, .. } => {
+                for panel in items {
+                    append(panel);
+                }
+            }
+            DockItem::Split { items, .. } => {
+                for item in items {
+                    item.append_unique_panels(panels);
+                }
+            }
+        }
+    }
+
+    /// Count raw panel occurrences so duplicate identities cannot hide behind normalized topology.
+    fn panel_occurrence_count(&self) -> usize {
+        match self {
+            DockItem::Empty => 0,
+            DockItem::Panel(_) => 1,
+            DockItem::Tabs { items, .. } | DockItem::Tiles { items, .. } => items.len(),
+            DockItem::Split { items, .. } => {
+                items.iter().map(DockItem::panel_occurrence_count).sum()
+            }
+        }
+    }
+
+    /// Project one live node to payload-free panel names and normalized geometry.
+    fn topology_by_name(&self, cx: &App) -> DockTopologyNode {
+        match self {
+            DockItem::Empty => DockTopologyNode::Empty,
+            DockItem::Panel(panel) => DockTopologyNode::Panel {
+                name: panel.panel_name(cx).to_string(),
+            },
+            DockItem::Tabs { items, .. } => DockTopologyNode::Tabs {
+                names: items
+                    .iter()
+                    .map(|panel| panel.panel_name(cx).to_string())
+                    .collect(),
+            },
+            DockItem::Tiles { items, metas } => DockTopologyNode::Tiles {
+                names: items
+                    .iter()
+                    .map(|panel| panel.panel_name(cx).to_string())
+                    .collect(),
+                metas: metas.clone(),
+            },
+            DockItem::Split {
+                horizontal,
+                items,
+                sizes,
+            } => DockTopologyNode::Split {
+                horizontal: *horizontal,
+                items: items.iter().map(|item| item.topology_by_name(cx)).collect(),
+                sizes: (0..items.len())
+                    .map(|ix| sizes.get(ix).copied().flatten())
+                    .collect(),
+            },
+        }
+    }
+
+    /// Add repaired missing panels to the first compatible center node without discarding it.
+    fn append_repaired_panels(&mut self, panels: Vec<Rc<dyn PanelView>>) {
+        if panels.is_empty() {
+            return;
+        }
+        match self {
+            DockItem::Empty => {
+                *self = if panels.len() == 1 {
+                    DockItem::Panel(panels.into_iter().next().expect("one panel"))
+                } else {
+                    DockItem::Tabs {
+                        items: panels,
+                        active_ix: 0,
+                    }
+                };
+            }
+            DockItem::Panel(existing) => {
+                let mut items = vec![existing.clone()];
+                items.extend(panels);
+                *self = DockItem::Tabs {
+                    items,
+                    active_ix: 0,
+                };
+            }
+            DockItem::Tabs { items, .. } => items.extend(panels),
+            DockItem::Tiles { items, metas } => {
+                for panel in panels {
+                    let ix = items.len();
+                    items.push(panel);
+                    metas.push(default_tile_meta(ix));
+                }
+            }
+            DockItem::Split { items, .. } => {
+                if let Some(first) = items.first_mut() {
+                    first.append_repaired_panels(panels);
+                }
+            }
+        }
+    }
+
+    /// Reorder pinned panels within tabs and before every sibling at horizontal split ancestors.
+    ///
+    /// Args:
+    ///     pinned: Stable panel names that must lead their tab/split topology.
+    ///     cx: Application context used to resolve live panel names.
+    ///
+    /// Returns:
+    ///     Whether any tab order or horizontal split order changed.
+    fn enforce_pinned_leading(&mut self, pinned: &[SharedString], cx: &App) -> bool {
+        match self {
+            DockItem::Tabs { items, active_ix } => {
+                let previous_active = items.get(*active_ix).cloned();
+                let previous = items
+                    .iter()
+                    .map(|panel| Rc::as_ptr(panel) as *const () as usize)
+                    .collect::<Vec<_>>();
+                items.sort_by_key(|panel| {
+                    pinned
+                        .iter()
+                        .position(|name| name.as_ref() == panel.panel_name(cx).as_ref())
+                        .map(|ix| (0, ix))
+                        .unwrap_or((1, usize::MAX))
+                });
+                if let Some(active) = previous_active {
+                    *active_ix = items
+                        .iter()
+                        .position(|panel| Rc::ptr_eq(panel, &active))
+                        .unwrap_or(0);
+                }
+                previous
+                    != items
+                        .iter()
+                        .map(|panel| Rc::as_ptr(panel) as *const () as usize)
+                        .collect::<Vec<_>>()
+            }
+            DockItem::Split {
+                horizontal,
+                items,
+                sizes,
+            } => {
+                let mut changed = items.iter_mut().fold(false, |changed, item| {
+                    item.enforce_pinned_leading(pinned, cx) || changed
+                });
+                if *horizontal {
+                    let previous = items
+                        .iter()
+                        .map(|item| item.contains_any_panel(pinned, cx))
+                        .collect::<Vec<_>>();
+                    if previous
+                        .iter()
+                        .skip_while(|pinned| **pinned)
+                        .any(|pinned| *pinned)
+                    {
+                        let previous_sizes = std::mem::take(sizes);
+                        let mut paired = std::mem::take(items)
+                            .into_iter()
+                            .enumerate()
+                            .map(|(ix, item)| {
+                                let size = previous_sizes.get(ix).copied().flatten();
+                                (item, size, ix)
+                            })
+                            .collect::<Vec<_>>();
+                        paired.sort_by_key(|(item, _, ix)| {
+                            (!item.contains_any_panel(pinned, cx), *ix)
+                        });
+                        for (item, size, _) in paired {
+                            items.push(item);
+                            sizes.push(size);
+                        }
+                        changed = true;
+                    }
+                }
+                changed
+            }
+            DockItem::Empty | DockItem::Panel(_) | DockItem::Tiles { .. } => false,
+        }
+    }
+
+    /// Return whether this subtree contains any configured pinned panel name.
+    ///
+    /// Args:
+    ///     names: Stable panel names considered pinned.
+    ///     cx: Application context used to resolve live panel names.
+    ///
+    /// Returns:
+    ///     `true` when at least one requested panel exists anywhere below this item.
+    fn contains_any_panel(&self, names: &[SharedString], cx: &App) -> bool {
+        names
+            .iter()
+            .any(|name| self.find_panel_named(name.as_ref(), cx).is_some())
+    }
+
     /// Путь к НАИМЕНЬШЕМУ поддереву, содержащему ВСЕ присутствующие из `names` (относительно
     /// self). Для восстановления сплита: соседний слот мог быть вложенным сплитом (столбец из
     /// панелей) — его надо обернуть целиком, а не один лист внутри. `None`, если ни одна из
@@ -1295,6 +1865,7 @@ struct MoonTabPanelRuntimeState {
 }
 
 #[derive(IntoElement)]
+/// Renders one dock tab group and its active panel surface.
 pub struct TabPanel {
     id: SharedString,
     items: Vec<Rc<dyn PanelView>>,
@@ -1307,9 +1878,14 @@ pub struct TabPanel {
     header_background_policy: MoonBackgroundPolicy,
     show_header: bool,
     show_panel_controls: bool,
+    layout_editable: bool,
+    detach_allowed: bool,
+    close_allowed: bool,
+    pinned_leading_panels: Vec<SharedString>,
 }
 
 impl TabPanel {
+    /// Create a tab group whose first item is active and whose layout controls are enabled.
     pub fn new(id: impl Into<SharedString>, items: Vec<Rc<dyn PanelView>>) -> Self {
         Self {
             id: id.into(),
@@ -1323,6 +1899,10 @@ impl TabPanel {
             header_background_policy: MoonBackgroundPolicy::Opaque,
             show_header: true,
             show_panel_controls: true,
+            layout_editable: true,
+            detach_allowed: true,
+            close_allowed: true,
+            pinned_leading_panels: Vec::new(),
         }
     }
 
@@ -1356,6 +1936,30 @@ impl TabPanel {
         self
     }
 
+    /// Set whether tab drag and close affordances may edit the dock topology.
+    fn layout_editable(mut self, layout_editable: bool) -> Self {
+        self.layout_editable = layout_editable;
+        self
+    }
+
+    /// Set whether this tab group exposes or accepts detach gestures.
+    fn detach_allowed(mut self, detach_allowed: bool) -> Self {
+        self.detach_allowed = detach_allowed;
+        self
+    }
+
+    /// Set whether this tab group exposes user close controls.
+    fn close_allowed(mut self, close_allowed: bool) -> Self {
+        self.close_allowed = close_allowed;
+        self
+    }
+
+    /// Mark stable panel names as emphasized non-draggable leading tabs.
+    fn pinned_leading_panels(mut self, panel_names: Vec<SharedString>) -> Self {
+        self.pinned_leading_panels = panel_names;
+        self
+    }
+
     fn dock_context(
         mut self,
         dock_area: WeakEntity<DockArea>,
@@ -1370,6 +1974,7 @@ impl TabPanel {
 }
 
 impl RenderOnce for TabPanel {
+    /// Render the tab group and synchronize edge-triggered panel activation notifications.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let tokens = MoonTheme::active_tokens(cx);
@@ -1381,6 +1986,18 @@ impl RenderOnce for TabPanel {
                 notified_active: None,
             },
         );
+        if self.dock_area.is_some() && state.read(cx).active_ix != self.active_ix {
+            state.update(cx, |state, _| {
+                state.active_ix = self.active_ix;
+                state.notified_active = None;
+            });
+        }
+        if let Some(dock_area) = self.dock_area.as_ref().and_then(WeakEntity::upgrade) {
+            dock_area.update(cx, |dock, _| {
+                dock.tab_runtime_states
+                    .insert(self.id.to_string(), state.downgrade());
+            });
+        }
         let active_ix = state
             .read(cx)
             .active_ix
@@ -1452,6 +2069,18 @@ impl RenderOnce for TabPanel {
                 let dock_path = self.dock_path.clone();
                 let panel_name = panel.panel_name(cx);
                 let tab_label = panel.tab_name(cx).unwrap_or_else(|| panel.panel_name(cx));
+                let pinned = self
+                    .pinned_leading_panels
+                    .iter()
+                    .any(|name| name.as_ref() == panel_name.as_ref());
+                let last_pinned = pinned
+                    && self.items.get(ix + 1).map_or(true, |next| {
+                        !self
+                            .pinned_leading_panels
+                            .iter()
+                            .any(|name| name.as_ref() == next.panel_name(cx).as_ref())
+                    });
+                let tab_debug_selector = format!("{}:tab-host:{ix}", self.id);
                 // The panel's own element right of the label (an unread badge, a status dot). The
                 // inherited dock already renders `title_suffix` in its tab bar; the Moon dock did
                 // not, so a Moon-hosted panel had no way to put anything on its tab.
@@ -1463,15 +2092,15 @@ impl RenderOnce for TabPanel {
                 let tab_suffix = (!selected)
                     .then(|| panel.title_suffix(window, cx))
                     .flatten();
-                // Вид вкладки = как у верхних (MoonTabStrip): высота 28, mono-текст,
-                // активная подсвечивается янтарным underline снизу, а не фоном Panel.
-                // drag/drop/double-click ниже навешиваются на этот же tab_host — поэтому
-                // механика докинга не зависит от вида.
+                // Match the top MoonTabStrip: a 28-unit mono tab with an amber bottom underline
+                // instead of a panel-colored active background. Drag, drop, and double-click all
+                // share this host so docking behavior stays independent of its presentation.
                 let mut tab_host = div()
                     .id(ElementId::from(SharedString::from(format!(
                         "{}:tab-host:{ix}",
                         self.id
                     ))))
+                    .debug_selector(move || tab_debug_selector)
                     .relative()
                     .h(px(tokens.fit_height(28.0, 13.0, 7.5)))
                     .flex()
@@ -1538,78 +2167,95 @@ impl RenderOnce for TabPanel {
                             cx.stop_propagation();
                         }
                     });
+                if pinned {
+                    tab_host = tab_host
+                        .bg(rgba_from(p.accent, 0.08))
+                        .when(last_pinned, |tab| {
+                            tab.border_r(px(tokens.ui(1.0)))
+                                .border_color(rgba_from(p.accent, 0.72))
+                        });
+                }
                 if selected {
-                    // Точный underline активной вкладки из палитры (тот же, что у верхних).
+                    // Reuse the exact palette-backed underline from the top tab strip.
                     tab_host = tab_host.child(super::tab::moon_active_tab_underline_scaled(
                         p,
                         tokens.clone(),
                     ));
                 }
-                if let (Some(dock_area), Some(root)) = (self.dock_area.clone(), self.dock_root) {
-                    if let Some(dock_entity) = dock_area.upgrade() {
-                        let drag = DockTabDrag {
-                            dock_id: dock_entity.entity_id(),
-                            root,
-                            path: self.dock_path.clone(),
-                            panel_name: panel_name.clone(),
-                            splittable: panel.show_dock_header(cx),
-                        };
-                        let drop_dock_area = dock_area.clone();
-                        let drop_path = self.dock_path.clone();
-                        tab_host = tab_host
-                            .on_drag(drag, |drag, _, _, cx| {
-                                cx.stop_propagation();
-                                cx.new(|_| drag.clone())
-                            })
-                            .drag_over::<DockTabDrag>(|style, _, _, cx| {
-                                let p = MoonPalette::active(cx);
-                                style
-                                    .border_l(px(2.0))
-                                    .border_color(rgba_from(p.accent, 0.9))
-                            })
-                            .on_drop(move |drag: &DockTabDrag, _window, cx| {
-                                if drag.dock_id != dock_entity.entity_id() {
-                                    return;
-                                }
-                                _ = drop_dock_area.update(cx, |dock, cx| {
-                                    let changed = if drag.root == root && drag.path == drop_path {
-                                        dock.move_tab_before(
-                                            root,
-                                            &drop_path,
-                                            drag.panel_name.as_ref(),
-                                            ix,
-                                            cx,
-                                        )
-                                    } else {
-                                        dock.move_panel_to_tabs(
-                                            drag.panel_name.as_ref(),
-                                            root,
-                                            &drop_path,
-                                            ix,
-                                            cx,
-                                        )
-                                    };
-                                    if changed {
-                                        cx.emit(DockEvent::LayoutChanged);
-                                        cx.notify();
+                let interactions =
+                    tab_interaction_policy(self.layout_editable, pinned, self.detach_allowed);
+                if interactions.accepts_drop {
+                    if let (Some(dock_area), Some(root)) = (self.dock_area.clone(), self.dock_root)
+                    {
+                        if let Some(dock_entity) = dock_area.upgrade() {
+                            let dock_id = dock_entity.entity_id();
+                            let drop_dock_area = dock_area.clone();
+                            let drop_path = self.dock_path.clone();
+                            tab_host = tab_host
+                                .drag_over::<DockTabDrag>(|style, _, _, cx| {
+                                    let p = MoonPalette::active(cx);
+                                    style
+                                        .border_l(px(2.0))
+                                        .border_color(rgba_from(p.accent, 0.9))
+                                })
+                                .on_drop(move |drag: &DockTabDrag, _window, cx| {
+                                    if drag.dock_id != dock_id {
+                                        return;
+                                    }
+                                    _ = drop_dock_area.update(cx, |dock, cx| {
+                                        let changed = if drag.root == root && drag.path == drop_path
+                                        {
+                                            dock.move_tab_before_from_user(
+                                                root,
+                                                &drop_path,
+                                                drag.panel_name.as_ref(),
+                                                ix,
+                                                cx,
+                                            )
+                                        } else {
+                                            dock.move_panel_to_tabs_from_user(
+                                                drag.panel_name.as_ref(),
+                                                root,
+                                                &drop_path,
+                                                ix,
+                                                cx,
+                                            )
+                                        };
+                                        if changed {
+                                            cx.emit(DockEvent::LayoutChanged);
+                                            cx.notify();
+                                        }
+                                    });
+                                });
+                            if interactions.draggable {
+                                let drag = DockTabDrag {
+                                    dock_id,
+                                    root,
+                                    path: self.dock_path.clone(),
+                                    panel_name: panel_name.clone(),
+                                    splittable: panel.show_dock_header(cx),
+                                };
+                                tab_host = tab_host.on_drag(drag, |drag, _, _, cx| {
+                                    cx.stop_propagation();
+                                    cx.new(|_| drag.clone())
+                                });
+                            }
+                            if interactions.detachable {
+                                tab_host = tab_host.on_double_click({
+                                    let dbl_area = dock_area.clone();
+                                    let dbl_name = panel_name.clone();
+                                    move |_, _, cx| {
+                                        // A tab double-click requests the same detach action as
+                                        // the header button; the host owns the detached window.
+                                        if let Some(area) = dbl_area.upgrade() {
+                                            area.update(cx, |dock, cx| {
+                                                dock.request_detach_from_user(dbl_name.clone(), cx);
+                                            });
+                                        }
                                     }
                                 });
-                            })
-                            .on_double_click({
-                                let dbl_area = dock_area.clone();
-                                let dbl_name = panel_name.clone();
-                                move |_, _, cx| {
-                                    // Дабл-клик по вкладке = вынос в окно (как кнопка ⧉).
-                                    // Хост (терминал) решает по panel_name (DetachRequested).
-                                    if let Some(area) = dbl_area.upgrade() {
-                                        area.update(cx, |_d, cx| {
-                                            cx.emit(DockEvent::DetachRequested {
-                                                panel_name: dbl_name.clone(),
-                                            });
-                                        });
-                                    }
-                                }
-                            });
+                            }
+                        }
                     }
                 }
                 header = header.child(tab_host);
@@ -1624,7 +2270,7 @@ impl RenderOnce for TabPanel {
                 }
                 if self.show_panel_controls {
                     let panel_name = panel.panel_name(cx);
-                    if panel.detachable(cx) {
+                    if self.layout_editable && self.detach_allowed && panel.detachable(cx) {
                         let dock_area = self.dock_area.clone();
                         header = header.child(
                             MoonButton::new(format!("{}:detach", self.id))
@@ -1637,10 +2283,11 @@ impl RenderOnce for TabPanel {
                                         if let Some(dock_area) =
                                             dock_area.as_ref().and_then(|area| area.upgrade())
                                         {
-                                            dock_area.update(cx, |_dock, cx| {
-                                                cx.emit(DockEvent::DetachRequested {
-                                                    panel_name: panel_name.clone(),
-                                                });
+                                            dock_area.update(cx, |dock, cx| {
+                                                dock.request_detach_from_user(
+                                                    panel_name.clone(),
+                                                    cx,
+                                                );
                                             });
                                         }
                                     }
@@ -1686,7 +2333,7 @@ impl RenderOnce for TabPanel {
                                 .render(),
                         );
                     }
-                    if panel.closable(cx) {
+                    if self.layout_editable && self.close_allowed && panel.closable(cx) {
                         let dock_area = self.dock_area.clone();
                         header = header.child(
                             MoonButton::new(format!("{}:close", self.id))
@@ -1699,12 +2346,13 @@ impl RenderOnce for TabPanel {
                                         if let Some(dock_area) =
                                             dock_area.as_ref().and_then(|area| area.upgrade())
                                         {
-                                            // Не удаляем сами — отдаём решение хосту (вернуть в
-                                            // домашнюю строку, а не уничтожить). См. DockEvent.
-                                            dock_area.update(cx, |_dock, cx| {
-                                                cx.emit(DockEvent::PanelCloseRequested {
-                                                    panel_name: panel_name.clone(),
-                                                });
+                                            // The host decides whether close returns the panel to
+                                            // its home strip or destroys it; the dock only asks.
+                                            dock_area.update(cx, |dock, cx| {
+                                                dock.request_close_from_user(
+                                                    panel_name.clone(),
+                                                    cx,
+                                                );
                                             });
                                         }
                                     }
@@ -1740,6 +2388,454 @@ impl RenderOnce for TabPanel {
     }
 }
 
+/// Fully resolved live layout assembled from local panel identities.
+struct ResolvedDockLayout {
+    center: DockItem,
+    left: Option<(DockItem, f32, bool)>,
+    right: Option<(DockItem, f32, bool)>,
+    bottom: Option<(DockItem, f32, bool)>,
+}
+
+impl ResolvedDockLayout {
+    /// Collect every resolved panel identity once in deterministic root order.
+    fn unique_panels(&self) -> Vec<Rc<dyn PanelView>> {
+        let mut panels = Vec::new();
+        self.center.append_unique_panels(&mut panels);
+        for side in [&self.left, &self.right, &self.bottom] {
+            if let Some((item, _, _)) = side {
+                item.append_unique_panels(&mut panels);
+            }
+        }
+        panels
+    }
+}
+
+impl DockArea {
+    /// Report whether the raw tree repeats an identity or stable logical panel name.
+    fn has_duplicate_panel_occurrences(&self, cx: &App) -> bool {
+        let occurrences = self.center.panel_occurrence_count()
+            + [&self.left, &self.right, &self.bottom]
+                .into_iter()
+                .flatten()
+                .map(|(item, _, _)| item.panel_occurrence_count())
+                .sum::<usize>();
+        let panels = self.unique_panels();
+        let unique_names = panels
+            .iter()
+            .map(|panel| panel.panel_name(cx).to_string())
+            .collect::<HashSet<_>>();
+        occurrences != panels.len() || unique_names.len() != panels.len()
+    }
+
+    /// Project resolved live parts to a canonical serializable topology.
+    fn topology_for_parts(parts: &ResolvedDockLayout, cx: &App) -> DockTopologyByName {
+        let side = |value: &Option<(DockItem, f32, bool)>| {
+            value.as_ref().map(|(item, size, open)| DockTopologySide {
+                item: item.topology_by_name(cx),
+                size: *size,
+                open: *open,
+            })
+        };
+        DockTopologyByName {
+            center: parts.center.topology_by_name(cx),
+            left: side(&parts.left),
+            right: side(&parts.right),
+            bottom: side(&parts.bottom),
+        }
+        .normalized()
+    }
+
+    /// Resolve requested topology against current and explicitly supplied local panel identities.
+    fn resolve_named_topology(
+        &self,
+        topology: &DockTopologyByName,
+        additional_panels: Vec<Rc<dyn PanelView>>,
+        retain_unmentioned: bool,
+        cx: &App,
+    ) -> ResolvedDockLayout {
+        let topology = topology.normalized();
+        let mut resolver = NamedPanelResolver::new(self.unique_panels(), additional_panels, cx);
+        let mut center = resolver.resolve_node(&topology.center, cx);
+        let mut resolve_side = |side: Option<&DockTopologySide>, minimum: f32| {
+            let side = side?;
+            let item = resolver.resolve_node(&side.item, cx);
+            (!item.is_empty()).then(|| (item, side.size.max(minimum), side.open))
+        };
+        let left = resolve_side(topology.left.as_ref(), DOCK_MIN_SIDE_SIZE);
+        let right = resolve_side(topology.right.as_ref(), DOCK_MIN_SIDE_SIZE);
+        let bottom = resolve_side(topology.bottom.as_ref(), DOCK_MIN_BOTTOM_SIZE);
+        if retain_unmentioned {
+            center.append_repaired_panels(resolver.remaining());
+        }
+        ResolvedDockLayout {
+            center,
+            left,
+            right,
+            bottom,
+        }
+    }
+
+    /// Collect active panel names for all tab groups, keyed by root and split path.
+    fn active_tabs_for_parts(parts: &ResolvedDockLayout, cx: &App) -> HashMap<String, String> {
+        let mut active = HashMap::new();
+        Self::collect_active_tabs(
+            &parts.center,
+            DockRoot::Center,
+            &mut Vec::new(),
+            cx,
+            &mut active,
+        );
+        for (root, side) in [
+            (DockRoot::Left, &parts.left),
+            (DockRoot::Right, &parts.right),
+            (DockRoot::Bottom, &parts.bottom),
+        ] {
+            if let Some((item, _, _)) = side {
+                Self::collect_active_tabs(item, root, &mut Vec::new(), cx, &mut active);
+            }
+        }
+        active
+    }
+
+    /// Traverse tab groups and record each selected panel by stable name.
+    fn collect_active_tabs(
+        item: &DockItem,
+        root: DockRoot,
+        path: &mut Vec<usize>,
+        cx: &App,
+        active: &mut HashMap<String, String>,
+    ) {
+        match item {
+            DockItem::Tabs { items, active_ix } => {
+                if let Some(panel) = items.get((*active_ix).min(items.len().saturating_sub(1))) {
+                    active.insert(
+                        Self::split_key(root, path),
+                        panel.panel_name(cx).to_string(),
+                    );
+                }
+            }
+            DockItem::Split { items, .. } => {
+                for (ix, item) in items.iter().enumerate() {
+                    path.push(ix);
+                    Self::collect_active_tabs(item, root, path, cx, active);
+                    path.pop();
+                }
+            }
+            DockItem::Empty | DockItem::Panel(_) | DockItem::Tiles { .. } => {}
+        }
+    }
+
+    /// Return all currently selected tab names independent of their topology paths.
+    fn active_panel_names(&self, cx: &App) -> HashSet<String> {
+        Self::active_tabs_for_parts(
+            &ResolvedDockLayout {
+                center: self.center.clone(),
+                left: self.left.clone(),
+                right: self.right.clone(),
+                bottom: self.bottom.clone(),
+            },
+            cx,
+        )
+        .into_values()
+        .collect()
+    }
+
+    /// Restore exact path-keyed tab activity into a newly resolved name-based layout.
+    fn apply_named_active_tabs(
+        parts: &mut ResolvedDockLayout,
+        active: &HashMap<String, String>,
+        cx: &App,
+    ) {
+        Self::apply_named_active_item(
+            &mut parts.center,
+            DockRoot::Center,
+            &mut Vec::new(),
+            active,
+            cx,
+        );
+        for (root, side) in [
+            (DockRoot::Left, &mut parts.left),
+            (DockRoot::Right, &mut parts.right),
+            (DockRoot::Bottom, &mut parts.bottom),
+        ] {
+            if let Some((item, _, _)) = side {
+                Self::apply_named_active_item(item, root, &mut Vec::new(), active, cx);
+            }
+        }
+    }
+
+    /// Apply one exact active-tab name at each split path.
+    fn apply_named_active_item(
+        item: &mut DockItem,
+        root: DockRoot,
+        path: &mut Vec<usize>,
+        active: &HashMap<String, String>,
+        cx: &App,
+    ) {
+        match item {
+            DockItem::Tabs { items, active_ix } => {
+                if let Some(name) = active.get(&Self::split_key(root, path)) {
+                    if let Some(ix) = items
+                        .iter()
+                        .position(|panel| panel.panel_name(cx).as_ref() == name)
+                    {
+                        *active_ix = ix;
+                    }
+                }
+            }
+            DockItem::Split { items, .. } => {
+                for (ix, item) in items.iter_mut().enumerate() {
+                    path.push(ix);
+                    Self::apply_named_active_item(item, root, path, active, cx);
+                    path.pop();
+                }
+            }
+            DockItem::Empty | DockItem::Panel(_) | DockItem::Tiles { .. } => {}
+        }
+    }
+
+    /// Preserve any locally active panel that remains inside a newly resolved tab group.
+    fn apply_active_name_set(
+        parts: &mut ResolvedDockLayout,
+        active_names: &HashSet<String>,
+        cx: &App,
+    ) {
+        fn apply(item: &mut DockItem, active_names: &HashSet<String>, cx: &App) {
+            match item {
+                DockItem::Tabs { items, active_ix } => {
+                    if let Some(ix) = items
+                        .iter()
+                        .position(|panel| active_names.contains(panel.panel_name(cx).as_ref()))
+                    {
+                        *active_ix = ix;
+                    }
+                }
+                DockItem::Split { items, .. } => {
+                    for item in items {
+                        apply(item, active_names, cx);
+                    }
+                }
+                DockItem::Empty | DockItem::Panel(_) | DockItem::Tiles { .. } => {}
+            }
+        }
+        apply(&mut parts.center, active_names, cx);
+        for side in [&mut parts.left, &mut parts.right, &mut parts.bottom]
+            .into_iter()
+            .flatten()
+        {
+            apply(&mut side.0, active_names, cx);
+        }
+    }
+
+    /// Reorder pinned panels within tabs and to the leading side of horizontal split ancestors.
+    fn enforce_pinned_on_parts(&self, parts: &mut ResolvedDockLayout, cx: &App) -> bool {
+        let mut changed = parts
+            .center
+            .enforce_pinned_leading(&self.pinned_leading_panels, cx);
+        for side in [&mut parts.left, &mut parts.right, &mut parts.bottom]
+            .into_iter()
+            .flatten()
+        {
+            changed |= side
+                .0
+                .enforce_pinned_leading(&self.pinned_leading_panels, cx);
+        }
+        changed
+    }
+
+    /// Find a named panel in resolved parts without installing them into the dock.
+    fn parts_find_panel(
+        parts: &ResolvedDockLayout,
+        panel_name: &str,
+        cx: &App,
+    ) -> Option<Rc<dyn PanelView>> {
+        parts.center.find_panel_named(panel_name, cx).or_else(|| {
+            [&parts.left, &parts.right, &parts.bottom]
+                .into_iter()
+                .flatten()
+                .find_map(|(item, _, _)| item.find_panel_named(panel_name, cx))
+        })
+    }
+
+    /// Install resolved local identities, reconcile lifecycle state, and emit one coherent event.
+    fn install_resolved_layout(
+        &mut self,
+        parts: ResolvedDockLayout,
+        zoomed_name: Option<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let previous_panels = self.unique_panels();
+        let next_panels = parts.unique_panels();
+        let previous_zoomed = self
+            .zoomed_panel
+            .as_ref()
+            .and_then(|name| self.find_panel_named(name, cx));
+        let next_zoomed = zoomed_name
+            .as_ref()
+            .and_then(|name| Self::parts_find_panel(&parts, name, cx));
+        let same_zoomed = previous_zoomed
+            .as_ref()
+            .zip(next_zoomed.as_ref())
+            .is_some_and(|(previous, next)| Rc::ptr_eq(previous, next));
+
+        // Removal callbacks may tear down zoom resources, so close the old zoom edge first.
+        if !same_zoomed && let Some(panel) = previous_zoomed.as_ref() {
+            panel.set_zoomed(false, window, cx.borrow_mut());
+        }
+
+        for panel in &previous_panels {
+            if !next_panels.iter().any(|next| Rc::ptr_eq(panel, next)) {
+                panel.set_active(false, window, cx.borrow_mut());
+                panel.on_removed(window, cx.borrow_mut());
+            }
+        }
+
+        self.center = parts.center;
+        self.left = parts.left;
+        self.right = parts.right;
+        self.bottom = parts.bottom;
+        self.zoomed_panel = zoomed_name.map(SharedString::from);
+        self.tile_drag_start = None;
+
+        let dock_area = cx.entity().downgrade();
+        for panel in &next_panels {
+            if !previous_panels
+                .iter()
+                .any(|previous| Rc::ptr_eq(previous, panel))
+            {
+                panel.on_added_to(dock_area.clone(), window, cx.borrow_mut());
+            }
+        }
+
+        if !same_zoomed {
+            if let Some(panel) = next_zoomed {
+                panel.set_zoomed(true, window, cx.borrow_mut());
+            }
+        }
+        self.sync_layout_active(window, cx);
+        cx.emit(DockEvent::LayoutChanged);
+        cx.notify();
+    }
+}
+
+/// Resolves stable panel names to existing local identities without invoking panel factories.
+struct NamedPanelResolver {
+    panels: Vec<Rc<dyn PanelView>>,
+    used: Vec<bool>,
+}
+
+impl NamedPanelResolver {
+    /// Merge current and supplied pools while retaining one identity per stable panel name.
+    fn new(current: Vec<Rc<dyn PanelView>>, additional: Vec<Rc<dyn PanelView>>, cx: &App) -> Self {
+        let mut panels = Vec::new();
+        for panel in current.into_iter().chain(additional) {
+            let name = panel.panel_name(cx);
+            if !panels
+                .iter()
+                .any(|known: &Rc<dyn PanelView>| known.panel_name(cx) == name)
+            {
+                panels.push(panel);
+            }
+        }
+        let used = vec![false; panels.len()];
+        Self { panels, used }
+    }
+
+    /// Consume the first unused local panel with the requested stable name.
+    fn take_named(&mut self, name: &str, cx: &App) -> Option<Rc<dyn PanelView>> {
+        let ix = self
+            .panels
+            .iter()
+            .enumerate()
+            .position(|(ix, panel)| !self.used[ix] && panel.panel_name(cx).as_ref() == name)?;
+        self.used[ix] = true;
+        Some(self.panels[ix].clone())
+    }
+
+    /// Resolve one normalized topology node, skipping names absent from the local pool.
+    fn resolve_node(&mut self, node: &DockTopologyNode, cx: &App) -> DockItem {
+        match node {
+            DockTopologyNode::Empty => DockItem::Empty,
+            DockTopologyNode::Panel { name } => self
+                .take_named(name, cx)
+                .map(DockItem::Panel)
+                .unwrap_or(DockItem::Empty),
+            DockTopologyNode::Tabs { names } => {
+                let mut items = names
+                    .iter()
+                    .filter_map(|name| self.take_named(name, cx))
+                    .collect::<Vec<_>>();
+                match items.len() {
+                    0 => DockItem::Empty,
+                    1 => DockItem::Panel(items.remove(0)),
+                    _ => DockItem::Tabs {
+                        items,
+                        active_ix: 0,
+                    },
+                }
+            }
+            DockTopologyNode::Tiles { names, metas } => {
+                let mut items = Vec::new();
+                let mut kept_metas = Vec::new();
+                for (ix, name) in names.iter().enumerate() {
+                    if let Some(panel) = self.take_named(name, cx) {
+                        items.push(panel);
+                        kept_metas.push(
+                            metas
+                                .get(ix)
+                                .copied()
+                                .unwrap_or_else(|| default_tile_meta(ix)),
+                        );
+                    }
+                }
+                match items.len() {
+                    0 => DockItem::Empty,
+                    1 => DockItem::Panel(items.remove(0)),
+                    _ => DockItem::Tiles {
+                        items,
+                        metas: kept_metas,
+                    },
+                }
+            }
+            DockTopologyNode::Split {
+                horizontal,
+                items,
+                sizes,
+            } => {
+                let mut resolved_items = Vec::new();
+                let mut resolved_sizes = Vec::new();
+                for (ix, item) in items.iter().enumerate() {
+                    let item = self.resolve_node(item, cx);
+                    if !item.is_empty() {
+                        resolved_items.push(item);
+                        resolved_sizes.push(sizes.get(ix).copied().flatten());
+                    }
+                }
+                match resolved_items.len() {
+                    0 => DockItem::Empty,
+                    1 => resolved_items.remove(0),
+                    _ => DockItem::Split {
+                        horizontal: *horizontal,
+                        items: resolved_items,
+                        sizes: resolved_sizes,
+                    },
+                }
+            }
+        }
+    }
+
+    /// Return every local panel not named by the requested topology in stable pool order.
+    fn remaining(&self) -> Vec<Rc<dyn PanelView>> {
+        self.panels
+            .iter()
+            .zip(&self.used)
+            .filter_map(|(panel, used)| (!*used).then(|| panel.clone()))
+            .collect()
+    }
+}
+
+/// Owns a live panel topology, its interaction state, and persistence-facing layout events.
 pub struct DockArea {
     id: SharedString,
     version: Option<usize>,
@@ -1755,16 +2851,27 @@ pub struct DockArea {
     row_bounds: Bounds<Pixels>,
     split_bounds: HashMap<String, Bounds<Pixels>>,
     tile_bounds: HashMap<String, Bounds<Pixels>>,
+    /// Keyed tab runtimes registered during render so named activation can update them directly.
+    tab_runtime_states: HashMap<String, WeakEntity<MoonTabPanelRuntimeState>>,
     tile_drag_start: Option<DockTileDragStart>,
     /// When false, slots do not expose split drop-zones — dragging a tab can only reorder
     /// it within a tab strip or move it into another existing tab strip, not create a new
     /// split anywhere (which lets panels land in e.g. a chart slot and wedge the layout).
     enable_split_drop: bool,
+    /// Whether pointer-driven controls may change the topology; tab activation remains enabled.
+    layout_editable: bool,
+    /// Whether user detach requests are accepted independently of other structural edits.
+    detach_allowed: bool,
+    /// Whether user close requests are accepted independently of other structural edits.
+    close_allowed: bool,
+    /// Stable panel names that remain leading, emphasized, and non-draggable in tab groups.
+    pinned_leading_panels: Vec<SharedString>,
 }
 
 impl EventEmitter<DockEvent> for DockArea {}
 
 impl DockArea {
+    /// Create an empty editable dock with the supplied persistence version.
     pub fn new(
         id: impl Into<SharedString>,
         version: Option<usize>,
@@ -1786,12 +2893,18 @@ impl DockArea {
             row_bounds: Bounds::default(),
             split_bounds: HashMap::new(),
             tile_bounds: HashMap::new(),
+            tab_runtime_states: HashMap::new(),
             tile_drag_start: None,
             enable_split_drop: true,
+            layout_editable: true,
+            detach_allowed: true,
+            close_allowed: true,
+            pinned_leading_panels: Vec::new(),
         }
     }
 
     #[cfg(test)]
+    /// Create an editable dock around a supplied center item for structural unit tests.
     fn test_with_center(center: DockItem) -> Self {
         Self {
             id: "test-dock".into(),
@@ -1808,11 +2921,17 @@ impl DockArea {
             row_bounds: Bounds::default(),
             split_bounds: HashMap::new(),
             tile_bounds: HashMap::new(),
+            tab_runtime_states: HashMap::new(),
             tile_drag_start: None,
             enable_split_drop: true,
+            layout_editable: true,
+            detach_allowed: true,
+            close_allowed: true,
+            pinned_leading_panels: Vec::new(),
         }
     }
 
+    /// Recreate a dock from serialized state through the registered panel factories.
     pub fn from_state(
         id: impl Into<SharedString>,
         state: DockAreaState,
@@ -1845,11 +2964,20 @@ impl DockArea {
             row_bounds: Bounds::default(),
             split_bounds: HashMap::new(),
             tile_bounds: HashMap::new(),
+            tab_runtime_states: HashMap::new(),
             tile_drag_start: None,
             enable_split_drop: true,
+            layout_editable: true,
+            detach_allowed: true,
+            close_allowed: true,
+            pinned_leading_panels: Vec::new(),
         }
     }
 
+    /// Load serialized state, recreate panels, and notify their addition lifecycle once.
+    ///
+    /// Loading replaces panel membership and requests a repaint, but does not emit
+    /// [`DockEvent::LayoutChanged`].
     pub fn load(
         &mut self,
         state: DockAreaState,
@@ -1885,6 +3013,225 @@ impl DockArea {
         Ok(())
     }
 
+    /// Project the current layout to normalized serializable topology by stable panel name.
+    pub fn topology_by_name(&self, cx: &App) -> DockTopologyByName {
+        Self::topology_for_parts(
+            &ResolvedDockLayout {
+                center: self.center.clone(),
+                left: self.left.clone(),
+                right: self.right.clone(),
+                bottom: self.bottom.clone(),
+            },
+            cx,
+        )
+    }
+
+    /// Capture full local topology, active tabs, and zoom by name without retaining panel owners.
+    pub fn named_layout(&self, cx: &App) -> DockNamedLayout {
+        let parts = ResolvedDockLayout {
+            center: self.center.clone(),
+            left: self.left.clone(),
+            right: self.right.clone(),
+            bottom: self.bottom.clone(),
+        };
+        DockNamedLayout {
+            topology: Self::topology_for_parts(&parts, cx),
+            active_tabs: Self::active_tabs_for_parts(&parts, cx),
+            zoomed_panel: self.zoomed_panel.as_ref().map(ToString::to_string),
+        }
+    }
+
+    /// Apply shared topology onto local panel identities and repair stale panel-name references.
+    ///
+    /// Unknown and duplicate requested names are discarded. The first live identity for each
+    /// stable panel name wins across this dock and `additional_panels`; unrequested names are
+    /// appended deterministically to the center. Local
+    /// active-tab and zoom state are preserved where their named panels survive. Returns `true`
+    /// only when live topology actually changes and one [`DockEvent::LayoutChanged`] is emitted.
+    pub fn apply_topology_by_name(
+        &mut self,
+        topology: &DockTopologyByName,
+        additional_panels: Vec<Rc<dyn PanelView>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let active_names = self.active_panel_names(cx);
+        let zoomed_panel = self.zoomed_panel.as_ref().map(ToString::to_string);
+        let mut resolved = self.resolve_named_topology(topology, additional_panels, true, cx);
+        Self::apply_active_name_set(&mut resolved, &active_names, cx);
+        self.enforce_pinned_on_parts(&mut resolved, cx);
+
+        let next_topology = Self::topology_for_parts(&resolved, cx);
+        if self.topology_by_name(cx) == next_topology && !self.has_duplicate_panel_occurrences(cx) {
+            return false;
+        }
+        self.install_resolved_layout(resolved, zoomed_panel, window, cx);
+        true
+    }
+
+    /// Restore an exact local name-based layout, including active tabs and zoom state.
+    ///
+    /// Current or supplied panels absent from the captured layout are removed from this dock;
+    /// named panels reuse their existing local `Rc` identity. Missing names are skipped safely.
+    /// Returns `true` only when topology, active tabs, zoom, or panel membership changes.
+    pub fn apply_named_layout(
+        &mut self,
+        layout: &DockNamedLayout,
+        additional_panels: Vec<Rc<dyn PanelView>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let mut resolved =
+            self.resolve_named_topology(&layout.topology, additional_panels, false, cx);
+        Self::apply_named_active_tabs(&mut resolved, &layout.active_tabs, cx);
+        self.enforce_pinned_on_parts(&mut resolved, cx);
+        let zoomed_panel = layout
+            .zoomed_panel
+            .as_ref()
+            .filter(|name| Self::parts_find_panel(&resolved, name, cx).is_some())
+            .cloned();
+        let effective = DockNamedLayout {
+            topology: Self::topology_for_parts(&resolved, cx),
+            active_tabs: Self::active_tabs_for_parts(&resolved, cx),
+            zoomed_panel: zoomed_panel.clone(),
+        };
+        if self.named_layout(cx) == effective && !self.has_duplicate_panel_occurrences(cx) {
+            return false;
+        }
+        self.install_resolved_layout(resolved, zoomed_panel, window, cx);
+        true
+    }
+
+    /// Activate a named panel, clearing zoom and synchronizing all activation stores.
+    ///
+    /// Returns `false` when the panel is absent. A found panel returns `true` even when it was
+    /// already active, because its keyed runtime and [`Panel::set_active`] state are repaired. Any
+    /// zoomed surface is cleared first so the requested normal-topology panel becomes visible.
+    /// A found panel emits one [`DockEvent::LayoutChanged`] only when zoom, side-root visibility,
+    /// or the topology's active tab changes; activation never adds, removes, or recreates panels.
+    pub fn activate_panel_by_name(
+        &mut self,
+        panel_name: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(location) = self.panel_location(panel_name, cx) else {
+            return false;
+        };
+
+        let previous_zoomed = self.zoomed_panel.take();
+        let zoom_cleared = previous_zoomed.is_some();
+        if let Some(previous_zoomed) = previous_zoomed {
+            if let Some(panel) = self.find_panel_named(previous_zoomed.as_ref(), cx) {
+                panel.set_zoomed(false, window, cx.borrow_mut());
+            }
+        }
+        let root_opened = self.open_root(location.root);
+        let mut layout_changed = zoom_cleared || root_opened;
+        if let DockPanelSlot::Tab(active_ix) = location.slot {
+            layout_changed |= self.set_tabs_active_index(location.root, &location.path, active_ix);
+        }
+
+        if zoom_cleared {
+            self.sync_layout_active(window, cx);
+        } else if root_opened {
+            if let Some(item) = self.root_item(location.root) {
+                self.sync_item_active(location.root, &[], item, window, cx);
+            }
+        } else if let Some(item) = self
+            .root_item(location.root)
+            .and_then(|item| Self::item_at_path(item, &location.path))
+        {
+            self.sync_item_active(location.root, &location.path, item, window, cx);
+        }
+        if layout_changed {
+            cx.emit(DockEvent::LayoutChanged);
+        }
+        cx.notify();
+        true
+    }
+
+    /// Enable or suppress pointer-driven structural layout edits.
+    ///
+    /// Programmatic layout APIs and user tab activation remain available while editing is locked.
+    pub fn set_layout_editable(&mut self, editable: bool, cx: &mut Context<Self>) {
+        if self.layout_editable == editable {
+            return;
+        }
+        self.layout_editable = editable;
+        self.tile_drag_start = None;
+        cx.notify();
+    }
+
+    /// Independently allow or reject user detach requests while retaining other layout edits.
+    pub fn set_detach_allowed(&mut self, allowed: bool, cx: &mut Context<Self>) {
+        if self.detach_allowed == allowed {
+            return;
+        }
+        self.detach_allowed = allowed;
+        cx.notify();
+    }
+
+    /// Independently allow or reject user close requests while retaining other layout edits.
+    pub fn set_close_allowed(&mut self, allowed: bool, cx: &mut Context<Self>) {
+        if self.close_allowed == allowed {
+            return;
+        }
+        self.close_allowed = allowed;
+        cx.notify();
+    }
+
+    /// Configure stable panel names that lead and receive emphasis in every tab group.
+    ///
+    /// Duplicate names are removed in caller order. Existing tab groups are reordered immediately
+    /// while retaining their active panel identity. Returns whether live topology changed.
+    pub fn set_pinned_leading_panels(
+        &mut self,
+        panel_names: Vec<SharedString>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let mut unique = Vec::new();
+        for name in panel_names {
+            if !name.is_empty() && !unique.iter().any(|known: &SharedString| known == &name) {
+                unique.push(name);
+            }
+        }
+        if self.pinned_leading_panels == unique {
+            return false;
+        }
+        self.pinned_leading_panels = unique;
+        let mut changed = self
+            .center
+            .enforce_pinned_leading(&self.pinned_leading_panels, cx);
+        for side in [&mut self.left, &mut self.right, &mut self.bottom]
+            .into_iter()
+            .flatten()
+        {
+            changed |= side
+                .0
+                .enforce_pinned_leading(&self.pinned_leading_panels, cx);
+        }
+        if changed {
+            cx.emit(DockEvent::LayoutChanged);
+        }
+        cx.notify();
+        changed
+    }
+
+    /// Emit a detach request only if both layout editing and detachment remain enabled.
+    fn request_detach_from_user(&self, panel_name: SharedString, cx: &mut Context<Self>) {
+        if self.layout_editable && self.detach_allowed {
+            cx.emit(DockEvent::DetachRequested { panel_name });
+        }
+    }
+
+    /// Emit a close request only if both layout editing and closing remain enabled.
+    fn request_close_from_user(&self, panel_name: SharedString, cx: &mut Context<Self>) {
+        if self.layout_editable && self.close_allowed {
+            cx.emit(DockEvent::PanelCloseRequested { panel_name });
+        }
+    }
+
     pub fn background_policy(mut self, policy: MoonBackgroundPolicy) -> Self {
         self.background_policy = policy;
         self
@@ -1908,6 +3255,10 @@ impl DockArea {
         self
     }
 
+    /// Replace the center topology and notify the supplied panels that they belong to this dock.
+    ///
+    /// This emits one [`DockEvent::LayoutChanged`] and requests a repaint. It does not run removal
+    /// lifecycle hooks for the previous center item.
     pub fn set_center(&mut self, item: DockItem, window: &mut Window, cx: &mut Context<Self>) {
         item.notify_added(&cx.entity().downgrade(), window, cx.borrow_mut());
         self.center = item;
@@ -1915,6 +3266,10 @@ impl DockArea {
         cx.notify();
     }
 
+    /// Add one panel to a dock root, opening side roots and preserving existing panels as tabs.
+    ///
+    /// The panel receives one addition lifecycle callback. The change emits one
+    /// [`DockEvent::LayoutChanged`] and requests a repaint.
     pub fn add_panel(
         &mut self,
         panel: Rc<dyn PanelView>,
@@ -1963,6 +3318,8 @@ impl DockArea {
     /// already holds one of `sibling_names` — at `ix` (clamped). Unlike `add_panel(Center)`,
     /// this does NOT collapse the surrounding split. Returns false if no such strip exists
     /// (e.g. every sibling is detached); the caller may then fall back to `add_panel`.
+    /// Success runs the addition lifecycle callback, emits one [`DockEvent::LayoutChanged`], and
+    /// requests a repaint.
     pub fn insert_panel_into_home_tabs(
         &mut self,
         panel: Rc<dyn PanelView>,
@@ -2004,6 +3361,8 @@ impl DockArea {
     ///   unit, not one leaf inside it) into a fresh split with `panel` on `placement`.
     ///
     /// Returns false if neither anchor nor slot survives — the caller falls back to tab restore.
+    /// Success runs the addition lifecycle callback, emits one [`DockEvent::LayoutChanged`], and
+    /// requests a repaint.
     pub fn insert_panel_beside_sibling(
         &mut self,
         panel: Rc<dyn PanelView>,
@@ -2117,6 +3476,11 @@ impl DockArea {
         ok
     }
 
+    /// Remove a named panel from any root and run its removal lifecycle callback.
+    ///
+    /// A successful removal also clears matching zoom state, emits one
+    /// [`DockEvent::LayoutChanged`], requests a repaint, and returns `true`.
+    /// An absent name returns `false` without those effects.
     pub fn remove_panel_by_name(
         &mut self,
         panel_name: &str,
@@ -2189,6 +3553,7 @@ impl DockArea {
             .unwrap_or(false)
     }
 
+    /// Toggle one panel as the sole visible active surface and notify one layout change.
     pub fn toggle_zoom_panel(
         &mut self,
         panel_name: impl Into<SharedString>,
@@ -2212,15 +3577,18 @@ impl DockArea {
             }
         }
         self.zoomed_panel = next;
+        self.sync_layout_active(window, cx);
         cx.emit(DockEvent::LayoutChanged);
         cx.notify();
     }
 
+    /// Return from a zoomed surface to the active normal topology.
     pub fn clear_zoom(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(current) = self.zoomed_panel.take() {
             if let Some(panel) = self.find_panel_named(current.as_ref(), cx) {
                 panel.set_zoomed(false, window, cx.borrow_mut());
             }
+            self.sync_layout_active(window, cx);
             cx.emit(DockEvent::LayoutChanged);
             cx.notify();
         }
@@ -2272,6 +3640,7 @@ impl DockArea {
         }
     }
 
+    /// Render a pointer resize handle, or no element while structural editing is locked.
     fn resize_handle(
         &self,
         id: SharedString,
@@ -2279,6 +3648,9 @@ impl DockArea {
         target: DockResizeTarget,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        if !self.layout_editable {
+            return Empty.into_any_element();
+        }
         let p = MoonPalette::active(cx);
         let drag = DockResizeDrag {
             dock_id: cx.entity_id(),
@@ -2319,6 +3691,262 @@ impl DockArea {
             .into_any_element()
     }
 
+    /// Collect every live panel identity once in deterministic root order.
+    fn unique_panels(&self) -> Vec<Rc<dyn PanelView>> {
+        let mut panels = Vec::new();
+        self.center.append_unique_panels(&mut panels);
+        for slot in [&self.left, &self.right, &self.bottom] {
+            if let Some((item, _, _)) = slot {
+                item.append_unique_panels(&mut panels);
+            }
+        }
+        panels
+    }
+
+    /// Return an immutable root item when that dock slot exists.
+    fn root_item(&self, root: DockRoot) -> Option<&DockItem> {
+        match root {
+            DockRoot::Center => Some(&self.center),
+            DockRoot::Left => self.left.as_ref().map(|(item, _, _)| item),
+            DockRoot::Right => self.right.as_ref().map(|(item, _, _)| item),
+            DockRoot::Bottom => self.bottom.as_ref().map(|(item, _, _)| item),
+        }
+    }
+
+    /// Return an immutable topology node at a split-only path.
+    fn item_at_path<'a>(item: &'a DockItem, path: &[usize]) -> Option<&'a DockItem> {
+        let mut current = item;
+        for ix in path {
+            let DockItem::Split { items, .. } = current else {
+                return None;
+            };
+            current = items.get(*ix)?;
+        }
+        Some(current)
+    }
+
+    /// Find a named panel across all roots and retain its owning node coordinates.
+    fn panel_location(&self, panel_name: &str, cx: &App) -> Option<DockPanelLocation> {
+        for root in [
+            DockRoot::Center,
+            DockRoot::Left,
+            DockRoot::Right,
+            DockRoot::Bottom,
+        ] {
+            let Some(item) = self.root_item(root) else {
+                continue;
+            };
+            if let Some((path, slot)) = item.panel_location(panel_name, cx, &mut Vec::new()) {
+                return Some(DockPanelLocation { root, path, slot });
+            }
+        }
+        None
+    }
+
+    /// Open a side root in place without emitting an intermediate layout event.
+    fn open_root(&mut self, root: DockRoot) -> bool {
+        let slot = match root {
+            DockRoot::Center => return false,
+            DockRoot::Left => self.left.as_mut(),
+            DockRoot::Right => self.right.as_mut(),
+            DockRoot::Bottom => self.bottom.as_mut(),
+        };
+        let Some((_, _, open)) = slot else {
+            return false;
+        };
+        if *open {
+            return false;
+        }
+        *open = true;
+        true
+    }
+
+    /// Build the rendered element id for a topology node.
+    fn item_element_id(&self, root: DockRoot, path: &[usize]) -> SharedString {
+        let mut id = format!("{}:{}", self.id, Self::split_key(root, &[]));
+        for ix in path {
+            id.push_str(":split:");
+            id.push_str(&ix.to_string());
+        }
+        id.into()
+    }
+
+    /// Synchronize one keyed tab runtime and every panel's active edge notification.
+    fn sync_tab_runtime(
+        &self,
+        id: SharedString,
+        items: &[Rc<dyn PanelView>],
+        active_ix: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let active_ix = active_ix.min(items.len().saturating_sub(1));
+        for (ix, panel) in items.iter().enumerate() {
+            panel.set_active(ix == active_ix, window, cx.borrow_mut());
+        }
+        let announced = (
+            items.get(active_ix).map(|panel| panel.panel_name(cx)),
+            items.len(),
+        );
+        if let Some(state) = self
+            .tab_runtime_states
+            .get(id.as_ref())
+            .and_then(WeakEntity::upgrade)
+        {
+            state.update(cx, |state, _| {
+                state.active_ix = active_ix;
+                state.notified_active = Some(announced);
+            });
+        }
+    }
+
+    /// Synchronize activation for a visible topology subtree and its keyed tab runtimes.
+    fn sync_item_active(
+        &self,
+        root: DockRoot,
+        path: &[usize],
+        item: &DockItem,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let id = self.item_element_id(root, path);
+        match item {
+            DockItem::Empty => {}
+            DockItem::Panel(panel) => {
+                self.sync_tab_runtime(id, std::slice::from_ref(panel), 0, window, cx);
+            }
+            DockItem::Tabs { items, active_ix } => {
+                self.sync_tab_runtime(id, items, *active_ix, window, cx);
+            }
+            DockItem::Tiles { items, .. } => {
+                for (ix, panel) in items.iter().enumerate() {
+                    self.sync_tab_runtime(
+                        format!("{id}:tile-panel:{ix}").into(),
+                        std::slice::from_ref(panel),
+                        0,
+                        window,
+                        cx,
+                    );
+                }
+            }
+            DockItem::Split { items, .. } => {
+                for (ix, item) in items.iter().enumerate() {
+                    let mut child_path = path.to_vec();
+                    child_path.push(ix);
+                    self.sync_item_active(root, &child_path, item, window, cx);
+                }
+            }
+        }
+    }
+
+    /// Mark a hidden side subtree inactive while keeping its tab index ready for reopening.
+    fn sync_item_inactive(
+        &self,
+        root: DockRoot,
+        path: &[usize],
+        item: &DockItem,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let id = self.item_element_id(root, path);
+        match item {
+            DockItem::Empty => {}
+            DockItem::Panel(panel) => {
+                panel.set_active(false, window, cx.borrow_mut());
+                self.mark_tab_runtime_inactive(id, 0, 1, cx);
+            }
+            DockItem::Tabs { items, active_ix } => {
+                for panel in items {
+                    panel.set_active(false, window, cx.borrow_mut());
+                }
+                self.mark_tab_runtime_inactive(id, *active_ix, items.len(), cx);
+            }
+            DockItem::Tiles { items, .. } => {
+                for (ix, panel) in items.iter().enumerate() {
+                    panel.set_active(false, window, cx.borrow_mut());
+                    self.mark_tab_runtime_inactive(
+                        format!("{id}:tile-panel:{ix}").into(),
+                        0,
+                        1,
+                        cx,
+                    );
+                }
+            }
+            DockItem::Split { items, .. } => {
+                for (ix, item) in items.iter().enumerate() {
+                    let mut child_path = path.to_vec();
+                    child_path.push(ix);
+                    self.sync_item_inactive(root, &child_path, item, window, cx);
+                }
+            }
+        }
+    }
+
+    /// Store an inactive edge marker so a reopened tab group announces its front panel again.
+    fn mark_tab_runtime_inactive(
+        &self,
+        id: SharedString,
+        active_ix: usize,
+        item_count: usize,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(state) = self
+            .tab_runtime_states
+            .get(id.as_ref())
+            .and_then(WeakEntity::upgrade)
+        {
+            state.update(cx, |state, _| {
+                state.active_ix = active_ix.min(item_count.saturating_sub(1));
+                state.notified_active = Some((None, item_count));
+            });
+        }
+    }
+
+    /// Synchronize only the topology currently visible through normal or zoomed rendering.
+    fn sync_layout_active(&self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(zoomed_panel) = self
+            .zoomed_panel
+            .as_ref()
+            .and_then(|name| self.find_panel_named(name.as_ref(), cx))
+        {
+            self.sync_item_inactive(DockRoot::Center, &[], &self.center, window, cx);
+            for (root, slot) in [
+                (DockRoot::Left, &self.left),
+                (DockRoot::Right, &self.right),
+                (DockRoot::Bottom, &self.bottom),
+            ] {
+                if let Some((item, _, _)) = slot {
+                    self.sync_item_inactive(root, &[], item, window, cx);
+                }
+            }
+            self.sync_tab_runtime(
+                format!("{}:zoom", self.id).into(),
+                std::slice::from_ref(&zoomed_panel),
+                0,
+                window,
+                cx,
+            );
+            return;
+        }
+
+        self.mark_tab_runtime_inactive(format!("{}:zoom", self.id).into(), 0, 1, cx);
+        self.sync_item_active(DockRoot::Center, &[], &self.center, window, cx);
+        for (root, slot) in [
+            (DockRoot::Left, &self.left),
+            (DockRoot::Right, &self.right),
+            (DockRoot::Bottom, &self.bottom),
+        ] {
+            if let Some((item, _, open)) = slot {
+                if *open {
+                    self.sync_item_active(root, &[], item, window, cx);
+                } else {
+                    self.sync_item_inactive(root, &[], item, window, cx);
+                }
+            }
+        }
+    }
+
+    /// Return a mutable root item when that dock slot exists.
     fn root_item_mut(&mut self, root: DockRoot) -> Option<&mut DockItem> {
         match root {
             DockRoot::Center => Some(&mut self.center),
@@ -2328,6 +3956,7 @@ impl DockArea {
         }
     }
 
+    /// Return a mutable topology node at a split-only path.
     fn item_at_path_mut<'a>(item: &'a mut DockItem, path: &[usize]) -> Option<&'a mut DockItem> {
         let mut current = item;
         for ix in path {
@@ -2407,6 +4036,22 @@ impl DockArea {
         items.insert(target_ix, panel);
         *active_ix = target_ix;
         true
+    }
+
+    /// Reorder a tab only when the pointer-driven layout editor is enabled.
+    fn move_tab_before_from_user(
+        &mut self,
+        root: DockRoot,
+        path: &[usize],
+        panel_name: &str,
+        target_ix: usize,
+        cx: &App,
+    ) -> bool {
+        if !self.layout_editable || self.is_pinned_panel(panel_name) {
+            return false;
+        }
+        let target_ix = target_ix.max(self.pinned_count_at(root, path, cx));
+        self.move_tab_before(root, path, panel_name, target_ix, cx)
     }
 
     fn take_panel_named_for_move(
@@ -2531,6 +4176,93 @@ impl DockArea {
             }
             false
         }
+    }
+
+    /// Move a panel between tab groups only when the layout editor is enabled.
+    fn move_panel_to_tabs_from_user(
+        &mut self,
+        panel_name: &str,
+        root: DockRoot,
+        path: &[usize],
+        target_ix: usize,
+        cx: &App,
+    ) -> bool {
+        if !self.layout_editable || self.is_pinned_panel(panel_name) {
+            return false;
+        }
+        let target_ix = target_ix.max(self.pinned_count_at(root, path, cx));
+        self.move_panel_to_tabs(panel_name, root, path, target_ix, cx)
+    }
+
+    /// Return whether a stable panel name has the configured pinned-leading role.
+    fn is_pinned_panel(&self, panel_name: &str) -> bool {
+        self.pinned_leading_panels
+            .iter()
+            .any(|name| name.as_ref() == panel_name)
+    }
+
+    /// Count the leading pinned tabs at one target node for insertion clamping.
+    fn pinned_count_at(&self, root: DockRoot, path: &[usize], cx: &App) -> usize {
+        let Some(DockItem::Tabs { items, .. }) = self
+            .root_item(root)
+            .and_then(|item| Self::item_at_path(item, path))
+        else {
+            return 0;
+        };
+        items
+            .iter()
+            .take_while(|panel| self.is_pinned_panel(panel.panel_name(cx).as_ref()))
+            .count()
+    }
+
+    /// Return whether a target subtree contains any configured pinned-leading panel.
+    ///
+    /// Args:
+    ///     root: Dock root containing the prospective split target.
+    ///     path: Split-only path to the target subtree.
+    ///     cx: Application context used to resolve stable panel names.
+    ///
+    /// Returns:
+    ///     `true` when a pinned panel would be displaced by a leading split insertion.
+    fn target_contains_pinned_panel(&self, root: DockRoot, path: &[usize], cx: &App) -> bool {
+        let Some(item) = self
+            .root_item(root)
+            .and_then(|item| Self::item_at_path(item, path))
+        else {
+            return false;
+        };
+        self.pinned_leading_panels
+            .iter()
+            .any(|name| item.find_panel_named(name.as_ref(), cx).is_some())
+    }
+
+    /// Apply a user split drop without letting an operational panel precede a pinned subtree.
+    ///
+    /// Args:
+    ///     panel_name: Stable name of the dragged panel.
+    ///     root: Dock root containing the target subtree.
+    ///     path: Split-only path to the target subtree.
+    ///     placement: Requested edge placement around that subtree.
+    ///     cx: Application context used for panel lookup and topology mutation.
+    ///
+    /// Returns:
+    ///     Whether the live topology changed.
+    fn move_panel_to_split_from_user(
+        &mut self,
+        panel_name: &str,
+        root: DockRoot,
+        path: &[usize],
+        placement: DockSplitPlacement,
+        cx: &App,
+    ) -> bool {
+        if !self.layout_editable
+            || self.is_pinned_panel(panel_name)
+            || (placement == DockSplitPlacement::Left
+                && self.target_contains_pinned_panel(root, path, cx))
+        {
+            return false;
+        }
+        self.move_panel_to_split(panel_name, root, path, placement, cx)
     }
 
     fn split_item_with_panel(
@@ -2706,12 +4438,16 @@ impl DockArea {
         self.tile_drag_start = None;
     }
 
+    /// Apply one user tile drag while layout editing remains enabled.
     fn on_tile_drag_move(
         &mut self,
         event: &DragMoveEvent<DockTileDrag>,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if !self.layout_editable {
+            return;
+        }
         let drag = event.drag(cx);
         if drag.dock_id != cx.entity_id() {
             return;
@@ -2755,6 +4491,7 @@ impl DockArea {
         }
     }
 
+    /// Render one directional drop zone with a stale-event editability guard.
     fn split_drop_zone(
         &self,
         id: SharedString,
@@ -2813,7 +4550,13 @@ impl DockArea {
                 return;
             }
             _ = dock.update(cx, |dock, cx| {
-                if dock.move_panel_to_split(drag.panel_name.as_ref(), root, &path, placement, cx) {
+                if dock.move_panel_to_split_from_user(
+                    drag.panel_name.as_ref(),
+                    root,
+                    &path,
+                    placement,
+                    cx,
+                ) {
                     cx.emit(DockEvent::LayoutChanged);
                     cx.notify();
                 }
@@ -2823,6 +4566,7 @@ impl DockArea {
         zone.into_any_element()
     }
 
+    /// Add user split targets only when both split drops and layout editing are enabled.
     fn add_split_drop_zones(
         &self,
         mut host: Div,
@@ -2834,7 +4578,7 @@ impl DockArea {
     ) -> Div {
         // Slot accepts split drops only if it is itself splittable (a bottom dock panel),
         // so a chart/detect slot never gets split zones.
-        if !self.enable_split_drop || !target_splittable {
+        if !self.layout_editable || !self.enable_split_drop || !target_splittable {
             return host;
         }
         host = host
@@ -2990,12 +4734,16 @@ impl DockArea {
         true
     }
 
+    /// Apply one user resize drag while layout editing remains enabled.
     fn on_resize_drag_move(
         &mut self,
         event: &DragMoveEvent<DockResizeDrag>,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if !self.layout_editable {
+            return;
+        }
         let drag = event.drag(cx);
         if drag.dock_id != cx.entity_id() {
             return;
@@ -3018,6 +4766,7 @@ impl DockArea {
         }
     }
 
+    /// Render one topology node with edit affordances controlled by `layout_editable`.
     fn render_item(
         &self,
         id: SharedString,
@@ -3042,6 +4791,10 @@ impl DockArea {
                         .dock_context(cx.entity().downgrade(), root, path.clone())
                         .show_header(want_header)
                         .show_panel_controls(want_header)
+                        .layout_editable(self.layout_editable)
+                        .detach_allowed(self.detach_allowed)
+                        .close_allowed(self.close_allowed)
+                        .pinned_leading_panels(self.pinned_leading_panels.clone())
                         .background_policy(self.tab_background_policy)
                         .content_background_policy(
                             self.content_background_policy
@@ -3058,6 +4811,10 @@ impl DockArea {
                     TabPanel::new(id, items.clone())
                         .dock_context(cx.entity().downgrade(), root, path.clone())
                         .active_index(*active_ix)
+                        .layout_editable(self.layout_editable)
+                        .detach_allowed(self.detach_allowed)
+                        .close_allowed(self.close_allowed)
+                        .pinned_leading_panels(self.pinned_leading_panels.clone())
                         .background_policy(self.tab_background_policy)
                         .when_some(self.content_background_policy, |this, policy| {
                             this.content_background_policy(policy)
@@ -3172,6 +4929,10 @@ impl DockArea {
                                 tile_path.push(ix);
                                 tile_path
                             })
+                            .layout_editable(self.layout_editable)
+                            .detach_allowed(self.detach_allowed)
+                            .close_allowed(self.close_allowed)
+                            .pinned_leading_panels(self.pinned_leading_panels.clone())
                             .background_policy(MoonBackgroundPolicy::NoFill)
                             .content_background_policy(panel.background_policy(cx)),
                         )
@@ -3180,6 +4941,7 @@ impl DockArea {
                                 .id(ElementId::from(SharedString::from(format!(
                                     "{id_text}:tile-move:{ix}"
                                 ))))
+                                .when(!self.layout_editable, |handle| handle.invisible())
                                 .absolute()
                                 .left(px(0.0))
                                 .top(px(0.0))
@@ -3213,6 +4975,7 @@ impl DockArea {
                                 .id(ElementId::from(SharedString::from(format!(
                                     "{id_text}:tile-resize-r:{ix}"
                                 ))))
+                                .when(!self.layout_editable, |handle| handle.invisible())
                                 .absolute()
                                 .right(px(0.0))
                                 .top(px(22.0))
@@ -3246,6 +5009,7 @@ impl DockArea {
                                 .id(ElementId::from(SharedString::from(format!(
                                     "{id_text}:tile-resize-b:{ix}"
                                 ))))
+                                .when(!self.layout_editable, |handle| handle.invisible())
                                 .absolute()
                                 .left(px(0.0))
                                 .right(px(10.0))
@@ -3279,6 +5043,7 @@ impl DockArea {
                                 .id(ElementId::from(SharedString::from(format!(
                                     "{id_text}:tile-resize-corner:{ix}"
                                 ))))
+                                .when(!self.layout_editable, |handle| handle.invisible())
                                 .absolute()
                                 .right(px(0.0))
                                 .bottom(px(0.0))
@@ -3415,6 +5180,7 @@ impl DockArea {
 }
 
 impl Render for DockArea {
+    /// Render the live dock, retaining tab activation even when structural editing is locked.
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let dock = cx.entity();
@@ -3448,6 +5214,10 @@ impl Render for DockArea {
                         vec![panel.clone()],
                     )
                     .dock_context(cx.entity().downgrade(), DockRoot::Center, Vec::new())
+                    .layout_editable(self.layout_editable)
+                    .detach_allowed(self.detach_allowed)
+                    .close_allowed(self.close_allowed)
+                    .pinned_leading_panels(self.pinned_leading_panels.clone())
                     .background_policy(self.tab_background_policy)
                     .content_background_policy(
                         self.content_background_policy

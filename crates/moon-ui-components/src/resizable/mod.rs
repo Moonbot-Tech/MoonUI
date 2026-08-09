@@ -86,6 +86,40 @@ impl ResizableState {
         self.done_resizing(cx);
     }
 
+    /// Programmatically synchronize one panel size without emitting a user-resize event.
+    ///
+    /// This uses the same range and sibling redistribution as [`Self::resize_panel`], but leaves
+    /// preference subscribers untouched. Use it when a view is applying an already-authoritative
+    /// value or fitting that value to one window rather than accepting a new user preference.
+    ///
+    /// Args:
+    ///     ix: Panel index to resize.
+    ///     size: Requested rendered size.
+    ///     window: Owning window required by the shared resize implementation.
+    ///     cx: State context used to repaint the resized group.
+    ///
+    /// Returns:
+    ///     Nothing; invalid indices remain no-ops.
+    pub fn resize_panel_silently(
+        &mut self,
+        ix: usize,
+        size: Pixels,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if ix >= self.sizes.len() {
+            return;
+        }
+        if ix + 1 < self.sizes.len() {
+            self.resize_panel_at_handle(ix, size, window, cx);
+        } else if ix > 0 {
+            let delta = self.sizes[ix] - size;
+            let prev = self.sizes[ix - 1];
+            self.resize_panel_at_handle(ix - 1, prev + delta, window, cx);
+        }
+        self.resizing_panel_ix = None;
+    }
+
     pub(crate) fn insert_panel(
         &mut self,
         size: Option<Pixels>,
