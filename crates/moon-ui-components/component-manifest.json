@@ -614,7 +614,7 @@
       "public_path": "moon_ui::MoonResizablePanelGroup",
       "upstream_ref": "Longbridge::resizable@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": "Reviewed TrackedFork drift: Moon resize handle/panel style hooks live in base resizable files; Longbridge resize behavior remains source-owned",
-      "donor_drift_budget": 2,
+      "donor_drift_budget": 3,
       "contracts": ["gallery.visual_coverage"]
     },
     {

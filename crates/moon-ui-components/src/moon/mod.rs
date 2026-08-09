@@ -113,6 +113,7 @@ pub use dock::{
     DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, DockSplitPlacement, MoonDockPanel,
     Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel,
 };
+pub use dock::{DockNamedLayout, DockTopologyByName, DockTopologyNode, DockTopologySide};
 pub(crate) use dropdown::{MENU_CHECK_WIDTH, menu_row_metrics};
 pub use dropdown::{MoonDropdown, MoonMenuItem, MoonMenuSize, MoonPopupMenu};
 pub use form::MoonFormRow;

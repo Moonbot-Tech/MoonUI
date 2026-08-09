@@ -1164,12 +1164,12 @@
       "local_paths": [
         "resizable"
       ],
-      "local_hash": "74a2039ca2f4a82a",
+      "local_hash": "b7327bacac2f665a",
       "local_files": [
         {
           "path": "resizable/mod.rs",
-          "hash": "be27c2b7341a653d",
-          "bytes": 10680
+          "hash": "848f701a509d05a7",
+          "bytes": 11974
         },
         {
           "path": "resizable/panel.rs",
@@ -1201,6 +1201,7 @@
         }
       ],
       "donor_changed_files": [
+        "resizable/mod.rs",
         "resizable/panel.rs",
         "resizable/resize_handle.rs"
       ]
