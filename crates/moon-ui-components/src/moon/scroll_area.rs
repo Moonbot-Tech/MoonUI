@@ -166,7 +166,12 @@ pub fn moon_scrollbar_overlay_with_palette(
     let max = scroll_handle.max_offset();
     let offset = scroll_handle.offset();
     let tokens = MoonTheme::active_tokens(cx);
-    let track = rgba_from(p.panel_high, 0.34);
+    // The track fades with its OWN thumb, per axis. Painting it at a fixed alpha made `Hover` and
+    // `Scrolling` misreport themselves: the thumb faded out on schedule while the track stayed, so
+    // any scrollable surface kept a permanent stripe down its edge. It reads as background on a
+    // surface whose colour happens to be close and as a seam on one that is not, which is the same
+    // bug either way. `alpha_for` already returns 1.0 under `Always`, so that mode is unchanged.
+    let track_alpha = |alpha: f32| rgba_from(p.panel_high, 0.34 * alpha);
     let state = window.use_keyed_state(
         ElementId::from(SharedString::from(format!("{id}:state"))),
         cx,
@@ -215,7 +220,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .top(px(0.0))
                 .bottom(px(0.0))
                 .w(px(tokens.ui(8.0)))
-                .bg(track)
+                .bg(track_alpha(runtime.vertical_alpha))
                 .cursor(CursorStyle::Arrow)
                 .on_hover(move |hovered, _window, cx| {
                     state_for_track_hover.update(cx, |state, cx| {
@@ -358,7 +363,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .right(px(0.0))
                 .bottom(px(0.0))
                 .h(px(tokens.ui(8.0)))
-                .bg(track)
+                .bg(track_alpha(runtime.horizontal_alpha))
                 .cursor(CursorStyle::Arrow)
                 .on_hover(move |hovered, _window, cx| {
                     state_for_track_hover.update(cx, |state, cx| {
