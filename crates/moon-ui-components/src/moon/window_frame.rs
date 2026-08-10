@@ -481,7 +481,13 @@ fn vline(height: f32, color: u32) -> impl IntoElement {
 fn drag_region_div() -> Div {
     div()
         .window_control_area(WindowControlArea::Drag)
-        .on_mouse_down(MouseButton::Left, |event, window, _cx| {
+        .on_mouse_down(MouseButton::Left, |event, window, cx| {
+            // The window chrome stacks two drag regions — the absolute hit overlay over the visual
+            // title cluster, both built from this helper — so a single press is delivered to this
+            // handler twice. Left unconsumed, a double-click then invokes the titlebar action twice
+            // (zoom, then immediately un-zoom), so the gesture appears to do nothing. Consuming the
+            // press collapses the duplicate delivery, and drag/double-click each fire exactly once.
+            cx.stop_propagation();
             if event.click_count >= 2 {
                 window.titlebar_double_click();
             } else {
