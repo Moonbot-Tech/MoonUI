@@ -120,6 +120,11 @@
       "file": "crates/moon-ui-components/src/moon/root.rs",
       "signature": "pub type MoonRoot = crate::Root;",
       "reason": "MoonRoot is now the real root type; Root remains only as a backward-compatible alias."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn header(mut self, header: impl IntoElement) -> Self",
+      "reason": "MoonPopupMenu::header now takes its height as a first argument, header(height_ui, element). A pinned header is held outside the scrolling rows, so its height must come out of the row list's budget, and the virtualized list is sized in pixels before its siblings are laid out and cannot measure it. Pairing the height with the element makes the declaration unavoidable: the one-argument form left the height at zero, which pinned the header to zero height and rendered it invisible."
     }
   ]
 }

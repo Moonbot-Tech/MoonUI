@@ -1363,7 +1363,11 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
-      "signature": "pub fn header(mut self, header: impl IntoElement) -> Self"
+      "signature": "pub fn header( mut self, height_ui: f32, header: impl Fn(&mut Window, &mut App) -> AnyElement + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn header(mut self, height_ui: f32, header: impl IntoElement) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
