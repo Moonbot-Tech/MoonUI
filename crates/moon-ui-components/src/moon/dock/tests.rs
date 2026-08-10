@@ -1,10 +1,15 @@
 //! Regression coverage for dock panel contracts and structural moves.
 
-use std::{cell::Cell, collections::HashMap, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
 use gpui::{
-    AppContext as _, Bounds, Context, EventEmitter, IntoElement as _, Modifiers, SharedString,
-    VisualTestContext, WeakEntity, Window, div, point, px, size,
+    AppContext as _, Bounds, Context, Entity, EventEmitter, IntoElement as _, Modifiers,
+    ParentElement as _, SharedString, Styled as _, VisualTestContext, WeakEntity, Window, div,
+    point, px, size,
 };
 
 use super::{
@@ -33,6 +38,22 @@ impl gpui::Render for DockTestHarness {
         _cx: &mut gpui::Context<Self>,
     ) -> impl gpui::IntoElement {
         div()
+    }
+}
+
+/// Render host that exposes a live dock to pointer-driven activation tests.
+struct DockEntityHarness {
+    dock: Entity<DockArea>,
+}
+
+impl gpui::Render for DockEntityHarness {
+    /// Render the configured dock across the full test window.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        div().size_full().child(self.dock.clone())
     }
 }
 
@@ -204,6 +225,61 @@ fn standalone_tab_panel_keeps_user_selection_across_renders(cx: &mut gpui::TestA
         calls_after_click,
         "an unrelated render must not reset or reannounce the standalone selection"
     );
+}
+
+/// Catches removing `DockEvent::PanelActivated` from `dock.rs:TabPanel`'s tab click, which would
+/// leave the host's persisted Auto tab unchanged after the operator selects another surface.
+#[gpui::test]
+fn dock_tab_click_emits_the_exact_activated_panel_name(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let activations = Rc::new(RefCell::new(Vec::new()));
+    let dock_slot = Rc::new(RefCell::new(None));
+    let window = cx.add_window({
+        let activations = activations.clone();
+        let dock_slot = dock_slot.clone();
+        move |window, cx| {
+            let dock = cx.new(|cx| DockArea::new("click-dock", None, window, cx));
+            dock.update(cx, |dock, cx| {
+                dock.set_center(
+                    DockItem::Tabs {
+                        items: vec![panel("report"), panel("chart")],
+                        active_ix: 0,
+                    },
+                    window,
+                    cx,
+                );
+            });
+            cx.subscribe(&dock, move |_, _, event: &DockEvent, _| {
+                if let DockEvent::PanelActivated { panel_name } = event {
+                    activations.borrow_mut().push(panel_name.to_string());
+                }
+            })
+            .detach();
+            *dock_slot.borrow_mut() = Some(dock.clone());
+            DockEntityHarness { dock }
+        }
+    });
+    let dock = dock_slot
+        .borrow()
+        .clone()
+        .expect("the test window must construct its dock");
+    let mut visual = VisualTestContext::from_window(window.into(), cx);
+    visual.update(|window, _| window.refresh());
+    visual.run_until_parked();
+
+    let chart_tab = visual
+        .debug_bounds("click-dock:center:tab-host:1")
+        .expect("the second dock tab must expose rendered bounds");
+    visual.simulate_click(chart_tab.center(), Modifiers::default());
+    visual.run_until_parked();
+
+    assert_eq!(activations.borrow().as_slice(), ["chart"]);
+    visual.update(|_, cx| {
+        let DockItem::Tabs { active_ix, .. } = &dock.read(cx).center else {
+            panic!("the click test must retain its tab group");
+        };
+        assert_eq!(*active_ix, 1);
+    });
 }
 
 /// Catches leaving `dock.rs:DockItem::with_panel_added` as a single panel, which would discard
@@ -404,6 +480,201 @@ fn named_layout_reuses_instances_and_drops_auto_only_panels(cx: &mut gpui::TestA
         assert_eq!(orders_probe.zoom_calls.get(), 0);
     })
     .unwrap();
+}
+
+/// Catches changing `dock.rs:DockArea::take_panel_by_name` to stop at one root, return a rebuilt
+/// panel, or repeat lifecycle callbacks for duplicate occurrences; any of those edits would leak
+/// a Classic-only panel into Auto or discard its retained local state.
+#[gpui::test]
+fn take_panel_removes_all_roots_and_restores_the_canonical_rc_once(cx: &mut gpui::TestAppContext) {
+    let window = cx.add_window(|_, _| DockTestHarness);
+    let layout_events = Rc::new(Cell::new(0));
+    let (dock, snapshot, canonical, canonical_probe, duplicate_probe, bottom_probe) = cx
+        .update_window(window.into(), {
+            let layout_events = layout_events.clone();
+            move |_, window, cx| {
+                let canonical_probe = Rc::new(PanelProbe::default());
+                let duplicate_probe = Rc::new(PanelProbe::default());
+                let bottom_probe = Rc::new(PanelProbe::default());
+                let canonical = tracking_panel("news", canonical_probe.clone(), cx);
+                let duplicate = tracking_panel("news", duplicate_probe.clone(), cx);
+                let bottom_duplicate = tracking_panel("news", bottom_probe.clone(), cx);
+                canonical.set_active(true, window, cx);
+                duplicate.set_active(true, window, cx);
+                bottom_duplicate.set_active(true, window, cx);
+                canonical.set_zoomed(true, window, cx);
+
+                let dock = cx.new(|_| {
+                    let mut dock = DockArea::test_with_center(DockItem::Tabs {
+                        items: vec![canonical.clone(), canonical.clone(), panel("center-other")],
+                        active_ix: 0,
+                    });
+                    dock.left = Some((DockItem::Panel(duplicate.clone()), 160.0, true));
+                    dock.right = Some((
+                        DockItem::Tabs {
+                            items: vec![duplicate, panel("right-other")],
+                            active_ix: 0,
+                        },
+                        170.0,
+                        true,
+                    ));
+                    dock.bottom = Some((DockItem::Panel(bottom_duplicate), 180.0, true));
+                    dock.zoomed_panel = Some("news".into());
+                    dock
+                });
+                let snapshot = dock.read(cx).named_layout(cx);
+                cx.subscribe(&dock, move |_, event: &DockEvent, _| {
+                    if matches!(event, DockEvent::LayoutChanged) {
+                        layout_events.set(layout_events.get() + 1);
+                    }
+                })
+                .detach();
+                (
+                    dock,
+                    snapshot,
+                    canonical,
+                    canonical_probe,
+                    duplicate_probe,
+                    bottom_probe,
+                )
+            }
+        })
+        .unwrap();
+
+    let taken = cx
+        .update_window(window.into(), |_, window, cx| {
+            dock.update(cx, |dock, cx| {
+                dock.take_panel_by_name("news", window, cx)
+                    .expect("the canonical News identity must be returned")
+            })
+        })
+        .unwrap();
+    cx.run_until_parked();
+
+    assert!(Rc::ptr_eq(&taken, &canonical));
+    assert_eq!(layout_events.get(), 1);
+    for probe in [&canonical_probe, &duplicate_probe, &bottom_probe] {
+        assert!(!probe.active.get());
+        assert_eq!(probe.active_calls.get(), 2);
+        assert_eq!(probe.removed_calls.get(), 1);
+    }
+    assert!(!canonical_probe.zoomed.get());
+    assert_eq!(canonical_probe.zoom_calls.get(), 2);
+    assert!(!canonical_probe.removed_while_zoomed.get());
+    cx.update(|cx| {
+        assert!(dock.read(cx).find_panel_named("news", cx).is_none());
+        assert!(
+            !dock
+                .read(cx)
+                .topology_by_name(cx)
+                .panel_names()
+                .iter()
+                .any(|name| name == "news")
+        );
+    });
+
+    cx.update_window(window.into(), |_, window, cx| {
+        dock.update(cx, |dock, cx| {
+            assert!(dock.apply_named_layout(&snapshot, vec![taken.clone()], window, cx));
+        });
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let restored = dock
+            .read(cx)
+            .find_panel_named("news", cx)
+            .expect("the saved layout must restore News");
+        assert!(Rc::ptr_eq(&restored, &canonical));
+        assert_eq!(canonical_probe.added_calls.get(), 1);
+        assert_eq!(canonical_probe.removed_calls.get(), 1);
+        assert_eq!(duplicate_probe.added_calls.get(), 0);
+        assert_eq!(bottom_probe.added_calls.get(), 0);
+    });
+}
+
+/// Catches deduplicating lifecycle callbacks or stopping at one root in
+/// `dock.rs:DockArea::remove_panel_by_name`, which would leave matching dock occurrences or their
+/// existing per-occurrence host cleanup behind after a destructive removal.
+#[gpui::test]
+fn remove_panel_clears_all_roots_and_preserves_occurrence_lifecycle(cx: &mut gpui::TestAppContext) {
+    let window = cx.add_window(|_, _| DockTestHarness);
+    let layout_events = Rc::new(Cell::new(0));
+    let (dock, canonical_probe, duplicate_probe, bottom_probe) = cx
+        .update_window(window.into(), {
+            let layout_events = layout_events.clone();
+            move |_, window, cx| {
+                let canonical_probe = Rc::new(PanelProbe::default());
+                let duplicate_probe = Rc::new(PanelProbe::default());
+                let bottom_probe = Rc::new(PanelProbe::default());
+                let canonical = tracking_panel("news", canonical_probe.clone(), cx);
+                let duplicate = tracking_panel("news", duplicate_probe.clone(), cx);
+                let bottom_duplicate = tracking_panel("news", bottom_probe.clone(), cx);
+                canonical.set_active(true, window, cx);
+                duplicate.set_active(true, window, cx);
+                bottom_duplicate.set_active(true, window, cx);
+                canonical.set_zoomed(true, window, cx);
+
+                let dock = cx.new(|_| {
+                    let mut dock = DockArea::test_with_center(DockItem::Tabs {
+                        items: vec![canonical.clone(), canonical, panel("center-other")],
+                        active_ix: 0,
+                    });
+                    dock.left = Some((DockItem::Panel(duplicate.clone()), 160.0, true));
+                    dock.right = Some((
+                        DockItem::Tabs {
+                            items: vec![duplicate, panel("right-other")],
+                            active_ix: 0,
+                        },
+                        170.0,
+                        true,
+                    ));
+                    dock.bottom = Some((DockItem::Panel(bottom_duplicate), 180.0, true));
+                    dock.zoomed_panel = Some("news".into());
+                    dock
+                });
+                cx.subscribe(&dock, move |_, event: &DockEvent, _| {
+                    if matches!(event, DockEvent::LayoutChanged) {
+                        layout_events.set(layout_events.get() + 1);
+                    }
+                })
+                .detach();
+                (dock, canonical_probe, duplicate_probe, bottom_probe)
+            }
+        })
+        .unwrap();
+
+    cx.update_window(window.into(), |_, window, cx| {
+        dock.update(cx, |dock, cx| {
+            assert!(dock.remove_panel_by_name("news", window, cx));
+        });
+    })
+    .unwrap();
+    cx.run_until_parked();
+
+    assert_eq!(layout_events.get(), 1);
+    assert_eq!(canonical_probe.removed_calls.get(), 2);
+    assert_eq!(duplicate_probe.removed_calls.get(), 2);
+    assert_eq!(bottom_probe.removed_calls.get(), 1);
+    for probe in [&canonical_probe, &duplicate_probe, &bottom_probe] {
+        assert!(probe.active.get());
+        assert_eq!(probe.active_calls.get(), 1);
+    }
+    assert!(canonical_probe.zoomed.get());
+    assert_eq!(canonical_probe.zoom_calls.get(), 1);
+    assert!(canonical_probe.removed_while_zoomed.get());
+    cx.update(|cx| {
+        assert!(dock.read(cx).zoomed_panel.is_none());
+        assert!(dock.read(cx).find_panel_named("news", cx).is_none());
+        assert!(
+            !dock
+                .read(cx)
+                .topology_by_name(cx)
+                .panel_names()
+                .iter()
+                .any(|name| name == "news")
+        );
+    });
 }
 
 /// Catches moving `dock.rs:install_resolved_layout`'s zoom reset below `Panel::on_removed`, which
@@ -804,6 +1075,93 @@ fn activating_named_panel_updates_tree_runtime_and_panel_state(cx: &mut gpui::Te
     .unwrap();
 }
 
+/// Catches omitting or reordering `DockEvent::PanelActivated` in named activation or user move
+/// wrappers, which would persist the wrong Auto tab before the accompanying layout update after a
+/// programmatic reveal, reorder, cross-group drop, or split transfer.
+#[gpui::test]
+fn activation_paths_emit_the_exact_stable_panel_name(cx: &mut gpui::TestAppContext) {
+    let window = cx.add_window(|_, _| DockTestHarness);
+    let event_order = Rc::new(RefCell::new(Vec::new()));
+    let dock = cx
+        .update_window(window.into(), {
+            let event_order = event_order.clone();
+            move |_, _window, cx| {
+                let dock = cx.new(|_| {
+                    DockArea::test_with_center(DockItem::Split {
+                        horizontal: true,
+                        items: vec![
+                            DockItem::Tabs {
+                                items: vec![
+                                    panel("programmatic"),
+                                    panel("reordered"),
+                                    panel("transferred"),
+                                    panel("split"),
+                                ],
+                                active_ix: 0,
+                            },
+                            DockItem::Tabs {
+                                items: vec![panel("target-a"), panel("target-b")],
+                                active_ix: 0,
+                            },
+                        ],
+                        sizes: Vec::new(),
+                    })
+                });
+                cx.subscribe(&dock, move |_, event: &DockEvent, _| match event {
+                    DockEvent::PanelActivated { panel_name } => {
+                        event_order
+                            .borrow_mut()
+                            .push(format!("activated:{panel_name}"));
+                    }
+                    DockEvent::LayoutChanged => event_order.borrow_mut().push("layout".to_string()),
+                    DockEvent::DetachRequested { .. }
+                    | DockEvent::PanelCloseRequested { .. }
+                    | DockEvent::TabContextMenu { .. } => {}
+                })
+                .detach();
+                dock
+            }
+        })
+        .unwrap();
+
+    cx.update_window(window.into(), |_, window, cx| {
+        dock.update(cx, |dock, cx| {
+            assert!(dock.activate_panel_by_name("reordered", window, cx));
+            assert!(dock.move_tab_before_from_user(DockRoot::Center, &[0], "programmatic", 2, cx,));
+            assert!(dock.move_panel_to_tabs_from_user(
+                "transferred",
+                DockRoot::Center,
+                &[1],
+                1,
+                cx,
+            ));
+            assert!(dock.move_panel_to_split_from_user(
+                "split",
+                DockRoot::Center,
+                &[1],
+                DockSplitPlacement::Right,
+                cx,
+            ));
+        });
+    })
+    .unwrap();
+    cx.run_until_parked();
+
+    assert_eq!(
+        event_order.borrow().as_slice(),
+        [
+            "activated:reordered",
+            "layout",
+            "activated:programmatic",
+            "layout",
+            "activated:transferred",
+            "layout",
+            "activated:split",
+            "layout",
+        ]
+    );
+}
+
 /// Catches coupling `dock.rs:DockArea::set_detach_allowed` back to structural editing, which would
 /// either allow Auto panels to escape into windows or disable reorder and close at the same time.
 #[gpui::test]
@@ -829,7 +1187,9 @@ fn disabled_detach_keeps_tab_reorder_close_and_activation_enabled(cx: &mut gpui:
                     DockEvent::PanelCloseRequested { .. } => {
                         close_events.set(close_events.get() + 1)
                     }
-                    DockEvent::LayoutChanged | DockEvent::TabContextMenu { .. } => {}
+                    DockEvent::LayoutChanged
+                    | DockEvent::PanelActivated { .. }
+                    | DockEvent::TabContextMenu { .. } => {}
                 })
                 .detach();
                 dock
@@ -958,46 +1318,50 @@ fn pinned_subtree_rejects_leading_split_but_accepts_trailing_split(cx: &mut gpui
     cx.update_window(window.into(), |_, _window, cx| {
         let chart = panel("chart");
         let report = panel("report");
-        let mut dock = DockArea::test_with_center(DockItem::Tabs {
-            items: vec![chart, report],
-            active_ix: 0,
+        let dock = cx.new(|_| {
+            let mut dock = DockArea::test_with_center(DockItem::Tabs {
+                items: vec![chart, report],
+                active_ix: 0,
+            });
+            dock.pinned_leading_panels = vec!["chart".into()];
+            dock
         });
-        dock.pinned_leading_panels = vec!["chart".into()];
+        dock.update(cx, |dock, cx| {
+            assert!(!dock.move_panel_to_split_from_user(
+                "report",
+                DockRoot::Center,
+                &[],
+                DockSplitPlacement::Left,
+                cx,
+            ));
+            let DockItem::Tabs { items, .. } = &dock.center else {
+                panic!("rejected leading split must preserve the original tab group");
+            };
+            assert_eq!(
+                items
+                    .iter()
+                    .map(|panel| panel.panel_name(cx).to_string())
+                    .collect::<Vec<_>>(),
+                vec!["chart", "report"]
+            );
 
-        assert!(!dock.move_panel_to_split_from_user(
-            "report",
-            DockRoot::Center,
-            &[],
-            DockSplitPlacement::Left,
-            cx,
-        ));
-        let DockItem::Tabs { items, .. } = &dock.center else {
-            panic!("rejected leading split must preserve the original tab group");
-        };
-        assert_eq!(
-            items
-                .iter()
-                .map(|panel| panel.panel_name(cx).to_string())
-                .collect::<Vec<_>>(),
-            vec!["chart", "report"]
-        );
-
-        assert!(dock.move_panel_to_split_from_user(
-            "report",
-            DockRoot::Center,
-            &[],
-            DockSplitPlacement::Right,
-            cx,
-        ));
-        let DockItem::Split {
-            horizontal, items, ..
-        } = &dock.center
-        else {
-            panic!("trailing split must remain available");
-        };
-        assert!(*horizontal);
-        assert!(items[0].find_panel_named("chart", cx).is_some());
-        assert!(items[1].find_panel_named("report", cx).is_some());
+            assert!(dock.move_panel_to_split_from_user(
+                "report",
+                DockRoot::Center,
+                &[],
+                DockSplitPlacement::Right,
+                cx,
+            ));
+            let DockItem::Split {
+                horizontal, items, ..
+            } = &dock.center
+            else {
+                panic!("trailing split must remain available");
+            };
+            assert!(*horizontal);
+            assert!(items[0].find_panel_named("chart", cx).is_some());
+            assert!(items[1].find_panel_named("report", cx).is_some());
+        });
     })
     .unwrap();
 }

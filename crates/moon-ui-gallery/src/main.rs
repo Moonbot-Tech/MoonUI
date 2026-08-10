@@ -2932,6 +2932,9 @@ impl Gallery {
                 let _ = dock;
                 this.push_event("Dock layout changed", cx);
             }
+            DockEvent::PanelActivated { panel_name } => {
+                this.push_event(format!("Dock panel activated: {panel_name}"), cx);
+            }
             DockEvent::DetachRequested { panel_name } => {
                 this.pending_detach.push(panel_name.clone());
                 this.push_event(format!("Dock detach requested: {panel_name}"), cx);
