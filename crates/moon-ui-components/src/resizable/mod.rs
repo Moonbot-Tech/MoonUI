@@ -55,6 +55,18 @@ impl ResizableState {
         &self.sizes
     }
 
+    /// Whether a handle is being dragged right now.
+    ///
+    /// A consumer that also drives these panels from its own stored preference must check this
+    /// before pushing a size in: [`Self::resize_panel_silently`] clears the in-flight drag as part
+    /// of applying its size, so a periodic "reconcile to the saved width" tick that fires mid-drag
+    /// both yanks the panel back and leaves the pointer dragging nothing. The panel's own
+    /// `.size(..)` builder is safe at any time — stored panel sizes take priority over it — so this
+    /// guard is only needed around the explicit resize calls.
+    pub fn is_resizing(&self) -> bool {
+        self.resizing_panel_ix.is_some()
+    }
+
     /// Programmatically resize the panel at `ix` to `size`, redistributing
     /// space among siblings using the same logic as a drag.
     ///
