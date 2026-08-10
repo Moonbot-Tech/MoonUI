@@ -481,18 +481,28 @@ fn vline(height: f32, color: u32) -> impl IntoElement {
 fn drag_region_div() -> Div {
     div()
         .window_control_area(WindowControlArea::Drag)
-        .on_mouse_down(MouseButton::Left, |event, window, cx| {
-            // The window chrome stacks two drag regions — the absolute hit overlay over the visual
-            // title cluster, both built from this helper — so a single press is delivered to this
-            // handler twice. Left unconsumed, a double-click then invokes the titlebar action twice
-            // (zoom, then immediately un-zoom), so the gesture appears to do nothing. Consuming the
-            // press collapses the duplicate delivery, and drag/double-click each fire exactly once.
-            cx.stop_propagation();
-            if event.click_count >= 2 {
-                window.titlebar_double_click();
-            } else {
-                window.start_window_move();
-            }
+        // Windows owns this gesture entirely, so the handler must not exist there — the same reason
+        // the frame buttons above are wired only off Windows. The hit test reports this region as
+        // `HTCAPTION`, so the press arrives as `WM_NCLBUTTONDOWN`/`WM_NCLBUTTONDBLCLK`, and
+        // `moon-gpui-windows` hands those to `DefWindowProc` — which is what moves the window and
+        // toggles maximize — ONLY while the event stays unconsumed. That same fall-through arms the
+        // Close/Min/Max buttons. Consuming the press here therefore killed both, and bought nothing:
+        // `titlebar_double_click` is implemented on macOS alone and is a no-op on Windows.
+        .when(cfg!(not(target_os = "windows")), |this| {
+            this.on_mouse_down(MouseButton::Left, |event, window, cx| {
+                // The window chrome stacks two drag regions — the absolute hit overlay over the
+                // visual title cluster, both built from this helper — so a single press is
+                // delivered to this handler twice. Left unconsumed, a double-click then invokes the
+                // titlebar action twice (zoom, then immediately un-zoom), so the gesture appears to
+                // do nothing. Consuming the press collapses the duplicate delivery, and drag and
+                // double-click each fire exactly once.
+                cx.stop_propagation();
+                if event.click_count >= 2 {
+                    window.titlebar_double_click();
+                } else {
+                    window.start_window_move();
+                }
+            })
         })
 }
 
