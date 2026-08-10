@@ -7,10 +7,11 @@ use super::{
     MENU_PALETTE_PROBE_PREFIX, MenuMetrics, MoonButtonIconSlot, MoonButtonSize, MoonDropdown,
     MoonDropdownSelectPlan, MoonDropdownTriggerWidth, MoonMenuItem, MoonMenuItemKind,
     MoonMenuMaxHeight, MoonMenuSize, MoonMenuWidth, MoonPalette, MoonPopupMenu, MoonRect,
-    MoonThemeTokens, SUBMENU_OFFSET_X, capped_menu_items_height, fit_dropdown_trigger_label,
-    fit_menu_item_labels, menu_measurement_probe_count, moon_dropdown_select_plan,
-    moon_menu_item_accepts_click, natural_menu_width, resolve_menu_width,
-    take_dropdown_handler_probe_count, take_menu_item_clone_probe_count, take_palette_probe_shell,
+    MoonThemeTokens, SUBMENU_OFFSET_X, capped_menu_items_height, clamp_header_budget,
+    fit_dropdown_trigger_label, fit_menu_item_labels, menu_content_max,
+    menu_measurement_probe_count, moon_dropdown_select_plan, moon_menu_item_accepts_click,
+    natural_menu_width, resolve_menu_width, take_dropdown_handler_probe_count,
+    take_menu_item_clone_probe_count, take_palette_probe_shell,
 };
 use crate::moon::{MoonScale, MoonTheme, ThemeMode};
 use gpui::{ParentElement as _, Styled as _};
@@ -1361,5 +1362,333 @@ fn fitted_submenu_resolves_width_from_its_own_items(cx: &mut gpui::TestAppContex
         submenu.origin.y - row.origin.y,
         gpui::px(-tokens.ui(MENU_PADDING)),
         "submenu top overlap must follow UI scale"
+    );
+}
+
+/// `dropdown.rs:menu_width_requirements`'s `Label` arm must reserve its own `right_label` the same
+/// way the `Item` arm does. Resolving `(0.0, 0.0)` for a label row's trailing text instead of
+/// calling `trailing_label_widths` lets a label's trailing count spill past a Scaled/Fit menu's
+/// resolved right edge.
+#[test]
+fn fitted_label_row_accounts_for_right_label_and_its_gap() {
+    let tokens = MoonThemeTokens::default();
+    let metrics = MenuMetrics {
+        row_height: 20.0,
+        font_size: 9.5,
+        line_height: 12.0,
+        radius: 3.0,
+        pad_x: 6.0,
+        gap: 5.0,
+    }
+    .scaled(&tokens);
+    let plain = [MoonMenuItem::label("Exchanges")];
+    let with_right = [MoonMenuItem::label("Exchanges").right_label("42")];
+    let measure = |text: &str, _size: f32, _weight: f32| text.chars().count() as f32;
+
+    let plain_width = natural_menu_width(&plain, metrics, &tokens, measure);
+    let right_width = natural_menu_width(&with_right, metrics, &tokens, measure);
+
+    assert_eq!(
+        right_width - plain_width,
+        "42".chars().count() as f32 + metrics.gap,
+        "a label row's resolved width must grow by exactly its trailing text plus one gap"
+    );
+}
+
+/// `dropdown.rs:menu_content_max` must charge the pinned header's budget straight to the row
+/// list. Dropping the `- header_budget` term lets a virtualized menu with a header size its list
+/// as if the header were absent, so the menu overshoots its own maximum height and the outer
+/// `overflow_hidden` silently clips the last rows.
+#[test]
+fn menu_content_max_charges_the_header_budget_to_the_row_list() {
+    let tokens = MoonThemeTokens::default();
+    let metrics = MenuMetrics {
+        row_height: 24.0,
+        font_size: 10.5,
+        line_height: 13.0,
+        radius: 4.0,
+        pad_x: 7.0,
+        gap: 6.0,
+    }
+    .scaled(&tokens);
+    let outer_max = 400.0;
+    let header_budget = 50.0;
+
+    let without_header = menu_content_max(outer_max, &tokens, 0.0, metrics);
+    let with_header = menu_content_max(outer_max, &tokens, header_budget, metrics);
+
+    assert_eq!(
+        without_header - with_header,
+        header_budget,
+        "a pinned header's declared budget must come straight off the row list's viewport"
+    );
+}
+
+/// `dropdown.rs:clamp_header_budget` must cap a header declared taller than the menu allows so at
+/// least one row still fits beneath it. Returning `declared` unclamped leaves the row list no
+/// space at all and the menu opens as an unusable strip.
+#[test]
+fn clamp_header_budget_leaves_room_for_at_least_one_row() {
+    let chrome = 10.0;
+    let row_height = 24.0;
+    let outer_max = 100.0;
+    // Independent of the clamp under test: the exact declared height that leaves precisely one
+    // row's worth of space once chrome is paid for.
+    let allowed = outer_max - chrome - row_height;
+
+    assert_eq!(
+        clamp_header_budget(allowed, outer_max, chrome, row_height),
+        allowed,
+        "a header declared exactly at the row-preserving limit must pass through unclamped"
+    );
+    assert_eq!(
+        clamp_header_budget(allowed + 1.0, outer_max, chrome, row_height),
+        allowed,
+        "a header declared one unit past the limit must be capped back to it, not left unclamped"
+    );
+}
+
+/// UI-scaled height declared for the pinned header probe below. Chosen far larger than both the
+/// default row height and the probe's own 4px content, so an unenforced wrapper collapses the gap
+/// to the header's real content height instead of the declared value.
+const HEADER_HEIGHT_UI: f32 = 300.0;
+
+/// Open direct popup menu with one pinned header whose own content is far shorter than its
+/// declared height, so the wrapper's enforced `.h(px(height))` is the only thing separating it
+/// from the first row.
+struct HeaderHeightHarness;
+
+impl gpui::Render for HeaderHeightHarness {
+    /// Render the probe menu.
+    ///
+    /// Args:
+    ///     _window: Test window.
+    ///     _cx: Test view context.
+    ///
+    /// Returns:
+    ///     A popup menu with one pinned header and one row.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{InteractiveElement as _, Styled as _};
+
+        MoonPopupMenu::new("header-height-probe")
+            .header(
+                HEADER_HEIGHT_UI,
+                gpui::div()
+                    .debug_selector(|| "header-height-probe:header".into())
+                    .h(gpui::px(4.0))
+                    .w(gpui::px(4.0)),
+            )
+            .item(MoonMenuItem::new("only item"))
+    }
+}
+
+/// Catches removing `.h(px(height))` from the pinned-header wrapper in
+/// `dropdown.rs:MoonPopupMenu::render_with_metrics`. Without it the wrapper shrinks to the
+/// header's own natural content size instead of the height its budget reserved, so an
+/// over-declared header wastes list space and an under-declared one pushes rows past the cap.
+#[gpui::test]
+fn pinned_header_wrapper_enforces_its_declared_height(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    cx.update(|cx| {
+        MoonTheme::global_mut(cx).scale = MoonScale {
+            ui: 1.0,
+            font: 1.0,
+            font_delta: 0.0,
+        };
+    });
+    let window = cx.add_window(|_, _| HeaderHeightHarness);
+    let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    let header = cx
+        .debug_bounds("header-height-probe:header")
+        .expect("pinned header must render");
+    let row = cx
+        .debug_bounds("header-height-probe:item:0")
+        .expect("first row must render");
+
+    let observed_gap = row.origin.y - (header.origin.y + header.size.height);
+
+    assert!(
+        observed_gap >= gpui::px(HEADER_HEIGHT_UI - 4.0),
+        "row started at {:?}, only {:?} below the header's own 4px content; the wrapper must be \
+         pinned to its declared {HEADER_HEIGHT_UI}px height rather than shrinking to the header's \
+         natural size",
+        row.origin,
+        observed_gap
+    );
+}
+
+/// Open a direct popup menu capped well below its eight rows' natural height, with a pinned header,
+/// and deliberately keep it below [`super::VIRTUAL_MENU_ITEM_THRESHOLD`] so it renders through the
+/// eager branch rather than the virtualized `list()`.
+struct EagerCappedHeaderHarness;
+
+impl gpui::Render for EagerCappedHeaderHarness {
+    /// Render the probe menu.
+    ///
+    /// Args:
+    ///     _window: Test window.
+    ///     _cx: Test view context.
+    ///
+    /// Returns:
+    ///     A capped, sub-threshold popup menu with a pinned header.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{InteractiveElement as _, Styled as _};
+
+        MoonPopupMenu::new("eager-capped-header")
+            .max_height(120.0)
+            .header(
+                28.0,
+                gpui::div()
+                    .debug_selector(|| "eager-capped-header:header".into())
+                    .h(gpui::px(28.0))
+                    .w_full(),
+            )
+            .items((0..8).map(|ix| MoonMenuItem::new(format!("Row {ix}"))))
+    }
+}
+
+/// Catches moving `.flex_1()`/`.overflow_y_scroll()` from the row list to the outer menu in
+/// `dropdown.rs:MoonPopupMenu::render_with_metrics`'s capped eager branch. Without its own scroll
+/// region, a sub-threshold row list cannot reveal rows past the cap while keeping its header pinned.
+#[gpui::test]
+fn eager_capped_menu_scrolls_its_rows_independently_of_the_pinned_header(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(crate::init);
+    let window = cx.add_window(|_, _| EagerCappedHeaderHarness);
+    let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    let header_before = cx
+        .debug_bounds("eager-capped-header:header")
+        .expect("pinned header must render");
+    let row0_before = cx
+        .debug_bounds("eager-capped-header:item:0")
+        .expect("first row must render");
+
+    cx.simulate_event(gpui::ScrollWheelEvent {
+        position: row0_before.center(),
+        delta: gpui::ScrollDelta::Pixels(gpui::point(gpui::px(0.0), gpui::px(-400.0))),
+        ..Default::default()
+    });
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+
+    let header_after = cx
+        .debug_bounds("eager-capped-header:header")
+        .expect("pinned header must remain rendered after scrolling the row list");
+    let row0_after = cx
+        .debug_bounds("eager-capped-header:item:0")
+        .expect("scrolled row list must keep rendering its rows");
+
+    assert_eq!(
+        header_after.origin.y, header_before.origin.y,
+        "the pinned header must not move when the row list scrolls"
+    );
+    assert_ne!(
+        row0_after.origin.y, row0_before.origin.y,
+        "the eager capped branch must let its own row list scroll, not sit inert with the whole \
+         menu clipped from outside"
+    );
+}
+
+/// UI-scaled height declared for the pinned header probe below, deliberately far larger than the
+/// capped menu's own maximum so `clamp_header_budget`'s scale must engage (< 1.0) rather than
+/// resolve to a no-op.
+const OVERSIZED_HEADER_HEIGHT_UI: f32 = 200.0;
+/// Outer cap declared for the same probe menu, small enough that the oversized header alone
+/// already exceeds it.
+const HEADER_CLAMP_MENU_MAX_HEIGHT: f32 = 100.0;
+
+/// Open direct popup menu whose declared header height and outer cap force the header-scaling
+/// clamp to actually engage, unlike an uncapped menu where the scale trivially resolves to 1.0.
+struct HeaderClampScalingHarness;
+
+impl gpui::Render for HeaderClampScalingHarness {
+    /// Render the probe menu.
+    ///
+    /// Args:
+    ///     _window: Test window.
+    ///     _cx: Test view context.
+    ///
+    /// Returns:
+    ///     A capped popup menu with one oversized pinned header and one row.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{InteractiveElement as _, Styled as _};
+
+        MoonPopupMenu::new("header-clamp-scaling-probe")
+            .max_height(HEADER_CLAMP_MENU_MAX_HEIGHT)
+            .header(
+                OVERSIZED_HEADER_HEIGHT_UI,
+                gpui::div()
+                    .debug_selector(|| "header-clamp-scaling-probe:header".into())
+                    .h(gpui::px(4.0))
+                    .w(gpui::px(4.0)),
+            )
+            .item(MoonMenuItem::new("only item"))
+    }
+}
+
+/// Catches replacing `dropdown.rs:MoonPopupMenu::render_with_metrics`'s header-scaling block
+/// (`let header_heights: Vec<f32> = if requested_total > 0.0 { .. } else { requested_heights };`)
+/// with a bare `let header_heights = requested_heights;`. `clamp_header_budget`'s surviving budget
+/// then never reaches the header wrapper's own `.h(px(height))`: the wrapper keeps rendering at its
+/// full, unclamped requested height while the row list is still sized as if it had been clamped,
+/// so header plus list overrun the menu's own maximum and the outer `overflow_hidden` silently
+/// clips the tail of the row list.
+#[gpui::test]
+fn pinned_header_scaling_shrinks_the_wrapper_when_the_clamp_engages(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    cx.update(|cx| {
+        MoonTheme::global_mut(cx).scale = MoonScale {
+            ui: 1.0,
+            font: 1.0,
+            font_delta: 0.0,
+        };
+    });
+    let window = cx.add_window(|_, _| HeaderClampScalingHarness);
+    let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    let header = cx
+        .debug_bounds("header-clamp-scaling-probe:header")
+        .expect("pinned header must render");
+    let row = cx
+        .debug_bounds("header-clamp-scaling-probe:item:0")
+        .expect("first row must render");
+
+    // The wrapper's own height plus the outer flex column's gap to the first row: the wrapper
+    // itself carries no debug selector, so this is the only way to observe how tall it actually
+    // rendered.
+    let header_block = row.origin.y - header.origin.y;
+
+    assert!(
+        header_block < gpui::px(OVERSIZED_HEADER_HEIGHT_UI),
+        "header block measured {header_block:?}, which is not below its declared \
+         {OVERSIZED_HEADER_HEIGHT_UI}px request; the surviving budget from clamp_header_budget \
+         must be spent back onto the header wrapper, not left unscaled",
+    );
+    assert!(
+        header_block <= gpui::px(HEADER_CLAMP_MENU_MAX_HEIGHT),
+        "header block {header_block:?} alone exceeds the menu's own \
+         {HEADER_CLAMP_MENU_MAX_HEIGHT}px maximum; an unscaled header pushes the row list past the \
+         cap, and the outer overflow_hidden then clips it silently",
     );
 }

@@ -30,6 +30,11 @@ const DROPDOWN_TRIGGER_PAD_X: f32 = 14.0;
 const DROPDOWN_CARET: &str = " \u{25be}";
 const DROPDOWN_TRIGGER_MONO: bool = true;
 const VIRTUAL_MENU_ITEM_THRESHOLD: usize = 64;
+/// Font-size step-down of a row's trailing text against its label. Shared by the measure, fit and
+/// render paths, which must agree exactly or a row overflows the width resolved for it.
+const MENU_TRAILING_FONT_DELTA: f32 = 0.5;
+/// Weight of a row's trailing text, shared by the same three paths.
+const MENU_TRAILING_WEIGHT: f32 = 400.0;
 const DEFAULT_VIRTUAL_MENU_MAX_HEIGHT: f32 = 320.0;
 #[cfg(test)]
 const MENU_MEASUREMENT_PROBE_PREFIX: &str = "moon-menu-measurement-probe-";
@@ -447,35 +452,214 @@ fn capped_menu_items_height(
     height
 }
 
+/// Resolve the outer height ceiling a menu level renders within.
+///
+/// One place decides the fallback because a virtualized level needs a bounded viewport even with
+/// no caller maximum, while an eager level can retain its natural height.
+///
+/// Args:
+///     max_height: Optional caller-supplied outer menu limit.
+///     tokens: Active theme tokens.
+///     virtualized: Whether this level renders through the virtual list.
+///
+/// Returns:
+///     The resolved ceiling, or `f32::INFINITY` for an uncapped eager level.
+fn resolve_menu_outer_max(
+    max_height: Option<MoonMenuMaxHeight>,
+    tokens: &MoonThemeTokens,
+    virtualized: bool,
+) -> f32 {
+    max_height
+        .map(|max_height| max_height.resolve(tokens))
+        .unwrap_or(if virtualized {
+            tokens.ui(DEFAULT_VIRTUAL_MENU_MAX_HEIGHT)
+        } else {
+            f32::INFINITY
+        })
+}
+
+/// Resolve the height available to the rows once chrome and pinned headers are paid for.
+///
+/// The virtualized width-fitting prefix and the rendered list viewport must use this same value;
+/// otherwise the menu fits its width to rows that the initial viewport never shows.
+///
+/// Args:
+///     outer_max: Resolved outer menu ceiling.
+///     tokens: Active theme tokens.
+///     header_budget: Resolved height pinned headers take, their gaps included.
+///     metrics: Resolved row geometry.
+///
+/// Returns:
+///     The row list's height budget, never less than a single row.
+fn menu_content_max(
+    outer_max: f32,
+    tokens: &MoonThemeTokens,
+    header_budget: f32,
+    metrics: MenuMetrics,
+) -> f32 {
+    (outer_max - menu_outer_chrome(tokens) - header_budget).max(metrics.row_height)
+}
+
+/// Cap a declared header height to preserve one row whenever the outer limit can contain it.
+///
+/// A header is pinned, so every unit it claims comes straight off the row list. Left unbounded, a
+/// header declared taller than the menu's own maximum would leave the list nothing to occupy and
+/// the menu would open as an unusable strip. The header yields before the list's one-row floor
+/// because its height is caller-chosen.
+///
+/// Args:
+///     declared: Resolved header height, gap included, or zero when there is no header.
+///     outer_max: Resolved outer menu maximum, or `f32::INFINITY` when the menu is uncapped.
+///     chrome: Resolved menu border and padding height.
+///     row_height: Resolved ordinary row height.
+///
+/// Returns:
+///     The header budget to subtract from the row list's viewport.
+fn clamp_header_budget(declared: f32, outer_max: f32, chrome: f32, row_height: f32) -> f32 {
+    if declared <= 0.0 {
+        return 0.0;
+    }
+    if !outer_max.is_finite() {
+        return declared;
+    }
+    declared.min((outer_max - chrome - row_height).max(0.0))
+}
+
 /// Resolve a bounded viewport height for a virtualized menu level.
 ///
 /// Args:
 ///     items: Ordered mixed menu rows.
 ///     metrics: Scaled ordinary-row geometry.
-///     max_height: Optional caller-supplied outer menu limit.
 ///     tokens: Active theme tokens.
+///     content_max: Height budget already left to the rows by chrome and pinned headers.
 ///
 /// Returns:
-///     `(list viewport height, outer menu height limit)`.
-fn virtual_menu_heights(
+///     The list viewport height.
+fn virtual_menu_list_height(
     items: &[MoonMenuItem],
     metrics: MenuMetrics,
-    max_height: Option<MoonMenuMaxHeight>,
     tokens: &MoonThemeTokens,
-) -> (f32, f32) {
-    let outer_max = max_height
-        .map(|height| height.resolve(tokens))
-        .unwrap_or_else(|| tokens.ui(DEFAULT_VIRTUAL_MENU_MAX_HEIGHT));
-    let content_max = (outer_max - menu_outer_chrome(tokens)).max(metrics.row_height);
-    (
-        capped_menu_items_height(
-            items.iter().map(|item| item.kind),
-            metrics,
-            tokens,
-            content_max,
-        ),
-        outer_max,
+    content_max: f32,
+) -> f32 {
+    capped_menu_items_height(
+        items.iter().map(|item| item.kind),
+        metrics,
+        tokens,
+        content_max,
     )
+}
+
+/// Render a row's trailing text.
+///
+/// The third of the trailing-text triple, beside [`trailing_label_widths`] and
+/// [`fit_trailing_label`]: the style here has to match what those two measured, so all three read
+/// the same two constants.
+///
+/// Args:
+///     right_label: Already-fitted trailing text.
+///     p: Active palette.
+///     metrics: Resolved row geometry.
+///     mono: Whether the row uses the configured monospaced font.
+///     alpha: Row alpha the trailing text is dimmed against.
+///
+/// Returns:
+///     The rendered trailing text.
+fn menu_trailing_label(
+    right_label: SharedString,
+    p: MoonPalette,
+    metrics: MenuMetrics,
+    mono: bool,
+    alpha: f32,
+) -> AnyElement {
+    MoonText::new(right_label)
+        .color(p.text_muted)
+        .alpha(alpha)
+        .font_size(metrics.font_size - MENU_TRAILING_FONT_DELTA)
+        .line_height(metrics.line_height)
+        .weight(MENU_TRAILING_WEIGHT)
+        .mono(mono)
+        .uppercase(false)
+        .render()
+        .into_any_element()
+}
+
+/// Measure a row's trailing text at its natural width and at its ellipsis-only minimum.
+///
+/// Label rows and ordinary rows render trailing text at the same step-down and weight. Keeping
+/// that policy here prevents their measured widths from drifting away from the rendered style.
+///
+/// Args:
+///     right_label: The row's trailing text, if any.
+///     metrics: Resolved row geometry.
+///     measure: Width function matching the row's text style.
+///
+/// Returns:
+///     `(natural width, minimum width)`, both zero when there is no trailing text. The gap that
+///     separates it from the label belongs to the caller, whose row kind decides how many gaps it
+///     pays for.
+fn trailing_label_widths(
+    right_label: Option<&SharedString>,
+    metrics: MenuMetrics,
+    measure: &mut impl FnMut(&str, f32, f32) -> f32,
+) -> (f32, f32) {
+    let Some(right_label) = right_label else {
+        return (0.0, 0.0);
+    };
+    let font_size = metrics.font_size - MENU_TRAILING_FONT_DELTA;
+    let natural = measure(right_label.as_ref(), font_size, MENU_TRAILING_WEIGHT);
+    let minimum = if right_label.is_empty() {
+        0.0
+    } else {
+        measure("\u{2026}", font_size, MENU_TRAILING_WEIGHT)
+    };
+    (natural, minimum)
+}
+
+/// Truncate a row's trailing text into the budget and report what it consumed.
+///
+/// The trailing text is fitted first, against a budget that still leaves room for the label's own
+/// ellipsis — otherwise a long count would take the whole row and the label would vanish instead
+/// of truncating. That ordering is the subtle part, and it is why both row kinds call this rather
+/// than restating it.
+///
+/// Args:
+///     right_label: The row's trailing text, taken and replaced with its fitted form.
+///     budget: Remaining text budget, reduced by what the trailing text consumed.
+///     main_weight: Weight of the row's own label, used to size its ellipsis reservation.
+///     metrics: Resolved row geometry.
+///     tokens: Active theme tokens.
+///     cx: Application context used for text measurement.
+///     mono: Whether the row uses the configured monospaced font.
+///
+/// Returns:
+///     Nothing; `right_label` and `budget` are updated in place.
+fn fit_trailing_label(
+    right_label: &mut Option<SharedString>,
+    budget: &mut f32,
+    main_weight: f32,
+    metrics: MenuMetrics,
+    tokens: &MoonThemeTokens,
+    cx: &App,
+    mono: bool,
+) {
+    let Some(text) = right_label.take() else {
+        return;
+    };
+    let main_ellipsis =
+        measure_menu_text_width(cx, tokens, "\u{2026}", metrics.font_size, main_weight, mono);
+    let trailing_budget = (*budget - main_ellipsis).max(0.0);
+    let (fitted, consumed) = fit_text_to_width(text.as_ref(), trailing_budget, |text| {
+        measure_menu_text_width(
+            cx,
+            tokens,
+            text,
+            metrics.font_size - MENU_TRAILING_FONT_DELTA,
+            MENU_TRAILING_WEIGHT,
+            mono,
+        )
+    });
+    *right_label = Some(SharedString::from(fitted));
+    *budget = (*budget - consumed).max(0.0);
 }
 
 /// Return the UI-scaled check-column width rendered by every actionable menu row.
@@ -517,32 +701,37 @@ fn menu_width_requirements(
         .map(|item| match item.kind {
             MoonMenuItemKind::Separator => (0.0, 0.0),
             MoonMenuItemKind::Label => {
-                let chrome = metrics.pad_x * 2.0;
-                let natural = chrome + measure(item.label.as_ref(), metrics.font_size, 500.0);
+                // A label row renders `right_label` too, so it has to reserve the trailing text
+                // the same way an ordinary row does — measuring only the label would resolve a
+                // width the row then overflows. It has no check column and no submenu, so it pays
+                // for the single gap its own row container sets.
+                let (trailing_natural, trailing_minimum) =
+                    trailing_label_widths(item.right_label.as_ref(), metrics, &mut measure);
+                let trailing_gap = if item.right_label.is_some() {
+                    metrics.gap
+                } else {
+                    0.0
+                };
+                let chrome = metrics.pad_x * 2.0 + trailing_gap;
+                let natural = chrome
+                    + measure(item.label.as_ref(), metrics.font_size, 500.0)
+                    + trailing_natural;
                 let marker = if item.label.is_empty() {
                     0.0
                 } else {
                     measure("\u{2026}", metrics.font_size, 500.0)
                 };
-                (natural, chrome + marker)
+                (natural, chrome + marker + trailing_minimum)
             }
             MoonMenuItemKind::Item => {
-                let (trailing_natural, trailing_minimum) =
-                    if let Some(right_label) = item.right_label.as_ref() {
-                        (
-                            measure(right_label.as_ref(), metrics.font_size - 0.5, 400.0),
-                            if right_label.is_empty() {
-                                0.0
-                            } else {
-                                measure("\u{2026}", metrics.font_size - 0.5, 400.0)
-                            },
-                        )
-                    } else if item.has_submenu() {
-                        let glyph = measure("\u{203a}", metrics.font_size, 600.0);
-                        (glyph, glyph)
-                    } else {
-                        (0.0, 0.0)
-                    };
+                let (trailing_natural, trailing_minimum) = if item.right_label.is_some() {
+                    trailing_label_widths(item.right_label.as_ref(), metrics, &mut measure)
+                } else if item.has_submenu() {
+                    let glyph = measure("\u{203a}", metrics.font_size, 600.0);
+                    (glyph, glyph)
+                } else {
+                    (0.0, 0.0)
+                };
                 let has_trailing = item.right_label.is_some() || item.has_submenu();
                 let gaps = if has_trailing { 3.0 } else { 2.0 };
                 let chrome = metrics.pad_x * 2.0 + menu_check_width(tokens) + metrics.gap * gaps;
@@ -640,7 +829,21 @@ fn fit_menu_item_label(
     match item.kind {
         MoonMenuItemKind::Separator => {}
         MoonMenuItemKind::Label => {
-            let budget = (width - outer - metrics.pad_x * 2.0).max(0.0);
+            let trailing_gap = if item.right_label.is_some() {
+                metrics.gap
+            } else {
+                0.0
+            };
+            let mut budget = (width - outer - metrics.pad_x * 2.0 - trailing_gap).max(0.0);
+            fit_trailing_label(
+                &mut item.right_label,
+                &mut budget,
+                500.0,
+                metrics,
+                tokens,
+                cx,
+                mono,
+            );
             let fitted = fit_text_to_width(item.label.as_ref(), budget, |text| {
                 measure_menu_text_width(cx, tokens, text, metrics.font_size, 500.0, mono)
             })
@@ -661,23 +864,16 @@ fn fit_menu_item_label(
                 - metrics.gap * trailing_gaps)
                 .max(0.0);
 
-            if let Some(right_label) = item.right_label.take() {
-                let main_ellipsis =
-                    measure_menu_text_width(cx, tokens, "\u{2026}", metrics.font_size, 600.0, mono);
-                let right_budget = (text_budget - main_ellipsis).max(0.0);
-                let (right_label, right_width) =
-                    fit_text_to_width(right_label.as_ref(), right_budget, |text| {
-                        measure_menu_text_width(
-                            cx,
-                            tokens,
-                            text,
-                            metrics.font_size - 0.5,
-                            400.0,
-                            mono,
-                        )
-                    });
-                item.right_label = Some(SharedString::from(right_label));
-                text_budget = (text_budget - right_width).max(0.0);
+            if item.right_label.is_some() {
+                fit_trailing_label(
+                    &mut item.right_label,
+                    &mut text_budget,
+                    600.0,
+                    metrics,
+                    tokens,
+                    cx,
+                    mono,
+                );
             } else if has_submenu {
                 text_budget = (text_budget
                     - measure_menu_text_width(
@@ -810,21 +1006,17 @@ fn resolve_menu_width(
 /// Args:
 ///     items: Ordered menu rows.
 ///     metrics: Resolved row geometry.
-///     max_height: Optional caller-supplied outer height limit.
 ///     tokens: Active theme tokens.
+///     content_max: Height budget already left to the rows by chrome and pinned headers.
 ///
 /// Returns:
 ///     A bounded prefix ending at the row that fills the initial viewport.
 fn virtual_menu_initial_rows<'a>(
     items: &'a [MoonMenuItem],
     metrics: MenuMetrics,
-    max_height: Option<MoonMenuMaxHeight>,
     tokens: &MoonThemeTokens,
+    content_max: f32,
 ) -> &'a [MoonMenuItem] {
-    let outer_max = max_height
-        .map(|height| height.resolve(tokens))
-        .unwrap_or_else(|| tokens.ui(DEFAULT_VIRTUAL_MENU_MAX_HEIGHT));
-    let content_max = (outer_max - menu_outer_chrome(tokens)).max(metrics.row_height);
     let mut height = 0.0;
     for (ix, item) in items.iter().enumerate() {
         if ix > 0 {
@@ -850,10 +1042,10 @@ fn virtual_menu_initial_rows<'a>(
 ///     policy: Configured rendered, scaled, or fitted width policy.
 ///     items: Ordered rows belonging to this menu level.
 ///     metrics: Resolved row geometry.
-///     max_height: Optional caller-supplied outer height limit.
 ///     tokens: Active theme tokens.
 ///     cx: Application context used for bounded text measurement.
 ///     mono: Whether rows use the configured monospaced font.
+///     content_max: Height budget already left to the rows by chrome and pinned headers.
 ///
 /// Returns:
 ///     Resolved outer width and whether visible labels must be truncated.
@@ -861,16 +1053,16 @@ fn resolve_virtual_menu_width(
     policy: MoonMenuWidth,
     items: &[MoonMenuItem],
     metrics: MenuMetrics,
-    max_height: Option<MoonMenuMaxHeight>,
     tokens: &MoonThemeTokens,
     cx: &App,
     mono: bool,
+    content_max: f32,
 ) -> (f32, bool) {
     if let MoonMenuWidth::Rendered(width) = policy {
         return (width, false);
     }
 
-    let initial_rows = virtual_menu_initial_rows(items, metrics, max_height, tokens);
+    let initial_rows = virtual_menu_initial_rows(items, metrics, tokens, content_max);
     let text_scale = tokens.font(metrics.font_size) / metrics.font_size.max(1.0);
     let requirements =
         menu_width_requirements(initial_rows, metrics, tokens, |text, size, weight| {
@@ -1120,6 +1312,17 @@ impl MoonMenuItem {
         &self.key
     }
 
+    /// Set the muted trailing text rendered at the row's right edge.
+    ///
+    /// Honoured by ordinary rows and by label rows alike, so a section heading or a click-only
+    /// action row can carry a count without borrowing the checkbox column that would make it read
+    /// as selectable state. On an ordinary row it also replaces the submenu chevron.
+    ///
+    /// Args:
+    ///     right_label: Trailing text, typically a count or a shortcut.
+    ///
+    /// Returns:
+    ///     The updated row.
     pub fn right_label(mut self, right_label: impl Into<SharedString>) -> Self {
         self.right_label = Some(right_label.into());
         self
@@ -1178,7 +1381,7 @@ impl MoonMenuItem {
 /// Moon-styled popup menu with rendered, scaled, or per-level fitted width policies.
 pub struct MoonPopupMenu {
     id: SharedString,
-    headers: Vec<AnyElement>,
+    headers: Vec<(f32, AnyElement)>,
     items: std::rc::Rc<Vec<MoonMenuItem>>,
     layout: MenuLayoutFingerprint,
     size: MoonMenuSize,
@@ -1231,8 +1434,26 @@ impl MoonPopupMenu {
         self
     }
 
-    pub fn header(mut self, header: impl IntoElement) -> Self {
-        self.headers.push(header.into_any_element());
+    /// Pin an element above the rows, outside the scrolling region.
+    ///
+    /// Repeatable; each header carries its own height. A header does not scroll, so the space it
+    /// takes comes out of the row list's budget, and the height travels with the element rather
+    /// than as a separate builder call — the row list is sized in pixels before its siblings are
+    /// laid out, so it cannot discover the header on its own, and a header whose height was never
+    /// declared would be pinned to zero and vanish.
+    ///
+    /// The height is a design-reference value. It is UI-scaled at render and initially floored by
+    /// the menu's row height so text survives font growth; a configured outer cap may then shrink
+    /// the wrapper before reducing the list below its one-row floor.
+    ///
+    /// Args:
+    ///     height_ui: Header height at the configured UI reference scale.
+    ///     header: Element rendered above the rows.
+    ///
+    /// Returns:
+    ///     The updated menu.
+    pub fn header(mut self, height_ui: f32, header: impl IntoElement) -> Self {
+        self.headers.push((height_ui, header.into_any_element()));
         self
     }
 
@@ -1481,18 +1702,55 @@ impl MoonPopupMenu {
         virtual_list_state: Option<ListState>,
     ) -> AnyElement {
         let id = self.id.clone();
+        // The capped eager row list needs an identity distinct from the outer menu to retain its
+        // scroll offset. Clone it before `self` is consumed by the branch-specific row rendering.
+        let id_for_rows = self.id.clone();
         let mono = self.mono;
         let virtualized = virtual_list_state.is_some();
+
+        // Resolve this before measurement because pinned headers reduce both the row list's height
+        // and the initial-row budget used to fit a virtualized menu's width. Each header also costs
+        // one gap because the outer flex column separates every child.
+        let menu_gap = tokens.ui(MENU_GAP);
+        let resolved_outer_max = resolve_menu_outer_max(self.max_height, &tokens, virtualized);
+        let requested_heights: Vec<f32> = self
+            .headers
+            .iter()
+            .map(|(height_ui, _)| tokens.ui(*height_ui).max(metrics.row_height))
+            .collect();
+        let header_gaps = menu_gap * requested_heights.len() as f32;
+        let requested_total = requested_heights.iter().sum::<f32>();
+        let header_budget = clamp_header_budget(
+            requested_total + header_gaps,
+            resolved_outer_max,
+            menu_outer_chrome(&tokens),
+            metrics.row_height,
+        );
+        // The clamp only affects layout if the elements follow it. Spending the surviving budget
+        // back onto the wrappers is what makes the header yield, as `clamp_header_budget` promises;
+        // pinning them to the requested heights instead would let header plus list overrun the
+        // menu's maximum and the outer `overflow_hidden` would clip the rows the clamp just saved.
+        let header_heights: Vec<f32> = if requested_total > 0.0 {
+            let scale = ((header_budget - header_gaps).max(0.0) / requested_total).min(1.0);
+            requested_heights
+                .iter()
+                .map(|height| height * scale)
+                .collect()
+        } else {
+            requested_heights
+        };
+        let content_max = menu_content_max(resolved_outer_max, &tokens, header_budget, metrics);
+
         let (width, truncate_labels) = if let Some(cx) = cx {
             if virtualized {
                 resolve_virtual_menu_width(
                     self.width,
                     &self.items,
                     metrics,
-                    self.max_height,
                     &tokens,
                     cx,
                     mono,
+                    content_max,
                 )
             } else {
                 resolve_menu_width(self.width, &self.items, metrics, &tokens, cx, mono)
@@ -1532,16 +1790,26 @@ impl MoonPopupMenu {
             .flex_col()
             .gap(px(tokens.ui(MENU_GAP)));
 
-        if virtual_list_state.is_none() {
-            if let Some(max_height) = self.max_height {
-                menu = menu
-                    .max_h(px(max_height.resolve(&tokens)))
-                    .overflow_y_scroll();
-            }
+        // The cap belongs to the whole menu, but the scroll belongs to the rows alone: a header
+        // that scrolled with them would leave the menu the moment the list is longer than the cap,
+        // which is exactly the case a header exists for.
+        let capped = self.max_height.is_some();
+        if virtual_list_state.is_none() && capped {
+            menu = menu.max_h(px(resolved_outer_max)).overflow_hidden();
         }
 
-        for header in self.headers {
-            menu = menu.child(header);
+        for ((_, header), height) in self.headers.into_iter().zip(header_heights) {
+            // Pinned to exactly the height its budget reserved, so the declaration cannot drift
+            // from the layout in either direction: an over-declared header would otherwise shrink
+            // the row list without using the space, and an under-declared one would push the list
+            // past the menu's maximum.
+            menu = menu.child(
+                div()
+                    .flex_none()
+                    .h(px(height))
+                    .overflow_hidden()
+                    .child(header),
+            );
         }
 
         let row_context = std::rc::Rc::new(MenuLevelRenderContext {
@@ -1557,12 +1825,12 @@ impl MoonPopupMenu {
             dropdown_selection: self.dropdown_selection,
         });
         if let Some(list_state) = virtual_list_state {
-            let (list_height, outer_max_height) =
-                virtual_menu_heights(&self.items, metrics, self.max_height, &row_context.tokens);
+            let list_height =
+                virtual_menu_list_height(&self.items, metrics, &row_context.tokens, content_max);
             let item_count = self.items.len();
             let items = self.items;
             let row_context = row_context.clone();
-            menu = menu.max_h(px(outer_max_height)).overflow_hidden().child(
+            menu = menu.max_h(px(resolved_outer_max)).overflow_hidden().child(
                 list(list_state, move |ix, _window, _cx| {
                     let item = items[ix].clone();
                     div()
@@ -1579,8 +1847,29 @@ impl MoonPopupMenu {
         } else {
             let items = std::rc::Rc::try_unwrap(self.items)
                 .unwrap_or_else(|shared_items| shared_items.as_ref().clone());
-            for (ix, item) in items.into_iter().enumerate() {
-                menu = menu.child(Self::render_item(&row_context, ix, item, cx));
+            // Only a capped menu needs a scrolling container of its own; an uncapped one keeps its
+            // natural height and its rows stay direct children, with no extra layout node and no
+            // retained element state to key.
+            if capped {
+                let mut rows = div()
+                    .id(ElementId::from(SharedString::from(format!(
+                        "{}:rows",
+                        id_for_rows
+                    ))))
+                    .flex()
+                    .flex_col()
+                    .gap(px(menu_gap))
+                    .min_h_0()
+                    .flex_1()
+                    .overflow_y_scroll();
+                for (ix, item) in items.into_iter().enumerate() {
+                    rows = rows.child(Self::render_item(&row_context, ix, item, cx));
+                }
+                menu = menu.child(rows);
+            } else {
+                for (ix, item) in items.into_iter().enumerate() {
+                    menu = menu.child(Self::render_item(&row_context, ix, item, cx));
+                }
             }
         }
 
@@ -1656,6 +1945,8 @@ impl MoonPopupMenu {
                     .px(px(metrics.pad_x))
                     .flex()
                     .items_center()
+                    .justify_between()
+                    .gap(px(metrics.gap))
                     .when(actionable, |this| {
                         this.hover(move |this| this.bg(rgba_from(p.overlay, 0.055)))
                             .active(move |this| this.bg(rgba_from(p.overlay, 0.032)))
@@ -1671,6 +1962,17 @@ impl MoonPopupMenu {
                             .uppercase(false)
                             .render(),
                     );
+
+                // A label row carries the same trailing count an ordinary row can. The count sits
+                // at the row's own muted alpha rather than taking the ordinary row's further
+                // opacity reduction: the whole row is already secondary chrome, and dimming it
+                // again would push it under the rows it is meant to be read against.
+                //
+                // `justify_between` plus the row's own gap, rather than a flexible spacer: that
+                // renders exactly the one gap the width measurement charges for this row kind.
+                if let Some(right_label) = item.right_label {
+                    row = row.child(menu_trailing_label(right_label, p, metrics, mono, 0.88));
+                }
 
                 if actionable {
                     if let Some(on_click) = on_click {
@@ -1751,17 +2053,13 @@ impl MoonPopupMenu {
                     .child(div().flex_1());
 
                 if let Some(right_label) = item.right_label {
-                    row = row.child(
-                        MoonText::new(right_label)
-                            .color(p.text_muted)
-                            .alpha(alpha * 0.88)
-                            .font_size(metrics.font_size - 0.5)
-                            .line_height(metrics.line_height)
-                            .weight(400.0)
-                            .mono(mono)
-                            .uppercase(false)
-                            .render(),
-                    );
+                    row = row.child(menu_trailing_label(
+                        right_label,
+                        p,
+                        metrics,
+                        mono,
+                        alpha * 0.88,
+                    ));
                 } else if has_submenu {
                     row = row.child(
                         MoonText::new("›")
@@ -1925,6 +2223,8 @@ pub struct MoonDropdown {
     close_on_select: bool,
     on_select: Option<MoonSelectHandler>,
     on_open_change: Option<std::rc::Rc<dyn Fn(bool, &mut Window, &mut App)>>,
+    menu_header: Option<std::rc::Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>>,
+    menu_header_height: f32,
 }
 
 impl MoonDropdown {
@@ -1960,6 +2260,8 @@ impl MoonDropdown {
             close_on_select: true,
             on_select: None,
             on_open_change: None,
+            menu_header: None,
+            menu_header_height: 0.0,
         }
     }
 
@@ -2189,6 +2491,41 @@ impl MoonDropdown {
         self
     }
 
+    /// Pin an element above the menu's rows that does not scroll with them.
+    ///
+    /// The builder takes a closure rather than a built element because the popup's content is
+    /// rebuilt on every render: a stored `AnyElement` could be consumed only once. The closure
+    /// receives the window, so a header may own focusable content such as a search field.
+    ///
+    /// When a maximum height is configured, the header is laid out inside that limit rather than
+    /// added on top of it: the row list gives up the space the header takes. The height is declared
+    /// rather than measured because the row list is sized in pixels before its siblings are laid
+    /// out; the virtualized width-fitting prefix reads the same budget, so an inaccurate
+    /// declaration also mis-measures the menu's width.
+    ///
+    /// Calling this twice replaces the header, unlike [`MoonPopupMenu::header`], which appends.
+    ///
+    /// **The closure is retained for as long as the popup state is** — it is cloned into the
+    /// popover's content closure, which outlives the frame. Capture weak handles and cheap values
+    /// only: a strong view handle closes a `view -> popup state -> closure -> view` cycle and the
+    /// view never drops, the same hazard the tree and virtual-list row builders carry.
+    ///
+    /// Args:
+    ///     height_ui: Header height at the configured UI reference scale.
+    ///     header: Builder invoked once per popup render.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn header(
+        mut self,
+        height_ui: f32,
+        header: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        self.menu_header = Some(std::rc::Rc::new(header));
+        self.menu_header_height = height_ui;
+        self
+    }
+
     pub fn close_on_select(mut self, close_on_select: bool) -> Self {
         self.close_on_select = close_on_select;
         self
@@ -2395,6 +2732,8 @@ impl RenderOnce for MoonDropdown {
         let menu_max_height = self.menu_max_height;
         let menu_offset_x = self.menu_offset_x;
         let menu_offset_y = self.menu_offset_y;
+        let menu_header = self.menu_header.clone();
+        let menu_header_height = self.menu_header_height;
         let popup_level = MoonMenuLevel::from_parts(std::rc::Rc::new(items), menu_layout);
         let dropdown_selection = std::rc::Rc::new(MoonDropdownSelectionContext {
             close_on_select: self.close_on_select,
@@ -2411,7 +2750,7 @@ impl RenderOnce for MoonDropdown {
             .deferred_priority(30_000)
             .open(open)
             .trigger_any(trigger)
-            .content(move |_, _window, cx| {
+            .content(move |_, window, cx| {
                 let tokens = MoonTheme::active_tokens(cx);
                 let mut menu = MoonPopupMenu::new(menu_id.clone())
                     .shared_level(popup_level.clone())
@@ -2421,6 +2760,11 @@ impl RenderOnce for MoonDropdown {
                     .mono(true);
                 if let Some(max_height) = menu_max_height {
                     menu = menu.max_height_policy(max_height);
+                }
+                // Built here rather than stored: this closure runs on every popup render, so a
+                // retained element would be consumable only once.
+                if let Some(header) = menu_header.as_ref() {
+                    menu = menu.header(menu_header_height, header(window, cx));
                 }
 
                 div()
