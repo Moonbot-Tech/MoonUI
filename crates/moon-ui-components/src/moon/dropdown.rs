@@ -1033,10 +1033,38 @@ fn virtual_menu_initial_rows<'a>(
     items
 }
 
-/// Resolve a large virtual menu from only the rows in its initial bounded viewport.
+/// Rows a virtual menu measures its width from.
 ///
-/// Later rows truncate against the resulting budget. This keeps fitting independent of total item
-/// count while avoiding the threshold jump caused by always choosing the declared maximum width.
+/// Measuring only the rows that fit the HEIGHT budget — roughly fifteen at a typical row height —
+/// makes the fitted width depend on WHAT SITS AT THE TOP of the menu. Adding a few header rows then
+/// pushes long labels out of the measured window and the whole menu narrows, truncating names that
+/// fitted a moment earlier. That is a visible defect, and an inconsistent one: a menu below
+/// [`VIRTUAL_MENU_ITEM_THRESHOLD`] measures EVERY row, so the same list narrows the moment it grows
+/// past the threshold.
+///
+/// So the sample is a row COUNT, not a height: enough to cover any real menu whole, while staying
+/// bounded for a pathological one. The height prefix still wins where it is somehow larger.
+const MENU_WIDTH_SAMPLE_ROWS: usize = 128;
+
+/// Take the rows a virtual menu's width is measured from.
+///
+/// Args:
+///     items: Every row in this menu level.
+///     height_rows: How many rows the height budget admits.
+///
+/// Returns:
+///     The leading rows to measure — all of them for any menu of ordinary size.
+fn menu_width_sample(items: &[MoonMenuItem], height_rows: usize) -> &[MoonMenuItem] {
+    let take = height_rows.max(MENU_WIDTH_SAMPLE_ROWS).min(items.len());
+    &items[..take]
+}
+
+/// Resolve a large virtual menu's width from a bounded leading sample of its rows.
+///
+/// The sample is [`MENU_WIDTH_SAMPLE_ROWS`] rows, which covers any menu of ordinary size whole, so
+/// the fitted width does not depend on which rows happen to sit at the top. Rows beyond the sample
+/// truncate against the resulting budget. Bounding by row count rather than by the declared maximum
+/// width is what avoids a jump at [`VIRTUAL_MENU_ITEM_THRESHOLD`].
 ///
 /// Args:
 ///     policy: Configured rendered, scaled, or fitted width policy.
@@ -1063,9 +1091,10 @@ fn resolve_virtual_menu_width(
     }
 
     let initial_rows = virtual_menu_initial_rows(items, metrics, tokens, content_max);
+    let measured_rows = menu_width_sample(items, initial_rows.len());
     let text_scale = tokens.font(metrics.font_size) / metrics.font_size.max(1.0);
     let requirements =
-        menu_width_requirements(initial_rows, metrics, tokens, |text, size, weight| {
+        menu_width_requirements(measured_rows, metrics, tokens, |text, size, weight| {
             measure_menu_text_width(cx, tokens, text, size, weight, mono)
         });
     let width = match policy {
@@ -1081,7 +1110,7 @@ fn resolve_virtual_menu_width(
     };
     (
         width,
-        initial_rows.len() < items.len() || width < requirements.natural,
+        measured_rows.len() < items.len() || width < requirements.natural,
     )
 }
 
@@ -1123,13 +1152,30 @@ struct MoonDropdownSelectionContext {
     parent_view: EntityId,
 }
 
+/// Decide what one row's click does to the menu around it.
+///
+/// `close_on_select` is a whole-menu policy, but a single menu can legitimately hold both kinds of
+/// row: checkbox rows that must leave a multi-select menu standing, and a row that opens a dialog
+/// and must also take the menu down during that click — an open popup is deferred ABOVE the dialog
+/// layer, so a menu left standing paints over the modal it just opened. `item_closes_menu` is that
+/// row's own answer, and it wins; `None` follows the menu.
+///
+/// Args:
+///     close_on_select: The dropdown's whole-menu policy.
+///     item_closes_menu: The clicked row's override, if it declared one.
+///     controlled_open: `Some` while the consumer owns the open state.
+///
+/// Returns:
+///     Whether to close, and whether this dropdown owns the state that records it.
 fn moon_dropdown_select_plan(
     close_on_select: bool,
+    item_closes_menu: Option<bool>,
     controlled_open: Option<bool>,
 ) -> MoonDropdownSelectPlan {
+    let close_menu = item_closes_menu.unwrap_or(close_on_select);
     MoonDropdownSelectPlan {
-        close_menu: close_on_select,
-        update_internal_open: close_on_select && controlled_open.is_none(),
+        close_menu,
+        update_internal_open: close_menu && controlled_open.is_none(),
     }
 }
 
@@ -1154,8 +1200,13 @@ fn menu_item_click_handler(
         return existing_handler;
     };
     let key = item.key.clone();
+    let closes_menu = item.closes_menu;
     Some(std::rc::Rc::new(move |event, window, cx| {
-        let plan = moon_dropdown_select_plan(dropdown.close_on_select, dropdown.controlled_open);
+        let plan = moon_dropdown_select_plan(
+            dropdown.close_on_select,
+            closes_menu,
+            dropdown.controlled_open,
+        );
         if let Some(existing_handler) = existing_handler.as_ref() {
             existing_handler(event, window, cx);
         }
@@ -1189,6 +1240,8 @@ pub struct MoonMenuItem {
     actionable: bool,
     submenu: MoonMenuLevel,
     on_click: Option<MoonClickHandler>,
+    /// Per-row override of the dropdown's `close_on_select`; `None` follows the dropdown.
+    closes_menu: Option<bool>,
 }
 
 impl Clone for MoonMenuItem {
@@ -1213,6 +1266,7 @@ impl Clone for MoonMenuItem {
             actionable: self.actionable,
             submenu: self.submenu.clone(),
             on_click: self.on_click.clone(),
+            closes_menu: self.closes_menu,
         }
     }
 }
@@ -1239,6 +1293,7 @@ impl MoonMenuItem {
             actionable: true,
             submenu: MoonMenuLevel::empty(),
             on_click: None,
+            closes_menu: None,
         }
     }
 
@@ -1263,6 +1318,7 @@ impl MoonMenuItem {
             actionable: true,
             submenu: MoonMenuLevel::empty(),
             on_click: None,
+            closes_menu: None,
         }
     }
 
@@ -1305,6 +1361,7 @@ impl MoonMenuItem {
             actionable: false,
             submenu: MoonMenuLevel::empty(),
             on_click: None,
+            closes_menu: None,
         }
     }
 
@@ -1345,6 +1402,28 @@ impl MoonMenuItem {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    /// Override, for this row alone, whether clicking it closes the menu.
+    ///
+    /// `MoonDropdown::close_on_select` is a whole-menu policy, which is wrong for a menu holding
+    /// two kinds of row: checkbox rows that must leave a multi-select menu standing, and a row
+    /// that opens a dialog. The second kind MUST take the menu down — a popup is deferred above
+    /// the dialog layer, so a menu left open paints over the modal it just opened, and the first
+    /// click into that modal both dismisses the menu and pulls focus back out of the dialog.
+    ///
+    /// Without this, the only way to mix the two in one menu is for the consumer to take over the
+    /// dropdown's open state entirely, which costs it a mirrored flag and a retained callback in
+    /// every hosting view.
+    ///
+    /// Args:
+    ///     closes_menu: Whether a click on this row closes the menu, overriding the dropdown.
+    ///
+    /// Returns:
+    ///     The row carrying its own close policy.
+    pub fn closes_menu(mut self, closes_menu: bool) -> Self {
+        self.closes_menu = Some(closes_menu);
         self
     }
 

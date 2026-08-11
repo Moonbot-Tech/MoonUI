@@ -4,14 +4,14 @@ use super::button_leading_icon_reservation;
 use super::{
     DROPDOWN_CARET, DROPDOWN_TRIGGER_PAD_X, MENU_CLONE_PROBE_PREFIX,
     MENU_DROPDOWN_HANDLER_PROBE_PREFIX, MENU_MEASUREMENT_PROBE_PREFIX, MENU_PADDING,
-    MENU_PALETTE_PROBE_PREFIX, MenuMetrics, MoonButtonIconSlot, MoonButtonSize, MoonDropdown,
-    MoonDropdownSelectPlan, MoonDropdownTriggerWidth, MoonMenuItem, MoonMenuItemKind,
-    MoonMenuMaxHeight, MoonMenuSize, MoonMenuWidth, MoonPalette, MoonPopupMenu, MoonRect,
-    MoonThemeTokens, SUBMENU_OFFSET_X, capped_menu_items_height, clamp_header_budget,
+    MENU_PALETTE_PROBE_PREFIX, MENU_WIDTH_SAMPLE_ROWS, MenuMetrics, MoonButtonIconSlot,
+    MoonButtonSize, MoonDropdown, MoonDropdownSelectPlan, MoonDropdownTriggerWidth, MoonMenuItem,
+    MoonMenuItemKind, MoonMenuMaxHeight, MoonMenuSize, MoonMenuWidth, MoonPalette, MoonPopupMenu,
+    MoonRect, MoonThemeTokens, SUBMENU_OFFSET_X, capped_menu_items_height, clamp_header_budget,
     fit_dropdown_trigger_label, fit_menu_item_labels, menu_content_max,
     menu_measurement_probe_count, moon_dropdown_select_plan, moon_menu_item_accepts_click,
-    natural_menu_width, resolve_menu_width, take_dropdown_handler_probe_count,
-    take_menu_item_clone_probe_count, take_palette_probe_shell,
+    natural_menu_width, resolve_menu_width, resolve_virtual_menu_width,
+    take_dropdown_handler_probe_count, take_menu_item_clone_probe_count, take_palette_probe_shell,
 };
 use crate::moon::{MoonScale, MoonTheme, ThemeMode};
 use gpui::{ParentElement as _, Styled as _};
@@ -525,26 +525,214 @@ fn rendered_action_label_dispatches_while_static_label_stays_inert(cx: &mut gpui
 #[test]
 fn dropdown_select_plan_respects_close_and_controlled_state() {
     assert_eq!(
-        moon_dropdown_select_plan(true, None),
+        moon_dropdown_select_plan(true, None, None),
         MoonDropdownSelectPlan {
             close_menu: true,
             update_internal_open: true,
         }
     );
     assert_eq!(
-        moon_dropdown_select_plan(true, Some(true)),
+        moon_dropdown_select_plan(true, None, Some(true)),
         MoonDropdownSelectPlan {
             close_menu: true,
             update_internal_open: false,
         }
     );
     assert_eq!(
-        moon_dropdown_select_plan(false, None),
+        moon_dropdown_select_plan(false, None, None),
         MoonDropdownSelectPlan {
             close_menu: false,
             update_internal_open: false,
         }
     );
+}
+
+/// A row's own `closes_menu` override must win over the dropdown's whole-menu `close_on_select`
+/// policy in `dropdown.rs:moon_dropdown_select_plan`, and `update_internal_open` must follow the
+/// RESOLVED `close_menu` rather than the dropdown's raw policy. Folding the override back down to
+/// `close_on_select` leaves a dialog-opening row unable to force its host menu shut, so the menu
+/// paints over the modal it just opened; deriving `update_internal_open` from `close_on_select`
+/// instead of `close_menu` leaves an uncontrolled dropdown's internal `open` flag out of sync with
+/// a row-forced close, so the menu re-opens on the next repaint.
+#[test]
+fn dropdown_select_plan_row_override_wins_over_dropdown_policy() {
+    // Row forces a close on a dropdown configured to stay open (checkbox-menu policy).
+    assert_eq!(
+        moon_dropdown_select_plan(false, Some(true), None),
+        MoonDropdownSelectPlan {
+            close_menu: true,
+            update_internal_open: true,
+        },
+        "closes_menu(true) must close a close_on_select(false) dropdown and clear its internal open state"
+    );
+    // Row forces staying open on a dropdown configured to close.
+    assert_eq!(
+        moon_dropdown_select_plan(true, Some(false), None),
+        MoonDropdownSelectPlan {
+            close_menu: false,
+            update_internal_open: false,
+        },
+        "closes_menu(false) must keep a close_on_select(true) dropdown open and leave its internal open state untouched"
+    );
+}
+
+/// The manual `Clone for MoonMenuItem` impl in `dropdown.rs` is written field by field, so a
+/// future field addition can silently drop `closes_menu` from the copy without a compiler
+/// complaint. That would lose a row's close-policy override every time the menu level is cloned
+/// during a repaint, which is every frame.
+#[test]
+fn menu_item_clone_preserves_closes_menu_override() {
+    let forces_close = MoonMenuItem::new("dialog-row").closes_menu(true);
+    assert_eq!(
+        forces_close.clone().closes_menu,
+        Some(true),
+        "cloning a row that forces the menu closed must preserve that override"
+    );
+
+    let forces_keep_open = MoonMenuItem::new("checkbox-row").closes_menu(false);
+    assert_eq!(
+        forces_keep_open.clone().closes_menu,
+        Some(false),
+        "cloning a row that forces the menu to stay open must preserve that override"
+    );
+}
+
+/// `dropdown.rs:menu_width_sample` must bound a virtual menu's WIDTH measurement to a sample large
+/// enough to cover any menu of ordinary size, independent of the height-only prefix that decides
+/// which rows render first. Before the fix, `resolve_virtual_menu_width` measured only that
+/// height-bounded prefix (roughly fifteen rows at a typical row height), so the fitted width
+/// depended on WHAT SAT AT THE TOP of the menu: adding a few rows above a long label pushed it out
+/// of the measured window and narrowed the whole menu, truncating a name that fitted a moment
+/// earlier. Shrinking the sample back down to the height-only prefix
+/// (`height_rows.min(items.len())`, dropping the `.max(MENU_WIDTH_SAMPLE_ROWS)` floor) reproduces
+/// exactly that defect.
+#[gpui::test]
+fn menu_width_sample_ignores_where_a_long_label_sits(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    cx.update(|cx| {
+        let tokens = MoonThemeTokens::default();
+        let metrics = MoonPopupMenu::new("width-sample-order")
+            .size(MoonMenuSize::Compact)
+            .metrics()
+            .scaled(&tokens);
+        // Small height budget: the height-only prefix covers only a handful of rows, far short of
+        // both the 80-row list and the 128-row sample floor.
+        let content_max = 100.0;
+        let long_label = "a deliberately long menu label that only fits a wide menu";
+        let width_policy = MoonMenuWidth::Fit {
+            min: 50.0,
+            max: 2000.0,
+        };
+
+        let mut items_at_top = vec![MoonMenuItem::new(long_label)];
+        items_at_top.extend((0..79).map(|ix| MoonMenuItem::new(format!("Short {ix}"))));
+
+        let mut items_buried = (0..50)
+            .map(|ix| MoonMenuItem::new(format!("Short {ix}")))
+            .collect::<Vec<_>>();
+        items_buried.push(MoonMenuItem::new(long_label));
+        items_buried.extend((50..79).map(|ix| MoonMenuItem::new(format!("Short {ix}"))));
+        assert_eq!(items_at_top.len(), items_buried.len());
+
+        let (width_at_top, _) = resolve_virtual_menu_width(
+            width_policy, &items_at_top, metrics, &tokens, cx, false, content_max,
+        );
+        let (width_buried, _) = resolve_virtual_menu_width(
+            width_policy, &items_buried, metrics, &tokens, cx, false, content_max,
+        );
+
+        assert_eq!(
+            width_at_top, width_buried,
+            "moving the long label past the height-only window must not narrow the fitted menu width"
+        );
+    });
+}
+
+/// [`MENU_WIDTH_SAMPLE_ROWS`] must stay a genuine BOUND, or the fix for width-order-dependence
+/// (`dropdown.rs:menu_width_sample`) turns into unbounded per-frame text measurement on a
+/// pathologically long menu. Catches replacing the bounded sample with the full item list
+/// (`let take = items.len();`), using the same measurement-probe counter
+/// `fitted_large_menu_measures_only_its_visible_window` relies on.
+#[gpui::test]
+fn menu_width_sample_stays_bounded_for_a_pathological_menu(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    cx.update(|cx| {
+        let tokens = MoonThemeTokens::default();
+        let metrics = MoonPopupMenu::new("width-sample-bound")
+            .size(MoonMenuSize::Compact)
+            .metrics()
+            .scaled(&tokens);
+        let items: Vec<_> = (0..5_000)
+            .map(|ix| MoonMenuItem::new(format!("{MENU_MEASUREMENT_PROBE_PREFIX}{ix}")))
+            .collect();
+
+        let before = menu_measurement_probe_count();
+        let _ = resolve_virtual_menu_width(
+            MoonMenuWidth::Fit {
+                min: 50.0,
+                max: 2000.0,
+            },
+            &items,
+            metrics,
+            &tokens,
+            cx,
+            false,
+            100.0,
+        );
+        let measured = menu_measurement_probe_count() - before;
+
+        // The probe counter is a shared global, so a small amount of cross-test contamination
+        // from concurrently running tests is expected (the same reason
+        // `fitted_large_menu_measures_only_its_visible_window` uses a `< 500` margin rather than
+        // an exact count). 1,000 stays an order of magnitude below the 5,000-row source while
+        // comfortably clearing that noise.
+        assert!(
+            measured < 1_000,
+            "virtual menu width measured {measured} rows for a 5,000-row source, expected a bounded sample near {MENU_WIDTH_SAMPLE_ROWS}"
+        );
+    });
+}
+
+/// `dropdown.rs:resolve_virtual_menu_width`'s truncation flag must read the SAMPLE it actually
+/// measured (`measured_rows.len() < items.len()`), not the height-only prefix it derives that
+/// sample from. The height prefix is virtually always shorter than the full list for any menu
+/// bigger than one screen, so reverting to it (`initial_rows.len() < items.len()`, the pre-fix
+/// expression) reports "must truncate" even for an ordinary-size menu whose whole list was already
+/// measured for width, forcing labels to truncate that already fit.
+#[gpui::test]
+fn virtual_menu_width_truncation_follows_the_measured_sample(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    cx.update(|cx| {
+        let tokens = MoonThemeTokens::default();
+        let metrics = MoonPopupMenu::new("width-sample-truncation")
+            .size(MoonMenuSize::Compact)
+            .metrics()
+            .scaled(&tokens);
+        // Over the 64-row virtualization threshold but comfortably under the 128-row sample, so
+        // the whole list is measured; a small height budget keeps the height-only prefix (a
+        // handful of rows) far shorter than the full 100-row list.
+        let items: Vec<_> = (0..100)
+            .map(|ix| MoonMenuItem::new(format!("Short {ix}")))
+            .collect();
+
+        let (_, truncate) = resolve_virtual_menu_width(
+            MoonMenuWidth::Fit {
+                min: 50.0,
+                max: 2000.0,
+            },
+            &items,
+            metrics,
+            &tokens,
+            cx,
+            false,
+            100.0,
+        );
+
+        assert!(
+            !truncate,
+            "the whole 100-row list was measured (sample cap is 128), so no row-count truncation was needed"
+        );
+    });
 }
 
 /// `dropdown.rs:fit_dropdown_trigger_label` must preserve the caret and clamp against a
