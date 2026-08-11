@@ -316,11 +316,46 @@ const CANDIDATE_VKEYS: &[VIRTUAL_KEY] = &[
 
 #[cfg(test)]
 mod tests {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        ACTIVATE_KEYBOARD_LAYOUT_FLAGS, ActivateKeyboardLayout, GetKeyboardLayout, HKL,
+        LoadKeyboardLayoutW,
+    };
+    use windows::core::w;
+
     use crate::WindowsKeyboardMapper;
     use gpui::{Keystroke, Modifiers, PlatformKeyboardMapper};
 
+    /// Pins the calling thread to the US layout, restoring the previous one when dropped.
+    ///
+    /// The mapper reads the shifted character of the LIVE layout (`get_shifted_key` asks
+    /// `ToUnicode`), while the expectations below are written against the US one. Without this, a
+    /// machine whose active layout is not US fails the test for a reason that has nothing to do
+    /// with the mapper: on the Russian layout shift+VK_4 is ';', not '$'.
+    struct UsLayout(HKL);
+
+    impl UsLayout {
+        fn activate() -> Self {
+            let previous = unsafe { GetKeyboardLayout(0) };
+            let us =
+                unsafe { LoadKeyboardLayoutW(w!("00000409"), ACTIVATE_KEYBOARD_LAYOUT_FLAGS(0)) }
+                    .expect("the US keyboard layout these expectations are written against");
+            unsafe { ActivateKeyboardLayout(us, ACTIVATE_KEYBOARD_LAYOUT_FLAGS(0)) }
+                .expect("activating the US keyboard layout for this thread");
+            Self(previous)
+        }
+    }
+
+    impl Drop for UsLayout {
+        fn drop(&mut self) {
+            // The layout is per-thread, so this only ever restores the test's own thread.
+            unsafe { ActivateKeyboardLayout(self.0, ACTIVATE_KEYBOARD_LAYOUT_FLAGS(0)) }.ok();
+        }
+    }
+
     #[test]
     fn test_keyboard_mapper() {
+        // Held for the whole test: the mapper snapshots the layout when it is built.
+        let _us_layout = UsLayout::activate();
         let mapper = WindowsKeyboardMapper::new();
 
         // Normal case
