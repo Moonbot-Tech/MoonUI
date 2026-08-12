@@ -55,10 +55,20 @@ static MENU_PALETTE_PROBE_SHELL: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 /// Width policy for one popup-menu level.
-enum MoonMenuWidth {
+pub(super) enum MoonMenuWidth {
     Rendered(f32),
     Scaled(f32),
     Fit { min: f32, max: f32 },
+}
+
+impl MoonMenuWidth {
+    /// Return whether this policy measures content against the active font metrics.
+    ///
+    /// Returns:
+    ///     `true` for scaled and fitted policies; legacy rendered widths stay untouched.
+    pub(super) fn is_measured(self) -> bool {
+        !matches!(self, Self::Rendered(_))
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -275,6 +285,14 @@ impl MoonMenuLevel {
     ///     Shared row count.
     pub(super) fn len(&self) -> usize {
         self.items.len()
+    }
+
+    /// Borrow the retained rows for sibling layout consumers.
+    ///
+    /// Returns:
+    ///     The ordered immutable menu rows.
+    pub(super) fn as_slice(&self) -> &[MoonMenuItem] {
+        self.items.as_slice()
     }
 }
 
@@ -1114,6 +1132,87 @@ fn resolve_virtual_menu_width(
     )
 }
 
+/// Resolve one retained level's width and apply an already-rendered viewport ceiling.
+///
+/// Context menus use this before positioning so their clamp and the nested popup agree on the
+/// exact painted width. The ceiling is rendered geometry; design-reference fit bounds remain
+/// governed by the active font metrics.
+///
+/// Args:
+///     policy: Configured rendered, scaled, or fitted width policy.
+///     level: Shared menu rows and their layout signature.
+///     size: Menu density used to resolve row geometry.
+///     tokens: Active theme and scale tokens.
+///     cx: Application context used for text measurement.
+///     mono: Whether rows use the configured monospaced font.
+///     rendered_max_width: Optional already-rendered viewport-safe outer width.
+///
+/// Returns:
+///     Resolved outer width and whether labels must truncate to it.
+pub(super) fn resolve_menu_level_width(
+    policy: MoonMenuWidth,
+    level: &MoonMenuLevel,
+    size: MoonMenuSize,
+    tokens: &MoonThemeTokens,
+    cx: &App,
+    mono: bool,
+    rendered_max_width: Option<f32>,
+) -> (f32, bool) {
+    let metrics = menu_row_metrics(size, tokens);
+    let virtualized = menu_level_is_virtualized(level.len());
+    let outer_max = resolve_menu_outer_max(None, tokens, virtualized);
+    let content_max = menu_content_max(outer_max, tokens, 0.0, metrics);
+    let (mut width, mut truncate) = if virtualized {
+        resolve_virtual_menu_width(
+            policy,
+            level.as_slice(),
+            metrics,
+            tokens,
+            cx,
+            mono,
+            content_max,
+        )
+    } else {
+        resolve_menu_width(policy, level.as_slice(), metrics, tokens, cx, mono)
+    };
+    if policy.is_measured()
+        && let Some(max_width) = rendered_max_width
+        && width > max_width
+    {
+        width = max_width.max(1.0);
+        truncate = true;
+    }
+    (width, truncate)
+}
+
+/// Resolve one retained level's natural outer height inside a rendered cap.
+///
+/// Args:
+///     level: Shared menu rows in display order.
+///     size: Menu density used to resolve row geometry.
+///     tokens: Active theme and scale tokens.
+///     rendered_max_height: Already-rendered viewport-safe outer height.
+///
+/// Returns:
+///     Natural painted outer height, capped to the supplied viewport budget.
+pub(super) fn menu_level_outer_height(
+    level: &MoonMenuLevel,
+    size: MoonMenuSize,
+    tokens: &MoonThemeTokens,
+    rendered_max_height: f32,
+) -> f32 {
+    let metrics = menu_row_metrics(size, tokens);
+    let chrome = menu_outer_chrome(tokens);
+    let content_max = (rendered_max_height - chrome).max(metrics.row_height);
+    let content = capped_menu_items_height(
+        level.as_slice().iter().map(|item| item.kind),
+        metrics,
+        tokens,
+        content_max,
+    );
+    (chrome + content).min(rendered_max_height)
+}
+
 /// Return whether a menu row kind is allowed to dispatch click handlers.
 ///
 /// Args:
@@ -1465,6 +1564,7 @@ pub struct MoonPopupMenu {
     layout: MenuLayoutFingerprint,
     size: MoonMenuSize,
     width: MoonMenuWidth,
+    rendered_max_width: Option<f32>,
     max_height: Option<MoonMenuMaxHeight>,
     mono: bool,
     dropdown_selection: Option<std::rc::Rc<MoonDropdownSelectionContext>>,
@@ -1494,6 +1594,7 @@ impl MoonPopupMenu {
             layout: MenuLayoutFingerprint::new(),
             size: MoonMenuSize::Normal,
             width: MoonMenuWidth::Rendered(160.0),
+            rendered_max_width: None,
             max_height: None,
             mono: true,
             dropdown_selection: None,
@@ -1622,8 +1723,20 @@ impl MoonPopupMenu {
     ///
     /// Returns:
     ///     The updated nested menu.
-    fn width_policy(mut self, width: MoonMenuWidth) -> Self {
+    pub(super) fn width_policy(mut self, width: MoonMenuWidth) -> Self {
         self.width = width;
+        self
+    }
+
+    /// Cap measured widths to an already-rendered viewport budget.
+    ///
+    /// Args:
+    ///     max_width: Maximum outer width in rendered pixels.
+    ///
+    /// Returns:
+    ///     The updated menu.
+    pub(super) fn rendered_max_width(mut self, max_width: f32) -> Self {
+        self.rendered_max_width = Some(max_width);
         self
     }
 
@@ -1820,7 +1933,7 @@ impl MoonPopupMenu {
         };
         let content_max = menu_content_max(resolved_outer_max, &tokens, header_budget, metrics);
 
-        let (width, truncate_labels) = if let Some(cx) = cx {
+        let (mut width, mut truncate_labels) = if let Some(cx) = cx {
             if virtualized {
                 resolve_virtual_menu_width(
                     self.width,
@@ -1842,6 +1955,13 @@ impl MoonPopupMenu {
                 }
             }
         };
+        if self.width.is_measured()
+            && let Some(max_width) = self.rendered_max_width
+            && width > max_width
+        {
+            width = max_width.max(1.0);
+            truncate_labels = true;
+        }
         let shadow = super::foundation::box_shadow(
             px(0.0),
             px(8.0),
@@ -2837,7 +2957,24 @@ impl RenderOnce for MoonDropdown {
                     .size(menu_size)
                     .width_policy(menu_width)
                     .mono(true);
-                if let Some(max_height) = menu_max_height {
+                if menu_width.is_measured() {
+                    let viewport = window.viewport_size();
+                    let viewport_max_width = (f32::from(viewport.width) - 16.0).max(1.0);
+                    // The deferred anchor fits the content wrapper, and this menu sits below an
+                    // in-wrapper top offset. Pay for that offset here or a nominal viewport-height
+                    // menu still extends past the bottom by exactly the trigger compensation plus
+                    // gap used below.
+                    let popover_top_offset = trigger_height + tokens.ui(menu_offset_y);
+                    let viewport_max_height =
+                        (f32::from(viewport.height) - 16.0 - popover_top_offset).max(80.0);
+                    let resolved_max_height = menu_max_height
+                        .map(|height| height.resolve(&tokens))
+                        .unwrap_or(viewport_max_height)
+                        .min(viewport_max_height);
+                    menu = menu
+                        .rendered_max_width(viewport_max_width)
+                        .max_height(resolved_max_height);
+                } else if let Some(max_height) = menu_max_height {
                     menu = menu.max_height_policy(max_height);
                 }
                 // Built here rather than stored: this closure runs on every popup render, so a
