@@ -75,7 +75,9 @@ struct DirectWriteState {
     custom_font_collection: IDWriteFontCollection1,
     fonts: Vec<FontInfo>,
     font_to_font_id: HashMap<Font, FontId>,
-    font_info_cache: HashMap<usize, FontId>,
+    /// Maps a font face's raw COM address to its [`FontId`], keeping the face alive so the address
+    /// cannot be recycled by an unrelated font while the entry lives. See `DrawGlyphRun`.
+    font_info_cache: HashMap<usize, (IDWriteFontFace3, FontId)>,
     layout_line_scratch: Vec<u16>,
 }
 
@@ -321,8 +323,10 @@ impl DirectWriteState {
 
             let font_id = FontId(this.fonts.len());
             let font_face_key = info.font_face.cast::<IUnknown>().unwrap().as_raw().addr();
+            let font_face = info.font_face.clone();
             this.fonts.push(info);
-            this.font_info_cache.insert(font_face_key, font_id);
+            this.font_info_cache
+                .insert(font_face_key, (font_face, font_id));
             Some(font_id)
         };
 
@@ -1494,32 +1498,34 @@ impl IDWriteTextRenderer_Impl for TextRenderer_Impl {
         };
 
         let font_face_key = font_face.cast::<IUnknown>().unwrap().as_raw().addr();
-        let font_id = context
-            .text_system
-            .font_info_cache
-            .get(&font_face_key)
-            .copied()
+        // The key is the face's raw COM address, which identifies a font only while that face is
+        // alive. DirectWrite frees a fallback face together with the layout that produced it, and a
+        // face for a DIFFERENT font then lands on the same address: the stale entry hands the run's
+        // glyph ids to the wrong font, which DirectWrite serves as `.notdef` rather than an error -
+        // the boxes that show up in place of CJK text and stay until the shaped line leaves the
+        // layout cache. Keeping the face in the entry pins that address for as long as the entry
+        // lives, which is what makes the address a sound identity here.
+        let font_id = match context.text_system.font_info_cache.get(&font_face_key) {
+            Some((_, font_id)) => *font_id,
             // in some circumstances, we might be getting served a FontFace that we did not create ourselves
             // so create a new font from it and cache it accordingly. The usual culprit here seems to be Segoe UI Symbol
-            .map_or_else(
-                || {
-                    let font = font_face_to_font(font_face, &self.locale)
-                        .ok_or_else(|| Error::new(DWRITE_E_NOFONT, "Failed to create font"))?;
-                    let font_id = match context.text_system.font_to_font_id.get(&font) {
-                        Some(&font_id) => font_id,
-                        None => context
-                            .text_system
-                            .select_and_cache_font(context.components, &font)
-                            .ok_or_else(|| Error::new(DWRITE_E_NOFONT, "Failed to create font"))?,
-                    };
-                    context
+            None => {
+                let font = font_face_to_font(font_face, &self.locale)
+                    .ok_or_else(|| Error::new(DWRITE_E_NOFONT, "Failed to create font"))?;
+                let font_id = match context.text_system.font_to_font_id.get(&font) {
+                    Some(&font_id) => font_id,
+                    None => context
                         .text_system
-                        .font_info_cache
-                        .insert(font_face_key, font_id);
-                    windows::core::Result::Ok(font_id)
-                },
-                Ok,
-            )?;
+                        .select_and_cache_font(context.components, &font)
+                        .ok_or_else(|| Error::new(DWRITE_E_NOFONT, "Failed to create font"))?,
+                };
+                context
+                    .text_system
+                    .font_info_cache
+                    .insert(font_face_key, (font_face.clone(), font_id));
+                font_id
+            }
+        };
 
         let color_font = unsafe { font_face.IsColorFont().as_bool() };
 
