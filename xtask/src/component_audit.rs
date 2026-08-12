@@ -603,9 +603,11 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &[
                 "context_menu_origin_clamps_to_viewport_edges",
                 "context_menu_requested_max_height_limits_vertical_clamp",
+                "fitted_root_context_menu_grows_and_stays_inside_scaled_viewports",
+                "fitted_root_context_menu_dismisses_once_per_escape_or_outside_click",
             ],
             &tests,
-            "context menu origin must clamp to the viewport edges and honor max-height",
+            "context menu origin must clamp fitted width and height to the viewport while the Root-owned route preserves one-shot dismissal",
         ),
         test_contract(
             "dropdown.select_behavior",
@@ -634,9 +636,10 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &[
                 "fitted_trigger_preserves_caret_at_independent_scale_extremes",
                 "scaled_trigger_uses_font_width_without_clipping_component_chrome",
+                "fitted_dropdown_stays_inside_both_viewport_edges_at_independent_scales",
             ],
             &tests,
-            "fitted and scaled dropdown triggers must preserve their component-owned caret and chrome across independent UI and font scales",
+            "fitted and scaled dropdowns must preserve trigger chrome and keep their open menus inside the viewport across independent UI and font scales",
         ),
         test_contract(
             "popup_menu.fitted_width",

@@ -19,29 +19,29 @@ use moon_ui::{
     MoonBadgeVariant, MoonBreadcrumb, MoonBreadcrumbItem, MoonButton, MoonButtonIconSlot,
     MoonButtonSegment, MoonButtonSize, MoonButtonVariant, MoonCalendar, MoonCalendarState,
     MoonCheckbox, MoonCheckboxSize, MoonCollapsible, MoonColorPicker, MoonColorPickerState,
-    MoonCombobox, MoonComboboxState, MoonComponentIndexPath, MoonContextMenu, MoonDataCell,
-    MoonDataRow, MoonDataTable, MoonDataTableColumn, MoonDataTableState, MoonDatePicker,
-    MoonDatePickerState, MoonDateTimePicker, MoonDateTimePickerState, MoonDescriptionList,
-    MoonDisclosure, MoonDisclosureDirection, MoonDockPanel, MoonDropdown, MoonFormRow,
-    MoonGroupBox, MoonHotkeyInput, MoonHoverCard, MoonInput, MoonInputMaskPattern, MoonKbd,
-    MoonKbdSize, MoonLabel, MoonLink, MoonList, MoonListDelegate, MoonListItem, MoonListState,
-    MoonMenuItem, MoonMenuSize, MoonNativeMenu, MoonNotification, MoonNumberFieldOptions,
-    MoonPagination, MoonPalette, MoonPlacement, MoonPopover, MoonPopoverPlacement, MoonPopupMenu,
-    MoonPresetItem, MoonPresetStrip, MoonProgress, MoonProgressCircle, MoonProgressCircleSize,
-    MoonRadio, MoonRadioSize, MoonRating, MoonResizablePanelGroup, MoonScrollableElement,
-    MoonScrollbarVisibility, MoonSearchableVec, MoonSegmentItem, MoonSegmentedControl, MoonSelect,
-    MoonSelectItem, MoonSelectState, MoonSelectorPill, MoonSelectorSegment, MoonSeparator,
-    MoonSettingField, MoonSettingGroup, MoonSettingItem, MoonSettingPage, MoonSettings,
-    MoonSidebar, MoonSidebarGroup, MoonSidebarMenu, MoonSidebarMenuItem, MoonSidebarToggleButton,
-    MoonSkeleton, MoonSlider, MoonSliderState, MoonSpinner, MoonSpinnerSize, MoonStatusBar,
-    MoonStatusIndicator, MoonStatusItem, MoonStepper, MoonSurface, MoonSurfaceVariant, MoonSwitch,
-    MoonTabItem, MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle,
-    MoonTag, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonTimePicker,
-    MoonTimePickerState, MoonToggle, MoonToggleSize, MoonTone, MoonTooltip, MoonTooltipPlacement,
-    MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem, MoonTreeSelectionMode, MoonTreeState,
-    MoonVirtualList, MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame,
-    MoonWindowFrameBrand, MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex,
-    moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
+    MoonCombobox, MoonComboboxState, MoonComponentIndexPath, MoonContextMenu,
+    MoonContextMenuWindowExt as _, MoonDataCell, MoonDataRow, MoonDataTable, MoonDataTableColumn,
+    MoonDataTableState, MoonDatePicker, MoonDatePickerState, MoonDateTimePicker,
+    MoonDateTimePickerState, MoonDescriptionList, MoonDisclosure, MoonDisclosureDirection,
+    MoonDockPanel, MoonDropdown, MoonFormRow, MoonGroupBox, MoonHotkeyInput, MoonHoverCard,
+    MoonInput, MoonInputMaskPattern, MoonKbd, MoonKbdSize, MoonLabel, MoonLink, MoonList,
+    MoonListDelegate, MoonListItem, MoonListState, MoonMenuItem, MoonMenuSize, MoonNativeMenu,
+    MoonNotification, MoonNumberFieldOptions, MoonPagination, MoonPalette, MoonPlacement,
+    MoonPopover, MoonPopoverPlacement, MoonPopupMenu, MoonPresetItem, MoonPresetStrip,
+    MoonProgress, MoonProgressCircle, MoonProgressCircleSize, MoonRadio, MoonRadioSize, MoonRating,
+    MoonResizablePanelGroup, MoonScrollableElement, MoonScrollbarVisibility, MoonSearchableVec,
+    MoonSegmentItem, MoonSegmentedControl, MoonSelect, MoonSelectItem, MoonSelectState,
+    MoonSelectorPill, MoonSelectorSegment, MoonSeparator, MoonSettingField, MoonSettingGroup,
+    MoonSettingItem, MoonSettingPage, MoonSettings, MoonSidebar, MoonSidebarGroup, MoonSidebarMenu,
+    MoonSidebarMenuItem, MoonSidebarToggleButton, MoonSkeleton, MoonSlider, MoonSliderState,
+    MoonSpinner, MoonSpinnerSize, MoonStatusBar, MoonStatusIndicator, MoonStatusItem, MoonStepper,
+    MoonSurface, MoonSurfaceVariant, MoonSwitch, MoonTabItem, MoonTabStrip, MoonTableCell,
+    MoonTableColumn, MoonTableRow, MoonTableStyle, MoonTag, MoonText, MoonTextArea, MoonTheme,
+    MoonThemeConfig, MoonTimePicker, MoonTimePickerState, MoonToggle, MoonToggleSize, MoonTone,
+    MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem,
+    MoonTreeSelectionMode, MoonTreeState, MoonVirtualList, MoonVirtualListScrollHandle,
+    MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, PanelView,
+    Root, TabPanel, ThemeMode, h_flex, moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
 };
 
 const COMPONENT_COVERAGE: &[&str] = &[
@@ -3799,7 +3799,7 @@ impl Gallery {
                                 .trigger_caret(true)
                                 .fit_trigger_width(100.0, 180.0)
                                 .default_open(false)
-                                .fit_menu_width(120.0, 240.0)
+                                .fit_menu_width(220.0, 560.0)
                                 .items([
                                     MoonMenuItem::with_key("Auto", "Auto")
                                         .selected(self.dropdown_value.as_ref() == "Auto"),
@@ -3812,6 +3812,9 @@ impl Gallery {
                                         MoonMenuItem::new("Bid view"),
                                         MoonMenuItem::new("Ask view"),
                                     ]),
+                                    MoonMenuItem::new(
+                                        "Only current market orders with a long translated label",
+                                    ),
                                 ])
                                 .on_select({
                                     let view = view.clone();
@@ -3876,10 +3879,10 @@ impl Gallery {
                                         .variant(MoonButtonVariant::Panel)
                                         .on_click({
                                             let view = view.clone();
-                                            move |_, _, app| {
+                                            move |_, window, app| {
+                                                let opening = !view.read(app).context_menu_open;
                                                 view.update(app, |this, cx| {
-                                                    this.context_menu_open =
-                                                        !this.context_menu_open;
+                                                    this.context_menu_open = opening;
                                                     this.push_event(
                                                         format!(
                                                             "Context menu open: {}",
@@ -3888,6 +3891,38 @@ impl Gallery {
                                                         cx,
                                                     );
                                                 });
+                                                if opening {
+                                                    let weak = view.downgrade();
+                                                    window.open_fitted_moon_context_menu_with_dismiss(
+                                                        app,
+                                                        "gallery-context-menu",
+                                                        window.mouse_position(),
+                                                        vec![
+                                                            MoonMenuItem::new("Root context"),
+                                                            MoonMenuItem::new(
+                                                                "Add to selected cores blacklist (56)",
+                                                            ),
+                                                            MoonMenuItem::new(
+                                                                "Add to strategy with a deliberately long name",
+                                                            ),
+                                                            MoonMenuItem::new("Delete")
+                                                                .tone(MoonTone::Danger),
+                                                        ],
+                                                        220.0..=560.0,
+                                                        move |window, app| {
+                                                            window.close_context_menu(app);
+                                                            _ = weak.update(app, |this, cx| {
+                                                                this.context_menu_open = false;
+                                                                this.push_event(
+                                                                    "Context menu dismissed",
+                                                                    cx,
+                                                                );
+                                                            });
+                                                        },
+                                                    );
+                                                } else {
+                                                    window.close_context_menu(app);
+                                                }
                                             }
                                         })
                                         .render(),
@@ -3915,17 +3950,6 @@ impl Gallery {
                             MoonMenuItem::new("Danger").tone(MoonTone::Danger),
                         ])
                         .render(),
-                )
-                .child(
-                    MoonContextMenu::new("gallery-context-menu")
-                        .position(point(px(760.0), px(182.0)))
-                        .open(self.context_menu_open)
-                        .width(190.0)
-                        .items([
-                            MoonMenuItem::new("Root context"),
-                            MoonMenuItem::new("Move").right_label("M"),
-                            MoonMenuItem::new("Delete").tone(MoonTone::Danger),
-                        ]),
                 ),
             )
     }

@@ -25,6 +25,8 @@ const DROPDOWN_ID: &str = "geometry-probe";
 /// `MoonDropdown::render` names its menu `{id}:menu`, and `MoonPopupMenu` registers that id as its
 /// debug selector.
 const MENU_SELECTOR: &str = "geometry-probe:menu";
+/// Debug selector for the fitted dropdown opened against both viewport edges.
+const FITTED_VIEWPORT_MENU_SELECTOR: &str = "fitted-viewport:menu";
 
 /// Catches removing the incremental `layout.push` call from
 /// `dropdown.rs:MoonPopupMenu::{item,items}`. Without the ordered signature, retained virtual
@@ -97,6 +99,42 @@ fn cloned_menu_items_share_immutable_submenu_storage() {
 struct DropdownHarness {
     trigger_bounds: Rc<RefCell<Vec<gpui::Bounds<gpui::Pixels>>>>,
     trigger_rect: Option<MoonRect>,
+}
+
+/// Root view holding a long fitted dropdown at the viewport's bottom-right corner.
+struct FittedViewportDropdownHarness;
+
+impl gpui::Render for FittedViewportDropdownHarness {
+    /// Render enough long rows to require both width fitting and a viewport-height cap.
+    ///
+    /// Args:
+    ///     window: Test window whose current viewport supplies the edge placement.
+    ///     _cx: View context unused by the stateless harness.
+    ///
+    /// Returns:
+    ///     An absolutely positioned open dropdown.
+    fn render(
+        &mut self,
+        window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        let viewport = window.viewport_size();
+        let items = (0..48).map(|index| {
+            MoonMenuItem::new(format!(
+                "Only current market orders with a deliberately long localized label {index}"
+            ))
+        });
+        MoonDropdown::new("fitted-viewport")
+            .bounds(MoonRect::new(
+                f32::from(viewport.width) - 24.0,
+                f32::from(viewport.height) - 24.0,
+                20.0,
+                20.0,
+            ))
+            .default_open(true)
+            .fit_menu_width(220.0, 560.0)
+            .items(items)
+    }
 }
 
 impl gpui::Render for DropdownHarness {
@@ -355,6 +393,63 @@ fn open_menu_hangs_just_below_its_trigger(cx: &mut gpui::TestAppContext) {
 fn supplied_bounds_menu_also_hangs_just_below_its_trigger(cx: &mut gpui::TestAppContext) {
     let (trigger, menu) = open_and_measure(cx, Some(MoonRect::new(40.0, 24.0, 120.0, 26.0)));
     assert_menu_hugs_trigger(trigger, menu);
+}
+
+/// Catches removing the viewport width/height caps from the fitted dropdown render path. The
+/// settings menu would still compile, but long translated rows or a large independent scale would
+/// reproduce the screenshot's clipping and let the row stack escape the window bottom.
+#[gpui::test]
+fn fitted_dropdown_stays_inside_both_viewport_edges_at_independent_scales(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(crate::init);
+    for (palette, scale) in [
+        (
+            MoonPalette::TERMINAL,
+            MoonScale {
+                ui: 0.9,
+                font: 1.35,
+                font_delta: 2.0,
+            },
+        ),
+        (
+            MoonPalette::LIGHT,
+            MoonScale {
+                ui: 1.35,
+                font: 0.9,
+                font_delta: 2.0,
+            },
+        ),
+    ] {
+        cx.update(|cx| {
+            let theme = MoonTheme::global_mut(cx);
+            theme.palette = palette;
+            theme.scale = scale;
+        });
+        let window = cx.add_window(|_, _| FittedViewportDropdownHarness);
+        let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+        let menu = (0..8)
+            .find_map(|_| {
+                visual.update(|window, _| window.refresh());
+                visual.run_until_parked();
+                visual.debug_bounds(FITTED_VIEWPORT_MENU_SELECTOR)
+            })
+            .expect("fitted viewport dropdown must render its deferred menu");
+        let viewport = visual.update(|window, _| window.viewport_size());
+
+        assert!(
+            menu.size.width > gpui::px(220.0),
+            "long fitted dropdown stayed at its old fixed width in {palette:?} at {scale:?}"
+        );
+        assert!(
+            menu.origin.x >= gpui::px(0.0) && menu.right() <= viewport.width,
+            "fitted dropdown escaped the horizontal viewport in {palette:?} at {scale:?}: {menu:?}"
+        );
+        assert!(
+            menu.origin.y >= gpui::px(0.0) && menu.bottom() <= viewport.height,
+            "fitted dropdown escaped the vertical viewport in {palette:?} at {scale:?}: {menu:?}"
+        );
+    }
 }
 
 /// `dropdown.rs:MoonMenuItem::action_label` must retain the label visual role while explicitly
