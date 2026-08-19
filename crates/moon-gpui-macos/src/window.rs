@@ -29,8 +29,8 @@ use gpui::{
     MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, PlatformAtlas,
     PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point, PromptButton,
     PromptLevel, RequestFrameOptions, Rgba, SharedString, Size, SystemWindowTab, WindowAppearance,
-    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind, WindowParams, point,
-    px, size,
+    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind, WindowParams,
+    macos_control_click_rewrite, point, px, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -2314,58 +2314,47 @@ extern "C" fn handle_view_event(this: &Object, _: Sel, native_event: id) {
         }
 
         match &mut event {
-            PlatformInput::MouseDown(
-                event @ MouseDownEvent {
-                    button: MouseButton::Left,
-                    modifiers: Modifiers { control: true, .. },
-                    ..
-                },
-            ) => {
-                // On mac, a ctrl-left click should be handled as a right click.
-                *event = MouseDownEvent {
-                    button: MouseButton::Right,
-                    modifiers: Modifiers {
-                        control: false,
-                        ..event.modifiers
-                    },
-                    click_count: 1,
-                    ..*event
-                };
+            PlatformInput::MouseDown(event) => {
+                // A ctrl-left click is handled as a right click only for an application that opted
+                // into that convention through `set_macos_control_click_as_secondary`; by default
+                // the press arrives as Left carrying Control, so an application gesture bound to
+                // ctrl-left can see it. The rewrite is lossy in both directions and cannot be
+                // undone downstream: it drops Control and flattens the click count.
+                if let Some((button, modifiers)) =
+                    macos_control_click_rewrite(event.button, event.modifiers)
+                {
+                    *event = MouseDownEvent {
+                        button,
+                        modifiers,
+                        click_count: 1,
+                        ..*event
+                    };
+                } else if lock.first_mouse && event.button == MouseButton::Left {
+                    // Handles focusing click.
+                    *event = MouseDownEvent {
+                        first_mouse: true,
+                        ..*event
+                    };
+                    lock.first_mouse = false;
+                }
             }
 
-            // Handles focusing click.
-            PlatformInput::MouseDown(
-                event @ MouseDownEvent {
-                    button: MouseButton::Left,
-                    ..
-                },
-            ) if (lock.first_mouse) => {
-                *event = MouseDownEvent {
-                    first_mouse: true,
-                    ..*event
-                };
-                lock.first_mouse = false;
-            }
-
-            // Because we map a ctrl-left_down to a right_down -> right_up let's ignore
-            // the ctrl-left_up to avoid having a mismatch in button down/up events if the
-            // user is still holding ctrl when releasing the left mouse button
-            PlatformInput::MouseUp(
-                event @ MouseUpEvent {
-                    button: MouseButton::Left,
-                    modifiers: Modifiers { control: true, .. },
-                    ..
-                },
-            ) => {
-                *event = MouseUpEvent {
-                    button: MouseButton::Right,
-                    modifiers: Modifiers {
-                        control: false,
-                        ..event.modifiers
-                    },
-                    click_count: 1,
-                    ..*event
-                };
+            // Because we map a ctrl-left_down to a right_down -> right_up let's map
+            // the ctrl-left_up as well, to avoid a mismatch in button down/up events if the
+            // user is still holding ctrl when releasing the left mouse button. Both halves read
+            // the switch independently, so it belongs to application setup: flipping it between a
+            // press and its release is the one way to still get a mismatched pair.
+            PlatformInput::MouseUp(event) => {
+                if let Some((button, modifiers)) =
+                    macos_control_click_rewrite(event.button, event.modifiers)
+                {
+                    *event = MouseUpEvent {
+                        button,
+                        modifiers,
+                        click_count: 1,
+                        ..*event
+                    };
+                }
             }
 
             _ => {}
