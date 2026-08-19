@@ -102,6 +102,10 @@ Three kinds of Rust test have three homes:
 - Intentional API removals, component-class changes, or donor drift are declared before baselines
   are refreshed. Never update a baseline merely to make a regression pass, and always inspect the
   baseline diff before keeping it.
+- A change that ADDS public API refreshes `docs/component-api-baseline.json` in the same pull
+  request; the snapshot check fails on an addition it does not know. That keeps the file a
+  description of the surface rather than a record of the part somebody once wrote down, and keeps
+  the next signature change from arriving with a backlog of other people's additions attached.
 
 ## Commits and pull requests
 
