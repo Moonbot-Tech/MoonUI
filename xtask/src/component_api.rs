@@ -82,6 +82,9 @@ pub fn run(options: ApiOptions) -> Result<()> {
             for failure in &failures {
                 println!("  - {failure}");
             }
+            println!("  fix: record an intended change with");
+            println!("       cargo xtask component-api --update-baseline");
+            println!("  a removal is declared in docs/component-api-removals.json with its reason");
         }
     }
 
@@ -177,6 +180,19 @@ fn compare_api(
             ));
         }
     }
+    // Additions are reported too, so the file keeps DESCRIBING the surface instead of only
+    // guarding the part of it somebody once wrote down. An addition left unrecorded is not a
+    // removal today, but it is unguarded against one tomorrow, and it makes the next legitimate
+    // signature change arrive with a stranger's backlog attached to it.
+    let baseline_set = baseline.items.iter().collect::<BTreeSet<_>>();
+    for item in &current.items {
+        if !baseline_set.contains(item) {
+            failures.push(format!(
+                "public API added and not recorded: {} :: {}",
+                item.file, item.signature
+            ));
+        }
+    }
     failures
 }
 
@@ -266,7 +282,63 @@ fn collect_signature(lines: &[&str], start: usize) -> (String, usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::collect_signature;
+    use super::{ApiItem, ApiSnapshot, collect_signature, compare_api};
+    use std::collections::BTreeSet;
+
+    fn item(signature: &str) -> ApiItem {
+        ApiItem {
+            file: "crates/moon-ui-components/src/moon/button.rs".to_string(),
+            signature: signature.to_string(),
+        }
+    }
+
+    fn snapshot(signatures: &[&str]) -> ApiSnapshot {
+        ApiSnapshot {
+            version: 1,
+            items: signatures.iter().map(|s| item(s)).collect(),
+        }
+    }
+
+    /// Catches letting an addition pass unrecorded, which is how the baseline drifted 87 items
+    /// behind the code: only removals were compared, so a new public builder never touched the
+    /// file. Everything it does not list is also unguarded against a later removal, and the next
+    /// legitimate signature change has to sweep the whole backlog into its own diff.
+    #[test]
+    fn an_unrecorded_addition_fails_the_check() {
+        let baseline = snapshot(&["pub fn caret(self) -> Self"]);
+        let current = snapshot(&[
+            "pub fn caret(self) -> Self",
+            "pub fn rotation(self) -> Self",
+        ]);
+
+        let failures = compare_api(&baseline, &current, &BTreeSet::new());
+
+        assert_eq!(failures.len(), 1, "{failures:?}");
+        assert!(
+            failures[0].contains("added and not recorded")
+                && failures[0].contains("pub fn rotation(self) -> Self"),
+            "{failures:?}"
+        );
+        assert!(
+            compare_api(&current, &current, &BTreeSet::new()).is_empty(),
+            "a recorded surface must pass"
+        );
+    }
+
+    /// Catches losing the removal half while adding the addition half: a removed builder breaks
+    /// MoonTerminal's next `cargo update`, which is the reason this guardrail exists at all.
+    #[test]
+    fn a_removal_still_fails_unless_it_is_declared() {
+        let baseline = snapshot(&["pub fn caret(self) -> Self"]);
+        let current = snapshot(&[]);
+
+        let failures = compare_api(&baseline, &current, &BTreeSet::new());
+        assert_eq!(failures.len(), 1, "{failures:?}");
+        assert!(failures[0].contains("removed/changed"), "{failures:?}");
+
+        let approved = BTreeSet::from([item("pub fn caret(self) -> Self")]);
+        assert!(compare_api(&baseline, &current, &approved).is_empty());
+    }
 
     #[test]
     fn collect_signature_keeps_multiline_pub_use_until_semicolon() {

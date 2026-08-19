@@ -163,8 +163,17 @@ docs/component-api-baseline.json
 
 This guard catches accidental removals or signature changes in public component
 builders, events, public structs, enums, types, constants and facade exports.
-Adding new API is allowed. Removing or changing existing API must be an approved
-migration, not an accidental side effect of refactoring.
+Removing or changing existing API must be an approved migration, not an
+accidental side effect of refactoring; a removal is declared in
+`docs/component-api-removals.json` with its reason.
+
+Adding API is allowed, and the addition is recorded: the check fails on a public
+item the baseline does not know, so an addition carries
+`--update-baseline` in the same change. Without that the file describes only the
+part of the surface somebody once wrote down — items it never learned about are
+unguarded against a later removal, and the next legitimate signature change has
+to sweep the accumulated backlog into its own diff, where a reviewer can no
+longer tell the two apart. That is exactly how it fell 87 items behind.
 
 ## Mirror Source Guard
 
