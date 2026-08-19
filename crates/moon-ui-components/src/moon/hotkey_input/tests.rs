@@ -191,3 +191,34 @@ fn hotkey_input_modifier_watch_is_silent_while_idle() {
         "not even a Caps Lock flip records while idle"
     );
 }
+
+/// Catches reading the state a window is re-told on activation as a press.
+///
+/// Windows re-announces the whole modifier state when a window comes back (`WM_ACTIVATE`
+/// synthesizes a modifiers-changed event), because a window without focus is not told about
+/// key-ups. Without [`MoonHotkeyModifierWatch::forget`] and the unprimed guard, Caps Lock flipped
+/// in another application fires the binding the moment the user clicks back in, and Alt still held
+/// from the Alt+Tab that brought them there fires on release — a keypress nobody made.
+#[test]
+fn a_state_snapshot_after_losing_focus_is_not_a_press() {
+    let mut watch = MoonHotkeyModifierWatch::default();
+    watch.prime(Modifiers::none(), Capslock { on: false });
+    watch.forget();
+
+    // Coming back with Caps Lock flipped somewhere else, and with Alt still held from Alt+Tab.
+    assert_eq!(
+        watch.modifiers_changed(Modifiers::alt(), Capslock { on: true }, true),
+        MoonHotkeyCapture::Ignore,
+        "the re-announcement is the state, not a press"
+    );
+    assert_eq!(
+        watch.modifiers_changed(Modifiers::none(), Capslock { on: true }, true),
+        MoonHotkeyCapture::Ignore,
+        "releasing a modifier that was never pressed here records nothing"
+    );
+    // The watch is primed again, so an ordinary press right after still reads as one.
+    assert_eq!(
+        watch.modifiers_changed(Modifiers::none(), Capslock { on: false }, true),
+        MoonHotkeyCapture::Commit(Keystroke::parse("capslock").unwrap())
+    );
+}

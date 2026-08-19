@@ -551,6 +551,7 @@ fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
                 "hotkey_input_ignores_a_modifier_that_led_a_chord",
                 "hotkey_input_records_capslock_from_its_state_flip",
                 "hotkey_input_modifier_watch_is_silent_while_idle",
+                "a_state_snapshot_after_losing_focus_is_not_a_press",
             ],
             &tests,
             "MoonHotkeyInput must record complete shortcuts, including the keys that arrive as modifier changes, without stealing idle app keybindings",

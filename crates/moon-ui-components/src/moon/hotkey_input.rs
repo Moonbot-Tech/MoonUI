@@ -561,11 +561,23 @@ impl MoonHotkeyModifierWatch {
         self.tap = None;
     }
 
-    /// Give up on the lone-modifier candidate because a key was pressed while it was held.
+    /// Give up on the lone-modifier candidate because something else happened while it was held.
     ///
-    /// The modifier turned out to be a chord prefix, and releasing it must not record it.
+    /// The modifier turned out to be a prefix — of a chord, or of a mouse gesture — and releasing
+    /// it must not record it on its own.
     pub fn interrupt(&mut self) {
         self.tap = None;
+    }
+
+    /// Forget the keyboard state, so the next event is read as a snapshot and not as a press.
+    ///
+    /// A window that loses focus stops being told about key-ups, so the platform re-announces the
+    /// whole modifier state when it comes back — on Windows by synthesizing a modifiers-changed
+    /// event from `WM_ACTIVATE`. Without this, Caps Lock flipped in another application reads as a
+    /// press here, and a modifier still held from the Alt+Tab that brought the window back arms a
+    /// tap that fires the moment the user lets go.
+    pub fn forget(&mut self) {
+        *self = Self::default();
     }
 
     /// Fold one modifiers-changed event into the watch and report what it means.
@@ -578,10 +590,13 @@ impl MoonHotkeyModifierWatch {
         capslock: Capslock,
         active: bool,
     ) -> MoonHotkeyCapture {
+        let primed = self.capslock.is_some();
         let previous = std::mem::replace(&mut self.modifiers, modifiers);
         let capslock_changed = self.capslock.replace(capslock.on) == Some(!capslock.on);
 
-        if !active {
+        // An unprimed watch is only learning the state the keyboard is already in — it must not
+        // read that as a Caps Lock press, nor arm a tap for a modifier that went down elsewhere.
+        if !active || !primed {
             self.tap = None;
             return MoonHotkeyCapture::Ignore;
         }
