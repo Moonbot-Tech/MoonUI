@@ -34,6 +34,16 @@ cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 
    - raw GPU hooks for DirectX, Metal, and wgpu
    - retained GPU canvas prepare/draw integration
    - visible-canvas pacing hooks where the platform needs them
+   - macOS Control-click policy: Zed rewrites a ctrl-left press into a right
+     click unconditionally, dropping the Control flag and the click count with
+     it, which makes a ctrl-left application gesture unreachable. MoonUI passes
+     the press through by default and keeps the editor convention as an opt-in
+     (`gpui::set_macos_control_click_as_secondary`). A re-sync will bring the
+     unconditional rewrite back in `moon-gpui-macos/src/window.rs` — keep the
+     call to `macos_control_click_rewrite` instead.
+   - `Window::is_text_input_active`: reports whether the drawn frame installed a
+     text-input handler. An application binding a bare key (Caps Lock, a lone
+     modifier) needs it, because those arrive whatever has focus.
 
 2. Zed bugfix candidates kept separate from `gpu_canvas` when possible:
    - Windows DPI/restore-bounds behavior

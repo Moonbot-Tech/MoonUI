@@ -40,6 +40,9 @@ struct HotkeyMetrics {
 struct MoonHotkeyInputState {
     value: Option<Keystroke>,
     recording: bool,
+    /// Caps Lock and lone-modifier presses arrive as modifier changes rather than key presses, so
+    /// reading them takes state that outlives one event.
+    watch: MoonHotkeyModifierWatch,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -245,6 +248,7 @@ impl RenderOnce for MoonHotkeyInput {
             window.use_keyed_state(state_id.clone(), cx, move |_, _| MoonHotkeyInputState {
                 value: default_value,
                 recording: false,
+                watch: MoonHotkeyModifierWatch::default(),
             });
         let focus_handle = window
             .use_keyed_state(focus_id, cx, |_, cx| cx.focus_handle().tab_stop(true))
@@ -268,6 +272,10 @@ impl RenderOnce for MoonHotkeyInput {
         let on_change = self.on_change.clone();
         let capture_state = state.clone();
         let capture_focus = focus_handle.clone();
+        let modifier_state = state.clone();
+        let modifier_on_change = self.on_change.clone();
+        let controlled_modifiers = controlled;
+        let recording_override = self.recording;
         let active_tone = self.tone.color(p);
 
         let alpha = if disabled { 0.45 } else { 1.0 };
@@ -302,13 +310,23 @@ impl RenderOnce for MoonHotkeyInput {
                         move |_, window, cx| {
                             cx.stop_propagation();
                             focus_handle.focus(window, cx);
+                            let modifiers = window.modifiers();
+                            let capslock = window.capslock();
                             state.update(cx, |state, cx| {
                                 state.recording = true;
+                                // Adopt the keyboard's current state, or the first Caps Lock press
+                                // of this session reads as the first observation and is swallowed.
+                                state.watch.prime(modifiers, capslock);
                                 cx.notify();
                             });
                         }
                     })
                     .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                        // A real key landing while a modifier is held makes that modifier a chord
+                        // prefix, so releasing it afterwards must not record it on its own.
+                        if !is_modifier_key_name(event.keystroke.key.as_str()) {
+                            capture_state.update(cx, |state, _| state.watch.interrupt());
+                        }
                         let recording = self
                             .recording
                             .unwrap_or_else(|| capture_state.read(cx).recording);
@@ -317,8 +335,11 @@ impl RenderOnce for MoonHotkeyInput {
                             MoonHotkeyCapture::StartRecording => {
                                 cx.stop_propagation();
                                 capture_focus.focus(window, cx);
+                                let modifiers = window.modifiers();
+                                let capslock = window.capslock();
                                 capture_state.update(cx, |state, cx| {
                                     state.recording = true;
+                                    state.watch.prime(modifiers, capslock);
                                     cx.notify();
                                 });
                             }
@@ -357,6 +378,32 @@ impl RenderOnce for MoonHotkeyInput {
                                 if let Some(on_change) = &on_change {
                                     on_change(Some(stroke), window, cx);
                                 }
+                            }
+                        }
+                    })
+                    .on_modifiers_changed(move |event: &ModifiersChangedEvent, window, cx| {
+                        // The second half of recording: Caps Lock and the bare modifiers never
+                        // arrive as key presses, so `on_key_down` alone cannot record them.
+                        let recording =
+                            recording_override.unwrap_or_else(|| modifier_state.read(cx).recording);
+                        let capture = modifier_state.update(cx, |state, _| {
+                            state.watch.modifiers_changed(
+                                event.modifiers,
+                                event.capslock,
+                                recording,
+                            )
+                        });
+                        if let MoonHotkeyCapture::Commit(stroke) = capture {
+                            cx.stop_propagation();
+                            modifier_state.update(cx, |state, cx| {
+                                state.recording = false;
+                                if !controlled_modifiers {
+                                    state.value = Some(stroke.clone());
+                                }
+                                cx.notify();
+                            });
+                            if let Some(on_change) = &modifier_on_change {
+                                on_change(Some(stroke), window, cx);
                             }
                         }
                     })
@@ -479,6 +526,124 @@ fn hotkey_border_color(
     } else {
         p.border
     }
+}
+
+/// Cross-event state a recorder needs to read Caps Lock and lone-modifier presses.
+///
+/// Neither of those reaches an application as a key press. Windows turns `VK_CAPITAL` and the bare
+/// modifier keys into `ModifiersChanged` instead of a keystroke, and macOS reports the same through
+/// `NSFlagsChanged`, so a control that listens only to `on_key_down` can never record them however
+/// permissive its key filter is. Reading them takes state, because a lone modifier is only a
+/// binding of its own when it goes down and comes back up with nothing in between — while it is
+/// held it may still turn out to be the prefix of a chord.
+///
+/// An application that dispatches such a binding at runtime drives the same type, so the key it
+/// recorded and the key it later matches are decided by one implementation.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MoonHotkeyModifierWatch {
+    /// Modifier state as of the previous event; a tap can only start from nothing held.
+    modifiers: Modifiers,
+    /// Caps Lock as last observed, or `None` until an event first names it. The first observation
+    /// is not a press: it is only the state the keyboard was already in.
+    capslock: Option<bool>,
+    /// The lone modifier held right now with nothing pressed since, and therefore still able to
+    /// become a binding of its own when it is released.
+    tap: Option<&'static str>,
+}
+
+impl MoonHotkeyModifierWatch {
+    /// Adopt the state the window is already in, so the next event is read as a change.
+    ///
+    /// Without this the first Caps Lock press of a session is swallowed as the first observation.
+    pub fn prime(&mut self, modifiers: Modifiers, capslock: Capslock) {
+        self.modifiers = modifiers;
+        self.capslock = Some(capslock.on);
+        self.tap = None;
+    }
+
+    /// Give up on the lone-modifier candidate because a key was pressed while it was held.
+    ///
+    /// The modifier turned out to be a chord prefix, and releasing it must not record it.
+    pub fn interrupt(&mut self) {
+        self.tap = None;
+    }
+
+    /// Fold one modifiers-changed event into the watch and report what it means.
+    ///
+    /// `active` is the recorder's recording flag; an application dispatching a live binding passes
+    /// `true`. State is tracked either way, so the watch stays primed while it is `false`.
+    pub fn modifiers_changed(
+        &mut self,
+        modifiers: Modifiers,
+        capslock: Capslock,
+        active: bool,
+    ) -> MoonHotkeyCapture {
+        let previous = std::mem::replace(&mut self.modifiers, modifiers);
+        let capslock_changed = self.capslock.replace(capslock.on) == Some(!capslock.on);
+
+        if !active {
+            self.tap = None;
+            return MoonHotkeyCapture::Ignore;
+        }
+
+        // Caps Lock has no press event to wait for: the flip of its state IS the press. It is
+        // reported with whatever modifiers are held, so ctrl-capslock is recordable too.
+        if capslock_changed {
+            self.tap = None;
+            return MoonHotkeyCapture::Commit(Keystroke {
+                modifiers,
+                key: "capslock".to_string(),
+                key_char: None,
+            });
+        }
+
+        if !modifiers.modified() {
+            // Everything came back up. A modifier that was held alone the whole time is the
+            // binding; anything else releases into nothing.
+            return match self.tap.take() {
+                Some(key) => MoonHotkeyCapture::Commit(Keystroke {
+                    modifiers: Modifiers::none(),
+                    key: key.to_string(),
+                    key_char: None,
+                }),
+                None => MoonHotkeyCapture::Ignore,
+            };
+        }
+
+        // Arm a tap only when the press started from nothing held. Coming down from a chord —
+        // releasing Control while Alt stays down — leaves a lone modifier that the user pressed as
+        // part of something else, and recording it would be recording an accident.
+        self.tap = if previous.modified() {
+            None
+        } else {
+            lone_modifier_key(modifiers)
+        };
+        MoonHotkeyCapture::WaitForKey
+    }
+}
+
+/// The name GPUI parses a modifier-only shortcut back into, when exactly one modifier is held.
+///
+/// The names are `Keystroke::parse`'s own (`control` and `platform`, not `ctrl` and `cmd`), so a
+/// recorded binding survives the round trip through a settings file.
+fn lone_modifier_key(modifiers: Modifiers) -> Option<&'static str> {
+    let held = [
+        (modifiers.control, "control"),
+        (modifiers.alt, "alt"),
+        (modifiers.shift, "shift"),
+        (modifiers.platform, "platform"),
+        (modifiers.function, "function"),
+    ];
+    let mut only = None;
+    for (down, name) in held {
+        if down {
+            if only.is_some() {
+                return None;
+            }
+            only = Some(name);
+        }
+    }
+    only
 }
 
 pub fn moon_hotkey_capture(stroke: &Keystroke, recording: bool) -> MoonHotkeyCapture {

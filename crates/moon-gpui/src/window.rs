@@ -1092,6 +1092,9 @@ pub struct Window {
     pub(crate) tooltip_bounds: Option<TooltipBounds>,
     next_frame_callbacks: Rc<RefCell<Vec<FrameCallback>>>,
     pub(crate) dirty_views: FxHashSet<EntityId>,
+    /// Whether the last drawn frame installed a text-input handler, i.e. the focused element is
+    /// taking typed text. Read through [`Window::is_text_input_active`].
+    text_input_active: bool,
     focus_listeners: SubscriberSet<(), AnyWindowFocusListener>,
     pub(crate) focus_lost_listeners: SubscriberSet<(), AnyObserver>,
     default_prevented: bool,
@@ -1714,6 +1717,7 @@ impl Window {
             next_tooltip_id: TooltipId::default(),
             tooltip_bounds: None,
             dirty_views: FxHashSet::default(),
+            text_input_active: false,
             focus_listeners: SubscriberSet::new(),
             focus_lost_listeners: SubscriberSet::new(),
             default_prevented: true,
@@ -1877,6 +1881,15 @@ impl Window {
     /// Close this window.
     pub fn remove_window(&mut self) {
         self.removed = true;
+    }
+
+    /// Whether the focused element is taking typed text on the frame that was drawn last.
+    ///
+    /// An application binding a bare key — Caps Lock, a lone modifier, a single letter — has to
+    /// know this: those arrive whatever has focus, and firing on one while the user is typing into
+    /// a field runs the binding instead of the character they meant.
+    pub fn is_text_input_active(&self) -> bool {
+        self.text_input_active
     }
 
     /// Obtain the currently focused [`FocusHandle`]. If no elements are focused, returns `None`.
@@ -2778,6 +2791,11 @@ impl Window {
             .find_map(|h| h.take())
         {
             self.platform_window.set_input_handler(input_handler);
+            self.text_input_active = true;
+        } else {
+            // Nothing asked for text input this frame, and the handler the platform held was taken
+            // back at the top of this draw, so no focused element is typing.
+            self.text_input_active = false;
         }
 
         self.layout_engine.as_mut().unwrap().clear();

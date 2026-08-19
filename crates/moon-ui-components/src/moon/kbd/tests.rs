@@ -42,3 +42,47 @@ fn kbd_formats_keystrokes_like_longbridge() {
         );
     }
 }
+
+/// Catches dropping the modifier-only and Caps Lock labels from `kbd.rs:MoonKbd::format_keystroke`.
+///
+/// A shortcut that is one modifier parses back under GPUI's own name for it, so without these the
+/// hotkey field shows "Control", "Platform" and "Capslock" — three labels no keyboard is printed
+/// with, and the last one wrong for the key it names.
+#[test]
+fn kbd_labels_modifier_only_and_capslock_shortcuts() {
+    #[cfg(target_os = "macos")]
+    {
+        assert_eq!(
+            MoonKbd::format_keystroke(&Keystroke::parse("ctrl").unwrap()),
+            "⌃"
+        );
+        assert_eq!(
+            MoonKbd::format_keystroke(&Keystroke::parse("capslock").unwrap()),
+            "⇪"
+        );
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // `Keystroke::parse` reports a lone Control as the key "control", not as the modifier.
+        assert_eq!(
+            MoonKbd::format_keystroke(&Keystroke::parse("ctrl").unwrap()),
+            "Ctrl"
+        );
+        assert_eq!(
+            MoonKbd::format_keystroke(&Keystroke::parse("alt").unwrap()),
+            "Alt"
+        );
+        assert_eq!(
+            MoonKbd::format_keystroke(&Keystroke::parse("cmd").unwrap()),
+            "Win"
+        );
+        assert_eq!(
+            MoonKbd::format_keystroke(&Keystroke::parse("capslock").unwrap()),
+            "Caps Lock"
+        );
+        assert_eq!(
+            MoonKbd::format_keystroke(&Keystroke::parse("ctrl-capslock").unwrap()),
+            "Ctrl+Caps Lock"
+        );
+    }
+}
