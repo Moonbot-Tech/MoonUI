@@ -315,6 +315,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn caret(direction: MoonDisclosureDirection, expanded: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn color(mut self, color: u32) -> Self"
     },
     {
@@ -408,6 +412,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn render(self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn rotation(mut self, rotation: f32) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
@@ -648,6 +656,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/context_menu.rs",
       "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn fit_width(mut self, min_width: f32, max_width: f32) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/context_menu.rs",
@@ -970,6 +982,98 @@
       "signature": "pub use crate::time::date_picker::{ DatePicker as MoonDatePicker, DatePickerEvent as MoonDatePickerEvent, DatePickerState as MoonDatePickerState, DateRangePreset as MoonDateRangePreset, DateRangePresetValue as MoonDateRangePresetValue, };"
     },
     {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub enum MoonDateTimePickerEvent"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn cleanable(mut self, cleanable: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn clear(&mut self, window: &mut Window, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn date(&self) -> Option<NaiveDate>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn date_format(mut self, format: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn is_open(&self) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn minute_step(mut self, step: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>, state: &Entity<MoonDateTimePickerState>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn number_of_months(mut self, number_of_months: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn render(self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn set_open(&mut self, open: bool, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn set_time(&mut self, time: NaiveTime, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn set_value( &mut self, value: Option<NaiveDateTime>, window: &mut Window, cx: &mut Context<Self>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn size(mut self, size: Size) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn time(&self) -> NaiveTime"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn time_format(mut self, format: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn value(&self) -> Option<NaiveDateTime>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub struct MoonDateTimePicker"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/date_time_picker.rs",
+      "signature": "pub struct MoonDateTimePickerState"
+    },
+    {
       "file": "crates/moon-ui-components/src/moon/description_list.rs",
       "signature": "pub fn bordered(mut self, bordered: bool) -> Self"
     },
@@ -1070,6 +1174,58 @@
       "signature": "pub struct MoonDialogContent"
     },
     {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub enum MoonDisclosureDirection"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn alpha(mut self, alpha: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn box_size(mut self, box_size: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn button(id: impl Into<ElementId>, expanded: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn color(mut self, color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn direction(mut self, direction: MoonDisclosureDirection) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn glyph(expanded: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn hover_color(mut self, hover_color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn on_toggle(mut self, handler: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn size(mut self, size: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/disclosure.rs",
+      "signature": "pub struct MoonDisclosure"
+    },
+    {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub enum DockEvent"
     },
@@ -1087,11 +1243,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub enum DockTopologyNode"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub enum PanelEvent"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub enum PanelInfo"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn activate_panel_by_name( &mut self, panel_name: &str, window: &mut Window, cx: &mut Context<Self>, ) -> bool"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1104,6 +1268,14 @@
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn add_panel( &mut self, panel: Rc<dyn PanelView>, placement: DockPlacement, size: Option<f32>, window: &mut Window, cx: &mut Context<Self>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn apply_named_layout( &mut self, layout: &DockNamedLayout, additional_panels: Vec<Rc<dyn PanelView>>, window: &mut Window, cx: &mut Context<Self>, ) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn apply_topology_by_name( &mut self, topology: &DockTopologyByName, additional_panels: Vec<Rc<dyn PanelView>>, window: &mut Window, cx: &mut Context<Self>, ) -> bool"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1171,6 +1343,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn named_layout(&self, cx: &App) -> DockNamedLayout"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn new( id: impl Into<SharedString>, version: Option<usize>, _window: &mut Window, _cx: &mut Context<Self>, ) -> Self"
     },
     {
@@ -1187,11 +1363,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn normalized(&self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn panel(info: serde_json::Value) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn panel(panel: Rc<dyn PanelView>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn panel_names(&self) -> Vec<String>"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1207,7 +1391,23 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn set_close_allowed(&mut self, allowed: bool, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn set_detach_allowed(&mut self, allowed: bool, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn set_dock_open( &mut self, placement: DockPlacement, open: bool, cx: &mut Context<Self>, ) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn set_layout_editable(&mut self, editable: bool, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn set_pinned_leading_panels( &mut self, panel_names: Vec<SharedString>, cx: &mut Context<Self>, ) -> bool"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1243,6 +1443,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn tab_preset<I, S>(names: I) -> Self where I: IntoIterator<Item = S>, S: Into<String>,"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn tab_suffix( mut self, suffix: impl Fn(&mut Window, &mut App) -> AnyElement + 'static, ) -> Self"
     },
     {
@@ -1252,6 +1456,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn tabs(active_index: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn take_panel_by_name( &mut self, panel_name: &str, window: &mut Window, cx: &mut Context<Self>, ) -> Option<Rc<dyn PanelView>>"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1268,6 +1476,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn toggle_zoom_panel( &mut self, panel_name: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn topology_by_name(&self, cx: &App) -> DockTopologyByName"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1291,7 +1503,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct DockNamedLayout"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub struct DockState"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct DockTopologyByName"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct DockTopologySide"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1332,6 +1556,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn close_on_select(mut self, close_on_select: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn closes_menu(mut self, closes_menu: bool) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -1707,11 +1935,23 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
+      "signature": "pub fn forget(&mut self)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
       "signature": "pub fn full_width(mut self) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
+      "signature": "pub fn interrupt(&mut self)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
       "signature": "pub fn invalid(mut self, invalid: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
+      "signature": "pub fn modifiers_changed( &mut self, modifiers: Modifiers, capslock: Capslock, active: bool, ) -> MoonHotkeyCapture"
     },
     {
       "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
@@ -1732,6 +1972,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
       "signature": "pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
+      "signature": "pub fn prime(&mut self, modifiers: Modifiers, capslock: Capslock)"
     },
     {
       "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
@@ -1760,6 +2004,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
       "signature": "pub struct MoonHotkeyInput"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
+      "signature": "pub struct MoonHotkeyModifierWatch"
     },
     {
       "file": "crates/moon-ui-components/src/moon/hotkey_input.rs",
@@ -2183,6 +2431,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use date_time_picker::{MoonDateTimePicker, MoonDateTimePickerEvent, MoonDateTimePickerState};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use description_list::MoonDescriptionList;"
     },
     {
@@ -2191,7 +2443,15 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use disclosure::{MoonDisclosure, MoonDisclosureDirection};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use dock::{ DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, DockSplitPlacement, MoonDockPanel, Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel, };"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use dock::{DockNamedLayout, DockTopologyByName, DockTopologyNode, DockTopologySide};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -2208,6 +2468,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use group_box::MoonGroupBox;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use hotkey_input::MoonHotkeyModifierWatch;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -2264,6 +2528,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use placement::MoonPlacement;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use popover::MoonPopoverChrome;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -2383,6 +2651,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use time_picker::{MoonTimePicker, MoonTimePickerEvent, MoonTimePickerState};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleSize};"
     },
     {
@@ -2495,6 +2767,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub enum MoonPopoverChrome"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
       "signature": "pub enum MoonPopoverPlacement"
     },
     {
@@ -2504,6 +2780,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/popover.rs",
       "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/popover.rs",
+      "signature": "pub fn chrome(mut self, chrome: MoonPopoverChrome) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/popover.rs",
@@ -4038,6 +4318,70 @@
       "signature": "pub struct MoonTypography"
     },
     {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub enum MoonTimePickerEvent"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn default_value(mut self, time: NaiveTime) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn is_open(&self) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn minute_step(mut self, step: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn new(cx: &mut Context<Self>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>, state: &Entity<MoonTimePickerState>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn render(self) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn set_open(&mut self, open: bool, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn set_value(&mut self, time: NaiveTime, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn size(mut self, size: Size) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn text(&self) -> SharedString"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn value(&self) -> NaiveTime"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub fn width(mut self, width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub struct MoonTimePicker"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/time_picker.rs",
+      "signature": "pub struct MoonTimePickerState"
+    },
+    {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub enum MoonToggleLabelSide"
     },
@@ -4116,6 +4460,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/tokens.rs",
       "signature": "pub fn color(self, palette: MoonPalette) -> u32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub fn ink_on(self, fill: u32) -> u32"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tokens.rs",
