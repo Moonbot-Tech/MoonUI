@@ -123,6 +123,9 @@ pub use hotkey_input::{
     MoonHotkeyCapture, MoonHotkeyChangeHandler, MoonHotkeyInput, MoonHotkeyInputSize,
     moon_hotkey_capture,
 };
+// Not part of the control's builder API: an application drives this one itself, so that the key it
+// records and the key it later matches are decided by the same implementation.
+pub use hotkey_input::MoonHotkeyModifierWatch;
 pub use hover_card::{MoonHoverCard, MoonHoverCardState};
 pub use icons::{MOON_ICON_CARET_DOWN, MOON_ICON_CHECK};
 pub use index_path::IndexPath;

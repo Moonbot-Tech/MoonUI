@@ -105,6 +105,21 @@ impl MoonKbd {
             "cmd" => keys.push('⌘'),
             #[cfg(not(target_os = "macos"))]
             "cmd" => keys.push_str("Win"),
+            // A shortcut that IS one modifier reaches here under `Keystroke::parse`'s own name for
+            // it ("control", not "ctrl"), which the fallback below would spell out as written.
+            #[cfg(target_os = "macos")]
+            "control" => keys.push('⌃'),
+            #[cfg(not(target_os = "macos"))]
+            "control" => keys.push_str("Ctrl"),
+            #[cfg(target_os = "macos")]
+            "platform" => keys.push('⌘'),
+            #[cfg(not(target_os = "macos"))]
+            "platform" => keys.push_str("Win"),
+            "function" => keys.push_str("Fn"),
+            #[cfg(target_os = "macos")]
+            "capslock" => keys.push('⇪'),
+            #[cfg(not(target_os = "macos"))]
+            "capslock" => keys.push_str("Caps Lock"),
             #[cfg(target_os = "macos")]
             "space" => keys.push_str("Space"),
             #[cfg(target_os = "macos")]

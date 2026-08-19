@@ -1,4 +1,5 @@
 mod app_menu;
+mod control_click;
 mod keyboard;
 mod keystroke;
 
@@ -71,6 +72,7 @@ use strum::EnumIter;
 use uuid::Uuid;
 
 pub use app_menu::*;
+pub use control_click::*;
 pub use keyboard::*;
 pub use keystroke::*;
 
