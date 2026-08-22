@@ -8,7 +8,7 @@ use super::{
 use crate::moon::{MoonPalette, MoonTheme};
 use std::{cell::RefCell, rc::Rc};
 
-/// `dropdown.rs:MoonMenuItem::action_label` must retain the label visual role while explicitly
+/// `dropdown/model.rs:MoonMenuItem::action_label` must retain the label visual role while explicitly
 /// opting into clicks. Returning a normal item would reintroduce item typography and its check
 /// gutter; treating every enabled label as actionable would make static section headings
 /// interactive after `.disabled(false)`.
@@ -159,7 +159,7 @@ fn assert_rendered_label_interactions(cx: &mut gpui::TestAppContext, palette: Mo
     );
 }
 
-/// `dropdown.rs:MoonPopupMenu::render_item` must wire enabled label rows into GPUI's native click
+/// `dropdown/popup.rs:MoonPopupMenu::render_item` must wire enabled label rows into GPUI's native click
 /// path. Removing the label click branch leaves visually correct exchange headings that no longer
 /// toggle their grouped menu items.
 #[gpui::test]
@@ -255,7 +255,7 @@ impl gpui::Render for LargeHandlerProbeMenuHarness {
     }
 }
 
-/// Catches restoring eager root-row wiring in `dropdown.rs:MoonDropdown::render`. That edit
+/// Catches restoring eager root-row wiring in `dropdown/trigger.rs:MoonDropdown::render`. That edit
 /// allocates one dropdown click closure per dynamic row on every repaint before virtualization.
 #[gpui::test]
 fn large_dropdown_resolves_handlers_only_for_visible_rows(cx: &mut gpui::TestAppContext) {

@@ -212,10 +212,12 @@ fn collect_public_api(dir: &Path, root: &Path, items: &mut Vec<ApiItem>) -> Resu
             let trimmed = lines[ix].trim();
             if starts_public_api(trimmed) {
                 let (signature, next_ix) = collect_signature(&lines, ix);
-                items.push(ApiItem {
-                    file: normalize_path(root, entry.path()),
-                    signature,
-                });
+                if !is_private_child_reexport(entry.path(), &signature) {
+                    items.push(ApiItem {
+                        file: normalize_path(root, &logical_api_file(root, entry.path())),
+                        signature,
+                    });
+                }
                 ix = next_ix;
             } else {
                 ix += 1;
@@ -281,78 +283,52 @@ fn collect_signature(lines: &[&str], start: usize) -> (String, usize) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{ApiItem, ApiSnapshot, collect_signature, compare_api};
-    use std::collections::BTreeSet;
+mod tests;
 
-    fn item(signature: &str) -> ApiItem {
-        ApiItem {
-            file: "crates/moon-ui-components/src/moon/button.rs".to_string(),
-            signature: signature.to_string(),
-        }
+/// Returns the public component source that owns an implementation file.
+///
+/// Files below `moon/<component>/` are implementation details of the sibling
+/// `moon/<component>.rs` module, so moving an item between those files does not change its API.
+fn logical_api_file(root: &Path, path: &Path) -> PathBuf {
+    let moon_root = root.join("crates/moon-ui-components/src/moon");
+    let Ok(relative) = path.strip_prefix(&moon_root) else {
+        return path.to_path_buf();
+    };
+    let mut components = relative.components();
+    let Some(component) = components.next() else {
+        return path.to_path_buf();
+    };
+    if components.next().is_none() {
+        return path.to_path_buf();
     }
 
-    fn snapshot(signatures: &[&str]) -> ApiSnapshot {
-        ApiSnapshot {
-            version: 1,
-            items: signatures.iter().map(|s| item(s)).collect(),
-        }
+    moon_root.join(component).with_extension("rs")
+}
+
+/// Returns whether a signature only re-exports a private sibling implementation module.
+///
+/// The declarations in the child module are recorded against the owning component file, while
+/// the externally reachable names remain guarded by `moon/mod.rs` and the compile gate.
+fn is_private_child_reexport(source: &Path, signature: &str) -> bool {
+    let Some(target) = signature.strip_prefix("pub use ") else {
+        return false;
+    };
+    let Some(module) = target.split("::").next() else {
+        return false;
+    };
+
+    let is_local_name = !matches!(module, "crate" | "self" | "super")
+        && !module.is_empty()
+        && module
+            .chars()
+            .all(|character| character == '_' || character.is_ascii_alphanumeric());
+    if !is_local_name {
+        return false;
     }
 
-    /// Catches letting an addition pass unrecorded, which is how the baseline drifted 87 items
-    /// behind the code: only removals were compared, so a new public builder never touched the
-    /// file. Everything it does not list is also unguarded against a later removal, and the next
-    /// legitimate signature change has to sweep the whole backlog into its own diff.
-    #[test]
-    fn an_unrecorded_addition_fails_the_check() {
-        let baseline = snapshot(&["pub fn caret(self) -> Self"]);
-        let current = snapshot(&[
-            "pub fn caret(self) -> Self",
-            "pub fn rotation(self) -> Self",
-        ]);
-
-        let failures = compare_api(&baseline, &current, &BTreeSet::new());
-
-        assert_eq!(failures.len(), 1, "{failures:?}");
-        assert!(
-            failures[0].contains("added and not recorded")
-                && failures[0].contains("pub fn rotation(self) -> Self"),
-            "{failures:?}"
-        );
-        assert!(
-            compare_api(&current, &current, &BTreeSet::new()).is_empty(),
-            "a recorded surface must pass"
-        );
-    }
-
-    /// Catches losing the removal half while adding the addition half: a removed builder breaks
-    /// MoonTerminal's next `cargo update`, which is the reason this guardrail exists at all.
-    #[test]
-    fn a_removal_still_fails_unless_it_is_declared() {
-        let baseline = snapshot(&["pub fn caret(self) -> Self"]);
-        let current = snapshot(&[]);
-
-        let failures = compare_api(&baseline, &current, &BTreeSet::new());
-        assert_eq!(failures.len(), 1, "{failures:?}");
-        assert!(failures[0].contains("removed/changed"), "{failures:?}");
-
-        let approved = BTreeSet::from([item("pub fn caret(self) -> Self")]);
-        assert!(compare_api(&baseline, &current, &approved).is_empty());
-    }
-
-    #[test]
-    fn collect_signature_keeps_multiline_pub_use_until_semicolon() {
-        let lines = [
-            "    pub use gpui_component::{",
-            "        Theme, WindowExt,",
-            "    };",
-        ];
-
-        let (signature, next) = collect_signature(&lines, 0);
-
-        assert_eq!(next, 3);
-        assert_eq!(signature, "pub use gpui_component::{ Theme, WindowExt, };");
-    }
+    let module_dir = source.with_extension("");
+    module_dir.join(format!("{module}.rs")).is_file()
+        || module_dir.join(module).join("mod.rs").is_file()
 }
 
 fn normalize_signature(signature: &str) -> String {
