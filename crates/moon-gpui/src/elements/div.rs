@@ -46,7 +46,11 @@ use std::{
 use super::ImageCacheProvider;
 
 const DRAG_THRESHOLD: f64 = 2.;
-const DEFAULT_TOOLTIP_SHOW_DELAY: Duration = Duration::from_millis(500);
+/// Continuous hover required before a regular tooltip becomes visible.
+const DEFAULT_TOOLTIP_SHOW_DELAY: Duration = Duration::from_millis(800);
+/// Maximum time a non-hoverable tooltip remains visible during one hover episode.
+const DEFAULT_TOOLTIP_VISIBLE_DURATION: Duration = Duration::from_secs(5);
+/// Grace period for moving between a hoverable tooltip and its trigger.
 const HOVERABLE_TOOLTIP_HIDE_DELAY: Duration = Duration::from_millis(500);
 
 /// The styling information for a given group.
@@ -3157,6 +3161,8 @@ pub(crate) enum ActiveTooltip {
     Visible {
         tooltip: AnyTooltip,
         is_hoverable: bool,
+        _auto_hide_guard: Option<Rc<()>>,
+        _auto_hide_task: Option<Task<()>>,
     },
     /// Tooltip is visible and hoverable, but the mouse is no longer hovering. Currently delaying
     /// before hiding it.
@@ -3164,8 +3170,11 @@ pub(crate) enum ActiveTooltip {
         tooltip: AnyTooltip,
         _task: Task<()>,
     },
+    /// A regular tooltip expired and must stay hidden until the pointer leaves its trigger.
+    SuppressedUntilMouseLeaves,
 }
 
+/// Clear pending, visible, or suppressed tooltip state and repaint only visible content.
 pub(crate) fn clear_active_tooltip(
     active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
     window: &mut Window,
@@ -3175,9 +3184,11 @@ pub(crate) fn clear_active_tooltip(
         Some(ActiveTooltip::WaitingForShow { .. }) => {}
         Some(ActiveTooltip::Visible { .. }) => window.refresh(),
         Some(ActiveTooltip::WaitingForHide { .. }) => window.refresh(),
+        Some(ActiveTooltip::SuppressedUntilMouseLeaves) => {}
     }
 }
 
+/// Clear an active regular tooltip while preserving hoverable and already-suppressed state.
 pub(crate) fn clear_active_tooltip_if_not_hoverable(
     active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
     window: &mut Window,
@@ -3187,6 +3198,7 @@ pub(crate) fn clear_active_tooltip_if_not_hoverable(
         Some(ActiveTooltip::WaitingForShow { .. }) => false,
         Some(ActiveTooltip::Visible { is_hoverable, .. }) => !is_hoverable,
         Some(ActiveTooltip::WaitingForHide { .. }) => false,
+        Some(ActiveTooltip::SuppressedUntilMouseLeaves) => false,
     };
     if should_clear {
         active_tooltip.borrow_mut().take();
@@ -3194,6 +3206,7 @@ pub(crate) fn clear_active_tooltip_if_not_hoverable(
     }
 }
 
+/// Publish visible tooltip content to the window while waiting and suppressed states stay hidden.
 pub(crate) fn set_tooltip_on_window(
     active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
     window: &mut Window,
@@ -3203,6 +3216,7 @@ pub(crate) fn set_tooltip_on_window(
         Some(ActiveTooltip::WaitingForShow { .. }) => return None,
         Some(ActiveTooltip::Visible { tooltip, .. }) => tooltip.clone(),
         Some(ActiveTooltip::WaitingForHide { tooltip, .. }) => tooltip.clone(),
+        Some(ActiveTooltip::SuppressedUntilMouseLeaves) => return None,
     };
     Some(window.set_tooltip(tooltip))
 }
@@ -3288,6 +3302,7 @@ fn handle_tooltip_mouse_move(
         CancelShow,
         ScheduleShow,
         CheckVisible,
+        ClearSuppression,
     }
 
     let action = match active_tooltip.borrow().as_ref() {
@@ -3328,6 +3343,13 @@ fn handle_tooltip_mouse_move(
                 Action::None
             }
         }
+        Some(ActiveTooltip::SuppressedUntilMouseLeaves) => {
+            if check_is_hovered(window) {
+                Action::None
+            } else {
+                Action::ClearSuppression
+            }
+        }
     };
 
     match action {
@@ -3350,30 +3372,34 @@ fn handle_tooltip_mouse_move(
                         let new_tooltip =
                             build_tooltip(window, cx).map(|(view, tooltip_is_hoverable)| {
                                 let weak_active_tooltip = Rc::downgrade(&active_tooltip);
-                                ActiveTooltip::Visible {
-                                    tooltip: AnyTooltip {
-                                        view,
-                                        mouse_position: window.mouse_position(),
-                                        check_visible_and_update: Rc::new(
-                                            move |tooltip_bounds, window, cx| {
-                                                let Some(active_tooltip) =
-                                                    weak_active_tooltip.upgrade()
-                                                else {
-                                                    return false;
-                                                };
-                                                handle_tooltip_check_visible_and_update(
-                                                    &active_tooltip,
-                                                    tooltip_is_hoverable,
-                                                    &check_is_hovered_during_prepaint,
-                                                    tooltip_bounds,
-                                                    window,
-                                                    cx,
-                                                )
-                                            },
-                                        ),
-                                    },
-                                    is_hoverable: tooltip_is_hoverable,
-                                }
+                                let tooltip = AnyTooltip {
+                                    view,
+                                    mouse_position: window.mouse_position(),
+                                    check_visible_and_update: Rc::new(
+                                        move |tooltip_bounds, window, cx| {
+                                            let Some(active_tooltip) =
+                                                weak_active_tooltip.upgrade()
+                                            else {
+                                                return false;
+                                            };
+                                            handle_tooltip_check_visible_and_update(
+                                                &active_tooltip,
+                                                tooltip_is_hoverable,
+                                                &check_is_hovered_during_prepaint,
+                                                tooltip_bounds,
+                                                window,
+                                                cx,
+                                            )
+                                        },
+                                    ),
+                                };
+                                visible_tooltip_state(
+                                    &active_tooltip,
+                                    tooltip,
+                                    tooltip_is_hoverable,
+                                    window,
+                                    cx,
+                                )
                             });
                         *active_tooltip.borrow_mut() = new_tooltip;
                         window.refresh();
@@ -3388,6 +3414,77 @@ fn handle_tooltip_mouse_move(
                 });
         }
         Action::CheckVisible => cx.notify(current_view),
+        Action::ClearSuppression => {
+            active_tooltip.borrow_mut().take();
+        }
+    }
+}
+
+/// Build visible tooltip state and expire non-hoverable content after one readable interval.
+///
+/// Args:
+///     active_tooltip: Element-owned lifecycle state used to reject stale timer callbacks.
+///     tooltip: View, pointer origin, and visibility callback for the rendered tooltip.
+///     tooltip_is_hoverable: Whether the pointer may move into the tooltip itself.
+///     window: Window that owns the timer and refresh boundary.
+///     cx: Application context used to schedule the timer.
+///
+/// Returns:
+///     Visible state with an auto-hide task only for ordinary informational tooltips.
+fn visible_tooltip_state(
+    active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
+    tooltip: AnyTooltip,
+    tooltip_is_hoverable: bool,
+    window: &mut Window,
+    cx: &mut App,
+) -> ActiveTooltip {
+    if tooltip_is_hoverable {
+        return ActiveTooltip::Visible {
+            tooltip,
+            is_hoverable: true,
+            _auto_hide_guard: None,
+            _auto_hide_task: None,
+        };
+    }
+
+    let auto_hide_guard = Rc::new(());
+    let weak_auto_hide_guard = Rc::downgrade(&auto_hide_guard);
+    let auto_hide_task = window.spawn(cx, {
+        let weak_active_tooltip = Rc::downgrade(active_tooltip);
+        async move |cx| {
+            cx.background_executor()
+                .timer(DEFAULT_TOOLTIP_VISIBLE_DURATION)
+                .await;
+            let Some(active_tooltip) = weak_active_tooltip.upgrade() else {
+                return;
+            };
+            cx.update(|window, _cx| {
+                if weak_auto_hide_guard.upgrade().is_none() {
+                    return;
+                }
+                let should_expire = matches!(
+                    active_tooltip.borrow().as_ref(),
+                    Some(ActiveTooltip::Visible {
+                        is_hoverable: false,
+                        ..
+                    })
+                );
+                if should_expire {
+                    active_tooltip
+                        .borrow_mut()
+                        .replace(ActiveTooltip::SuppressedUntilMouseLeaves);
+                    window.refresh();
+                }
+            })
+            .ok();
+        }
+    });
+
+    ActiveTooltip::Visible {
+        tooltip,
+        is_hoverable: false,
+        _auto_hide_guard: Some(auto_hide_guard),
+        _auto_hide_task: Some(auto_hide_task),
     }
 }
 
@@ -3432,7 +3529,9 @@ fn handle_tooltip_check_visible_and_update(
                 Action::None
             }
         }
-        None | Some(ActiveTooltip::WaitingForShow { .. }) => Action::None,
+        None
+        | Some(ActiveTooltip::WaitingForShow { .. })
+        | Some(ActiveTooltip::SuppressedUntilMouseLeaves) => Action::None,
     };
 
     match action {
@@ -3465,6 +3564,8 @@ fn handle_tooltip_check_visible_and_update(
             active_tooltip.borrow_mut().replace(ActiveTooltip::Visible {
                 tooltip,
                 is_hoverable: true,
+                _auto_hide_guard: None,
+                _auto_hide_task: None,
             });
         }
     }
@@ -3866,317 +3967,4 @@ impl ScrollHandle {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{
-        AppContext as _, Context, InputEvent, MouseMoveEvent, TestAppContext,
-        util::FluentBuilder as _,
-    };
-    use std::rc::Weak;
-
-    struct TestTooltipView;
-
-    impl Render for TestTooltipView {
-        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-            div().w(px(20.)).h(px(20.)).child("tooltip")
-        }
-    }
-
-    type CapturedActiveTooltip = Rc<RefCell<Option<Weak<RefCell<Option<ActiveTooltip>>>>>>;
-
-    struct TooltipCaptureElement {
-        child: AnyElement,
-        captured_active_tooltip: CapturedActiveTooltip,
-    }
-
-    impl IntoElement for TooltipCaptureElement {
-        type Element = Self;
-
-        fn into_element(self) -> Self::Element {
-            self
-        }
-    }
-
-    impl Element for TooltipCaptureElement {
-        type RequestLayoutState = ();
-        type PrepaintState = ();
-
-        fn id(&self) -> Option<ElementId> {
-            None
-        }
-
-        fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
-            None
-        }
-
-        fn request_layout(
-            &mut self,
-            _id: Option<&GlobalElementId>,
-            _inspector_id: Option<&InspectorElementId>,
-            window: &mut Window,
-            cx: &mut App,
-        ) -> (LayoutId, Self::RequestLayoutState) {
-            (self.child.request_layout(window, cx), ())
-        }
-
-        fn prepaint(
-            &mut self,
-            _id: Option<&GlobalElementId>,
-            _inspector_id: Option<&InspectorElementId>,
-            _bounds: Bounds<Pixels>,
-            _request_layout: &mut Self::RequestLayoutState,
-            window: &mut Window,
-            cx: &mut App,
-        ) -> Self::PrepaintState {
-            self.child.prepaint(window, cx);
-        }
-
-        fn paint(
-            &mut self,
-            _id: Option<&GlobalElementId>,
-            _inspector_id: Option<&InspectorElementId>,
-            _bounds: Bounds<Pixels>,
-            _request_layout: &mut Self::RequestLayoutState,
-            _prepaint: &mut Self::PrepaintState,
-            window: &mut Window,
-            cx: &mut App,
-        ) {
-            self.child.paint(window, cx);
-            window.with_global_id("target".into(), |global_id, window| {
-                window.with_element_state::<InteractiveElementState, _>(
-                    global_id,
-                    |state, _window| {
-                        let state = state.unwrap();
-                        *self.captured_active_tooltip.borrow_mut() =
-                            state.active_tooltip.as_ref().map(Rc::downgrade);
-                        ((), state)
-                    },
-                )
-            });
-        }
-    }
-
-    struct TooltipOwner {
-        captured_active_tooltip: CapturedActiveTooltip,
-        show_delay_override: Option<Duration>,
-    }
-
-    impl Render for TooltipOwner {
-        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-            TooltipCaptureElement {
-                child: div()
-                    .size_full()
-                    .child(
-                        div()
-                            .id("target")
-                            .w(px(50.))
-                            .h(px(50.))
-                            .tooltip(|_, cx| cx.new(|_| TestTooltipView).into())
-                            .when_some(self.show_delay_override, |this, delay| {
-                                this.tooltip_show_delay(delay)
-                            }),
-                    )
-                    .into_any_element(),
-                captured_active_tooltip: self.captured_active_tooltip.clone(),
-            }
-        }
-    }
-
-    #[test]
-    fn scroll_handle_aligns_wide_children_to_left_edge() {
-        let handle = ScrollHandle::new();
-        {
-            let mut state = handle.0.borrow_mut();
-            state.bounds = Bounds::new(point(px(0.), px(0.)), size(px(80.), px(20.)));
-            state.child_bounds = vec![Bounds::new(point(px(25.), px(0.)), size(px(200.), px(20.)))];
-            state.overflow.x = Overflow::Scroll;
-            state.active_item = Some(ScrollActiveItem {
-                index: 0,
-                strategy: ScrollStrategy::default(),
-            });
-        }
-
-        handle.scroll_to_active_item();
-
-        assert_eq!(handle.offset().x, px(-25.));
-    }
-
-    #[test]
-    fn scroll_handle_aligns_tall_children_to_top_edge() {
-        let handle = ScrollHandle::new();
-        {
-            let mut state = handle.0.borrow_mut();
-            state.bounds = Bounds::new(point(px(0.), px(0.)), size(px(20.), px(80.)));
-            state.child_bounds = vec![Bounds::new(point(px(0.), px(25.)), size(px(20.), px(200.)))];
-            state.overflow.y = Overflow::Scroll;
-            state.active_item = Some(ScrollActiveItem {
-                index: 0,
-                strategy: ScrollStrategy::default(),
-            });
-        }
-
-        handle.scroll_to_active_item();
-
-        assert_eq!(handle.offset().y, px(-25.));
-    }
-
-    fn setup_tooltip_owner_test(
-        show_delay_override: Option<Duration>,
-    ) -> (
-        TestAppContext,
-        crate::AnyWindowHandle,
-        CapturedActiveTooltip,
-    ) {
-        let mut test_app = TestAppContext::single();
-        let captured_active_tooltip: CapturedActiveTooltip = Rc::new(RefCell::new(None));
-        let window = test_app.add_window({
-            let captured_active_tooltip = captured_active_tooltip.clone();
-            move |_, _| TooltipOwner {
-                captured_active_tooltip,
-                show_delay_override,
-            }
-        });
-        let any_window = window.into();
-
-        test_app
-            .update_window(any_window, |_, window, cx| {
-                window.draw(cx).clear();
-            })
-            .unwrap();
-
-        test_app
-            .update_window(any_window, |_, window, cx| {
-                window.dispatch_event(
-                    MouseMoveEvent {
-                        position: point(px(10.), px(10.)),
-                        modifiers: Default::default(),
-                        pressed_button: None,
-                    }
-                    .to_platform_input(),
-                    cx,
-                );
-            })
-            .unwrap();
-
-        test_app
-            .update_window(any_window, |_, window, cx| {
-                window.draw(cx).clear();
-            })
-            .unwrap();
-
-        (test_app, any_window, captured_active_tooltip)
-    }
-
-    #[test]
-    fn tooltip_waiting_for_show_is_released_when_its_owner_disappears() {
-        let (mut test_app, any_window, captured_active_tooltip) = setup_tooltip_owner_test(None);
-
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
-        assert!(matches!(
-            active_tooltip.borrow().as_ref(),
-            Some(ActiveTooltip::WaitingForShow { .. })
-        ));
-
-        test_app
-            .update_window(any_window, |_, window, _| {
-                window.remove_window();
-            })
-            .unwrap();
-        test_app.run_until_parked();
-        drop(active_tooltip);
-
-        assert!(weak_active_tooltip.upgrade().is_none());
-    }
-
-    #[test]
-    fn tooltip_respects_custom_show_delay() {
-        let extra_delay = Duration::from_secs(1);
-        let show_delay_override = DEFAULT_TOOLTIP_SHOW_DELAY + extra_delay;
-        let (mut test_app, _any_window, captured_active_tooltip) =
-            setup_tooltip_owner_test(Some(show_delay_override));
-
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
-
-        test_app
-            .dispatcher
-            .advance_clock(DEFAULT_TOOLTIP_SHOW_DELAY);
-        test_app.run_until_parked();
-
-        assert!(matches!(
-            active_tooltip.borrow().as_ref(),
-            Some(ActiveTooltip::WaitingForShow { .. })
-        ));
-
-        test_app.dispatcher.advance_clock(extra_delay);
-        test_app.run_until_parked();
-
-        assert!(matches!(
-            active_tooltip.borrow().as_ref(),
-            Some(ActiveTooltip::Visible { .. })
-        ));
-    }
-
-    #[test]
-    fn tooltip_is_released_when_its_owner_disappears() {
-        let (mut test_app, any_window, captured_active_tooltip) = setup_tooltip_owner_test(None);
-
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
-
-        test_app
-            .dispatcher
-            .advance_clock(DEFAULT_TOOLTIP_SHOW_DELAY);
-        test_app.run_until_parked();
-
-        assert!(matches!(
-            active_tooltip.borrow().as_ref(),
-            Some(ActiveTooltip::Visible { .. })
-        ));
-
-        test_app
-            .update_window(any_window, |_, window, _| {
-                window.remove_window();
-            })
-            .unwrap();
-        test_app.run_until_parked();
-        drop(active_tooltip);
-
-        assert!(weak_active_tooltip.upgrade().is_none());
-    }
-
-    #[test]
-    fn tooltip_hides_after_mouse_leaves_origin() {
-        let (mut test_app, any_window, captured_active_tooltip) = setup_tooltip_owner_test(None);
-
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
-
-        test_app
-            .dispatcher
-            .advance_clock(DEFAULT_TOOLTIP_SHOW_DELAY);
-        test_app.run_until_parked();
-
-        assert!(matches!(
-            active_tooltip.borrow().as_ref(),
-            Some(ActiveTooltip::Visible { .. })
-        ));
-
-        test_app
-            .update_window(any_window, |_, window, cx| {
-                window.dispatch_event(
-                    MouseMoveEvent {
-                        position: point(px(75.), px(75.)),
-                        modifiers: Default::default(),
-                        pressed_button: None,
-                    }
-                    .to_platform_input(),
-                    cx,
-                );
-            })
-            .unwrap();
-
-        assert!(active_tooltip.borrow().is_none());
-    }
-}
+mod tests;
