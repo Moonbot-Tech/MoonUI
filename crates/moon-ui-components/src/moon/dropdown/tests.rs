@@ -27,7 +27,7 @@ const MENU_SELECTOR: &str = "geometry-probe:menu";
 const FITTED_VIEWPORT_MENU_SELECTOR: &str = "fitted-viewport:menu";
 
 /// Catches removing the incremental `layout.push` call from
-/// `dropdown.rs:MoonPopupMenu::{item,items}`. Without the ordered signature, retained virtual
+/// `dropdown/popup.rs:MoonPopupMenu::{item,items}`. Without the ordered signature, retained virtual
 /// state cannot invalidate cached variable heights when a same-length menu changes row roles.
 #[test]
 fn menu_layout_fingerprint_tracks_count_and_row_order() {
@@ -45,7 +45,7 @@ fn menu_layout_fingerprint_tracks_count_and_row_order() {
     );
 }
 
-/// Catches moving the viewport cap in `dropdown.rs:capped_menu_items_height` after the iterator
+/// Catches moving the viewport cap in `dropdown/layout.rs:capped_menu_items_height` after the iterator
 /// traversal. That edit restores an O(total rows) repaint scan even though the viewport is already
 /// full after two ordinary rows.
 #[test]
@@ -252,7 +252,7 @@ fn laid_out_trigger_bounds(
 }
 
 /// Catches removing the `MoonButton::leading_icon` forwarding call from
-/// `dropdown.rs:MoonDropdown::render_trigger`. That edit would silently hide configured trigger
+/// `dropdown/trigger.rs:MoonDropdown::render_trigger`. That edit would silently hide configured trigger
 /// icons while leaving labelled dropdowns otherwise functional.
 #[gpui::test]
 fn labelled_trigger_icon_adds_width_in_both_palettes(cx: &mut gpui::TestAppContext) {
@@ -281,7 +281,7 @@ fn labelled_trigger_icon_adds_width_in_both_palettes(cx: &mut gpui::TestAppConte
 }
 
 /// Catches removing `reserved_content_width` from
-/// `dropdown.rs:fit_dropdown_trigger_label`. That edit would fit a long translated label into the
+/// `dropdown/trigger.rs:fit_dropdown_trigger_label`. That edit would fit a long translated label into the
 /// icon's space and let the non-shrinking trigger content paint beyond its configured width.
 #[gpui::test]
 fn fitted_labelled_trigger_reserves_rendered_icon_chrome_in_both_palettes(
@@ -338,7 +338,7 @@ fn fitted_labelled_trigger_reserves_rendered_icon_chrome_in_both_palettes(
 }
 
 /// Catches restoring the unconditional empty `MoonButton::label` call in
-/// `dropdown.rs:MoonDropdown::render_trigger`. That edit would add text padding and a phantom gap,
+/// `dropdown/trigger.rs:MoonDropdown::render_trigger`. That edit would add text padding and a phantom gap,
 /// turning toolbar icon dropdowns into off-center rectangular controls.
 #[gpui::test]
 fn icon_only_trigger_stays_square_in_both_palettes(cx: &mut gpui::TestAppContext) {
@@ -373,7 +373,7 @@ fn assert_menu_hugs_trigger(trigger: gpui::Bounds<gpui::Pixels>, menu: gpui::Bou
     );
 }
 
-/// Catches adding a second trigger-height offset in `dropdown.rs:MoonDropdown::render`, which
+/// Catches adding a second trigger-height offset in `dropdown/trigger.rs:MoonDropdown::render`, which
 /// would leave an in-flow menu visibly detached from its trigger.
 ///
 /// This also guards the compensation for `ElementExt::on_prepaint`: if capture starts reporting
@@ -385,7 +385,7 @@ fn open_menu_hangs_just_below_its_trigger(cx: &mut gpui::TestAppContext) {
 }
 
 /// Catches removing conditional height compensation from
-/// `dropdown.rs:MoonDropdown::render`, which would place a bounds-driven menu over or too far
+/// `dropdown/trigger.rs:MoonDropdown::render`, which would place a bounds-driven menu over or too far
 /// below its trigger.
 #[gpui::test]
 fn supplied_bounds_menu_also_hangs_just_below_its_trigger(cx: &mut gpui::TestAppContext) {
@@ -471,7 +471,7 @@ fn menu_item_clone_preserves_closes_menu_override() {
     );
 }
 
-/// `dropdown.rs:menu_width_sample` must bound a virtual menu's WIDTH measurement to a sample large
+/// `dropdown/layout.rs:menu_width_sample` must bound a virtual menu's WIDTH measurement to a sample large
 /// enough to cover any menu of ordinary size, independent of the height-only prefix that decides
 /// which rows render first. Before the fix, `resolve_virtual_menu_width` measured only that
 /// height-bounded prefix (roughly fifteen rows at a typical row height), so the fitted width
@@ -523,7 +523,7 @@ fn menu_width_sample_ignores_where_a_long_label_sits(cx: &mut gpui::TestAppConte
 }
 
 /// [`MENU_WIDTH_SAMPLE_ROWS`] must stay a genuine BOUND, or the fix for width-order-dependence
-/// (`dropdown.rs:menu_width_sample`) turns into unbounded per-frame text measurement on a
+/// (`dropdown/layout.rs:menu_width_sample`) turns into unbounded per-frame text measurement on a
 /// pathologically long menu. Catches replacing the bounded sample with the full item list
 /// (`let take = items.len();`), using the same measurement-probe counter
 /// `fitted_large_menu_measures_only_its_visible_window` relies on.
@@ -567,7 +567,7 @@ fn menu_width_sample_stays_bounded_for_a_pathological_menu(cx: &mut gpui::TestAp
     });
 }
 
-/// `dropdown.rs:resolve_virtual_menu_width`'s truncation flag must read the SAMPLE it actually
+/// `dropdown/layout.rs:resolve_virtual_menu_width`'s truncation flag must read the SAMPLE it actually
 /// measured (`measured_rows.len() < items.len()`), not the height-only prefix it derives that
 /// sample from. The height prefix is virtually always shorter than the full list for any menu
 /// bigger than one screen, so reverting to it (`initial_rows.len() < items.len()`, the pre-fix
@@ -609,7 +609,7 @@ fn virtual_menu_width_truncation_follows_the_measured_sample(cx: &mut gpui::Test
     });
 }
 
-/// `dropdown.rs:fit_dropdown_trigger_label` must preserve the caret and clamp against a
+/// `dropdown/trigger.rs:fit_dropdown_trigger_label` must preserve the caret and clamp against a
 /// font-scaled ceiling independently of UI padding. Appending the caret downstream or scaling the
 /// width with UI geometry makes long translated labels overflow at non-default font scale.
 #[test]
@@ -695,7 +695,7 @@ fn scaled_trigger_uses_font_width_without_clipping_component_chrome() {
     }
 }
 
-/// `dropdown.rs:MoonMenuWidth::Scaled` must follow font width without shrinking below UI-scaled
+/// `dropdown/layout.rs:MoonMenuWidth::Scaled` must follow font width without shrinking below UI-scaled
 /// row chrome. Using only either scale makes a fixed Terminal menu overflow in the
 /// high-UI/low-font cross-product.
 #[gpui::test]
@@ -750,7 +750,7 @@ fn scaled_menu_width_retains_fitted_rows_at_independent_scale_extremes(
     }
 }
 
-/// `dropdown.rs:MoonMenuMaxHeight::Ui` must scale with UI geometry while the legacy rendered
+/// `dropdown/layout.rs:MoonMenuMaxHeight::Ui` must scale with UI geometry while the legacy rendered
 /// policy remains raw. Routing either through font scaling leaves menu scroll bounds detached from
 /// their row heights.
 #[test]
@@ -799,7 +799,7 @@ impl gpui::Render for LargeMixedMenuHarness {
     }
 }
 
-/// Catches replacing `dropdown.rs:menu_level_is_virtualized` with an eager path for mixed menus.
+/// Catches replacing `dropdown/layout.rs:menu_level_is_virtualized` with an eager path for mixed menus.
 /// That edit constructs all 1,000 row elements before clipping, freezing core and log selectors
 /// as their dynamic sources grow.
 #[gpui::test]
@@ -864,7 +864,7 @@ impl gpui::Render for LargeCloneProbeMenuHarness {
     }
 }
 
-/// Catches restoring `popup_items.clone()` in `dropdown.rs:MoonDropdown::render`. That edit clones
+/// Catches restoring `popup_items.clone()` in `dropdown/trigger.rs:MoonDropdown::render`. That edit clones
 /// every dynamic root row whenever the open popover content repaints, even though the virtual list
 /// only constructs its bounded visible window.
 #[gpui::test]
@@ -911,7 +911,7 @@ impl gpui::Render for LargePaletteMenuHarness {
     }
 }
 
-/// Catches passing `None` from `dropdown.rs:MoonPopupMenu::render_with_palette` into the shared
+/// Catches passing `None` from `dropdown/popup.rs:MoonPopupMenu::render_with_palette` into the shared
 /// renderer. That mutation eagerly constructs all 1,000 direct popup rows and restores the public
 /// non-virtualized escape path.
 #[gpui::test]
@@ -934,7 +934,7 @@ fn palette_only_large_menu_constructs_a_bounded_visible_window(cx: &mut gpui::Te
 }
 
 /// Catches constructing a fresh `ListState` inside
-/// `dropdown.rs:MoonPopupMenu::render_with_palette`. That edit returns a scrolled direct popup to
+/// `dropdown/popup.rs:MoonPopupMenu::render_with_palette`. That edit returns a scrolled direct popup to
 /// its first row on the next ordinary view refresh.
 #[gpui::test]
 fn palette_only_large_menu_retains_scroll_across_repaint(cx: &mut gpui::TestAppContext) {
@@ -994,7 +994,7 @@ impl gpui::Render for LargeFittedMenuHarness {
     }
 }
 
-/// Catches routing a virtual fitted level through `dropdown.rs:resolve_menu_width` or fitting all
+/// Catches routing a virtual fitted level through `dropdown/layout.rs:resolve_menu_width` or fitting all
 /// labels before list construction. Either edit performs at least one sentinel measurement per
 /// off-screen row and makes first-open latency grow with the complete dynamic source.
 #[gpui::test]
@@ -1110,7 +1110,7 @@ impl gpui::Render for LargeSubmenuHarness {
 }
 
 /// Catches removing `deferred` around the selected submenu in
-/// `dropdown.rs:MoonPopupMenu::render_item`. Without that escape, GPUI clips the submenu hitbox to
+/// `dropdown/popup.rs:MoonPopupMenu::render_item`. Without that escape, GPUI clips the submenu hitbox to
 /// the virtual parent's list mask, so the visible nested action cannot be clicked.
 #[gpui::test]
 fn virtualized_parent_submenu_escapes_the_list_mask(cx: &mut gpui::TestAppContext) {
@@ -1248,7 +1248,7 @@ fn explicit_palette_is_inherited_by_selected_submenu(cx: &mut gpui::TestAppConte
     );
 }
 
-/// `dropdown.rs:MoonPopupMenu::render_with_palette` must fail loudly for widths that require an
+/// `dropdown/popup.rs:MoonPopupMenu::render_with_palette` must fail loudly for widths that require an
 /// `App` text system. Falling back to the fit minimum or default scale would render user menus at
 /// the wrong width and clip their labels.
 #[test]
@@ -1271,7 +1271,7 @@ fn palette_only_menu_render_rejects_measured_width_policies() {
     );
 }
 
-/// `dropdown.rs:natural_menu_width` must reserve both the right-label glyphs and the additional
+/// `dropdown/layout.rs:natural_menu_width` must reserve both the right-label glyphs and the additional
 /// flex gap they introduce. Omitting either clips the clock's time column at its fitted width.
 #[test]
 fn fitted_menu_accounts_for_right_label_and_its_gap() {
@@ -1328,7 +1328,7 @@ impl gpui::Render for FittedSubmenuHarness {
     }
 }
 
-/// `dropdown.rs:MoonPopupMenu::render_item` must pass the fit policy, not the resolved parent
+/// `dropdown/popup.rs:MoonPopupMenu::render_item` must pass the fit policy, not the resolved parent
 /// width, into a submenu. Restoring `.width(menu_width)` makes this named child clip to the narrow
 /// parent even though its own label fits below the shared maximum.
 #[gpui::test]
@@ -1377,7 +1377,7 @@ fn fitted_submenu_resolves_width_from_its_own_items(cx: &mut gpui::TestAppContex
     );
 }
 
-/// `dropdown.rs:menu_width_requirements`'s `Label` arm must reserve its own `right_label` the same
+/// `dropdown/layout.rs:menu_width_requirements`'s `Label` arm must reserve its own `right_label` the same
 /// way the `Item` arm does. Resolving `(0.0, 0.0)` for a label row's trailing text instead of
 /// calling `trailing_label_widths` lets a label's trailing count spill past a Scaled/Fit menu's
 /// resolved right edge.
@@ -1407,7 +1407,7 @@ fn fitted_label_row_accounts_for_right_label_and_its_gap() {
     );
 }
 
-/// `dropdown.rs:menu_content_max` must charge the pinned header's budget straight to the row
+/// `dropdown/layout.rs:menu_content_max` must charge the pinned header's budget straight to the row
 /// list. Dropping the `- header_budget` term lets a virtualized menu with a header size its list
 /// as if the header were absent, so the menu overshoots its own maximum height and the outer
 /// `overflow_hidden` silently clips the last rows.
@@ -1436,7 +1436,7 @@ fn menu_content_max_charges_the_header_budget_to_the_row_list() {
     );
 }
 
-/// `dropdown.rs:clamp_header_budget` must cap a header declared taller than the menu allows so at
+/// `dropdown/layout.rs:clamp_header_budget` must cap a header declared taller than the menu allows so at
 /// least one row still fits beneath it. Returning `declared` unclamped leaves the row list no
 /// space at all and the menu opens as an unusable strip.
 #[test]
@@ -1499,7 +1499,7 @@ impl gpui::Render for HeaderHeightHarness {
 }
 
 /// Catches removing `.h(px(height))` from the pinned-header wrapper in
-/// `dropdown.rs:MoonPopupMenu::render_with_metrics`. Without it the wrapper shrinks to the
+/// `dropdown/popup.rs:MoonPopupMenu::render_with_metrics`. Without it the wrapper shrinks to the
 /// header's own natural content size instead of the height its budget reserved, so an
 /// over-declared header wastes list space and an under-declared one pushes rows past the cap.
 #[gpui::test]
@@ -1571,7 +1571,7 @@ impl gpui::Render for EagerCappedHeaderHarness {
 }
 
 /// Catches moving `.flex_1()`/`.overflow_y_scroll()` from the row list to the outer menu in
-/// `dropdown.rs:MoonPopupMenu::render_with_metrics`'s capped eager branch. Without its own scroll
+/// `dropdown/popup.rs:MoonPopupMenu::render_with_metrics`'s capped eager branch. Without its own scroll
 /// region, a sub-threshold row list cannot reveal rows past the cap while keeping its header pinned.
 #[gpui::test]
 fn eager_capped_menu_scrolls_its_rows_independently_of_the_pinned_header(
@@ -1747,7 +1747,7 @@ impl gpui::Render for HeaderClampScalingHarness {
     }
 }
 
-/// Catches replacing `dropdown.rs:MoonPopupMenu::render_with_metrics`'s header-scaling block
+/// Catches replacing `dropdown/popup.rs:MoonPopupMenu::render_with_metrics`'s header-scaling block
 /// (`let header_heights: Vec<f32> = if requested_total > 0.0 { .. } else { requested_heights };`)
 /// with a bare `let header_heights = requested_heights;`. `clamp_header_budget`'s surviving budget
 /// then never reaches the header wrapper's own `.h(px(height))`: the wrapper keeps rendering at its
