@@ -9,7 +9,7 @@ use super::{
     },
     foundation::{MoonClickHandler, MoonSelectHandler, selected_background},
     icons::{MOON_ICON_CHECK, moon_icon},
-    text::{MoonText, fit_text_to_width, fit_text_with_suffix, measure_text_width},
+    text::{MoonText, fit_text_with_suffix, measure_text_width},
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
@@ -17,10 +17,6 @@ use super::{
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-const MENU_PADDING: f32 = 4.0;
-const MENU_BORDER: f32 = 1.0;
-const MENU_GAP: f32 = 2.0;
-pub(crate) const MENU_CHECK_WIDTH: f32 = 12.0;
 const SUBMENU_OFFSET_X: f32 = 2.0;
 const DROPDOWN_TRIGGER_PAD_X: f32 = 14.0;
 // Keep this caret as a text suffix rather than a `MoonDisclosure` element: its text advance is part
@@ -30,14 +26,6 @@ const DROPDOWN_TRIGGER_PAD_X: f32 = 14.0;
 const DROPDOWN_CARET: &str = " \u{25be}";
 const DROPDOWN_TRIGGER_MONO: bool = true;
 const VIRTUAL_MENU_ITEM_THRESHOLD: usize = 64;
-/// Font-size step-down of a row's trailing text against its label. Shared by the measure, fit and
-/// render paths, which must agree exactly or a row overflows the width resolved for it.
-const MENU_TRAILING_FONT_DELTA: f32 = 0.5;
-/// Weight of a row's trailing text, shared by the same three paths.
-const MENU_TRAILING_WEIGHT: f32 = 400.0;
-const DEFAULT_VIRTUAL_MENU_MAX_HEIGHT: f32 = 320.0;
-#[cfg(test)]
-const MENU_MEASUREMENT_PROBE_PREFIX: &str = "moon-menu-measurement-probe-";
 #[cfg(test)]
 const MENU_CLONE_PROBE_PREFIX: &str = "moon-menu-clone-probe-";
 #[cfg(test)]
@@ -45,54 +33,11 @@ const MENU_DROPDOWN_HANDLER_PROBE_PREFIX: &str = "moon-menu-handler-probe-";
 #[cfg(test)]
 const MENU_PALETTE_PROBE_PREFIX: &str = "moon-menu-palette-probe-";
 #[cfg(test)]
-static MENU_MEASUREMENT_PROBE_COUNT: AtomicUsize = AtomicUsize::new(0);
-#[cfg(test)]
 static MENU_ITEM_CLONE_PROBE_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[cfg(test)]
 static MENU_DROPDOWN_HANDLER_PROBE_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[cfg(test)]
 static MENU_PALETTE_PROBE_SHELL: AtomicUsize = AtomicUsize::new(0);
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-/// Width policy for one popup-menu level.
-pub(super) enum MoonMenuWidth {
-    Rendered(f32),
-    Scaled(f32),
-    Fit { min: f32, max: f32 },
-}
-
-impl MoonMenuWidth {
-    /// Return whether this policy measures content against the active font metrics.
-    ///
-    /// Returns:
-    ///     `true` for scaled and fitted policies; legacy rendered widths stay untouched.
-    pub(super) fn is_measured(self) -> bool {
-        !matches!(self, Self::Rendered(_))
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-/// Maximum-height policy for a popup menu.
-enum MoonMenuMaxHeight {
-    Rendered(f32),
-    Ui(f32),
-}
-
-impl MoonMenuMaxHeight {
-    /// Resolve the maximum rendered menu height.
-    ///
-    /// Args:
-    ///     tokens: Active theme tokens used by UI-scaled policies.
-    ///
-    /// Returns:
-    ///     Maximum menu height in rendered pixels.
-    fn resolve(self, tokens: &MoonThemeTokens) -> f32 {
-        match self {
-            Self::Rendered(height) => height,
-            Self::Ui(height) => tokens.ui(height),
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 /// Width policy for a dropdown's plain-label trigger.
@@ -102,6 +47,22 @@ enum MoonDropdownTriggerWidth {
     Scaled(f32),
     Fit { min: f32, max: f32 },
 }
+
+mod layout;
+
+pub(crate) use layout::{MENU_CHECK_WIDTH, MenuMetrics, menu_row_metrics};
+use layout::{
+    MENU_GAP, MENU_PADDING, MENU_TRAILING_FONT_DELTA, MENU_TRAILING_WEIGHT, MoonMenuMaxHeight,
+    clamp_header_budget, fit_menu_item_label, menu_check_width, menu_content_max,
+    menu_level_is_virtualized, menu_outer_chrome, resolve_menu_outer_max, resolve_menu_width,
+    resolve_virtual_menu_width, unscaled_menu_metrics, virtual_menu_list_height,
+};
+#[cfg(test)]
+use layout::{
+    MENU_MEASUREMENT_PROBE_PREFIX, MENU_WIDTH_SAMPLE_ROWS, capped_menu_items_height,
+    fit_menu_item_labels, menu_measurement_probe_count, natural_menu_width,
+};
+pub(super) use layout::{MoonMenuWidth, menu_level_outer_height, resolve_menu_level_width};
 
 /// Resolve and, when necessary, truncate one plain dropdown trigger label.
 ///
@@ -310,29 +271,6 @@ pub enum MoonMenuSize {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-/// Resolved per-row geometry for one menu size and theme scale.
-pub(crate) struct MenuMetrics {
-    pub(crate) row_height: f32,
-    pub(crate) font_size: f32,
-    pub(crate) line_height: f32,
-    pub(crate) radius: f32,
-    pub(crate) pad_x: f32,
-    pub(crate) gap: f32,
-}
-
-/// Return the row metrics of a menu of this size, resolved for the active scale.
-///
-/// Crate-visible so a list that must READ as a menu draws its rows on the menu's own geometry
-/// rather than approximating it — the searchable combobox popup, which opens in the same rows as
-/// dropdown menus and would otherwise differ in row height and label size.
-pub(crate) fn menu_row_metrics(size: MoonMenuSize, tokens: &MoonThemeTokens) -> MenuMetrics {
-    MoonPopupMenu::new("menu-metrics")
-        .size(size)
-        .metrics()
-        .scaled(tokens)
-}
-
 /// Shared immutable inputs used to render every row in one menu level.
 struct MenuLevelRenderContext {
     menu_id: SharedString,
@@ -395,183 +333,10 @@ impl MoonPopupMenuVirtualState {
     }
 }
 
-impl MenuMetrics {
-    /// Scale menu geometry while leaving font inputs in design-reference units for MoonText.
-    ///
-    /// Args:
-    ///     tokens: Active theme tokens used to scale row geometry.
-    ///
-    /// Returns:
-    ///     Menu metrics resolved for the active UI scale.
-    fn scaled(self, tokens: &MoonThemeTokens) -> Self {
-        let line_height = tokens.line_height(self.line_height);
-        Self {
-            row_height: tokens.ui(self.row_height).max(line_height + tokens.ui(4.0)),
-            font_size: self.font_size,
-            line_height: self.line_height,
-            radius: tokens.ui(self.radius),
-            pad_x: tokens.ui(self.pad_x),
-            gap: tokens.ui(self.gap),
-        }
-    }
-}
-
-/// Return the fixed outer chrome around a menu row.
-///
-/// Args:
-///     tokens: Active theme tokens used to scale menu padding.
-///
-/// Returns:
-///     Combined menu padding and border width.
-fn menu_outer_chrome(tokens: &MoonThemeTokens) -> f32 {
-    tokens.ui(MENU_PADDING) * 2.0 + MENU_BORDER * 2.0
-}
-
-/// Return whether a menu level is large enough to require bounded element construction.
-///
-/// Args:
-///     item_count: Number of rows at this menu level.
-///
-/// Returns:
-///     `true` when this level should use GPUI's retained variable-height list.
-fn menu_level_is_virtualized(item_count: usize) -> bool {
-    item_count >= VIRTUAL_MENU_ITEM_THRESHOLD
-}
-
-/// Compute a mixed menu level's natural height only until its viewport is full.
-///
-/// Args:
-///     kinds: Ordered item, label, and separator roles.
-///     metrics: Scaled ordinary-row geometry.
-///     tokens: Active theme tokens used for inter-row gaps.
-///     content_max: Maximum useful viewport height.
-///
-/// Returns:
-///     Natural content height capped at `content_max`.
-fn capped_menu_items_height(
-    kinds: impl Iterator<Item = MoonMenuItemKind>,
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    content_max: f32,
-) -> f32 {
-    let mut height = 0.0;
-    for (ix, kind) in kinds.enumerate() {
-        if ix > 0 {
-            height += tokens.ui(MENU_GAP);
-        }
-        height += match kind {
-            MoonMenuItemKind::Separator => 7.0,
-            MoonMenuItemKind::Item | MoonMenuItemKind::Label => metrics.row_height,
-        };
-        if height >= content_max {
-            return content_max;
-        }
-    }
-    height
-}
-
-/// Resolve the outer height ceiling a menu level renders within.
-///
-/// One place decides the fallback because a virtualized level needs a bounded viewport even with
-/// no caller maximum, while an eager level can retain its natural height.
-///
-/// Args:
-///     max_height: Optional caller-supplied outer menu limit.
-///     tokens: Active theme tokens.
-///     virtualized: Whether this level renders through the virtual list.
-///
-/// Returns:
-///     The resolved ceiling, or `f32::INFINITY` for an uncapped eager level.
-fn resolve_menu_outer_max(
-    max_height: Option<MoonMenuMaxHeight>,
-    tokens: &MoonThemeTokens,
-    virtualized: bool,
-) -> f32 {
-    max_height
-        .map(|max_height| max_height.resolve(tokens))
-        .unwrap_or(if virtualized {
-            tokens.ui(DEFAULT_VIRTUAL_MENU_MAX_HEIGHT)
-        } else {
-            f32::INFINITY
-        })
-}
-
-/// Resolve the height available to the rows once chrome and pinned headers are paid for.
-///
-/// The virtualized width-fitting prefix and the rendered list viewport must use this same value;
-/// otherwise the menu fits its width to rows that the initial viewport never shows.
-///
-/// Args:
-///     outer_max: Resolved outer menu ceiling.
-///     tokens: Active theme tokens.
-///     header_budget: Resolved height pinned headers take, their gaps included.
-///     metrics: Resolved row geometry.
-///
-/// Returns:
-///     The row list's height budget, never less than a single row.
-fn menu_content_max(
-    outer_max: f32,
-    tokens: &MoonThemeTokens,
-    header_budget: f32,
-    metrics: MenuMetrics,
-) -> f32 {
-    (outer_max - menu_outer_chrome(tokens) - header_budget).max(metrics.row_height)
-}
-
-/// Cap a declared header height to preserve one row whenever the outer limit can contain it.
-///
-/// A header is pinned, so every unit it claims comes straight off the row list. Left unbounded, a
-/// header declared taller than the menu's own maximum would leave the list nothing to occupy and
-/// the menu would open as an unusable strip. The header yields before the list's one-row floor
-/// because its height is caller-chosen.
-///
-/// Args:
-///     declared: Resolved header height, gap included, or zero when there is no header.
-///     outer_max: Resolved outer menu maximum, or `f32::INFINITY` when the menu is uncapped.
-///     chrome: Resolved menu border and padding height.
-///     row_height: Resolved ordinary row height.
-///
-/// Returns:
-///     The header budget to subtract from the row list's viewport.
-fn clamp_header_budget(declared: f32, outer_max: f32, chrome: f32, row_height: f32) -> f32 {
-    if declared <= 0.0 {
-        return 0.0;
-    }
-    if !outer_max.is_finite() {
-        return declared;
-    }
-    declared.min((outer_max - chrome - row_height).max(0.0))
-}
-
-/// Resolve a bounded viewport height for a virtualized menu level.
-///
-/// Args:
-///     items: Ordered mixed menu rows.
-///     metrics: Scaled ordinary-row geometry.
-///     tokens: Active theme tokens.
-///     content_max: Height budget already left to the rows by chrome and pinned headers.
-///
-/// Returns:
-///     The list viewport height.
-fn virtual_menu_list_height(
-    items: &[MoonMenuItem],
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    content_max: f32,
-) -> f32 {
-    capped_menu_items_height(
-        items.iter().map(|item| item.kind),
-        metrics,
-        tokens,
-        content_max,
-    )
-}
-
 /// Render a row's trailing text.
 ///
-/// The third of the trailing-text triple, beside [`trailing_label_widths`] and
-/// [`fit_trailing_label`]: the style here has to match what those two measured, so all three read
-/// the same two constants.
+/// The render half of the trailing-text policy; measurement and fitting use
+/// the same font-size delta and font weight in the layout module.
 ///
 /// Args:
 ///     right_label: Already-fitted trailing text.
@@ -601,355 +366,6 @@ fn menu_trailing_label(
         .into_any_element()
 }
 
-/// Measure a row's trailing text at its natural width and at its ellipsis-only minimum.
-///
-/// Label rows and ordinary rows render trailing text at the same step-down and weight. Keeping
-/// that policy here prevents their measured widths from drifting away from the rendered style.
-///
-/// Args:
-///     right_label: The row's trailing text, if any.
-///     metrics: Resolved row geometry.
-///     measure: Width function matching the row's text style.
-///
-/// Returns:
-///     `(natural width, minimum width)`, both zero when there is no trailing text. The gap that
-///     separates it from the label belongs to the caller, whose row kind decides how many gaps it
-///     pays for.
-fn trailing_label_widths(
-    right_label: Option<&SharedString>,
-    metrics: MenuMetrics,
-    measure: &mut impl FnMut(&str, f32, f32) -> f32,
-) -> (f32, f32) {
-    let Some(right_label) = right_label else {
-        return (0.0, 0.0);
-    };
-    let font_size = metrics.font_size - MENU_TRAILING_FONT_DELTA;
-    let natural = measure(right_label.as_ref(), font_size, MENU_TRAILING_WEIGHT);
-    let minimum = if right_label.is_empty() {
-        0.0
-    } else {
-        measure("\u{2026}", font_size, MENU_TRAILING_WEIGHT)
-    };
-    (natural, minimum)
-}
-
-/// Truncate a row's trailing text into the budget and report what it consumed.
-///
-/// The trailing text is fitted first, against a budget that still leaves room for the label's own
-/// ellipsis — otherwise a long count would take the whole row and the label would vanish instead
-/// of truncating. That ordering is the subtle part, and it is why both row kinds call this rather
-/// than restating it.
-///
-/// Args:
-///     right_label: The row's trailing text, taken and replaced with its fitted form.
-///     budget: Remaining text budget, reduced by what the trailing text consumed.
-///     main_weight: Weight of the row's own label, used to size its ellipsis reservation.
-///     metrics: Resolved row geometry.
-///     tokens: Active theme tokens.
-///     cx: Application context used for text measurement.
-///     mono: Whether the row uses the configured monospaced font.
-///
-/// Returns:
-///     Nothing; `right_label` and `budget` are updated in place.
-fn fit_trailing_label(
-    right_label: &mut Option<SharedString>,
-    budget: &mut f32,
-    main_weight: f32,
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    cx: &App,
-    mono: bool,
-) {
-    let Some(text) = right_label.take() else {
-        return;
-    };
-    let main_ellipsis =
-        measure_menu_text_width(cx, tokens, "\u{2026}", metrics.font_size, main_weight, mono);
-    let trailing_budget = (*budget - main_ellipsis).max(0.0);
-    let (fitted, consumed) = fit_text_to_width(text.as_ref(), trailing_budget, |text| {
-        measure_menu_text_width(
-            cx,
-            tokens,
-            text,
-            metrics.font_size - MENU_TRAILING_FONT_DELTA,
-            MENU_TRAILING_WEIGHT,
-            mono,
-        )
-    });
-    *right_label = Some(SharedString::from(fitted));
-    *budget = (*budget - consumed).max(0.0);
-}
-
-/// Return the UI-scaled check-column width rendered by every actionable menu row.
-///
-/// Args:
-///     tokens: Active theme tokens.
-///
-/// Returns:
-///     Rendered check-column width.
-fn menu_check_width(tokens: &MoonThemeTokens) -> f32 {
-    tokens.ui(MENU_CHECK_WIDTH)
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-/// Natural and minimum viable outer widths for one menu level.
-struct MenuWidthRequirements {
-    natural: f32,
-    minimum: f32,
-}
-
-/// Measure natural and minimum viable widths in one pass over a menu level.
-///
-/// Args:
-///     items: Rows belonging to this menu level.
-///     metrics: Resolved row geometry.
-///     tokens: Active theme tokens.
-///     measure: Width function matching each row's text style.
-///
-/// Returns:
-///     Rounded natural and minimum viable outer widths.
-fn menu_width_requirements(
-    items: &[MoonMenuItem],
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    mut measure: impl FnMut(&str, f32, f32) -> f32,
-) -> MenuWidthRequirements {
-    let (widest_natural, widest_minimum) = items
-        .iter()
-        .map(|item| match item.kind {
-            MoonMenuItemKind::Separator => (0.0, 0.0),
-            MoonMenuItemKind::Label => {
-                // A label row renders `right_label` too, so it has to reserve the trailing text
-                // the same way an ordinary row does — measuring only the label would resolve a
-                // width the row then overflows. It has no check column and no submenu, so it pays
-                // for the single gap its own row container sets.
-                let (trailing_natural, trailing_minimum) =
-                    trailing_label_widths(item.right_label.as_ref(), metrics, &mut measure);
-                let trailing_gap = if item.right_label.is_some() {
-                    metrics.gap
-                } else {
-                    0.0
-                };
-                let chrome = metrics.pad_x * 2.0 + trailing_gap;
-                let natural = chrome
-                    + measure(item.label.as_ref(), metrics.font_size, 500.0)
-                    + trailing_natural;
-                let marker = if item.label.is_empty() {
-                    0.0
-                } else {
-                    measure("\u{2026}", metrics.font_size, 500.0)
-                };
-                (natural, chrome + marker + trailing_minimum)
-            }
-            MoonMenuItemKind::Item => {
-                let (trailing_natural, trailing_minimum) = if item.right_label.is_some() {
-                    trailing_label_widths(item.right_label.as_ref(), metrics, &mut measure)
-                } else if item.has_submenu() {
-                    let glyph = measure("\u{203a}", metrics.font_size, 600.0);
-                    (glyph, glyph)
-                } else {
-                    (0.0, 0.0)
-                };
-                let has_trailing = item.right_label.is_some() || item.has_submenu();
-                let gaps = if has_trailing { 3.0 } else { 2.0 };
-                let chrome = metrics.pad_x * 2.0 + menu_check_width(tokens) + metrics.gap * gaps;
-                let label_natural = measure(item.label.as_ref(), metrics.font_size, 600.0);
-                let label_minimum = if item.label.is_empty() {
-                    0.0
-                } else {
-                    measure("\u{2026}", metrics.font_size, 600.0)
-                };
-                (
-                    chrome + label_natural + trailing_natural,
-                    chrome + label_minimum + trailing_minimum,
-                )
-            }
-        })
-        .fold((0.0_f32, 0.0_f32), |(natural, minimum), row| {
-            (natural.max(row.0), minimum.max(row.1))
-        });
-    let outer = menu_outer_chrome(tokens);
-    MenuWidthRequirements {
-        natural: (outer + widest_natural).ceil(),
-        minimum: (outer + widest_minimum).ceil(),
-    }
-}
-
-/// Return the natural outer width required by the widest item in one menu level.
-///
-/// Args:
-///     items: Rows belonging to this menu level.
-///     metrics: Resolved row geometry.
-///     tokens: Active theme tokens.
-///     measure: Width function matching each row's text style.
-///
-/// Returns:
-///     Rounded outer width required by the widest row.
-#[cfg(test)]
-fn natural_menu_width(
-    items: &[MoonMenuItem],
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    measure: impl FnMut(&str, f32, f32) -> f32,
-) -> f32 {
-    menu_width_requirements(items, metrics, tokens, measure).natural
-}
-
-/// Truncate labels to the exact text budgets of one resolved menu level.
-///
-/// Args:
-///     items: Mutable rows belonging to this menu level.
-///     width: Resolved outer menu width.
-///     metrics: Resolved row geometry.
-///     tokens: Active theme tokens.
-///     cx: Application context used for text measurement.
-///     mono: Whether rows use the configured monospaced font.
-///
-/// Returns:
-///     Nothing; row labels are updated in place.
-#[cfg(test)]
-fn fit_menu_item_labels(
-    items: &mut [MoonMenuItem],
-    width: f32,
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    cx: &App,
-    mono: bool,
-) {
-    let outer = menu_outer_chrome(tokens);
-    for item in items {
-        fit_menu_item_label(item, width, metrics, tokens, cx, mono, outer);
-    }
-}
-
-/// Truncate one menu row to the exact text budget of a resolved menu level.
-///
-/// Args:
-///     item: Mutable row to fit.
-///     width: Resolved outer menu width.
-///     metrics: Resolved row geometry.
-///     tokens: Active theme tokens.
-///     cx: Application context used for text measurement.
-///     mono: Whether the row uses the configured monospaced font.
-///     outer: Precomputed menu border and padding width.
-///
-/// Returns:
-///     Nothing; the row labels are updated in place.
-fn fit_menu_item_label(
-    item: &mut MoonMenuItem,
-    width: f32,
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    cx: &App,
-    mono: bool,
-    outer: f32,
-) {
-    match item.kind {
-        MoonMenuItemKind::Separator => {}
-        MoonMenuItemKind::Label => {
-            let trailing_gap = if item.right_label.is_some() {
-                metrics.gap
-            } else {
-                0.0
-            };
-            let mut budget = (width - outer - metrics.pad_x * 2.0 - trailing_gap).max(0.0);
-            fit_trailing_label(
-                &mut item.right_label,
-                &mut budget,
-                500.0,
-                metrics,
-                tokens,
-                cx,
-                mono,
-            );
-            let fitted = fit_text_to_width(item.label.as_ref(), budget, |text| {
-                measure_menu_text_width(cx, tokens, text, metrics.font_size, 500.0, mono)
-            })
-            .0;
-            item.label = SharedString::from(fitted);
-        }
-        MoonMenuItemKind::Item => {
-            let has_submenu = item.has_submenu();
-            let trailing_gaps = if item.right_label.is_some() || has_submenu {
-                3.0
-            } else {
-                2.0
-            };
-            let mut text_budget = (width
-                - outer
-                - metrics.pad_x * 2.0
-                - menu_check_width(tokens)
-                - metrics.gap * trailing_gaps)
-                .max(0.0);
-
-            if item.right_label.is_some() {
-                fit_trailing_label(
-                    &mut item.right_label,
-                    &mut text_budget,
-                    600.0,
-                    metrics,
-                    tokens,
-                    cx,
-                    mono,
-                );
-            } else if has_submenu {
-                text_budget = (text_budget
-                    - measure_menu_text_width(
-                        cx,
-                        tokens,
-                        "\u{203a}",
-                        metrics.font_size,
-                        600.0,
-                        mono,
-                    ))
-                .max(0.0);
-            }
-
-            let fitted = fit_text_to_width(item.label.as_ref(), text_budget, |text| {
-                measure_menu_text_width(cx, tokens, text, metrics.font_size, 600.0, mono)
-            })
-            .0;
-            item.label = SharedString::from(fitted);
-        }
-    }
-}
-
-/// Measure menu text and expose a sentinel-only counter to regression tests.
-///
-/// Args:
-///     cx: Application context owning the text system.
-///     tokens: Active theme tokens.
-///     text: Text being measured.
-///     font_size: Design-reference font size.
-///     weight: Font weight.
-///     mono: Whether to use the configured monospaced family.
-///
-/// Returns:
-///     Rendered text width.
-fn measure_menu_text_width(
-    cx: &App,
-    tokens: &MoonThemeTokens,
-    text: &str,
-    font_size: f32,
-    weight: f32,
-    mono: bool,
-) -> f32 {
-    #[cfg(test)]
-    if text.starts_with(MENU_MEASUREMENT_PROBE_PREFIX) {
-        MENU_MEASUREMENT_PROBE_COUNT.fetch_add(1, Ordering::Relaxed);
-    }
-    measure_text_width(cx, tokens, text, font_size, weight, mono)
-}
-
-/// Return the current sentinel-only menu measurement count for visual regressions.
-///
-/// Returns:
-///     Number of measurement calls whose text started with the probe prefix.
-#[cfg(test)]
-fn menu_measurement_probe_count() -> usize {
-    MENU_MEASUREMENT_PROBE_COUNT.load(Ordering::Relaxed)
-}
-
 /// Reset and return the menu-row clone probe used by virtual repaint regressions.
 ///
 /// Returns:
@@ -975,242 +391,6 @@ fn take_dropdown_handler_probe_count() -> usize {
 #[cfg(test)]
 fn take_palette_probe_shell() -> u32 {
     MENU_PALETTE_PROBE_SHELL.swap(0, Ordering::Relaxed) as u32
-}
-
-/// Resolve a menu width policy and whether its labels should be bounded to the result.
-///
-/// Args:
-///     policy: Configured rendered, scaled, or fitted width policy.
-///     items: Rows belonging to this menu level.
-///     metrics: Resolved row geometry.
-///     tokens: Active theme tokens.
-///     cx: Application context used for text measurement.
-///     mono: Whether rows use the configured monospaced font.
-///
-/// Returns:
-///     Resolved outer width and whether labels must be truncated to it.
-fn resolve_menu_width(
-    policy: MoonMenuWidth,
-    items: &[MoonMenuItem],
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    cx: &App,
-    mono: bool,
-) -> (f32, bool) {
-    if let MoonMenuWidth::Rendered(width) = policy {
-        return (width, false);
-    }
-
-    let text_scale = tokens.font(metrics.font_size) / metrics.font_size.max(1.0);
-    let requirements = menu_width_requirements(items, metrics, tokens, |text, size, weight| {
-        measure_menu_text_width(cx, tokens, text, size, weight, mono)
-    });
-    let width = match policy {
-        MoonMenuWidth::Scaled(width) => (width * text_scale).max(requirements.minimum),
-        MoonMenuWidth::Fit { min, max } => {
-            let min = (min * text_scale).max(requirements.minimum);
-            let max = (max * text_scale).max(min);
-            requirements.natural.clamp(min, max)
-        }
-        MoonMenuWidth::Rendered(_) => {
-            unreachable!("rendered menu width handled before text measurement")
-        }
-    };
-    (width, width < requirements.natural)
-}
-
-/// Return the prefix of rows that can contribute to a virtual menu's initial viewport.
-///
-/// Args:
-///     items: Ordered menu rows.
-///     metrics: Resolved row geometry.
-///     tokens: Active theme tokens.
-///     content_max: Height budget already left to the rows by chrome and pinned headers.
-///
-/// Returns:
-///     A bounded prefix ending at the row that fills the initial viewport.
-fn virtual_menu_initial_rows<'a>(
-    items: &'a [MoonMenuItem],
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    content_max: f32,
-) -> &'a [MoonMenuItem] {
-    let mut height = 0.0;
-    for (ix, item) in items.iter().enumerate() {
-        if ix > 0 {
-            height += tokens.ui(MENU_GAP);
-        }
-        height += match item.kind {
-            MoonMenuItemKind::Separator => 7.0,
-            MoonMenuItemKind::Item | MoonMenuItemKind::Label => metrics.row_height,
-        };
-        if height >= content_max {
-            return &items[..=ix];
-        }
-    }
-    items
-}
-
-/// Rows a virtual menu measures its width from.
-///
-/// Measuring only the rows that fit the HEIGHT budget — roughly fifteen at a typical row height —
-/// makes the fitted width depend on WHAT SITS AT THE TOP of the menu. Adding a few header rows then
-/// pushes long labels out of the measured window and the whole menu narrows, truncating names that
-/// fitted a moment earlier. That is a visible defect, and an inconsistent one: a menu below
-/// [`VIRTUAL_MENU_ITEM_THRESHOLD`] measures EVERY row, so the same list narrows the moment it grows
-/// past the threshold.
-///
-/// So the sample is a row COUNT, not a height: enough to cover any real menu whole, while staying
-/// bounded for a pathological one. The height prefix still wins where it is somehow larger.
-const MENU_WIDTH_SAMPLE_ROWS: usize = 128;
-
-/// Take the rows a virtual menu's width is measured from.
-///
-/// Args:
-///     items: Every row in this menu level.
-///     height_rows: How many rows the height budget admits.
-///
-/// Returns:
-///     The leading rows to measure — all of them for any menu of ordinary size.
-fn menu_width_sample(items: &[MoonMenuItem], height_rows: usize) -> &[MoonMenuItem] {
-    let take = height_rows.max(MENU_WIDTH_SAMPLE_ROWS).min(items.len());
-    &items[..take]
-}
-
-/// Resolve a large virtual menu's width from a bounded leading sample of its rows.
-///
-/// The sample is [`MENU_WIDTH_SAMPLE_ROWS`] rows, which covers any menu of ordinary size whole, so
-/// the fitted width does not depend on which rows happen to sit at the top. Rows beyond the sample
-/// truncate against the resulting budget. Bounding by row count rather than by the declared maximum
-/// width is what avoids a jump at [`VIRTUAL_MENU_ITEM_THRESHOLD`].
-///
-/// Args:
-///     policy: Configured rendered, scaled, or fitted width policy.
-///     items: Ordered rows belonging to this menu level.
-///     metrics: Resolved row geometry.
-///     tokens: Active theme tokens.
-///     cx: Application context used for bounded text measurement.
-///     mono: Whether rows use the configured monospaced font.
-///     content_max: Height budget already left to the rows by chrome and pinned headers.
-///
-/// Returns:
-///     Resolved outer width and whether visible labels must be truncated.
-fn resolve_virtual_menu_width(
-    policy: MoonMenuWidth,
-    items: &[MoonMenuItem],
-    metrics: MenuMetrics,
-    tokens: &MoonThemeTokens,
-    cx: &App,
-    mono: bool,
-    content_max: f32,
-) -> (f32, bool) {
-    if let MoonMenuWidth::Rendered(width) = policy {
-        return (width, false);
-    }
-
-    let initial_rows = virtual_menu_initial_rows(items, metrics, tokens, content_max);
-    let measured_rows = menu_width_sample(items, initial_rows.len());
-    let text_scale = tokens.font(metrics.font_size) / metrics.font_size.max(1.0);
-    let requirements =
-        menu_width_requirements(measured_rows, metrics, tokens, |text, size, weight| {
-            measure_menu_text_width(cx, tokens, text, size, weight, mono)
-        });
-    let width = match policy {
-        MoonMenuWidth::Scaled(width) => (width * text_scale).max(requirements.minimum),
-        MoonMenuWidth::Fit { min, max } => {
-            let min = (min * text_scale).max(requirements.minimum);
-            let max = (max * text_scale).max(min);
-            requirements.natural.clamp(min, max)
-        }
-        MoonMenuWidth::Rendered(_) => {
-            unreachable!("rendered menu width handled before fixed glyph measurement")
-        }
-    };
-    (
-        width,
-        measured_rows.len() < items.len() || width < requirements.natural,
-    )
-}
-
-/// Resolve one retained level's width and apply an already-rendered viewport ceiling.
-///
-/// Context menus use this before positioning so their clamp and the nested popup agree on the
-/// exact painted width. The ceiling is rendered geometry; design-reference fit bounds remain
-/// governed by the active font metrics.
-///
-/// Args:
-///     policy: Configured rendered, scaled, or fitted width policy.
-///     level: Shared menu rows and their layout signature.
-///     size: Menu density used to resolve row geometry.
-///     tokens: Active theme and scale tokens.
-///     cx: Application context used for text measurement.
-///     mono: Whether rows use the configured monospaced font.
-///     rendered_max_width: Optional already-rendered viewport-safe outer width.
-///
-/// Returns:
-///     Resolved outer width and whether labels must truncate to it.
-pub(super) fn resolve_menu_level_width(
-    policy: MoonMenuWidth,
-    level: &MoonMenuLevel,
-    size: MoonMenuSize,
-    tokens: &MoonThemeTokens,
-    cx: &App,
-    mono: bool,
-    rendered_max_width: Option<f32>,
-) -> (f32, bool) {
-    let metrics = menu_row_metrics(size, tokens);
-    let virtualized = menu_level_is_virtualized(level.len());
-    let outer_max = resolve_menu_outer_max(None, tokens, virtualized);
-    let content_max = menu_content_max(outer_max, tokens, 0.0, metrics);
-    let (mut width, mut truncate) = if virtualized {
-        resolve_virtual_menu_width(
-            policy,
-            level.as_slice(),
-            metrics,
-            tokens,
-            cx,
-            mono,
-            content_max,
-        )
-    } else {
-        resolve_menu_width(policy, level.as_slice(), metrics, tokens, cx, mono)
-    };
-    if policy.is_measured()
-        && let Some(max_width) = rendered_max_width
-        && width > max_width
-    {
-        width = max_width.max(1.0);
-        truncate = true;
-    }
-    (width, truncate)
-}
-
-/// Resolve one retained level's natural outer height inside a rendered cap.
-///
-/// Args:
-///     level: Shared menu rows in display order.
-///     size: Menu density used to resolve row geometry.
-///     tokens: Active theme and scale tokens.
-///     rendered_max_height: Already-rendered viewport-safe outer height.
-///
-/// Returns:
-///     Natural painted outer height, capped to the supplied viewport budget.
-pub(super) fn menu_level_outer_height(
-    level: &MoonMenuLevel,
-    size: MoonMenuSize,
-    tokens: &MoonThemeTokens,
-    rendered_max_height: f32,
-) -> f32 {
-    let metrics = menu_row_metrics(size, tokens);
-    let chrome = menu_outer_chrome(tokens);
-    let content_max = (rendered_max_height - chrome).max(metrics.row_height);
-    let content = capped_menu_items_height(
-        level.as_slice().iter().map(|item| item.kind),
-        metrics,
-        tokens,
-        content_max,
-    );
-    (chrome + content).min(rendered_max_height)
 }
 
 /// Return whether a menu row kind is allowed to dispatch click handlers.
@@ -2316,39 +1496,7 @@ impl MoonPopupMenu {
     /// Returns:
     ///     Design-reference row metrics.
     fn metrics(&self) -> MenuMetrics {
-        match self.size {
-            MoonMenuSize::Compact => MenuMetrics {
-                row_height: 20.0,
-                font_size: 9.5,
-                line_height: 12.0,
-                radius: 3.0,
-                pad_x: 6.0,
-                gap: 5.0,
-            },
-            MoonMenuSize::Normal => MenuMetrics {
-                row_height: 24.0,
-                font_size: 10.5,
-                line_height: 13.0,
-                radius: 4.0,
-                pad_x: 7.0,
-                gap: 6.0,
-            },
-            MoonMenuSize::Custom {
-                row_height,
-                font_size,
-                line_height,
-                radius,
-                pad_x,
-                gap,
-            } => MenuMetrics {
-                row_height,
-                font_size,
-                line_height,
-                radius,
-                pad_x,
-                gap,
-            },
-        }
+        unscaled_menu_metrics(self.size)
     }
 }
 
