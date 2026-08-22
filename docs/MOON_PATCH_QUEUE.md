@@ -44,6 +44,9 @@ cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 
    - `Window::is_text_input_active`: reports whether the drawn frame installed a
      text-input handler. An application binding a bare key (Caps Lock, a lone
      modifier) needs it, because those arrive whatever has focus.
+   - regular pointer tooltips require 800 ms of continuous hover, expire after
+     five visible seconds, and stay suppressed until pointer re-entry; hoverable
+     tooltips remain persistent while either their trigger or content is hovered.
 
 2. Zed bugfix candidates kept separate from `gpu_canvas` when possible:
    - Windows DPI/restore-bounds behavior
