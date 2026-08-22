@@ -2914,7 +2914,17 @@ impl Window {
             self.a11y.begin_frame();
         }
 
-        let _inspector_width: Pixels = rems(30.0).to_pixels(self.rem_size());
+        // The inspector's own panel. Width is settable through `App::set_inspector_panel_width`
+        // and defaults to the 30rem the built-in panel wants.
+        //
+        // Zero is a supported value, and the reason the setting exists: a host that only wants the
+        // inspector's DATA — element ids, source locations, bounds — pays for it today by having
+        // its application relaid out 30rem narrower the moment the inspector is installed. Every
+        // recorded rectangle then describes a window the user never sees, and overlays anchored to
+        // the window move with it.
+        let _inspector_width: Pixels = cx
+            .inspector_panel_width
+            .unwrap_or_else(|| rems(30.0).to_pixels(self.rem_size()));
         let root_size = {
             #[cfg(debug_assertions)]
             {

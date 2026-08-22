@@ -676,6 +676,8 @@ pub struct App {
     pub(crate) current_window_by_entity: FxHashMap<EntityId, WindowId>,
     #[cfg(debug_assertions)]
     pub(crate) inspector_renderer: Option<crate::InspectorRenderer>,
+    /// Width reserved for the inspector's panel; `None` means the built-in 30rem.
+    pub(crate) inspector_panel_width: Option<Pixels>,
     #[cfg(debug_assertions)]
     pub(crate) inspector_element_registry: InspectorElementRegistry,
     #[cfg(any(test, feature = "test-support", debug_assertions))]
@@ -772,6 +774,7 @@ impl App {
                 prompt_builder: Some(PromptBuilder::Default),
                 #[cfg(debug_assertions)]
                 inspector_renderer: None,
+                inspector_panel_width: None,
                 #[cfg(debug_assertions)]
                 inspector_element_registry: InspectorElementRegistry::default(),
                 quit_mode: QuitMode::default(),
@@ -2449,6 +2452,19 @@ impl App {
     #[cfg(debug_assertions)]
     pub fn set_inspector_renderer(&mut self, f: crate::InspectorRenderer) {
         self.inspector_renderer = Some(f);
+    }
+
+    /// Set how much width the inspector's panel takes from the window.
+    ///
+    /// Defaults to 30rem, which is what the built-in panel needs. Set it to zero for a host that
+    /// wants the inspector's DATA without its interface: with a panel, installing the inspector
+    /// relays the application out narrower, so measured rectangles describe a window the user never
+    /// sees and window-anchored overlays move as it toggles.
+    ///
+    /// Args:
+    ///     width: Width to reserve, or `None` to restore the default.
+    pub fn set_inspector_panel_width(&mut self, width: Option<Pixels>) {
+        self.inspector_panel_width = width;
     }
 
     /// Registers a renderer specific to an inspector state.
