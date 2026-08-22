@@ -1887,6 +1887,96 @@ fn eager_capped_menu_scrolls_its_rows_independently_of_the_pinned_header(
     );
 }
 
+/// Maximum outer height for the virtual pinned-header parity probe.
+const VIRTUAL_HEADER_MENU_MAX_HEIGHT: f32 = 120.0;
+
+/// Open a virtualized popup whose pinned header must remain outside its scrolling row list.
+struct VirtualCappedHeaderHarness;
+
+impl gpui::Render for VirtualCappedHeaderHarness {
+    /// Render a capped menu at the virtualization threshold with one pinned header.
+    ///
+    /// Args:
+    ///     _window: Test window.
+    ///     _cx: Test view context.
+    ///
+    /// Returns:
+    ///     A virtualized popup menu whose rows exceed its available viewport.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{InteractiveElement as _, Styled as _};
+
+        MoonPopupMenu::new("virtual-capped-header")
+            .max_height(VIRTUAL_HEADER_MENU_MAX_HEIGHT)
+            .header(
+                28.0,
+                gpui::div()
+                    .debug_selector(|| "virtual-capped-header:header".into())
+                    .h(gpui::px(28.0))
+                    .w_full(),
+            )
+            .items(
+                (0..super::VIRTUAL_MENU_ITEM_THRESHOLD)
+                    .map(|ix| MoonMenuItem::new(format!("Row {ix}"))),
+            )
+    }
+}
+
+/// Catches preserving pinned-header scrolling only in the eager branch while moving virtual
+/// headers into, or omitting them from, the retained list. The menu maximum is an independent
+/// outer-height oracle; the header origin must stay fixed while row zero leaves the constructed
+/// virtual window after scrolling.
+#[gpui::test]
+fn virtual_capped_menu_scrolls_its_rows_independently_of_the_pinned_header(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(crate::init);
+    let window = cx.add_window(|_, _| VirtualCappedHeaderHarness);
+    let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+
+    let (menu, header_before, row0_before) = (0..8)
+        .find_map(|_| {
+            cx.update(|window, _| window.refresh());
+            cx.run_until_parked();
+            Some((
+                cx.debug_bounds("virtual-capped-header")?,
+                cx.debug_bounds("virtual-capped-header:header")?,
+                cx.debug_bounds("virtual-capped-header:item:0")?,
+            ))
+        })
+        .expect("virtual capped menu, pinned header, and first row must render");
+
+    assert!(
+        menu.size.height <= gpui::px(VIRTUAL_HEADER_MENU_MAX_HEIGHT),
+        "virtual menu height {:?} exceeded its independent {}px outer cap",
+        menu.size.height,
+        VIRTUAL_HEADER_MENU_MAX_HEIGHT
+    );
+
+    cx.simulate_event(gpui::ScrollWheelEvent {
+        position: row0_before.center(),
+        delta: gpui::ScrollDelta::Pixels(gpui::point(gpui::px(0.0), gpui::px(-400.0))),
+        ..Default::default()
+    });
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+
+    let header_after = cx
+        .debug_bounds("virtual-capped-header:header")
+        .expect("pinned virtual header must remain rendered after row scrolling");
+    assert_eq!(
+        header_after.origin.y, header_before.origin.y,
+        "the pinned virtual header must not move with the retained row list"
+    );
+    assert!(
+        cx.debug_bounds("virtual-capped-header:item:0").is_none(),
+        "scrolling must move row zero outside the constructed virtual window"
+    );
+}
+
 /// UI-scaled height declared for the pinned header probe below, deliberately far larger than the
 /// capped menu's own maximum so `clamp_header_budget`'s scale must engage (< 1.0) rather than
 /// resolve to a no-op.
