@@ -233,9 +233,17 @@ impl Element for AnyView {
                         ((), element_state)
                     },
                 )
-            } else {
-                element.as_mut().unwrap().paint(window, cx);
+            } else if let Some(element) = element.as_mut() {
+                element.paint(window, cx);
             }
+            // Nothing to paint here means prepaint took the CACHED path while paint took this one.
+            // `caching_disabled` is read in both phases, and the inspector's picking flag can flip
+            // between them: a click in picking mode selects an element and ends picking, mid-frame.
+            // Prepaint then produced no element while paint expected one.
+            //
+            // Skipping this view costs one frame of it. The `unwrap` that used to stand here cost
+            // the whole process — and not only under the inspector: a double click on a dock tab
+            // took the application down through this line, in `TabPanel`'s paint.
         });
     }
 }
