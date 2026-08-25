@@ -231,9 +231,17 @@ impl MoonDataCell {
     }
 }
 
+/// One row handed to a [`MoonDataTable`] row builder.
+///
+/// CONSTRUCT IT THROUGH [`MoonDataRow::new`] AND THE BUILDERS, never a struct literal. `cells` and
+/// `selected` are `pub` for the table's own internals to read back, which reads like an invitation
+/// to build one field-by-field; it is not, and `banner` is deliberately private to say so. A
+/// literal would break on the next field added here whatever that field's visibility is, so the
+/// builder path is the only construction contract this type has ever been able to keep.
 pub struct MoonDataRow {
     pub cells: Vec<MoonDataCell>,
     pub selected: bool,
+    banner: Option<AnyElement>,
 }
 
 impl MoonDataRow {
@@ -241,7 +249,25 @@ impl MoonDataRow {
         Self {
             cells: cells.into_iter().collect(),
             selected: false,
+            banner: None,
         }
+    }
+
+    /// Lay one element across the whole row, above the cells and outside their clipping.
+    ///
+    /// Forwards to [`MoonTableRow::banner`], which carries the contract: a section heading or any
+    /// other row-wide statement, on a row whose cells are decorative. The cells are still emitted
+    /// — they keep the column geometry and any background the row paints — the banner simply
+    /// covers them.
+    ///
+    /// Args:
+    ///     banner: The element to lay across the row.
+    ///
+    /// Returns:
+    ///     The row, carrying the banner.
+    pub fn banner(mut self, banner: impl IntoElement) -> Self {
+        self.banner = Some(banner.into_any_element());
+        self
     }
 
     pub fn selected(mut self, selected: bool) -> Self {
@@ -250,9 +276,17 @@ impl MoonDataRow {
     }
 
     fn as_table_row(self) -> MoonTableRow {
-        MoonTableRow::new()
+        // A plain `match`, NOT `FluentBuilder::when_some`: that combinator is blanket-implemented
+        // only for `IntoElement`, and `MoonTableRow` is a plain builder struct that is not an
+        // element. Reaching for it here fails to compile with E0599 "trait bounds were not
+        // satisfied" -- measured, after a review suggested exactly that swap.
+        let row = MoonTableRow::new()
             .selected(self.selected)
-            .cells(self.cells.into_iter().map(|cell| cell.cell))
+            .cells(self.cells.into_iter().map(|cell| cell.cell));
+        match self.banner {
+            Some(banner) => row.banner(banner),
+            None => row,
+        }
     }
 }
 

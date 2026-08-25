@@ -137,6 +137,7 @@ pub struct MoonTableRow {
     cells: Vec<MoonTableCell>,
     selected: bool,
     text_alpha: f32,
+    banner: Option<AnyElement>,
 }
 
 impl Default for MoonTableRow {
@@ -151,7 +152,37 @@ impl MoonTableRow {
             cells: Vec::new(),
             selected: false,
             text_alpha: 1.0,
+            banner: None,
         }
+    }
+
+    /// Lay one element across the WHOLE row, above the cells and outside their clipping.
+    ///
+    /// Every cell is `overflow_hidden`, which is what keeps a long value from spilling into its
+    /// neighbour — and is also why a row that wants to say ONE thing across its full width cannot
+    /// say it through a cell: a section heading put in the leftmost cell is cut at that column's
+    /// edge, however much empty room the rest of the row has. The banner is the escape hatch, and
+    /// it is deliberately the only one: widening a cell's clipping would let ordinary values
+    /// overlap.
+    ///
+    /// It is painted AFTER the cells, so it sits ON TOP of them VISUALLY. It does NOT take their
+    /// pointer events: GPUI stops hit-testing at a hitbox only when that hitbox is
+    /// `HitboxBehavior::BlockMouse` (`window.rs::hit_test` breaks on exactly that), and only
+    /// `occlude()` / `occlude_mouse()` set it. This wrapper calls neither, so a cell underneath
+    /// stays clickable and a banner is safe on a row whose cells are interactive.
+    ///
+    /// The consequence to design around is the OPPOSITE of occlusion: put a click handler on the
+    /// banner AND on a cell beneath it and BOTH fire for one click. A caller that wants the banner
+    /// to win calls `cx.stop_propagation()` in its own handler, or `occlude()`s its own element.
+    ///
+    /// Args:
+    ///     banner: The element to lay across the row.
+    ///
+    /// Returns:
+    ///     The row, carrying the banner.
+    pub fn banner(mut self, banner: impl IntoElement) -> Self {
+        self.banner = Some(banner.into_any_element());
+        self
     }
 
     pub fn cell(mut self, cell: MoonTableCell) -> Self {
@@ -172,6 +203,23 @@ impl MoonTableRow {
     pub fn text_alpha(mut self, text_alpha: f32) -> Self {
         self.text_alpha = text_alpha;
         self
+    }
+
+    /// Whether a banner was laid across this row.
+    ///
+    /// `pub(crate)` and a PREDICATE rather than a field: `MoonDataRow::as_table_row` forwards the
+    /// banner across a module boundary, and nothing downstream of that forward is observable
+    /// without a rendering harness — so the forward itself is untestable unless the receiving side
+    /// can be asked. Exposing the field instead would let any module in the crate MOVE the element
+    /// out of a row it does not own; a bool answers the only question a caller has.
+    ///
+    /// `allow(dead_code)` OUTSIDE a test build, and only there: the crate's own callers are all in
+    /// `#[cfg(test)] mod tests`, which is stripped before dead-code analysis runs, so an ordinary
+    /// `cargo build` would warn about a method that is doing its job. The attribute is conditional
+    /// rather than blanket so that a REAL orphaning — the tests going away — still warns.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn has_banner(&self) -> bool {
+        self.banner.is_some()
     }
 }
 
@@ -288,6 +336,23 @@ impl MoonTable {
         for (column_ix, (column, cell)) in columns.iter().zip(row.cells).enumerate() {
             let cell = Self::render_cell(column, cell, row.text_alpha, p, tokens);
             row_el = row_el.child(decorate_cell(column_ix, cell));
+        }
+
+        // LAST, so it paints over the cells rather than under them, and absolute so it spans the
+        // row instead of joining the cell flex line. The row itself is `relative` and carries no
+        // `overflow_hidden`, which is the whole reason a banner can reach past a column edge.
+        //
+        // Deliberately NOT `occlude()`d — see the builder's doc. Painting last decides what the
+        // eye sees, never what the mouse reaches.
+        if let Some(banner) = row.banner {
+            row_el = row_el.child(
+                div()
+                    .absolute()
+                    .left(px(0.0))
+                    .top(px(0.0))
+                    .size_full()
+                    .child(banner),
+            );
         }
 
         row_el

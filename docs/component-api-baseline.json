@@ -723,6 +723,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn banner(mut self, banner: impl IntoElement) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
     },
     {
@@ -3908,6 +3912,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/table.rs",
       "signature": "pub fn align(mut self, align: MoonTableAlign) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn banner(mut self, banner: impl IntoElement) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/table.rs",
