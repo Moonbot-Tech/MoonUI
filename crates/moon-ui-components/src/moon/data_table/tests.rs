@@ -3,10 +3,10 @@
 // Do not use `super::*`: the glob would import the `gpui::test` macro, causing `#[test]` to
 // recursively expand into itself.
 use super::{
-    MIN_COLUMN_WIDTH, MoonDataTable, MoonDataTableColumn, MoonDataTableWidthPolicy,
-    is_select_all_shortcut,
+    MIN_COLUMN_WIDTH, MoonDataCell, MoonDataRow, MoonDataTable, MoonDataTableColumn,
+    MoonDataTableWidthPolicy, is_select_all_shortcut,
 };
-use gpui::Modifiers;
+use gpui::{Modifiers, div};
 
 /// Build a test column with matching key and label.
 fn col(key: &str, width: f32) -> MoonDataTableColumn {
@@ -245,4 +245,21 @@ fn select_all_shortcut_requires_the_exact_platform_secondary_modifier() {
     assert!(!is_select_all_shortcut("a", Modifiers::default()));
     assert!(!is_select_all_shortcut("a", with_shift));
     assert!(!is_select_all_shortcut("a", with_alt));
+}
+
+/// Catches dropping the banner forward in `data_table.rs:MoonDataRow::as_table_row`, which would
+/// render an exchange section heading as an empty grey stripe without its logo, name, or count.
+#[test]
+fn data_row_conversion_preserves_banner_presence() {
+    let row_with_banner = MoonDataRow::new([MoonDataCell::text("placeholder")]).banner(div());
+    let row_without_banner = MoonDataRow::new([MoonDataCell::text("placeholder")]);
+
+    assert!(
+        row_with_banner.as_table_row().has_banner(),
+        "a banner supplied through MoonDataRow must reach MoonTableRow"
+    );
+    assert!(
+        !row_without_banner.as_table_row().has_banner(),
+        "a MoonDataRow without a banner must not create one during conversion"
+    );
 }
