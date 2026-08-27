@@ -448,3 +448,50 @@ fn tooltip_hides_after_mouse_leaves_origin() {
 
     assert!(active_tooltip.borrow().is_none());
 }
+
+/// Catches dropping the `inspector_transparent` term from `Interactivity::should_insert_hitbox`,
+/// which would put a hitbox back on every decorative overlay while the inspector is picking.
+///
+/// The consequence is not visible and not local: picking takes the topmost hitbox that carries an
+/// inspector id, so a transparent layer stretched over a list answers for every row under it. A
+/// terminal that documents its own interface through the inspector could name nothing inside any
+/// scrollable surface — six tables and lists all came back as their scrollbar, sized to the whole
+/// panel.
+#[test]
+fn inspector_picking_looks_through_an_element_that_declared_itself_transparent() {
+    let mut test_app = TestAppContext::single();
+    let window = test_app.add_window(move |_, _| TestTooltipView);
+    let any_window = window.into();
+
+    test_app
+        .update_window(any_window, |_, window, cx| {
+            let style = Style::default();
+            let plain = Interactivity::default();
+            let transparent = Interactivity {
+                inspector_transparent: true,
+                ..Default::default()
+            };
+
+            // Outside picking neither of them is interactive, so neither takes a hitbox — the
+            // half of the behaviour the flag must leave exactly as it was.
+            assert!(!plain.should_insert_hitbox(&style, window, cx));
+            assert!(!transparent.should_insert_hitbox(&style, window, cx));
+
+            // `Inspector::new` starts in picking mode, which is what gives every element a hitbox
+            // so that any of them can be selected.
+            window.toggle_inspector(cx);
+            assert!(
+                window.is_inspector_picking(cx),
+                "the inspector opens already picking"
+            );
+            assert!(
+                plain.should_insert_hitbox(&style, window, cx),
+                "picking offers every element"
+            );
+            assert!(
+                !transparent.should_insert_hitbox(&style, window, cx),
+                "except one that asked to be looked through"
+            );
+        })
+        .unwrap();
+}

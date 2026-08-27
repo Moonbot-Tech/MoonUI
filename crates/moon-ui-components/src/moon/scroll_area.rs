@@ -183,8 +183,15 @@ pub fn moon_scrollbar_overlay_with_palette(
         window.request_animation_frame();
     }
 
+    // Transparent to picking, because this layer is not a control: it spans the whole viewport for
+    // the sole purpose of giving the two tracks something to be absolute inside, and it carries no
+    // handler, no hover style and no state of its own. Painted after the content, it would
+    // otherwise be the topmost hitbox at every point of a list — and the inspector would answer
+    // "scrollbar" for every row in it. The track and the thumb below keep their own ids and are
+    // what a pointer is meant to find.
     let mut layer = div()
         .id(ElementId::from(id.clone()))
+        .inspector_transparent()
         .absolute()
         .top_0()
         .right_0()
