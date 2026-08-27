@@ -6,6 +6,7 @@ use std::{
     borrow::BorrowMut,
     collections::{HashMap, HashSet},
     rc::Rc,
+    time::{Duration, Instant},
 };
 
 use gpui::prelude::FluentBuilder;
@@ -26,8 +27,8 @@ mod tab_panel;
 mod tree;
 
 use drag::{
-    DockResizeDrag, DockResizeTarget, DockTabDrag, DockTileDrag, DockTileDragKind,
-    DockTileDragStart, tab_interaction_policy,
+    DockResizeTarget, DockTabDrag, DockTileDrag, DockTileDragKind, DockTileDragStart,
+    tab_interaction_policy,
 };
 use panel::MoonPanelRegistry;
 pub use panel::{DockItem, MoonDockPanel, Panel, PanelView, register_panel};
@@ -38,6 +39,11 @@ pub use state::{
 };
 
 const DOCK_RESIZE_HIT_SIZE: f32 = 6.0;
+
+/// Smallest gap between two repaints while a dock handle is being dragged.
+///
+/// See `DockArea::on_resize_drag_move`, which is the only user and carries the reasoning.
+const RESIZE_NOTIFY_MIN_INTERVAL: Duration = Duration::from_millis(16);
 const DOCK_MIN_SIDE_SIZE: f32 = 112.0;
 const DOCK_MIN_CENTER_SIZE: f32 = 220.0;
 const DOCK_MIN_BOTTOM_SIZE: f32 = 104.0;
@@ -713,6 +719,15 @@ pub struct DockArea {
     /// Keyed tab runtimes registered during render so named activation can update them directly.
     tab_runtime_states: HashMap<String, WeakEntity<MoonTabPanelRuntimeState>>,
     tile_drag_start: Option<DockTileDragStart>,
+    /// The handle currently held down, or `None` when no resize is in flight.
+    ///
+    /// A resize is driven by plain mouse events rather than by GPUI's drag machinery, and this
+    /// is the whole state that makes it a gesture: see [`DockArea::resize_pointer_hook`]. The
+    /// cursor rides along because the gesture outlives the pointer's stay over the thin handle
+    /// that started it, and the axis is known only there.
+    resize_active: Option<(DockResizeTarget, CursorStyle)>,
+    /// When the last resize repaint was asked for; `None` outside a gesture.
+    resize_notify_at: Option<Instant>,
     /// When false, slots do not expose split drop-zones — dragging a tab can only reorder
     /// it within a tab strip or move it into another existing tab strip, not create a new
     /// split anywhere (which lets panels land in e.g. a chart slot and wedge the layout).
@@ -754,6 +769,8 @@ impl DockArea {
             tile_bounds: HashMap::new(),
             tab_runtime_states: HashMap::new(),
             tile_drag_start: None,
+            resize_active: None,
+            resize_notify_at: None,
             enable_split_drop: true,
             layout_editable: true,
             detach_allowed: true,
@@ -782,6 +799,8 @@ impl DockArea {
             tile_bounds: HashMap::new(),
             tab_runtime_states: HashMap::new(),
             tile_drag_start: None,
+            resize_active: None,
+            resize_notify_at: None,
             enable_split_drop: true,
             layout_editable: true,
             detach_allowed: true,
@@ -825,6 +844,8 @@ impl DockArea {
             tile_bounds: HashMap::new(),
             tab_runtime_states: HashMap::new(),
             tile_drag_start: None,
+            resize_active: None,
+            resize_notify_at: None,
             enable_split_drop: true,
             layout_editable: true,
             detach_allowed: true,
@@ -1554,9 +1575,10 @@ impl DockArea {
             return Empty.into_any_element();
         }
         let p = MoonPalette::active(cx);
-        let drag = DockResizeDrag {
-            dock_id: cx.entity_id(),
-            target,
+        let grab_cursor = if horizontal_split {
+            CursorStyle::ResizeColumn
+        } else {
+            CursorStyle::ResizeRow
         };
 
         div()
@@ -1585,11 +1607,26 @@ impl DockArea {
                     .child(div().h(px(1.0)).w_full().bg(rgba_from(p.border, 1.0)))
             })
             .hover(|style| style.bg(rgba_from(p.shell_high, 1.0)))
-            .on_drag(drag, |drag, _, _, cx| {
-                cx.stop_propagation();
-                cx.new(|_| drag.clone())
-            })
-            .on_drag_move(cx.listener(Self::on_resize_drag_move))
+            // A press ARMS the gesture; the pointer is then followed by window-level
+            // listeners (`resize_pointer_hook`). Deliberately NOT `on_drag`: GPUI's drag
+            // machinery exists to float a preview under the cursor, and pays for it with a
+            // `Window::refresh()` on EVERY mouse move (`window.rs`, "redraw the window so that
+            // the active drag can follow the mouse cursor"). A refresh clears `refreshing`,
+            // which invalidates every cached view in the window — so dragging one handle was
+            // rebuilding, re-laying-out and repainting every panel in the dock, including the
+            // ones nowhere near it. This handle's preview renders `Empty`; it was paying a
+            // full-window refresh per move to move nothing.
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this: &mut Self, _, _, cx| {
+                    if !this.layout_editable {
+                        return;
+                    }
+                    this.resize_active = Some((target.clone(), grab_cursor));
+                    this.resize_notify_at = None;
+                    cx.stop_propagation();
+                }),
+            )
             .into_any_element()
     }
 
@@ -2759,35 +2796,128 @@ impl DockArea {
     }
 
     /// Apply one user resize drag while layout editing remains enabled.
-    fn on_resize_drag_move(
+    /// Zero-sized element that follows the pointer for the whole resize gesture.
+    ///
+    /// `Window::on_mouse_event` is a PAINT-phase API, so the listeners are installed from a
+    /// `canvas` paint closure rather than from `render`, which runs a phase earlier. Window-level
+    /// and not on the dock's own element: on Windows the platform captures the pointer for the
+    /// life of the press (`SetCapture` on mouse-down, `ReleaseCapture` on mouse-up), so a handle
+    /// dragged past the edge of the window keeps receiving moves — an element-scoped listener
+    /// would simply stop hearing them and the panel would freeze under the cursor.
+    ///
+    /// Only present while a gesture is in flight, so an idle dock installs nothing.
+    fn resize_pointer_hook(&self, cursor: CursorStyle, cx: &mut Context<Self>) -> AnyElement {
+        let moved = cx.entity().downgrade();
+        let released = moved.clone();
+        canvas(
+            |_, _, _| (),
+            move |_, (), window, _| {
+                // Held for the gesture, not for the hitbox: once the pointer leaves the thin
+                // handle the cursor would otherwise flip to whatever is underneath, mid-drag.
+                // The request is per-frame, so it lapses on its own when the hook goes away.
+                window.set_window_cursor_style(cursor);
+                window.on_mouse_event({
+                    let dock = moved.clone();
+                    move |event: &MouseMoveEvent, phase, window, cx| {
+                        if !phase.bubble() {
+                            return;
+                        }
+                        let position = event.position;
+                        let dragging = event.dragging();
+                        dock.update(cx, |this, cx| {
+                            this.on_resize_pointer_move(position, dragging, window, cx)
+                        })
+                        .ok();
+                    }
+                });
+                window.on_mouse_event({
+                    let dock = released.clone();
+                    move |_: &MouseUpEvent, phase, _, cx| {
+                        if !phase.bubble() {
+                            return;
+                        }
+                        dock.update(cx, |this, cx| this.end_resize(cx)).ok();
+                    }
+                });
+            },
+        )
+        .absolute()
+        .size_0()
+        .into_any_element()
+    }
+
+    /// Apply one pointer move of an armed resize gesture.
+    ///
+    /// `dragging` is the button state carried by the move itself. A move without it means the
+    /// release was never delivered — the pointer was over another window, or the platform ate the
+    /// event — and the gesture is ended here rather than left armed forever.
+    fn on_resize_pointer_move(
         &mut self,
-        event: &DragMoveEvent<DockResizeDrag>,
+        position: Point<Pixels>,
+        dragging: bool,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.layout_editable {
+        let Some((target, _)) = self.resize_active.clone() else {
             return;
-        }
-        let drag = event.drag(cx);
-        if drag.dock_id != cx.entity_id() {
+        };
+        if !dragging || !self.layout_editable {
+            self.end_resize(cx);
             return;
         }
 
-        let changed = match &drag.target {
-            DockResizeTarget::OuterLeft => self.resize_outer_left(event.event.position),
-            DockResizeTarget::OuterRight => self.resize_outer_right(event.event.position),
-            DockResizeTarget::OuterBottom => self.resize_outer_bottom(event.event.position),
+        let changed = match &target {
+            DockResizeTarget::OuterLeft => self.resize_outer_left(position),
+            DockResizeTarget::OuterRight => self.resize_outer_right(position),
+            DockResizeTarget::OuterBottom => self.resize_outer_bottom(position),
             DockResizeTarget::Split {
                 root,
                 path,
                 after_ix,
-            } => self.resize_split(*root, path, *after_ix, event.event.position),
+            } => self.resize_split(*root, path, *after_ix, position),
         };
 
-        if changed {
-            cx.emit(DockEvent::LayoutChanged);
+        if !changed {
+            return;
+        }
+        cx.emit(DockEvent::LayoutChanged);
+        // PACED. One notify here is not a repaint of the two panels beside the handle: it dirties
+        // this view and every ancestor, and a re-rendered root re-lays-out and repaints the WHOLE
+        // window. Measured in a host terminal on a 120 Hz display, one splitter drag drove about
+        // 100 full window draws a second at 7.7 ms each — 92% of an 8.33 ms frame budget, leaving
+        // nothing for anything else, and the drag stuttered because any hiccup then overflowed it.
+        //
+        // 60 Hz, not the vblank rate: a pointer-following drag has to look continuous, and 60 is
+        // where it already does. Painting at every vblank of a high-refresh panel buys nothing an
+        // eye can see and spends the headroom that keeps the cadence steady.
+        //
+        // The layout itself is NOT paced — `resize_*` ran above on this very move, so the sizes
+        // are always current and the handle never trails the pointer. Only the repaint is thinned.
+        // A dropped one needs no settling: releasing the button ends the drag, and GPUI answers a
+        // mouse-up during a drag with `Window::refresh` (`window.rs`, "cancel the active drag and
+        // redraw the window"), so the final position is always painted.
+        let now = Instant::now();
+        if self
+            .resize_notify_at
+            .is_none_or(|last| now.duration_since(last) >= RESIZE_NOTIFY_MIN_INTERVAL)
+        {
+            self.resize_notify_at = Some(now);
             cx.notify();
         }
+    }
+
+    /// End an armed resize gesture and paint where it finished.
+    ///
+    /// The final notify is unconditional and pays whatever the pacer dropped: the last move of a
+    /// gesture usually lands inside the interval, and nothing else is coming to redraw it.
+    /// Idempotent, because the release arrives at both this and any other listener.
+    fn end_resize(&mut self, cx: &mut Context<Self>) {
+        if self.resize_active.take().is_none() {
+            return;
+        }
+        self.resize_notify_at = None;
+        cx.emit(DockEvent::LayoutChanged);
+        cx.notify();
     }
 
     /// Render one topology node with edit affordances controlled by `layout_editable`.
@@ -3229,6 +3359,10 @@ impl Render for DockArea {
             .absolute()
             .size_full(),
         );
+        // Only while a handle is held: an idle dock installs no window listeners at all.
+        if let Some((_, cursor)) = self.resize_active {
+            root = root.child(self.resize_pointer_hook(cursor, cx));
+        }
 
         if let Some(panel_name) = self.zoomed_panel.as_ref() {
             if let Some(panel) = self.find_panel_named(panel_name.as_ref(), cx) {

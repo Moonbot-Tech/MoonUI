@@ -17,20 +17,6 @@ pub(super) enum DockResizeTarget {
     },
 }
 
-/// Carries the dock identity and resize target through GPUI drag routing.
-#[derive(Clone, Debug)]
-pub(super) struct DockResizeDrag {
-    pub(super) dock_id: EntityId,
-    pub(super) target: DockResizeTarget,
-}
-
-impl Render for DockResizeDrag {
-    /// Render no visual content because the value is only a drag payload.
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        Empty
-    }
-}
-
 /// Carries a dock tab and its structural location through a tab drag.
 #[derive(Clone, Debug)]
 pub(super) struct DockTabDrag {
