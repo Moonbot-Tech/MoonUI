@@ -1127,6 +1127,28 @@ pub trait InteractiveElement: Sized {
         self
     }
 
+    /// Take this element out of inspector picking, so a click or a hover selects whatever is
+    /// beneath it.
+    ///
+    /// For an element that is there to POSITION other things rather than to be one: a transparent
+    /// layer stretched over a viewport so two scrollbar tracks can be absolute inside it, a spacer,
+    /// a gradient painted across a list. Picking has no way to tell those from a control, because
+    /// while it is on every element is given a hitbox — see [`Interactivity::should_insert_hitbox`]
+    /// — and the pick takes the topmost hitbox that carries an inspector id. Anything painted over
+    /// the content therefore answers for every point of it.
+    ///
+    /// Measured: a terminal that documents its own interface through the inspector could not name
+    /// one control inside any scrollable surface — six tables and lists came back as their
+    /// scrollbar, at the size of the whole panel.
+    ///
+    /// This changes NOTHING outside picking. A decorative layer has no listeners, no hover style
+    /// and no cursor, so it gets no hitbox in an ordinary frame either way, and the mouse has
+    /// always passed through it.
+    fn inspector_transparent(mut self) -> Self {
+        self.interactivity().inspector_transparent = true;
+        self
+    }
+
     /// Block the mouse from all interactions with elements behind this element's hitbox. Typically
     /// `block_mouse_except_scroll` should be preferred.
     /// The fluent API equivalent to [`Interactivity::occlude_mouse`].
@@ -1859,6 +1881,12 @@ pub struct Interactivity {
     pub(crate) tooltip_show_delay: Option<Duration>,
     pub(crate) window_control: Option<WindowControlArea>,
     pub(crate) hitbox_behavior: HitboxBehavior,
+    /// Whether inspector picking should look straight through this element.
+    ///
+    /// See [`InteractiveElement::inspector_transparent`]. Not behind `cfg(debug_assertions)`: a
+    /// `bool` on a struct this size costs nothing, and gating it would put a `cfg` on every element
+    /// that sets it.
+    pub(crate) inspector_transparent: bool,
     pub(crate) tab_index: Option<isize>,
     pub(crate) tab_group: bool,
     pub(crate) tab_stop: bool,
@@ -2082,7 +2110,11 @@ impl Interactivity {
             || self.drag_listener.is_some()
             || !self.drop_listeners.is_empty()
             || self.tooltip_builder.is_some()
-            || window.is_inspector_picking(cx)
+            // Picking gives EVERY element a hitbox, so that any of them can be selected — except
+            // the ones that asked not to be. Without the exception a transparent layer laid over a
+            // list is the topmost hitbox at every point of it, and the inspector can only ever name
+            // the layer. See [`InteractiveElement::inspector_transparent`].
+            || (window.is_inspector_picking(cx) && !self.inspector_transparent)
     }
 
     fn clamp_scroll_position(
