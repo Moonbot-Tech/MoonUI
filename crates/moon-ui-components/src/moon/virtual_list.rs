@@ -77,6 +77,19 @@ impl MoonVirtualList {
         self
     }
 
+    /// Observe the item range the list actually draws.
+    ///
+    /// Every reported range is a range the list renders: never the single row it measured to get
+    /// a row height, and, for a flipped list, always in the item renderer's own index space. A
+    /// list holding no rows reports `0..0`, while a list that holds rows but shows none of them —
+    /// a collapsed panel, a frame before sizing — reports nothing at all, so a squeezed list is
+    /// never mistaken for an empty one. An observer may therefore evict state belonging to rows
+    /// outside the range (keyboard focus, an open popup) without first proving the range is real.
+    ///
+    /// It reports per prepaint of the list, which is not the same as per frame: a cached ancestor
+    /// view can skip it, and a retried prepaint pass can repeat it. Keep the observer an
+    /// idempotent assignment, and note that a repaint it asks for (`cx.notify`, `Window::refresh`)
+    /// is dropped mid-draw — see [`gpui::UniformList::on_visible_range`] for the full contract.
     pub fn on_visible_range(
         mut self,
         on_visible_range: impl 'static + Fn(Range<usize>, &mut Window, &mut App),
@@ -191,15 +204,18 @@ impl RenderOnce for MoonVirtualList {
 
         let list_id = ElementId::from(SharedString::from(format!("{}:list", id)));
         let mut list = uniform_list(list_id, self.item_count, move |range, window, cx| {
-            if let Some(on_visible_range) = &on_visible_range {
-                on_visible_range(range.clone(), window, cx);
-            }
             Self::render_range(&render_item, item_height, range, window, cx)
         })
         .size_full()
         .p(px(self.padding))
         .track_scroll(&scroll_handle)
         .y_flipped(self.y_flipped);
+        // Through the list's own observer channel, NOT from the item renderer above: that closure
+        // is also used to measure one item, so an observer inside it fires on a phantom
+        // single-item range twice per frame before the real one ever arrives.
+        if let Some(on_visible_range) = on_visible_range {
+            list = list.on_visible_range(on_visible_range);
+        }
         if self.surface {
             list = self.background_policy.apply(list, p.shell_high, 0.98);
         }
@@ -257,3 +273,6 @@ impl UniformListDecoration for MoonVirtualListTailFill {
             .into_any_element()
     }
 }
+
+#[cfg(test)]
+mod tests;

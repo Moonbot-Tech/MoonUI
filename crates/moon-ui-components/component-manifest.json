@@ -736,7 +736,10 @@
       "public_path": "moon_ui::MoonVirtualList",
       "upstream_ref": null,
       "fork_reason": "Moon virtualized terminal list styling",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": [
+        "virtual_list.visible_range_reporting",
+        "gallery.visual_coverage"
+      ]
     },
     {
       "concept": "window_frame",
