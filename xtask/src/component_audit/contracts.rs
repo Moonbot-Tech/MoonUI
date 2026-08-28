@@ -397,6 +397,20 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &tests,
             "toggle click handling must respect disabled and controlled state",
         ),
+        test_contract(
+            "virtual_list.visible_range_reporting",
+            ContractSeverity::Guardrail,
+            &[
+                "visible_range_observer_never_sees_the_measured_row",
+                "flipped_list_reports_the_range_it_renders",
+                "scrolled_list_reports_the_rows_under_the_offset",
+                "emptied_list_still_reports_its_empty_range",
+                "collapsed_list_reports_nothing_at_all",
+                "padded_list_still_reports_the_row_it_draws",
+            ],
+            &tests,
+            "the virtual list must report only ranges it renders, never the row it measured, and must still report once it holds no rows",
+        ),
         pass_if(
             "window_frame.visual_types",
             ContractSeverity::Critical,

@@ -47,6 +47,14 @@ cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 
    - regular pointer tooltips require 800 ms of continuous hover, expire after
      five visible seconds, and stay suppressed until pointer re-entry; hoverable
      tooltips remain persistent while either their trigger or content is hovered.
+   - `UniformList::on_visible_range`: a channel for observing the item range the
+     list draws. The renderer closure cannot serve as one — `measure_item` runs
+     it on a single item, twice per frame, before the real range exists — so a
+     consumer wired through the renderer sees a phantom one-item range. A
+     re-sync drops the field, the builder and its call in `prepaint`; restore
+     all three, and with them both halves of the reporting rule: an empty list
+     reports `0..0`, while a list that holds rows but renders none of them
+     stays silent.
 
 2. Zed bugfix candidates kept separate from `gpu_canvas` when possible:
    - Windows DPI/restore-bounds behavior

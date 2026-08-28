@@ -42,6 +42,7 @@ where
         item_count,
         item_to_measure_index: 0,
         render_items: Box::new(render_range),
+        on_visible_range: None,
         decorations: Vec::new(),
         interactivity: Interactivity {
             element_id: Some(id),
@@ -61,6 +62,7 @@ pub struct UniformList {
     render_items: Box<
         dyn for<'a> Fn(Range<usize>, &'a mut Window, &'a mut App) -> SmallVec<[AnyElement; 64]>,
     >,
+    on_visible_range: Option<Box<dyn for<'a> Fn(Range<usize>, &'a mut Window, &'a mut App)>>,
     decorations: Vec<Box<dyn UniformListDecoration>>,
     interactivity: Interactivity,
     scroll_handle: Option<UniformListScrollHandle>,
@@ -479,14 +481,38 @@ impl Element for UniformList {
                     let visible_range = first_visible_element_ix
                         ..cmp::min(last_visible_element_ix, self.item_count);
 
+                    let rendered_range = if y_flipped {
+                        self.item_count.saturating_sub(visible_range.end)
+                            ..self.item_count.saturating_sub(visible_range.start)
+                    } else {
+                        visible_range.clone()
+                    };
+
+                    // Report exactly what is on screen. Showing nothing while rows EXIST is not
+                    // "no rows" — it is a collapsed panel, a splitter mid-drag, or a first frame
+                    // before sizing; saying `0..0` there would be indistinguishable from the
+                    // emptied-list report below, and a consumer evicting state outside the range
+                    // would drop the focused row every frame its container is squeezed shut.
+                    //
+                    // Two conditions, because neither alone is that question. The rendered range
+                    // can be non-empty at zero height whenever the scroll offset is not a whole
+                    // multiple of a row (`floor`/`ceil` then straddle one row that has no pixels),
+                    // and the PADDED box is zero for a merely padded list whose row is plainly
+                    // visible — Taffy floors the element at its own padding, so `bounds` is the
+                    // height that says whether anything is shown at all.
+                    if bounds.size.height > Pixels::ZERO
+                        && !rendered_range.is_empty()
+                        && let Some(on_visible_range) = self.on_visible_range.as_ref()
+                    {
+                        on_visible_range(rendered_range.clone(), window, cx);
+                    }
+
                     let items = if y_flipped {
-                        let flipped_range = self.item_count.saturating_sub(visible_range.end)
-                            ..self.item_count.saturating_sub(visible_range.start);
-                        let mut items = (self.render_items)(flipped_range, window, cx);
+                        let mut items = (self.render_items)(rendered_range, window, cx);
                         items.reverse();
                         items
                     } else {
-                        (self.render_items)(visible_range.clone(), window, cx)
+                        (self.render_items)(rendered_range, window, cx)
                     };
 
                     let content_mask = ContentMask { bounds };
@@ -531,6 +557,11 @@ impl Element for UniformList {
                             frame_state.decorations.push(decoration);
                         }
                     });
+                } else if let Some(on_visible_range) = self.on_visible_range.as_ref() {
+                    // An emptied list still reports, with the empty range it now draws. A consumer
+                    // that evicts state for rows outside the reported range needs this frame most
+                    // of all: it is the frame where every row it was tracking stopped existing.
+                    on_visible_range(0..0, window, cx);
                 }
 
                 hitbox
@@ -646,6 +677,42 @@ impl UniformList {
                 self.interactivity.base_style.overflow.x = Some(Overflow::Scroll);
             }
         }
+        self
+    }
+
+    /// Observes the item range this list draws.
+    ///
+    /// The observer is handed the very range that goes to the item renderer — flipped indices
+    /// included when `y_flipped` is set, so it always speaks the renderer's index space, while
+    /// [`UniformListDecoration::compute`] keeps receiving unflipped positions. A list with no
+    /// items reports `0..0` rather than staying silent; a list that HAS items but draws none of
+    /// them — no room, mid-collapse, not yet sized — stays silent instead, so "there is nothing
+    /// to show" and "there is no room to show it in" never arrive as the same range.
+    ///
+    /// It is deliberately a channel of its own rather than a hook inside the item renderer: that
+    /// closure is ALSO invoked to measure a single item — `measure_item` renders
+    /// `item_to_measure_index..+1` from both `request_layout` and `prepaint`, before the real
+    /// range exists — so an observer wired through the renderer sees a phantom one-item range
+    /// twice before every real one. An observer that evicts state outside the range it is given
+    /// (focus, an open popup) would then evict everything below the measured item on every frame.
+    ///
+    /// What the runtime does NOT promise, because the observer runs from `prepaint`:
+    ///
+    /// - It fires once per prepaint of this element, not once per drawn frame. A frame that never
+    ///   prepaints the list — an ancestor `AnyView::cached` hit — reports nothing, and a prepaint
+    ///   pass that is retried and discarded (`Window::transact`) reports more than once.
+    /// - `cx.notify()` is silent for an entity held by THIS window while it draws
+    ///   (`Invalidator::invalidate_view` bails unless `draw_phase == None`), and `Window::refresh`
+    ///   is silent on its own `not_drawing()` guard, so state the observer changes reaches the
+    ///   screen on the next frame something else schedules. `Window::blur` still takes effect, and
+    ///   an entity with no drawing window of its own still notifies.
+    /// - It runs after the deferred `scroll_to_item` for this frame has been applied, so a scroll
+    ///   the observer requests lands on the next frame.
+    pub fn on_visible_range(
+        mut self,
+        on_visible_range: impl 'static + for<'a> Fn(Range<usize>, &'a mut Window, &'a mut App),
+    ) -> Self {
+        self.on_visible_range = Some(Box::new(on_visible_range));
         self
     }
 
@@ -861,5 +928,53 @@ mod test {
                 assert_eq!(view.visible_range, ix..ix + 10);
             })
         }
+    }
+
+    /// Catches wiring an `on_visible_range` observer through the item renderer instead of its own
+    /// channel. The renderer is also called to MEASURE one item, twice per frame, so an observer
+    /// living there sees a phantom `0..1` before every real range — and a consumer that evicts row
+    /// state outside the reported range (keyboard focus, an open popup) then evicts every row but
+    /// the measured one, on every frame.
+    #[gpui::test]
+    fn visible_range_observer_skips_the_measured_item(cx: &mut TestAppContext) {
+        use crate::{Context, IntoElement, Render, Window, div, prelude::*, px, uniform_list};
+        use std::{cell::RefCell, ops::Range, rc::Rc};
+
+        struct TestView {
+            ranges: Rc<RefCell<Vec<Range<usize>>>>,
+        }
+
+        impl Render for TestView {
+            fn render(
+                &mut self,
+                _window: &mut Window,
+                _cx: &mut Context<Self>,
+            ) -> impl IntoElement {
+                let sink = self.ranges.clone();
+                div().w(px(100.0)).h(px(200.0)).child(
+                    uniform_list("probe", 50, |range: Range<usize>, _window, _cx| {
+                        range
+                            .map(|ix| div().h(px(20.0)).child(format!("row {ix}")))
+                            .collect::<Vec<_>>()
+                    })
+                    .size_full()
+                    .on_visible_range(move |range, _window, _cx| sink.borrow_mut().push(range)),
+                )
+            }
+        }
+
+        let ranges = Rc::new(RefCell::new(Vec::new()));
+        let sink = ranges.clone();
+        let window = cx.add_window(move |_, _| TestView { ranges: sink });
+        // Opening the window already drew a frame; measure exactly the one drawn below.
+        ranges.borrow_mut().clear();
+        cx.update_window(window.into(), |_, window, cx| {
+            window.draw(cx).clear();
+        })
+        .unwrap();
+
+        // 200 px of viewport over 20 px rows, unscrolled: rows 0..10 are drawn, and that is the
+        // only thing the observer may hear about.
+        assert_eq!(*ranges.borrow(), vec![0..10]);
     }
 }
