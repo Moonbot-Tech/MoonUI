@@ -3,16 +3,18 @@
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
     App, AppContext as _, ElementId, InteractiveElement as _, IntoElement, MouseButton,
-    MouseDownEvent, ParentElement as _, RenderOnce, SharedString, StatefulInteractiveElement as _,
-    Styled as _, WeakEntity, Window, div, px,
+    MouseDownEvent, ParentElement as _, RenderOnce, ScrollHandle, SharedString,
+    StatefulInteractiveElement as _, Styled as _, WeakEntity, Window, div, px,
 };
 
 use super::{DockEvent, DockTabDrag, MoonTabPanelRuntimeState, TabPanel, tab_interaction_policy};
 use crate::{
     event::InteractiveElementExt as _,
     moon::{
+        MOON_ICON_CARET_DOWN, MoonDropdown, MoonMenuItem, MoonMenuSize,
         background::MoonBackgroundPolicy,
         button::{MoonButton, MoonButtonSize, MoonButtonVariant},
+        h_flex,
         text::MoonText,
         theme::MoonTheme,
         tokens::{MoonPalette, rgba_from},
@@ -107,6 +109,34 @@ impl RenderOnce for TabPanel {
                 .border_color(rgba_from(p.border, 1.0));
             header = self.header_background_policy.apply(header, p.panel, 1.0);
 
+            let tabs_scroll_handle = window
+                .use_keyed_state(
+                    ElementId::from(SharedString::from(format!("{}:tabs-scroll", self.id))),
+                    cx,
+                    |_, _| ScrollHandle::default(),
+                )
+                .read(cx)
+                .clone();
+            let prev_tab_ix = window.use_keyed_state(
+                ElementId::from(SharedString::from(format!("{}:tabs-selected", self.id))),
+                cx,
+                |_, _| None::<usize>,
+            );
+            if prev_tab_ix.read(cx).as_ref() != Some(&active_ix) {
+                tabs_scroll_handle.scroll_to_item(active_ix);
+                prev_tab_ix.update(cx, |value, _| *value = Some(active_ix));
+            }
+            let mut tabs_inner = h_flex()
+                .id(ElementId::from(SharedString::from(format!(
+                    "{}:tabs-inner",
+                    self.id
+                ))))
+                .relative()
+                .gap(px(tokens.ui(4.0)))
+                .overflow_x_scroll()
+                .track_scroll(&tabs_scroll_handle);
+            let mut overflow_items: Vec<MoonMenuItem> = Vec::new();
+
             for (ix, panel) in self.items.iter().enumerate() {
                 let selected = ix == active_ix;
                 let state = state.clone();
@@ -115,6 +145,29 @@ impl RenderOnce for TabPanel {
                 let dock_path = self.dock_path.clone();
                 let panel_name = panel.panel_name(cx);
                 let tab_label = panel.tab_name(cx).unwrap_or_else(|| panel.panel_name(cx));
+                {
+                    let state = state.clone();
+                    let dock_area = self.dock_area.clone();
+                    let dock_root = self.dock_root;
+                    let dock_path = self.dock_path.clone();
+                    overflow_items.push(
+                        MoonMenuItem::with_key(
+                            format!("{}:overflow:{ix}", self.id),
+                            tab_label.clone(),
+                        )
+                        .checked(selected)
+                        .selected(selected)
+                        .on_click(move |_, _, cx| {
+                            state.update(cx, |state, _| state.active_ix = ix);
+                            if let (Some(dock_area), Some(root)) = (dock_area.as_ref(), dock_root) {
+                                _ = dock_area.update(cx, |dock, cx| {
+                                    dock.activate_tab_from_user(root, &dock_path, ix, cx);
+                                });
+                            }
+                            cx.notify(parent_view);
+                        }),
+                    );
+                }
                 let pinned = self
                     .pinned_leading_panels
                     .iter()
@@ -296,21 +349,46 @@ impl RenderOnce for TabPanel {
                         }
                     }
                 }
-                header = header.child(tab_host);
+                tabs_inner = tabs_inner.child(tab_host);
             }
 
-            header = header.child(div().flex_1());
+            header = header.child(
+                h_flex()
+                    .id(ElementId::from(SharedString::from(format!(
+                        "{}:tabs",
+                        self.id
+                    ))))
+                    .flex_1()
+                    .min_w_0()
+                    .overflow_x_hidden()
+                    .child(tabs_inner),
+            );
+            header = header.child(
+                div().flex_none().child(
+                    MoonDropdown::new(format!("{}:overflow", self.id))
+                        .trigger_icon(MOON_ICON_CARET_DOWN)
+                        .trigger_caret(false)
+                        .trigger_variant(MoonButtonVariant::Ghost)
+                        .trigger_size(MoonButtonSize::Micro)
+                        .menu_size(MoonMenuSize::Compact)
+                        .items(overflow_items),
+                ),
+            );
+            // Leftover space lives inside the tab cluster (`flex_1 min_w_0`); a second `flex_1`
+            // sibling here would steal half the header. Toolbar buttons stay `flex_none` after
+            // the chevron.
             if let Some(panel) = active_panel.as_ref() {
+                let mut tools = h_flex().flex_none().items_center().gap(px(tokens.ui(4.0)));
                 if let Some(buttons) = panel.toolbar_buttons(window, cx) {
                     for button in buttons {
-                        header = header.child(button);
+                        tools = tools.child(button);
                     }
                 }
                 if self.show_panel_controls {
                     let panel_name = panel.panel_name(cx);
                     if self.layout_editable && self.detach_allowed && panel.detachable(cx) {
                         let dock_area = self.dock_area.clone();
-                        header = header.child(
+                        tools = tools.child(
                             MoonButton::new(format!("{}:detach", self.id))
                                 .label("⧉")
                                 .size(MoonButtonSize::Micro)
@@ -347,7 +425,7 @@ impl RenderOnce for TabPanel {
                         } else {
                             "▣"
                         };
-                        header = header.child(
+                        tools = tools.child(
                             MoonButton::new(format!("{}:zoom", self.id))
                                 .label(zoom_label)
                                 .size(MoonButtonSize::Micro)
@@ -373,7 +451,7 @@ impl RenderOnce for TabPanel {
                     }
                     if self.layout_editable && self.close_allowed && panel.closable(cx) {
                         let dock_area = self.dock_area.clone();
-                        header = header.child(
+                        tools = tools.child(
                             MoonButton::new(format!("{}:close", self.id))
                                 .label("×")
                                 .size(MoonButtonSize::Micro)
@@ -399,6 +477,7 @@ impl RenderOnce for TabPanel {
                         );
                     }
                 }
+                header = header.child(tools);
             }
 
             root = root.child(header);

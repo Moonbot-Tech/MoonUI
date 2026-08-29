@@ -3875,6 +3875,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn overflow_menu(mut self, overflow_menu: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
       "signature": "pub fn padding_left(mut self, padding_left: f32) -> Self"
     },
     {
@@ -3883,11 +3887,11 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tab.rs",
-      "signature": "pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement"
+      "signature": "pub fn render_with_palette( self, window: &mut Window, cx: &mut App, p: MoonPalette, ) -> impl IntoElement"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tab.rs",
-      "signature": "pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement"
+      "signature": "pub fn render_with_theme( self, window: &mut Window, cx: &mut App, p: MoonPalette, tokens: MoonThemeTokens, ) -> impl IntoElement"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tab.rs",
