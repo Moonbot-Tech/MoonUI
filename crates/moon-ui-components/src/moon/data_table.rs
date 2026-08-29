@@ -3,7 +3,7 @@ use std::{collections::HashMap, rc::Rc};
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
-use crate::window_ext::WindowExt as _;
+use crate::{ActiveTheme as _, window_ext::WindowExt as _};
 
 use super::{
     background::MoonBackgroundPolicy,
@@ -1306,7 +1306,7 @@ impl RenderOnce for MoonDataTable {
                     .w_full()
                     .h(px(row_height))
                     .cursor_pointer()
-                    .hover(|this| this.bg(rgba_from(p.panel_high, 0.28)))
+                    .hover(|this| this.bg(cx.theme().table_hover))
                     .on_click({
                         let on_select_row = on_select_row.clone();
                         move |event, window, cx| {
