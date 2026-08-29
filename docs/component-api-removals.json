@@ -125,6 +125,16 @@
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn header(mut self, header: impl IntoElement) -> Self",
       "reason": "MoonPopupMenu::header now takes its height as a first argument, header(height_ui, element). A pinned header is held outside the scrolling rows, so its height must come out of the row list's budget, and the virtualized list is sized in pixels before its siblings are laid out and cannot measure it. Pairing the height with the element makes the declaration unavoidable: the one-argument form left the height at zero, which pinned the header to zero height and rendered it invisible."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn render_with_palette(self, p: MoonPalette) -> impl IntoElement",
+      "reason": "MoonTabStrip overflow persists a ScrollHandle via window.use_keyed_state, so render_with_palette now takes Window and App. The palette-only form could not keep the handle across frames and recreated scroll state every paint."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement",
+      "reason": "Same as render_with_palette: the themed path is the one that lays out overflow, so it takes Window and App to persist the keyed ScrollHandle instead of building a new one each frame."
     }
   ]
 }
