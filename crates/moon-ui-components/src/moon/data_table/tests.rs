@@ -186,6 +186,24 @@ fn horizontal_scrollbar_visibility_reaches_the_overlay() {
     );
 }
 
+/// Catches restoring the translucent palette hardcode in the row hover path. That regression makes
+/// the hovered Screener row nearly indistinguishable in both themes instead of using the shared,
+/// opaque `table_hover` role chosen by the active theme.
+#[test]
+fn data_table_row_hover_uses_the_semantic_theme_role() {
+    let source = include_str!("../data_table.rs");
+    let implementation = source.split("#[cfg(test)]").next().unwrap_or(source);
+
+    assert!(
+        implementation.contains(".hover(|this| this.bg(cx.theme().table_hover))"),
+        "MoonDataTable rows must use the shared table_hover theme role"
+    );
+    assert!(
+        !implementation.contains(".hover(|this| this.bg(rgba_from(p.panel_high, 0.28)))"),
+        "MoonDataTable must not weaken row hover with a local translucent palette override"
+    );
+}
+
 /// Catches replacing `data_table.rs:MoonDataTable` root-owned context-menu dispatch with a local
 /// child overlay, which would put menus behind neighboring panels and break outside dismissal.
 #[test]
