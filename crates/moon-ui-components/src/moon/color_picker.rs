@@ -85,6 +85,20 @@ fn push_custom(list: &mut Vec<Hsla>, color: Hsla) -> bool {
     true
 }
 
+/// Seed/replace `list` from an already most-recent-first ORDERED source (a persisted history, or
+/// another picker's current `custom()`), preserving that order.
+///
+/// `push_custom` inserts one colour at the front, so feeding it a MRU-ordered sequence
+/// front-to-back would reverse it (the first, newest element ends up pushed deepest). Processing
+/// the source in REVERSE — oldest first — restores the intended order: each push moves the
+/// correct next-newest colour back to the front.
+fn push_all_custom(list: &mut Vec<Hsla>, colors: impl IntoIterator<Item = Hsla>) {
+    let ordered: Vec<Hsla> = colors.into_iter().collect();
+    for color in ordered.into_iter().rev() {
+        push_custom(list, color);
+    }
+}
+
 pub enum MoonColorPickerEvent {
     Change(Hsla),
     /// A colour typed into the hex field and committed, newly added to (or moved to the front
@@ -136,9 +150,7 @@ impl MoonColorPickerState {
     /// Seed the reuse palette shown in the popover (most-recent-first), e.g. from persisted
     /// config. Runs each entry through the same dedupe/cap as a live hex commit.
     pub fn custom_colors(mut self, colors: impl IntoIterator<Item = Hsla>) -> Self {
-        for color in colors {
-            push_custom(&mut self.custom, color);
-        }
+        push_all_custom(&mut self.custom, colors);
         self
     }
 
@@ -151,9 +163,7 @@ impl MoonColorPickerState {
         cx: &mut Context<Self>,
     ) {
         self.custom.clear();
-        for color in colors {
-            push_custom(&mut self.custom, color);
-        }
+        push_all_custom(&mut self.custom, colors);
         cx.notify();
     }
 

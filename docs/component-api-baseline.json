@@ -639,7 +639,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
-      "signature": "pub fn set_custom_colors(&mut self, colors: impl IntoIterator<Item = Hsla>, cx: &mut Context<Self>)"
+      "signature": "pub fn set_custom_colors( &mut self, colors: impl IntoIterator<Item = Hsla>, cx: &mut Context<Self>, )"
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
