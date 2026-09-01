@@ -1,7 +1,7 @@
 //! Regression coverage for the Moon colour-picker hex field and reuse palette.
 
-use super::{MAX_CUSTOM_COLORS, hex_label, parse_hex_rgb, push_custom, rgb8_of};
-use gpui::{Hsla, rgb};
+use super::{MAX_CUSTOM_COLORS, hex_label, parse_hex_rgb, push_all_custom, push_custom, rgb8_of};
+use gpui::{Hsla, hsla, rgb};
 
 /// Builds an opaque colour from its independently chosen six-digit RGB value.
 fn color(value: u32) -> Hsla {
@@ -90,4 +90,30 @@ fn custom_colour_history_is_capped_with_the_newest_entries_first() {
     assert_eq!(list.len(), MAX_CUSTOM_COLORS);
     assert_eq!(labels(&list).first(), Some(&"#000017".to_string()));
     assert_eq!(labels(&list).last(), Some(&"#000004".to_string()));
+}
+
+/// Catches removing the reverse iteration in `color_picker.rs:push_all_custom`.
+///
+/// A persisted or shared most-recent-first reuse palette would otherwise show its custom
+/// swatches oldest-first after it is seeded or replaced.
+#[test]
+fn seeded_custom_colours_preserve_most_recent_first_order() {
+    let most_recent_first = vec![color(0xA5A5A5), color(0x8A2BE2), color(0x3A6EA5)];
+    let mut list = Vec::new();
+
+    push_all_custom(&mut list, most_recent_first.iter().copied());
+
+    assert_eq!(list, most_recent_first);
+}
+
+/// Catches reverting `color_picker.rs:rgb8_of` to truncate `c.r * 255.0` with `as u8` instead
+/// of rounding each channel.
+///
+/// The picker palette's 50% gray swatch would otherwise display and round-trip as `#7F7F7F`
+/// instead of the nearest-byte `#808080`.
+#[test]
+fn hsl_middle_gray_rounds_to_the_picker_hex_byte() {
+    let picker_middle_gray = hsla(0.0, 0.0, 0.5, 1.0);
+
+    assert_eq!(rgb8_of(picker_middle_gray), [0x80, 0x80, 0x80]);
 }
