@@ -161,8 +161,11 @@ impl Gallery {
                 .step(1.0)
                 .default_value((18.0, 74.0))
         });
-        let color_state =
-            cx.new(|cx| MoonColorPickerState::new(window, cx).default_value(rgb(0xFFB347).into()));
+        let color_state = cx.new(|cx| {
+            MoonColorPickerState::new(window, cx)
+                .default_value(rgb(0xFFB347).into())
+                .custom_colors([rgb(0x3A6EA5).into(), rgb(0x8A2BE2).into()])
+        });
         let data_table_state = cx.new(|_| MoonDataTableState::new());
         let tooltip_view =
             cx.new(|_| MoonTooltipView::new("MoonTooltipView entity").max_width(220.0));

@@ -611,6 +611,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn custom(&self) -> &[Hsla]"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn custom_colors(mut self, colors: impl IntoIterator<Item = Hsla>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
       "signature": "pub fn default_value(mut self, value: Hsla) -> Self"
     },
     {
@@ -623,11 +631,15 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
-      "signature": "pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self"
+      "signature": "pub fn new(state: &Entity<MoonColorPickerState>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
-      "signature": "pub fn new(state: &Entity<MoonColorPickerState>) -> Self"
+      "signature": "pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn set_custom_colors( &mut self, colors: impl IntoIterator<Item = Hsla>, cx: &mut Context<Self>, )"
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
