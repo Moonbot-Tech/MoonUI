@@ -7,6 +7,14 @@ use super::{
     tokens::{MoonPalette, rgba_from},
 };
 
+/// Thickness of a Moon scrollbar track, in design-reference (unscaled) units.
+///
+/// The single home for the number: both tracks below take their cross-axis size from it, and a
+/// surface that has to keep content clear of a track — `MoonDataTable`'s rows area — insets by
+/// the same value instead of restating it. Feed it to `MoonTheme::active_tokens(cx).ui(..)`,
+/// never to `px()` directly, or it stops following the UI scale.
+pub const MOON_SCROLLBAR_TRACK: f32 = 8.0;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonScrollAxis {
     Vertical,
@@ -26,6 +34,21 @@ impl MoonScrollbarVisibility {
     pub(crate) fn is_visible(self) -> bool {
         !matches!(self, Self::Hidden)
     }
+}
+
+/// Whether the pinned horizontal track is actually drawn for this handle.
+///
+/// The overlay below asks it to decide whether to build the track; a surface that must keep its
+/// content clear of that track — `MoonDataTable`'s rows area, which the track would otherwise
+/// paint over at the end of the scroll range — asks the SAME function to decide whether to
+/// reserve `MOON_SCROLLBAR_TRACK`. Hand-copying the predicate is what lets the two drift: a
+/// third condition added here would silently stop matching a copy that lives in another file,
+/// and the content would go back under the track with nothing failing.
+pub(crate) fn moon_horizontal_track_is_drawn(
+    scroll_handle: &ScrollHandle,
+    visibility: MoonScrollbarVisibility,
+) -> bool {
+    visibility.is_visible() && f32::from(scroll_handle.max_offset().x) > 0.0
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -226,7 +249,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .right(px(0.0))
                 .top(px(0.0))
                 .bottom(px(0.0))
-                .w(px(tokens.ui(8.0)))
+                .w(px(tokens.ui(MOON_SCROLLBAR_TRACK)))
                 .bg(track_alpha(runtime.vertical_alpha))
                 .cursor(CursorStyle::Arrow)
                 .on_hover(move |hovered, _window, cx| {
@@ -341,7 +364,9 @@ pub fn moon_scrollbar_overlay_with_palette(
         );
     }
 
-    if matches!(axis, MoonScrollAxis::Horizontal | MoonScrollAxis::Both) && f32::from(max.x) > 0.0 {
+    if matches!(axis, MoonScrollAxis::Horizontal | MoonScrollAxis::Both)
+        && moon_horizontal_track_is_drawn(scroll_handle, visibility)
+    {
         let viewport = f32::from(bounds.size.width).max(1.0);
         let content = viewport + f32::from(max.x);
         let thumb_w = (viewport / content * viewport).clamp(18.0_f32.min(viewport), viewport);
@@ -369,7 +394,7 @@ pub fn moon_scrollbar_overlay_with_palette(
                 .left(px(0.0))
                 .right(px(0.0))
                 .bottom(px(0.0))
-                .h(px(tokens.ui(8.0)))
+                .h(px(tokens.ui(MOON_SCROLLBAR_TRACK)))
                 .bg(track_alpha(runtime.horizontal_alpha))
                 .cursor(CursorStyle::Arrow)
                 .on_hover(move |hovered, _window, cx| {

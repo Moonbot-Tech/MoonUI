@@ -6,7 +6,11 @@ use super::{
     MIN_COLUMN_WIDTH, MoonDataCell, MoonDataRow, MoonDataTable, MoonDataTableColumn,
     MoonDataTableWidthPolicy, is_select_all_shortcut,
 };
+use crate::moon::{
+    MOON_SCROLLBAR_TRACK, MoonPalette, MoonRect, MoonScrollbarVisibility, MoonTheme,
+};
 use gpui::{Modifiers, div};
+use std::{cell::RefCell, rc::Rc};
 
 /// Build a test column with matching key and label.
 fn col(key: &str, width: f32) -> MoonDataTableColumn {
@@ -280,4 +284,186 @@ fn data_row_conversion_preserves_banner_presence() {
         !row_without_banner.as_table_row().has_banner(),
         "a MoonDataRow without a banner must not create one during conversion"
     );
+}
+
+/// Stable identifiers for the table roots measured by the gutter probes.
+const OVERFLOW_TABLE_ID: &str = "data-table-gutter-overflow";
+const FITTED_TABLE_ID: &str = "data-table-gutter-fitted";
+const HIDDEN_TABLE_ID: &str = "data-table-gutter-hidden";
+
+/// Choose the column geometry that either exceeds or fits the fixed table viewport.
+#[derive(Clone, Copy)]
+enum TableWidthCase {
+    /// Declared columns require horizontal scrolling in the 200-unit viewport.
+    Overflow,
+    /// Declared columns stay inside the same 200-unit viewport.
+    Fit,
+}
+
+/// Render one fixed-size data table and retain its root box through the in-flow prepaint hook.
+struct DataTableGutterHarness {
+    table_id: &'static str,
+    width_case: TableWidthCase,
+    visibility: MoonScrollbarVisibility,
+    root_bounds: Rc<RefCell<Vec<gpui::Bounds<gpui::Pixels>>>>,
+    rows_scroll_handle: gpui::UniformListScrollHandle,
+}
+
+impl gpui::Render for DataTableGutterHarness {
+    /// Render the configured data-table geometry probe.
+    ///
+    /// Args:
+    ///     _window: Test window hosting the table.
+    ///     _cx: Test view context.
+    ///
+    /// Returns:
+    ///     A fixed-size table whose root is captured after its children lay out.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{ParentElement as _, Styled as _};
+
+        let columns = match self.width_case {
+            TableWidthCase::Overflow => vec![col("first", 150.0), col("second", 150.0)],
+            TableWidthCase::Fit => vec![col("first", 80.0), col("second", 80.0)],
+        };
+        let sink = self.root_bounds.clone();
+        gpui::div()
+            .size_full()
+            .on_children_prepainted(move |bounds, _, _| *sink.borrow_mut() = bounds)
+            .child(
+                MoonDataTable::new(self.table_id, 8, |ix, _, _| {
+                    MoonDataRow::new([
+                        MoonDataCell::text(format!("left-{ix}")),
+                        MoonDataCell::text(format!("right-{ix}")),
+                    ])
+                })
+                .bounds(MoonRect::new(0.0, 0.0, 200.0, 160.0))
+                .columns(columns)
+                .track_scroll(&self.rows_scroll_handle)
+                .width_policy(MoonDataTableWidthPolicy::Preserve)
+                .horizontal_scrollbar_visibility(self.visibility),
+            )
+    }
+}
+
+/// Lay out a table through enough frames for its horizontal scroll handle to learn the viewport.
+///
+/// Args:
+///     cx: GPUI test context whose active palette has already been selected.
+///     table_id: Stable table identity for the probe.
+///     width_case: Whether the table columns overflow its fixed viewport.
+///     visibility: Horizontal scrollbar visibility policy to exercise.
+///
+/// Returns:
+///     The measured root and rows-list bounds after layout has settled.
+fn laid_out_data_table_bounds(
+    cx: &mut gpui::TestAppContext,
+    table_id: &'static str,
+    width_case: TableWidthCase,
+    visibility: MoonScrollbarVisibility,
+) -> (gpui::Bounds<gpui::Pixels>, gpui::Bounds<gpui::Pixels>) {
+    let root_bounds = Rc::new(RefCell::new(Vec::new()));
+    let sink = root_bounds.clone();
+    let rows_scroll_handle = gpui::UniformListScrollHandle::new();
+    let handle_for_view = rows_scroll_handle.clone();
+    let window = cx.add_window(move |_, _| DataTableGutterHarness {
+        table_id,
+        width_case,
+        visibility,
+        root_bounds: sink,
+        rows_scroll_handle: handle_for_view,
+    });
+    let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+
+    for _ in 0..8 {
+        visual.update(|window, _| window.refresh());
+        visual.run_until_parked();
+    }
+    let rows = rows_scroll_handle.0.borrow().base_handle.bounds();
+    assert!(
+        rows.size.height > gpui::px(0.0),
+        "data table rows must lay out before their bottom inset is measured"
+    );
+    let roots = root_bounds.borrow();
+    assert_eq!(
+        roots.len(),
+        1,
+        "the geometry harness must have one table child"
+    );
+    (roots[0], rows)
+}
+
+/// Return the unoccupied space between the laid-out rows list and its table root's bottom edge.
+///
+/// Args:
+///     root: Measured table-root bounds.
+///     rows: Measured virtual rows-list bounds.
+///
+/// Returns:
+///     The bottom inset the rows list leaves for an overlay track.
+fn rows_bottom_inset(
+    root: gpui::Bounds<gpui::Pixels>,
+    rows: gpui::Bounds<gpui::Pixels>,
+) -> gpui::Pixels {
+    (root.origin.y + root.size.height) - (rows.origin.y + rows.size.height)
+}
+
+/// Catches restoring `.bottom(px(0.0))` in `data_table.rs:MoonDataTable::render`, which would
+/// leave the final row under the visible horizontal scrollbar at the end of an overflowing table.
+#[gpui::test]
+fn overflowing_table_reserves_the_rendered_horizontal_track_in_both_themes(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+        let expected_track =
+            cx.update(|cx| gpui::px(MoonTheme::active_tokens(cx).ui(MOON_SCROLLBAR_TRACK)));
+        let (root, rows) = laid_out_data_table_bounds(
+            cx,
+            OVERFLOW_TABLE_ID,
+            TableWidthCase::Overflow,
+            MoonScrollbarVisibility::Always,
+        );
+
+        assert_eq!(
+            rows_bottom_inset(root, rows),
+            expected_track,
+            "overflowing rows must stop one shared scrollbar-track height above the table bottom in {palette:?}"
+        );
+    }
+}
+
+/// Catches making `horizontal_track_gutter` unconditional in `data_table.rs:MoonDataTable::render`,
+/// which would leave an eight-unit dead band under fitting or Hidden-scrollbar tables.
+#[gpui::test]
+fn tables_without_a_drawn_horizontal_track_keep_rows_flush_in_both_themes(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+        for (table_id, width_case, visibility) in [
+            (
+                FITTED_TABLE_ID,
+                TableWidthCase::Fit,
+                MoonScrollbarVisibility::Always,
+            ),
+            (
+                HIDDEN_TABLE_ID,
+                TableWidthCase::Overflow,
+                MoonScrollbarVisibility::Hidden,
+            ),
+        ] {
+            let (root, rows) = laid_out_data_table_bounds(cx, table_id, width_case, visibility);
+            assert_eq!(
+                rows_bottom_inset(root, rows),
+                gpui::px(0.0),
+                "rows must reach the table bottom without a drawn horizontal track in {palette:?}"
+            );
+        }
+    }
 }
