@@ -2583,6 +2583,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use scroll_area::MOON_SCROLLBAR_TRACK;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use scroll_area::{ MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette, };"
     },
     {
@@ -3092,6 +3096,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/root.rs",
       "signature": "pub use crate::MoonRoot;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/scroll_area.rs",
+      "signature": "pub const MOON_SCROLLBAR_TRACK: f32 = 8.0;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/scroll_area.rs",

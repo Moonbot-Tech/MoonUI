@@ -155,6 +155,7 @@ pub use resizable::{
     moon_h_resizable, moon_resizable_panel, moon_v_resizable,
 };
 pub use root::{MoonRoot, MoonRoot as Root};
+pub use scroll_area::MOON_SCROLLBAR_TRACK;
 pub use scroll_area::{
     MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette,
 };

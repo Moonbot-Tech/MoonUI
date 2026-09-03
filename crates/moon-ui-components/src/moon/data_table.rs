@@ -10,7 +10,10 @@ use super::{
     context_menu::MoonContextMenuWindowExt as _,
     dropdown::MoonMenuItem,
     foundation::selected_background,
-    scroll_area::{MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette},
+    scroll_area::{
+        MOON_SCROLLBAR_TRACK, MoonScrollAxis, MoonScrollbarVisibility,
+        moon_horizontal_track_is_drawn, moon_scrollbar_overlay_with_palette,
+    },
     table::{MoonTableAlign, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle},
     theme::MoonTheme,
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
@@ -957,6 +960,26 @@ impl RenderOnce for MoonDataTable {
         let viewport_width = viewport_from_scroll.max(viewport_from_state);
         let width_policy = self.width_policy;
         let horizontal_scrollbar_visibility = self.horizontal_scrollbar_visibility;
+        // Height the pinned horizontal track occupies, or 0.0 when no track is drawn.
+        //
+        // The track is an absolute overlay at the root's bottom edge and reserves no layout
+        // height (`scroll_area.rs`, the `h-track` child), so a rows area pinned to `bottom(0)`
+        // ends UNDER it. Mid-list that is invisible — the user scrolls past it — but at the end
+        // of the scroll range the last row can never be moved out from under the track, which is
+        // the whole bug this inset fixes.
+        //
+        // The condition is not restated here: it is the SAME function the overlay itself asks,
+        // on the SAME handle it is handed below, so the gutter and the track appear and vanish
+        // together and cannot drift apart. A table that does not overflow keeps its rows flush
+        // with the root bottom and gains no permanent dead band.
+        let horizontal_track_gutter = if moon_horizontal_track_is_drawn(
+            &horizontal_scroll_handle,
+            horizontal_scrollbar_visibility,
+        ) {
+            tokens.ui(MOON_SCROLLBAR_TRACK)
+        } else {
+            0.0
+        };
         // Original column order (by key) BEFORE reordering — `render_row` returns cells in
         // this order. After columns are reordered (drag), the body cells must be permuted to
         // match, otherwise only the header moves while cell content stays in place.
@@ -1437,7 +1460,7 @@ impl RenderOnce for MoonDataTable {
                     .left(px(0.0))
                     .top(px(header_height))
                     .right(px(0.0))
-                    .bottom(px(0.0))
+                    .bottom(px(horizontal_track_gutter))
                     .child(rows_list),
             );
 
