@@ -9,6 +9,7 @@ use super::super::{
     table::{MoonTableAlign, MoonTableStyle},
     theme::MoonTheme,
     tokens::{MoonPalette, rgba_from},
+    tooltip::MoonTooltipView,
 };
 use super::drag::{MoonDataColumnDrag, MoonDataColumnResizeDrag};
 use super::{
@@ -123,7 +124,12 @@ pub(super) fn render_header(
                 },
                 1.0,
             ))
-            .child(label);
+            .child(label)
+            .when_some(column.tooltip.clone(), |cell, tooltip| {
+                cell.tooltip(move |_window, cx| {
+                    cx.new(|_| MoonTooltipView::new(tooltip.clone())).into()
+                })
+            });
 
         cell = cell.child(
             canvas(
