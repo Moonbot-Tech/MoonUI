@@ -251,7 +251,7 @@ impl MoonThemeTokens {
             table_head_foreground: rgba_from(p.text_soft, 1.0),
             table_foot: rgba_from(p.head_row, 1.0),
             table_foot_foreground: rgba_from(p.text_soft, 1.0),
-            table_hover: rgba_from(p.panel_high, 1.0),
+            table_hover: rgba_from(p.table_hover, 1.0),
             table_row_border: rgba_from(p.row_line, 1.0),
             title_bar: rgba_from(p.chrome, 1.0),
             title_bar_border: rgba_from(p.border, 1.0),

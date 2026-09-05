@@ -89,6 +89,9 @@ pub enum MoonDataTableWidthPolicy {
 pub struct MoonDataTableColumn {
     pub key: SharedString,
     pub title: SharedString,
+    /// Hover text for the header cell, e.g. the raw schema name behind a translated title.
+    /// `None` renders the bare title as before.
+    pub tooltip: Option<SharedString>,
     /// Base column width in logical design pixels.
     ///
     /// `MoonDataTable` treats this value as both the minimum width and the proportional weight for
@@ -136,6 +139,7 @@ impl MoonDataTableColumn {
         Self {
             key: key.into(),
             title: title.into(),
+            tooltip: None,
             width,
             fill: false,
             no_grow: false,
@@ -164,6 +168,12 @@ impl MoonDataTableColumn {
     pub fn no_grow(mut self) -> Self {
         self.no_grow = true;
         self.fill = false;
+        self
+    }
+
+    /// Attach a hover tooltip to the header cell.
+    pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self {
+        self.tooltip = Some(tooltip.into());
         self
     }
 

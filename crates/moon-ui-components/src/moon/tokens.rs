@@ -50,6 +50,9 @@ pub struct MoonPalette {
     pub table_head: u32,
     pub table_body: u32,
     pub table_selected: u32,
+    /// Row hover fill for data tables: one step off the row surface in EITHER theme, so a
+    /// hovered row is visible on a white light-theme table (where `panel_high` is itself white).
+    pub table_hover: u32,
     pub green: u32,
     pub green_btn: u32,
     pub green_text: u32,
@@ -132,6 +135,7 @@ impl MoonPalette {
         table_head: 0x20232A,
         table_body: 0x1A1C1F,
         table_selected: 0xFFB347,
+        table_hover: 0x22252B,
         green: 0x1E8C5B,
         green_btn: 0x1E8C5B,
         green_text: 0x1E8C5B,
@@ -178,6 +182,7 @@ impl MoonPalette {
         table_head: 0xF3F6F8,
         table_body: 0xFFFFFF,
         table_selected: 0x009DFF,
+        table_hover: 0xEEF2F6,
         green: 0x178A57,
         green_btn: 0x178A57,
         green_text: 0x0E6E45,
