@@ -24,6 +24,7 @@ fn rgb_of(color: gpui::Hsla) -> u32 {
 fn selection_inks_are_readable_on_the_surface_each_one_lands_on() {
     for (name, palette) in [
         ("dark", MoonPalette::TERMINAL),
+        ("graphite", MoonPalette::GRAPHITE),
         ("light", MoonPalette::LIGHT),
     ] {
         let tokens = MoonThemeTokens {
@@ -114,4 +115,14 @@ fn a_non_finite_font_delta_is_replaced_while_zero_is_kept() {
         cfg.dark.scale.font_delta, 0.0,
         "zero font delta is 'no adjustment', a real setting - it must be kept"
     );
+}
+
+/// Catches `theme.rs:MoonThemeConfig::moon_graphite` drifting from its bundled TOML palette.
+/// A const and its bundled theme file must agree, or Graphite paints a different palette than planned.
+#[test]
+fn graphite_theme_config_matches_the_bundled_dark_and_light_palettes() {
+    let config = MoonThemeConfig::moon_graphite();
+    assert_eq!(config.dark.palette, MoonPalette::GRAPHITE);
+    assert_eq!(config.light.palette, MoonPalette::LIGHT);
+    assert_eq!(config.mode, crate::moon::foundation::ThemeMode::Dark);
 }

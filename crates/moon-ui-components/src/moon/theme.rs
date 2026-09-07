@@ -319,6 +319,17 @@ impl MoonThemeConfig {
             .expect("bundled moon-light theme must parse")
     }
 
+    /// The middle theme — [`MoonPalette::GRAPHITE`] on the DARK side, `LIGHT` on the light side.
+    ///
+    /// `mode` is `Dark`, and that is not a placeholder: Graphite IS a dark theme, just a softer
+    /// one, so it takes the dark colour set everywhere a consumer branches on
+    /// [`MoonPalette::is_light`]. A host that needs to know Graphite specifically asks its own
+    /// settings, not this config's `mode`.
+    pub fn moon_graphite() -> Self {
+        toml::from_str(include_str!("../../themes/moon-graphite.toml"))
+            .expect("bundled moon-graphite theme must parse")
+    }
+
     /// Set the font delta on both themes, refusing a value that cannot render.
     ///
     /// [`MoonScale::font_delta`] is added directly into every text metric, so a non-finite value

@@ -92,6 +92,36 @@ Font scaling and global UI scaling must be architecture-level capabilities, not
 per-screen hacks. Increasing UI font size should not require hunting through
 application panels.
 
+### Bundled themes
+
+Three palettes ship in the crate, each a `MoonPalette` constant in
+`moon/tokens.rs` paired with a theme file under `crates/moon-ui-components/themes/`:
+
+| theme | file | palette | colour set |
+|---|---|---|---|
+| Terminal | `moon-terminal.toml` | `MoonPalette::TERMINAL` | dark |
+| Light | `moon-light.toml` | `MoonPalette::LIGHT` | light |
+| Graphite | `moon-graphite.toml` | `MoonPalette::GRAPHITE` | dark |
+
+The constant and the file hold the same values on purpose — the constant is what
+code reads, the file is what a host installs — so a change to one is a change to
+both, and a test pins the pair.
+
+Two rules bind a new bundled palette:
+
+- **Which side it is on is MEASURED, never declared.** `MoonPalette::is_light`
+  reads the luminance of `shell`, so a palette lands on the light or dark side by
+  its own colours. That is why Graphite needs no `ThemeMode` of its own: it is a
+  dark theme with softer surfaces, and every consumer that branches on `is_light`
+  takes the dark arm with no new code. Adding a `ThemeMode` variant to carry a
+  palette is the wrong instrument.
+- **`text` and `text_muted` must reach 4.5:1 against `shell`, `window` and
+  `panel`**, measured by `contrast_ratio` (WCAG 2.x). A palette may not borrow an
+  ink from a neighbouring theme that fails this: Graphite lifts its own
+  `text_muted` precisely because the dark palette's value measures 3.03:1 on a
+  mid-tone surface. Fix legibility in the palette's own tokens, never by adding a
+  third colour table for consumers to branch on.
+
 ## Real Component Requirement
 
 A component is not considered implemented in the palette merely because:
