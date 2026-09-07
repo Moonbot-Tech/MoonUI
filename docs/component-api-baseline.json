@@ -4295,6 +4295,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn moon_graphite() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn moon_light() -> Self"
     },
     {
@@ -4472,6 +4476,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub struct MoonToggle"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub const GRAPHITE: Self = Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tokens.rs",

@@ -1,0 +1,139 @@
+mode = "Dark"
+
+[dark.palette]
+shell = 0x33373C
+shell_high = 0x3B3F45
+window = 0x33373C
+surface = 0x373B40
+panel = 0x41464C
+panel_high = 0x464B52
+chrome = 0x3B3F45
+tabbar = 0x3B3F45
+panel_head = 0x464B52
+gutter = 0x2E3236
+chart_bg = 0x373B40
+card = 0x3B3F45
+row_alt = 0x3B3F45
+head_row = 0x41464C
+border = 0x51565D
+border_soft = 0x4C5158
+border_card = 0x51565D
+border_hover = 0x646A72
+row_line = 0x4C5158
+shadow = 0x000000
+overlay = 0xFFFFFF
+on_accent = 0xFFFFFF
+text = 0xF1EEE8
+text_soft = 0xC9C5BD
+text_dim = 0xF1EEE8
+text_muted = 0xBDB9B1
+text_faint = 0xA8A49C
+table_head = 0x41464C
+table_body = 0x3B3F45
+table_selected = 0xFFB347
+table_hover = 0x4B5057
+green = 0x2FB673
+green_btn = 0x1E8C5B
+green_text = 0x2FB673
+red = 0xFA8A8C
+red_text = 0xFA8A8C
+red_soft_bd = 0xFA8A8C
+orange = 0xFF8E5A
+amber = 0xFFB347
+blue = 0x7FC9FF
+accent = 0xFFB347
+accent_fg = 0xFFCF94
+accent_tint_a = 0.14
+yellow = 0xFFD93D
+
+[dark.metrics]
+header_top_h = 32.0
+toolbar_h = 32.0
+status_h = 22.0
+dock_tab_h = 26.0
+table_header_h = 26.0
+table_row_h = 25.0
+button_radius = 4.0
+container_radius = 8.0
+hairline = 1.0
+
+[dark.scale]
+ui = 1.0
+font = 1.0
+font_delta = 0.0
+
+[dark.typography]
+font_family = "Inter"
+mono_font_family = "Geist Mono"
+font_size = 12.0
+mono_font_size = 11.0
+rem_size = 16.0
+
+[light.palette]
+shell = 0xF3F5F7
+shell_high = 0xFAFBFC
+window = 0xF7F8FA
+surface = 0xFFFFFF
+panel = 0xF8FAFC
+panel_high = 0xFFFFFF
+chrome = 0xF5F7FA
+tabbar = 0xF2F5F8
+panel_head = 0xF5F7FA
+gutter = 0xEEF2F6
+chart_bg = 0xFFFFFF
+card = 0xFFFFFF
+row_alt = 0xFCFDFE
+head_row = 0xF3F6F8
+border = 0xD5DBE1
+border_soft = 0xE1E5EA
+border_card = 0xDCE2E8
+border_hover = 0xB8C2CC
+row_line = 0xECEFF2
+shadow = 0x000000
+overlay = 0x000000
+on_accent = 0xFFFFFF
+text = 0x17202A
+text_soft = 0x4B5865
+text_dim = 0x2D3945
+text_muted = 0x768391
+text_faint = 0x98A3AE
+table_head = 0xF3F6F8
+table_body = 0xFFFFFF
+table_selected = 0x009DFF
+table_hover = 0xEEF2F6
+green = 0x178A57
+green_btn = 0x178A57
+green_text = 0x0E6E45
+red = 0xD2483F
+red_text = 0xB7352F
+red_soft_bd = 0xE1B5B0
+orange = 0xD18A2B
+amber = 0xB97824
+blue = 0x2B6F9E
+accent = 0x009DFF
+accent_fg = 0x0A3F68
+accent_tint_a = 0.08
+yellow = 0xB8860B
+
+[light.metrics]
+header_top_h = 32.0
+toolbar_h = 32.0
+status_h = 22.0
+dock_tab_h = 26.0
+table_header_h = 26.0
+table_row_h = 25.0
+button_radius = 4.0
+container_radius = 8.0
+hairline = 1.0
+
+[light.scale]
+ui = 1.0
+font = 1.0
+font_delta = 0.0
+
+[light.typography]
+font_family = "Inter"
+mono_font_family = "Geist Mono"
+font_size = 12.0
+mono_font_size = 11.0
+rem_size = 16.0

@@ -198,6 +198,86 @@ impl MoonPalette {
         yellow: 0xB8860B,
     };
 
+    /// The middle theme: mid-tone neutral surfaces with light ink, between [`Self::TERMINAL`]
+    /// and [`Self::LIGHT`].
+    ///
+    /// It is a DARK palette by measurement, not by declaration — `shell` has a luma of 54.5, so
+    /// [`Self::is_light`] answers `false` and every consumer that branches on it (`MoonTone`,
+    /// `theme_colors`, a host's own logo and chart-colour picks) takes the dark arm with no new
+    /// code. That is the whole reason this ships as a palette rather than a third `ThemeMode`.
+    ///
+    /// Surfaces sit at HSL-L 21.8–29.8%, which is 5.4× `TERMINAL`'s relative luminance — visibly
+    /// softer than the near-black dark theme while staying unmistakably dark. Lighter was tried
+    /// and does not work: at a shell of HSL-L 31.6% even `text` falls under 4.5:1 on the matching
+    /// `panel_high`, and any conforming `text_muted` would then have to be LIGHTER than `text`,
+    /// erasing the muted/normal distinction the palette exists to express.
+    ///
+    /// `text_muted` is deliberately NOT the dark palette's `0x7D7669`: that ink measures 3.03:1
+    /// here and is unreadable. Lifting it is the fix — a mid-tone surface needs its own muted
+    /// ink, never a third colour table.
+    ///
+    /// Measured with [`contrast_ratio`] against the WCAG floor of 4.5:1 — `text` 10.35 / 10.35 /
+    /// 8.22 and `text_muted` 6.13 / 6.13 / 4.87 on `shell` / `window` / `panel`. Accent hues are
+    /// carried over from `TERMINAL` unchanged, and `green` and `red` are lifted in lightness only,
+    /// at the same hue.
+    ///
+    /// `red` is lifted further than it looks like it needs to be, because on the dark side it is
+    /// not only a fill: `Button::danger_fg` resolves to `red` for any palette that is not light,
+    /// and the outline danger button paints that ink over a transparent `shell`. A saturated red
+    /// cannot reach the required luminance there at all — pure `0xFF0000` is only 0.21 — so the
+    /// choice is a paler red or unreadable danger text. At `0xFA8A8C` the pairing measures
+    /// 5.18 / 4.12 / 4.58 on `shell` / `panel` / `card`, which matches or beats `TERMINAL`'s own
+    /// 4.71 / 4.02 / 4.36 on every one. Do not "restore the saturation" without re-measuring that
+    /// button.
+    pub const GRAPHITE: Self = Self {
+        shell: 0x33373C,
+        shell_high: 0x3B3F45,
+        window: 0x33373C,
+        surface: 0x373B40,
+        panel: 0x41464C,
+        panel_high: 0x464B52,
+        chrome: 0x3B3F45,
+        tabbar: 0x3B3F45,
+        panel_head: 0x464B52,
+        gutter: 0x2E3236,
+        chart_bg: 0x373B40,
+        card: 0x3B3F45,
+        row_alt: 0x3B3F45,
+        head_row: 0x41464C,
+        border: 0x51565D,
+        border_soft: 0x4C5158,
+        border_card: 0x51565D,
+        border_hover: 0x646A72,
+        row_line: 0x4C5158,
+        shadow: 0x000000,
+        overlay: 0xFFFFFF,
+        on_accent: 0xFFFFFF,
+        text: 0xF1EEE8,
+        text_soft: 0xC9C5BD,
+        text_dim: 0xF1EEE8,
+        text_muted: 0xBDB9B1,
+        text_faint: 0xA8A49C,
+        table_head: 0x41464C,
+        table_body: 0x3B3F45,
+        table_selected: 0xFFB347,
+        table_hover: 0x4B5057,
+        green: 0x2FB673,
+        green_btn: 0x1E8C5B,
+        green_text: 0x2FB673,
+        red: 0xFA8A8C,
+        red_text: 0xFA8A8C,
+        red_soft_bd: 0xFA8A8C,
+        orange: 0xFF8E5A,
+        amber: 0xFFB347,
+        blue: 0x7FC9FF,
+        accent: 0xFFB347,
+        accent_fg: 0xFFCF94,
+        // A touch stronger than TERMINAL's 0.11: an 11% tint disappears into a mid grey where on
+        // near-black it reads clearly.
+        accent_tint_a: 0.14,
+        yellow: 0xFFD93D,
+    };
+
     pub fn with_legacy_defaults(mut self) -> Self {
         if self.window == 0 {
             self.window = self.shell;

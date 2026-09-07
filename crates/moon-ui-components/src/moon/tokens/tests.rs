@@ -15,6 +15,7 @@ const SELECTED_TEXT_CONTRAST_FLOOR: f32 = 4.5;
 fn selected_row_ink_stays_readable_on_the_panel_it_is_tinted_over() {
     for (name, p) in [
         ("dark", MoonPalette::TERMINAL),
+        ("graphite", MoonPalette::GRAPHITE),
         ("light", MoonPalette::LIGHT),
     ] {
         let ratio = contrast_ratio(p.selected_fg(), p.panel);
@@ -34,6 +35,7 @@ fn selected_row_ink_stays_readable_on_the_panel_it_is_tinted_over() {
 fn ink_on_a_solid_fill_is_readable_in_both_palettes() {
     for (name, p) in [
         ("dark", MoonPalette::TERMINAL),
+        ("graphite", MoonPalette::GRAPHITE),
         ("light", MoonPalette::LIGHT),
     ] {
         for (fill_name, fill) in [("accent", p.accent), ("panel", p.panel)] {
@@ -62,6 +64,33 @@ fn dark_terminal_palette_keeps_legacy_core_values() {
     assert_eq!(p.orange, 0xFF8E5A);
     assert_eq!(p.blue, 0x7FC9FF);
     assert_eq!(p.accent, 0xFFB347);
+}
+
+/// Catches raising `tokens.rs:MoonPalette::GRAPHITE.shell` above the dark luma threshold.
+/// A light classification flips every `is_light()` consumer to the light branch at once.
+#[test]
+fn graphite_palette_remains_a_dark_palette_by_measured_shell_luma() {
+    assert!(!MoonPalette::GRAPHITE.is_light());
+}
+
+/// Catches restoring Graphite's `text_muted` to the dark palette's low-contrast value.
+/// Muted text on Graphite's shell, window, or panel must remain readable at the WCAG floor.
+#[test]
+fn graphite_text_and_muted_text_clear_the_surface_contrast_floor() {
+    let palette = MoonPalette::GRAPHITE;
+    for (ink_name, ink) in [("text", palette.text), ("text_muted", palette.text_muted)] {
+        for (surface_name, surface) in [
+            ("shell", palette.shell),
+            ("window", palette.window),
+            ("panel", palette.panel),
+        ] {
+            let ratio = contrast_ratio(ink, surface);
+            assert!(
+                ratio >= SELECTED_TEXT_CONTRAST_FLOOR,
+                "Graphite {ink_name} on {surface_name} is {ratio:.2}:1, below {SELECTED_TEXT_CONTRAST_FLOOR}:1"
+            );
+        }
+    }
 }
 
 /// Catches changing `tokens.rs:MoonPalette::LIGHT` away from the neutral-terminal design
