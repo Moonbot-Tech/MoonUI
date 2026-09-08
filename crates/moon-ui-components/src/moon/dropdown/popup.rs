@@ -2,6 +2,9 @@
 
 use super::*;
 
+mod submenu;
+use submenu::SubmenuPlacement;
+
 /// Shared immutable inputs used to render every row in one menu level.
 struct MenuLevelRenderContext {
     menu_id: SharedString,
@@ -14,6 +17,7 @@ struct MenuLevelRenderContext {
     palette: MoonPalette,
     tokens: MoonThemeTokens,
     dropdown_selection: Option<std::rc::Rc<MoonDropdownSelectionContext>>,
+    submenu_state: Option<Entity<Option<Option<usize>>>>,
 }
 
 /// Retained variable-height list state for one large popup-menu level.
@@ -119,6 +123,7 @@ pub struct MoonPopupMenu {
     max_height: Option<MoonMenuMaxHeight>,
     mono: bool,
     dropdown_selection: Option<std::rc::Rc<MoonDropdownSelectionContext>>,
+    submenu_state: Option<Entity<Option<Option<usize>>>>,
 }
 
 #[derive(IntoElement)]
@@ -149,6 +154,7 @@ impl MoonPopupMenu {
             max_height: None,
             mono: true,
             dropdown_selection: None,
+            submenu_state: None,
         }
     }
 
@@ -399,9 +405,6 @@ impl MoonPopupMenu {
             matches!(self.width, MoonMenuWidth::Rendered(_)),
             "scaled or fitted menu widths require RenderOnce with an App context"
         );
-        if !menu_level_is_virtualized(self.items.len()) {
-            return self.render_with_theme(p, MoonThemeTokens::default(), None, None);
-        }
         MoonPopupMenuResolvedTheme {
             menu: self,
             palette: p,
@@ -512,8 +515,7 @@ impl MoonPopupMenu {
                 }
             }
         };
-        if self.width.is_measured()
-            && let Some(max_width) = self.rendered_max_width
+        if let Some(max_width) = self.rendered_max_width
             && width > max_width
         {
             width = max_width.max(1.0);
@@ -579,6 +581,7 @@ impl MoonPopupMenu {
             palette: p,
             tokens,
             dropdown_selection: self.dropdown_selection,
+            submenu_state: self.submenu_state,
         });
         if let Some(list_state) = virtual_list_state {
             let list_height =
@@ -673,7 +676,16 @@ impl MoonPopupMenu {
             );
         }
 
-        match item.kind {
+        let hovered_branch = context
+            .submenu_state
+            .as_ref()
+            .and_then(|state| cx.and_then(|cx| *state.read(cx)));
+        let open = !item.disabled
+            && !item.submenu.items.is_empty()
+            && hovered_branch.map_or(item.selected, |branch| branch == Some(ix));
+        let hover_state = context.submenu_state.clone();
+        let hover_branch = (!item.disabled && !item.submenu.items.is_empty()).then_some(ix);
+        let row = match item.kind {
             MoonMenuItemKind::Separator => div()
                 .id(ElementId::from(row_id.clone()))
                 .debug_selector(move || row_id.to_string())
@@ -746,7 +758,7 @@ impl MoonPopupMenu {
             }
             MoonMenuItemKind::Item => {
                 let disabled = item.disabled;
-                let selected = item.selected;
+                let selected = item.selected || open;
                 let checked = item.checked;
                 let on_click = menu_item_click_handler(&item, context.dropdown_selection.as_ref());
                 let submenu = item.submenu;
@@ -842,30 +854,61 @@ impl MoonPopupMenu {
                     }
                 }
 
-                if selected && has_submenu {
+                if open {
+                    let row_bounds = std::rc::Rc::new(std::cell::Cell::new(Bounds::default()));
+                    let capture = row_bounds.clone();
                     row = row.child(
-                        deferred(
-                            div()
-                                .absolute()
-                                .left_full()
-                                .ml(px(tokens.ui(SUBMENU_OFFSET_X)))
-                                .top(px(-tokens.ui(MENU_PADDING)))
-                                .child(MoonPopupMenuResolvedTheme {
-                                    menu: MoonPopupMenu::new(format!("{menu_id}:submenu:{ix}"))
-                                        .shared_level(submenu)
-                                        .width_policy(menu_width_policy)
-                                        .size(menu_size),
-                                    palette: p,
-                                    tokens: tokens.clone(),
-                                }),
-                        )
+                        canvas(move |bounds, _, _| capture.set(bounds), |_, _, _, _| {})
+                            .absolute()
+                            .inset_0()
+                            .size_full(),
+                    );
+                    row = row.child(
+                        deferred(SubmenuPlacement {
+                            row_bounds,
+                            gap: tokens.ui(SUBMENU_OFFSET_X),
+                            top_overlap: tokens.ui(MENU_PADDING),
+                            child: MoonPopupMenuResolvedTheme {
+                                menu: MoonPopupMenu::new(format!("{menu_id}:submenu:{ix}"))
+                                    .shared_level(submenu)
+                                    .width_policy(menu_width_policy)
+                                    .size(menu_size),
+                                palette: p,
+                                tokens: tokens.clone(),
+                            }
+                            .into_any_element(),
+                        })
                         .with_priority(1),
                     );
                 }
 
                 row.into_any_element()
             }
-        }
+        };
+        div()
+            .id(SharedString::from(format!("{menu_id}:hover:{ix}")))
+            .on_hover(move |hovered, window, cx| {
+                if *hovered && let Some(state) = &hover_state {
+                    state.update(cx, |state, cx| {
+                        if *state != Some(hover_branch) {
+                            *state = Some(hover_branch);
+                            cx.notify();
+                            window.refresh();
+                        }
+                    });
+                }
+            })
+            .child(row)
+            .into_any_element()
+    }
+
+    /// Retain one hovered branch per menu level; leaving a row keeps its child reachable.
+    fn retain_submenu_state(&mut self, window: &mut Window, cx: &mut App) {
+        self.submenu_state = Some(window.use_keyed_state(
+            ElementId::from(SharedString::from(format!("{}:hovered-branch", self.id))),
+            cx,
+            |_, _| None,
+        ));
     }
 
     /// Return unscaled row metrics for the configured menu size.
@@ -886,7 +929,8 @@ impl RenderOnce for MoonPopupMenu {
     ///
     /// Returns:
     ///     The rendered menu.
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        self.retain_submenu_state(window, cx);
         let tokens = MoonTheme::active_tokens(cx);
         let virtual_list_state = self.retained_virtual_list_state(&tokens, window, cx);
         self.render_with_theme(
@@ -907,7 +951,13 @@ impl RenderOnce for MoonPopupMenuResolvedTheme {
     ///
     /// Returns:
     ///     The popup rendered with the inherited palette and theme tokens.
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        self.menu.retain_submenu_state(window, cx);
+        let viewport = window.viewport_size();
+        self.menu.rendered_max_width = Some((f32::from(viewport.width) - 12.0).max(1.0));
+        let viewport_height = (f32::from(viewport.height) - 12.0).max(1.0);
+        let cap = resolve_menu_outer_max(self.menu.max_height, &self.tokens, false);
+        self.menu.max_height = Some(MoonMenuMaxHeight::Rendered(cap.min(viewport_height)));
         let virtual_list_state = self
             .menu
             .retained_virtual_list_state(&self.tokens, window, cx);
@@ -915,3 +965,6 @@ impl RenderOnce for MoonPopupMenuResolvedTheme {
             .render_with_theme(self.palette, self.tokens, Some(cx), virtual_list_state)
     }
 }
+
+#[cfg(test)]
+mod tests;
