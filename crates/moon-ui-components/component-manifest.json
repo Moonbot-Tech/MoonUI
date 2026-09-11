@@ -487,7 +487,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonSelect",
       "upstream_ref": "Longbridge::select@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon trigger variant/style hook lives in base select; Longbridge select state remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon trigger variant/style and configurable deferred menu layer live in base select; MoonSelect explicitly opts popover-hosted menus above their parent, while ordinary selects retain layer 1 and Longbridge selection behavior",
       "donor_drift_budget": 1,
       "contracts": ["select.open_select_lifecycle", "gallery.visual_coverage"]
     },

@@ -4246,6 +4246,7 @@ dependencies = [
  "enum-iterator",
  "futures",
  "html5ever",
+ "image",
  "indoc",
  "instant",
  "itertools 0.13.0",

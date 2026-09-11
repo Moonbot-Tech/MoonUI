@@ -1,3 +1,5 @@
+//! Moon selection controls adapting core behavior and semantic overlay hosting.
+
 use crate::searchable_list::{SearchableListItem, SearchableVec};
 use crate::select::{
     Select as CoreSelect, SelectEvent as CoreSelectEvent, SelectState as CoreSelectState,
@@ -243,6 +245,7 @@ where
     }
 }
 
+/// Single-selection control with an explicit opt-in for popover-hosted menus.
 #[derive(IntoElement)]
 pub struct MoonSelect<T>
 where
@@ -263,12 +266,14 @@ where
     menu_width: f32,
     menu_max_height: Option<f32>,
     menu_size: MoonMenuSize,
+    in_popover: bool,
 }
 
 impl<T> MoonSelect<T>
 where
     T: Clone + PartialEq + 'static,
 {
+    /// Create a select using the ordinary menu layer; popover hosts must opt in explicitly.
     pub fn new(state: &Entity<MoonSelectState<T>>) -> Self {
         Self {
             id: SharedString::from(format!("moon-select:{}", state.entity_id())),
@@ -286,6 +291,7 @@ where
             menu_width: 180.0,
             menu_max_height: None,
             menu_size: MoonMenuSize::Normal,
+            in_popover: false,
         }
     }
 
@@ -358,12 +364,21 @@ where
         self.menu_size = size;
         self
     }
+
+    /// Paint this select's menu above its hosting [`super::MoonPopover`].
+    ///
+    /// Use only for controls inside a MoonPopover; ordinary selects keep their default layer.
+    pub fn in_popover(mut self) -> Self {
+        self.in_popover = true;
+        self
+    }
 }
 
 impl<T> RenderOnce for MoonSelect<T>
 where
     T: Clone + PartialEq + 'static,
 {
+    /// Forward the host's layering opt-in while preserving core selection behavior.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         self.state.update(cx, |state, cx| {
             state.sync_core(self.searchable, window, cx);
@@ -378,6 +393,10 @@ where
             .appearance(self.appearance)
             .menu_width(px(self.menu_width))
             .with_size(size_for(self.trigger_size, self.menu_size));
+
+        if self.in_popover {
+            select = select.menu_priority(super::popover::MOON_POPOVER_PRIORITY + 1);
+        }
 
         if let Some(trigger_variant) = self.trigger_variant {
             select = select.trigger_variant(trigger_variant.into());
@@ -424,3 +443,6 @@ fn size_for(trigger: MoonButtonSize, _menu: MoonMenuSize) -> Size {
         MoonButtonSize::Custom { height, .. } => Size::Size(px(height)),
     }
 }
+
+#[cfg(test)]
+mod tests;

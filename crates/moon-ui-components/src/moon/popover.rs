@@ -7,7 +7,8 @@ use super::{
     tokens::{MoonPalette, MoonRect, rgba_from},
 };
 
-const MOON_POPOVER_PRIORITY: usize = 30_000;
+/// Shared layer boundary for popovers and controls opening menus above them.
+pub(super) const MOON_POPOVER_PRIORITY: usize = 30_000;
 const POPOVER_PADDING: f32 = 6.0;
 const POPOVER_BORDER: f32 = 1.0;
 
