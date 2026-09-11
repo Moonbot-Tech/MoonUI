@@ -1,3 +1,5 @@
+//! Base single-selection control with configurable deferred menu layering.
+
 use gpui::{
     AnyElement, App, ClickEvent, Context, DismissEvent, Edges, ElementId, Entity, EventEmitter,
     FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, Length, ParentElement,
@@ -61,6 +63,7 @@ where
 
 // MARK: SelectOptions (builder only — applied to SearchableListState during render)
 
+/// Per-render select configuration, including the host's menu layer.
 struct SelectOptions {
     style: StyleRefinement,
     size: Size,
@@ -71,12 +74,14 @@ struct SelectOptions {
     search_placeholder: Option<SharedString>,
     menu_width: Length,
     menu_max_h: Length,
+    menu_priority: usize,
     disabled: bool,
     appearance: bool,
     trigger_variant: Option<ButtonVariant>,
 }
 
 impl Default for SelectOptions {
+    /// Preserve the ordinary select layer unless a host explicitly overrides it.
     fn default() -> Self {
         Self {
             style: StyleRefinement::default(),
@@ -87,6 +92,7 @@ impl Default for SelectOptions {
             title_prefix: None,
             menu_width: Length::Auto,
             menu_max_h: rems(20.).into(),
+            menu_priority: 1,
             disabled: false,
             appearance: true,
             search_placeholder: None,
@@ -105,6 +111,7 @@ where
     pub(crate) state: SearchableListState<D>,
 
     // Select-specific fields
+    menu_priority: usize,
     searchable: bool,
     icon: Option<Icon>,
     title_prefix: Option<SharedString>,
@@ -243,6 +250,7 @@ where
 
         Self {
             state,
+            menu_priority: SelectOptions::default().menu_priority,
             searchable: false,
             icon: None,
             title_prefix: None,
@@ -487,6 +495,7 @@ where
     D: SearchableListDelegate + 'static,
     <D::Item as SearchableListItem>::Value: PartialEq + Clone,
 {
+    /// Render the trigger and defer the open menu to its configured host layer.
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let searchable = self.searchable;
         let is_focused = self.state.focus_handle.is_focused(window);
@@ -616,6 +625,7 @@ where
                                 })
                                 .child(
                                     v_flex()
+                                        .debug_selector(|| "select-menu".to_string())
                                         .occlude()
                                         .mt_1p5()
                                         .bg(cx.theme().background)
@@ -641,7 +651,7 @@ where
                                 })),
                         ),
                     )
-                    .with_priority(1),
+                    .with_priority(self.menu_priority),
                 )
             })
     }
@@ -670,6 +680,12 @@ where
     /// Set the max height of the dropdown menu, default: 20rem.
     pub fn menu_max_h(mut self, max_h: impl Into<Length>) -> Self {
         self.options.menu_max_h = max_h.into();
+        self
+    }
+
+    /// Set the deferred menu layer; higher priorities paint above lower ones (default: 1).
+    pub fn menu_priority(mut self, priority: usize) -> Self {
+        self.options.menu_priority = priority;
         self
     }
 
@@ -789,6 +805,7 @@ where
     D: SearchableListDelegate + 'static,
     <D::Item as SearchableListItem>::Value: PartialEq + Clone,
 {
+    /// Apply per-render options before rendering the persistent select state.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let disabled = self.options.disabled;
         let focus_handle = self.state.focus_handle(cx);
@@ -803,6 +820,7 @@ where
             this.state.search_placeholder = opts.search_placeholder;
             this.state.menu_width = opts.menu_width;
             this.state.menu_max_h = opts.menu_max_h;
+            this.menu_priority = opts.menu_priority;
             this.state.disabled = opts.disabled;
             this.state.appearance = opts.appearance;
             this.icon = opts.icon;

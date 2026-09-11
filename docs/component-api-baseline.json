@@ -3243,6 +3243,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn in_popover(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
       "signature": "pub fn items(&self) -> &[MoonSelectItem<T>]"
     },
     {
