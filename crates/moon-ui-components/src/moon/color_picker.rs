@@ -6,10 +6,15 @@ use super::{
     foundation::v_flex,
     input::{MoonInput, MoonInputEvent, MoonInputState},
     popover::{MoonPopover, MoonPopoverPlacement},
+    scroll_area::{
+        MOON_SCROLLBAR_TRACK, MoonScrollAxis, MoonScrollbarVisibility,
+        moon_scrollbar_overlay_with_palette,
+    },
     text::MoonText,
     theme::MoonTheme,
     tokens::{MoonPalette, MoonTone, rgba_from},
 };
+use crate::ElementExt;
 
 /// Cap on remembered custom colours (most-recent-first). A larger stored/seeded list is silently
 /// trimmed on the next `custom_colors`/`set_custom_colors` call — callers that persist a longer
@@ -272,6 +277,10 @@ fn hex_label(color: Hsla) -> SharedString {
 }
 
 impl RenderOnce for MoonColorPicker {
+    /// Render the picker with a capped palette and an automatic overflow scrollbar.
+    ///
+    /// Uses the window's persistent scroll state and the application's active theme; returns
+    /// the trigger and popover without requiring callers to configure scrolling.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         // Drain a pending `default_value`/rejected-commit sync before reading anything else, so
         // the trigger label and the hex field never show stale text for one frame.
@@ -354,6 +363,17 @@ impl RenderOnce for MoonColorPicker {
                     .render(),
             );
 
+        let scroll_state = window.use_keyed_state(
+            ElementId::from(SharedString::from(format!("{}:scroll", self.id))),
+            cx,
+            |_, _| ScrollHandle::new(),
+        );
+        let scroll_handle = scroll_state.read(cx).clone();
+        let scroll_metrics = (
+            scroll_handle.bounds(),
+            scroll_handle.max_offset(),
+            scroll_handle.offset(),
+        );
         let mut grid = div()
             .id(ElementId::from(SharedString::from(format!(
                 "{}:grid",
@@ -361,9 +381,13 @@ impl RenderOnce for MoonColorPicker {
             ))))
             .grid()
             .grid_cols(5)
-            .gap(px(tokens.ui(6.0)))
+            // Reserve the shared track width inside the existing popup. A smaller gap keeps
+            // five full swatches at the reference scale; max_w_full lets them fit larger scales.
+            .gap(px(tokens.ui(4.0)))
+            .pr(px(tokens.ui(MOON_SCROLLBAR_TRACK)))
             .max_h(px(tokens.ui(GRID_MAX_HEIGHT_UI)))
-            .overflow_y_scroll();
+            .overflow_y_scroll()
+            .track_scroll(&scroll_handle);
 
         for (ix, color) in colors.into_iter().enumerate() {
             let state = state.clone();
@@ -374,6 +398,7 @@ impl RenderOnce for MoonColorPicker {
                         self.id
                     ))))
                     .size(px(tokens.ui(22.0)))
+                    .max_w_full()
                     .rounded(px(tokens.ui(4.0)))
                     .border(px(1.0))
                     .border_color(if color == value {
@@ -415,7 +440,37 @@ impl RenderOnce for MoonColorPicker {
                 .when(hex_is_invalid, |this| this.tone(MoonTone::Danger)),
         );
 
-        let content = v_flex().gap(px(tokens.ui(6.0))).child(hex_row).child(grid);
+        let mut palette = div().relative().child(grid).on_prepaint({
+            let scroll_handle = scroll_handle.clone();
+            move |_, window, _| {
+                // The overlay reads layout metrics during render. On first opening,
+                // resize, or scrolling, refresh once after the grid has measured them.
+                if scroll_metrics
+                    != (
+                        scroll_handle.bounds(),
+                        scroll_handle.max_offset(),
+                        scroll_handle.offset(),
+                    )
+                {
+                    window.request_animation_frame();
+                }
+            }
+        });
+        if let Some(scrollbar) = moon_scrollbar_overlay_with_palette(
+            SharedString::from(format!("{}:scrollbar", self.id)),
+            &scroll_handle,
+            MoonScrollAxis::Vertical,
+            MoonScrollbarVisibility::Always,
+            p,
+            window,
+            cx,
+        ) {
+            palette = palette.child(scrollbar);
+        }
+        let content = v_flex()
+            .gap(px(tokens.ui(6.0)))
+            .child(hex_row)
+            .child(palette);
 
         MoonPopover::new(self.id)
             .trigger(trigger)
