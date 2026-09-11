@@ -14,6 +14,7 @@ use super::{
     theme::MoonTheme,
     tokens::{MoonPalette, MoonTone, rgba_from},
 };
+use crate::ElementExt;
 
 /// Cap on remembered custom colours (most-recent-first). A larger stored/seeded list is silently
 /// trimmed on the next `custom_colors`/`set_custom_colors` call — callers that persist a longer
@@ -439,29 +440,22 @@ impl RenderOnce for MoonColorPicker {
                 .when(hex_is_invalid, |this| this.tone(MoonTone::Danger)),
         );
 
-        let mut palette = div().relative().child(grid).child(
-            canvas(
+        let mut palette = div().relative().child(grid).on_prepaint({
+            let scroll_handle = scroll_handle.clone();
+            move |_, window, _| {
+                // The overlay reads layout metrics during render. On first opening,
+                // resize, or scrolling, refresh once after the grid has measured them.
+                if scroll_metrics
+                    != (
+                        scroll_handle.bounds(),
+                        scroll_handle.max_offset(),
+                        scroll_handle.offset(),
+                    )
                 {
-                    let scroll_handle = scroll_handle.clone();
-                    move |_, window, _| {
-                        // The overlay reads layout metrics during render. On first opening,
-                        // resize, or scrolling, refresh once after the grid has measured them.
-                        if scroll_metrics
-                            != (
-                                scroll_handle.bounds(),
-                                scroll_handle.max_offset(),
-                                scroll_handle.offset(),
-                            )
-                        {
-                            window.request_animation_frame();
-                        }
-                    }
-                },
-                |_, _, _, _| {},
-            )
-            .absolute()
-            .size_full(),
-        );
+                    window.request_animation_frame();
+                }
+            }
+        });
         if let Some(scrollbar) = moon_scrollbar_overlay_with_palette(
             SharedString::from(format!("{}:scrollbar", self.id)),
             &scroll_handle,
