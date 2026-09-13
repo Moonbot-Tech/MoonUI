@@ -2720,6 +2720,13 @@ pub struct KeystrokeEvent {
 
     /// The context stack at the time
     pub context_stack: Vec<KeyContext>,
+
+    /// Whether this keystroke is an auto-repeat of a key that is still held down, as reported by
+    /// the platform (`KeyDownEvent::is_held`). Interceptors run before actions and element
+    /// listeners and are the only place that can veto a repeat before it reaches them.
+    ///
+    /// Windows, macOS and Wayland report repeats; the X11 backend does not and always sets `false`.
+    pub is_held: bool,
 }
 
 struct NullHttpClient;
