@@ -710,7 +710,7 @@ impl Gallery {
                             .child(
                                 MoonCheckbox::new("check-progress-loading")
                                     .label("animate")
-                                    .size(MoonCheckboxSize::Compact)
+                                    .size(MoonSize::Sm)
                                     .checked(self.progress_loading_demo)
                                     .on_change({
                                         let view = view.clone();
@@ -751,7 +751,7 @@ impl Gallery {
                             .child(
                                 MoonCheckbox::new("check-compact")
                                     .label("compact")
-                                    .size(MoonCheckboxSize::Compact)
+                                    .size(MoonSize::Sm)
                                     .checked(self.compact_checked)
                                     .on_change({
                                         let view = view.clone();
@@ -776,6 +776,23 @@ impl Gallery {
                                 MoonCheckbox::new("check-disabled")
                                     .label("disabled")
                                     .disabled(true),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(14.0))
+                            .items_start()
+                            .child(
+                                MoonCheckbox::new("check-description-sm")
+                                    .label("Remember me")
+                                    .description("Save my login details for next time")
+                                    .size(MoonSize::Sm),
+                            )
+                            .child(
+                                MoonCheckbox::new("check-description-md")
+                                    .label("Remember me")
+                                    .description("Save my login details for next time")
+                                    .default_checked(true),
                             ),
                     )
                     .child(
@@ -2460,7 +2477,7 @@ impl Gallery {
                                             entry.item().id()
                                         )))
                                         .checked(meta.selected)
-                                        .size(MoonCheckboxSize::Compact),
+                                        .size(MoonSize::Sm),
                                     )
                                     .child(
                                         div().flex_1().min_w_0().truncate().child(

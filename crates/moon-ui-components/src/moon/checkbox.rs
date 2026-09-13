@@ -3,14 +3,16 @@ use crate::{Disableable, Sizable};
 use gpui::*;
 
 use super::{
+    foundation::MoonSize,
     theme::MoonTheme,
     tokens::{MoonRect, MoonTone},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonCheckboxSize {
-    Compact,
-    Normal,
+    /// A tier of the shared size scale. Checkboxes come in `Sm` (16px box) and `Md` (20px box);
+    /// `Xs` renders as `Sm`, and `Lg` and above render as `Md`.
+    Tier(MoonSize),
     Custom {
         box_size: f32,
         font_size: f32,
@@ -18,6 +20,20 @@ pub enum MoonCheckboxSize {
         gap: f32,
         radius: f32,
     },
+}
+
+#[allow(non_upper_case_globals)]
+impl MoonCheckboxSize {
+    #[deprecated(note = "use `MoonSize::Sm`")]
+    pub const Compact: Self = Self::Tier(MoonSize::Sm);
+    #[deprecated(note = "use `MoonSize::Md`")]
+    pub const Normal: Self = Self::Tier(MoonSize::Md);
+}
+
+impl From<MoonSize> for MoonCheckboxSize {
+    fn from(size: MoonSize) -> Self {
+        Self::Tier(size)
+    }
 }
 
 #[derive(Default)]
@@ -30,6 +46,7 @@ pub struct MoonCheckbox {
     id: SharedString,
     bounds: Option<MoonRect>,
     label: Option<SharedString>,
+    description: Option<SharedString>,
     checked: Option<bool>,
     default_checked: bool,
     disabled: bool,
@@ -46,11 +63,12 @@ impl MoonCheckbox {
             id: id.into(),
             bounds: None,
             label: None,
+            description: None,
             checked: None,
             default_checked: false,
             disabled: false,
             indeterminate: false,
-            size: MoonCheckboxSize::Normal,
+            size: MoonCheckboxSize::Tier(MoonSize::Md),
             tone: MoonTone::Info,
             mono: false,
             on_change: None,
@@ -64,6 +82,12 @@ impl MoonCheckbox {
 
     pub fn label(mut self, label: impl Into<SharedString>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    /// Sets supporting text shown under the label in the muted text colour.
+    pub fn description(mut self, description: impl Into<SharedString>) -> Self {
+        self.description = Some(description.into());
         self
     }
 
@@ -87,8 +111,9 @@ impl MoonCheckbox {
         self
     }
 
-    pub fn size(mut self, size: MoonCheckboxSize) -> Self {
-        self.size = size;
+    /// Sets the size: a tier such as `MoonSize::Sm`, or a `MoonCheckboxSize::Custom`.
+    pub fn size(mut self, size: impl Into<MoonCheckboxSize>) -> Self {
+        self.size = size.into();
         self
     }
 
@@ -121,6 +146,7 @@ impl RenderOnce for MoonCheckbox {
 
         let mut checkbox = Checkbox::new(state_id)
             .checked(checked)
+            .indeterminate(self.indeterminate)
             .disabled(self.disabled)
             .tone(self.tone)
             .mono(self.mono)
@@ -139,6 +165,9 @@ impl RenderOnce for MoonCheckbox {
 
         if let Some(label) = self.label {
             checkbox = checkbox.label(label);
+        }
+        if let Some(description) = self.description {
+            checkbox = checkbox.description(description);
         }
         if let Some(bounds) = self.bounds {
             checkbox = checkbox
@@ -165,8 +194,13 @@ impl RenderOnce for MoonCheckbox {
 
 fn size_for(size: MoonCheckboxSize) -> crate::Size {
     match size {
-        MoonCheckboxSize::Compact => crate::Size::Small,
-        MoonCheckboxSize::Normal => crate::Size::Medium,
+        MoonCheckboxSize::Tier(MoonSize::Xs | MoonSize::Sm) => crate::Size::Small,
+        MoonCheckboxSize::Tier(MoonSize::Md | MoonSize::Lg | MoonSize::Xl | MoonSize::Xxl) => {
+            crate::Size::Medium
+        }
         MoonCheckboxSize::Custom { box_size, .. } => crate::Size::Size(px(box_size)),
     }
 }
+
+#[cfg(test)]
+mod tests;

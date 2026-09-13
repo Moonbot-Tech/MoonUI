@@ -54,12 +54,15 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             visual_missing.is_empty(),
             "MoonButton::mono must affect rendered text font family",
         ),
-        pass_if(
+        test_contract(
             "checkbox.checked_glyph.asset",
             ContractSeverity::Critical,
-            ContractVerifier::VisualGolden,
-            visual_missing.is_empty(),
-            "checked checkbox must render the Moon check SVG asset, not a text glyph",
+            &[
+                "test_check_icon_stroke_is_rewritten_to_design_width",
+                "test_checked_mark_is_sized_and_centred_in_its_box",
+            ],
+            &tests,
+            "checked checkbox must render its check SVG asset at the reviewed size and stroke, centred in the box, not a text glyph",
         ),
         test_contract(
             "checkbox.click_toggles",

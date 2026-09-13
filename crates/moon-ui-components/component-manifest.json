@@ -119,7 +119,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonCheckbox",
       "upstream_ref": "Longbridge::checkbox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon checked SVG/theme hooks and click regression tests live in base checkbox; Longbridge checkbox behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon theme hooks, a check SVG with its stroke set per size, a pointer cursor with no hover or press fill, a focus ring, click-to-focus, and click and geometry regression tests live in base checkbox; Longbridge checkbox behavior remains source-owned",
       "donor_drift_budget": 1,
       "contracts": ["checkbox.checked_glyph.asset", "checkbox.click_toggles", "gallery.visual_coverage"]
     },

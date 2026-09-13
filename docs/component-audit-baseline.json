@@ -154,7 +154,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonCheckbox",
       "upstream_ref": "Longbridge::checkbox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon checked SVG/theme hooks and click regression tests live in base checkbox; Longbridge checkbox behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon theme hooks, a check SVG with its stroke set per size, a pointer cursor with no hover or press fill, a focus ring, click-to-focus, and click and geometry regression tests live in base checkbox; Longbridge checkbox behavior remains source-owned",
       "donor_drift_budget": 1,
       "contracts": [
         "checkbox.checked_glyph.asset",
@@ -1056,8 +1056,8 @@
       "id": "checkbox.checked_glyph.asset",
       "status": "Pass",
       "severity": "Critical",
-      "verifier": "VisualGolden",
-      "details": "checked checkbox must render the Moon check SVG asset, not a text glyph"
+      "verifier": "BehavioralTest",
+      "details": "checked checkbox must render its check SVG asset at the reviewed size and stroke, centred in the box, not a text glyph; covered by Rust test(s): test_check_icon_stroke_is_rewritten_to_design_width, test_checked_mark_is_sized_and_centred_in_its_box"
     },
     {
       "id": "checkbox.click_toggles",

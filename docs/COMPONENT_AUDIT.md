@@ -49,11 +49,11 @@ The audit currently records:
 Example critical visual contract:
 
 ```text
-checkbox.checked_glyph.asset
+window_frame.visual_types
 ```
 
-This is backed by committed gallery golden PNGs. If checked checkbox rendering
-is replaced by a text glyph such as `x`, the snapshot diff must fail.
+This is backed by committed gallery golden PNGs. If the window frame's visual
+chrome changes, the snapshot diff must fail.
 
 Example behavioral contract:
 

@@ -135,6 +135,16 @@
       "file": "crates/moon-ui-components/src/moon/tab.rs",
       "signature": "pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement",
       "reason": "Same as render_with_palette: the themed path is the one that lays out overflow, so it takes Window and App to persist the keyed ScrollHandle instead of building a new one each frame."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn size(mut self, size: MoonCheckboxSize) -> Self",
+      "reason": "Checkboxes moved onto the shared MoonSize scale, so size now takes impl Into<MoonCheckboxSize> and accepts a MoonSize tier directly. Existing MoonCheckboxSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use foundation::{StyledExt, ThemeMode, h_flex, init, v_flex};",
+      "reason": "The re-export gained MoonSize so the shared size scale is reachable as moon_ui::MoonSize; nothing was removed from it."
     }
   ]
 }

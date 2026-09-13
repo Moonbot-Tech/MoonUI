@@ -507,6 +507,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
       "signature": "pub enum MoonCheckboxSize"
     },
     {
@@ -520,6 +528,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/checkbox.rs",
       "signature": "pub fn default_checked(mut self, checked: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub fn description(mut self, description: impl Into<SharedString>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/checkbox.rs",
@@ -547,7 +559,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/checkbox.rs",
-      "signature": "pub fn size(mut self, size: MoonCheckboxSize) -> Self"
+      "signature": "pub fn size(mut self, size: impl Into<MoonCheckboxSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/checkbox.rs",
@@ -1819,6 +1831,22 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub const Large: Self = Self::Lg;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub const Medium: Self = Self::Md;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub const Small: Self = Self::Sm;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub const XSmall: Self = Self::Xs;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
       "signature": "pub enum MoonSize"
     },
     {
@@ -2483,7 +2511,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use foundation::{StyledExt, ThemeMode, h_flex, init, v_flex};"
+      "signature": "pub use foundation::{MoonSize, StyledExt, ThemeMode, h_flex, init, v_flex};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
