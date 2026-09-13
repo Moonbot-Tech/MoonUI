@@ -117,7 +117,7 @@ pub use dock::{DockNamedLayout, DockTopologyByName, DockTopologyNode, DockTopolo
 pub(crate) use dropdown::{MENU_CHECK_WIDTH, menu_row_metrics};
 pub use dropdown::{MoonDropdown, MoonMenuItem, MoonMenuSize, MoonPopupMenu};
 pub use form::MoonFormRow;
-pub use foundation::{StyledExt, ThemeMode, h_flex, init, v_flex};
+pub use foundation::{MoonSize, StyledExt, ThemeMode, h_flex, init, v_flex};
 pub use group_box::MoonGroupBox;
 pub use hotkey_input::{
     MoonHotkeyCapture, MoonHotkeyChangeHandler, MoonHotkeyInput, MoonHotkeyInputSize,

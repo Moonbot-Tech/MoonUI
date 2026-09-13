@@ -22,7 +22,9 @@ use wasm_bindgen::prelude::*;
 
 static BUNDLED_FONTS: &[&[u8]] = &[
     include_bytes!("../../../assets/fonts/inter/Inter-Regular.ttf"),
+    include_bytes!("../../../assets/fonts/inter/Inter-Medium.ttf"),
     include_bytes!("../../../assets/fonts/inter/Inter-SemiBold.ttf"),
+    include_bytes!("../../../assets/fonts/inter/Inter-Bold.ttf"),
     include_bytes!("../../../assets/fonts/geist-mono/GeistMono-Regular.ttf"),
     include_bytes!("../../../assets/fonts/geist-mono/GeistMono-Bold.ttf"),
 ];

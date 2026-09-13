@@ -5,6 +5,7 @@ mod async_util;
 mod element_ext;
 mod event;
 mod focus_trap;
+mod fonts;
 mod geometry;
 pub mod global_state;
 mod icon;
@@ -106,6 +107,7 @@ rust_i18n::i18n!("locales", fallback = "en");
 ///
 /// You must initialize the components at your application's entry point.
 pub fn init(cx: &mut App) {
+    fonts::init(cx);
     theme::init(cx);
     global_state::init(cx);
     #[cfg(any(feature = "inspector", debug_assertions))]

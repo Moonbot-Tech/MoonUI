@@ -73,6 +73,10 @@ impl BackgroundPolicy {
 pub struct MoonRoot {
     style: StyleRefinement,
     view: AnyView,
+    /// Focused by a press that no focusable element under the pointer claimed, so clicking empty
+    /// space moves focus off the last control while keys still reach Root's Tab handling. It is
+    /// not a tab stop.
+    focus_handle: FocusHandle,
     pub(crate) active_sheet: Option<ActiveSheet>,
     pub(crate) active_dialogs: Vec<ActiveDialog>,
     pub(crate) active_context_menu: Option<ActiveContextMenu>,
@@ -153,6 +157,7 @@ impl MoonRoot {
         Self {
             style: StyleRefinement::default(),
             view: view.into(),
+            focus_handle: cx.focus_handle(),
             active_sheet: None,
             active_dialogs: Vec::new(),
             active_context_menu: None,
@@ -737,6 +742,7 @@ impl Render for MoonRoot {
 
         let inner = div()
             .id("root")
+            .track_focus(&self.focus_handle)
             .key_context(CONTEXT)
             .on_action(cx.listener(Self::on_action_tab))
             .on_action(cx.listener(Self::on_action_tab_prev))
@@ -810,6 +816,59 @@ mod tests {
             Root::new(view, window, cx).bordered(false).bordered(true)
         });
         assert!(root.read_with(cx, |root, _| root.bordered));
+    }
+
+    struct FocusProbeView {
+        control: FocusHandle,
+    }
+
+    impl Render for FocusProbeView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .child(
+                    div()
+                        .id("control")
+                        .debug_selector(|| "focus-probe:control".into())
+                        .track_focus(&self.control.clone().tab_stop(true))
+                        .size(gpui::px(40.)),
+                )
+                .child(
+                    div()
+                        .debug_selector(|| "focus-probe:empty".into())
+                        .size(gpui::px(40.)),
+                )
+        }
+    }
+
+    /// Catches focus sticking to a control forever: a press on empty space inside Root must take
+    /// focus off the last focused control, and Tab must still work afterwards because the focus
+    /// lands on Root (whose key context carries Tab) rather than on nothing.
+    #[gpui::test]
+    fn clicking_empty_space_moves_focus_off_control(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let control = cx.update(|cx| cx.focus_handle());
+        let window = cx.add_window({
+            let control = control.clone();
+            move |window, cx| {
+                let view = cx.new(|_| FocusProbeView { control });
+                Root::new(view, window, cx).bordered(false)
+            }
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+
+        let control_bounds = cx.debug_bounds("focus-probe:control").unwrap();
+        let empty_bounds = cx.debug_bounds("focus-probe:empty").unwrap();
+
+        cx.simulate_click(control_bounds.center(), gpui::Modifiers::none());
+        assert!(cx.update(|window, _| control.is_focused(window)));
+
+        cx.simulate_click(empty_bounds.center(), gpui::Modifiers::none());
+        assert!(!cx.update(|window, _| control.is_focused(window)));
+
+        cx.simulate_keystrokes("tab");
+        assert!(cx.update(|window, _| control.is_focused(window)));
     }
 
     #[test]

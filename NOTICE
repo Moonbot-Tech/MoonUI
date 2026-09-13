@@ -14,6 +14,12 @@ Longbridge-derived component portions:
 Copyright 2024 - 2025 Longbridge <https://longbridge.com>
 Licensed under Apache-2.0. See `crates/moon-ui-components/LICENSE-APACHE`.
 
+Bundled fonts:
+Inter, Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter).
+Licensed under the SIL Open Font License 1.1. See `assets/fonts/inter/OFL.txt`.
+The bundled files are the 18pt optical-size static instances with their family
+name changed from "Inter 18pt" to "Inter" and the STAT table removed.
+
 Moonbot-specific additions:
 Copyright Moonbot-Tech.
 Licensed under Apache-2.0 unless a file or crate manifest says otherwise.

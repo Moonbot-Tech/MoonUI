@@ -878,7 +878,7 @@ impl CaseGallery {
             "checkbox.compact" => MoonCheckbox::new("handoff-checkbox-compact")
                 .label("compact")
                 .checked(true)
-                .size(MoonCheckboxSize::Compact)
+                .size(MoonSize::Sm)
                 .mono(true)
                 .into_any_element(),
             "checkbox.indeterminate" => MoonCheckbox::new("handoff-checkbox-indeterminate")
@@ -2328,7 +2328,7 @@ fn handoff_strategy_editor(cx: &App) -> impl IntoElement {
                             MoonCheckbox::new("handoff-strategy-active")
                                 .label("active only")
                                 .checked(true)
-                                .size(MoonCheckboxSize::Compact),
+                                .size(MoonSize::Sm),
                         )
                         .child(strategy_tree_row("v server 1", "8/172", p.blue, false, p))
                         .child(strategy_tree_row("> TestF", "7/21", p.text_soft, false, p))
@@ -2408,7 +2408,7 @@ fn handoff_strategy_editor(cx: &App) -> impl IntoElement {
                             MoonCheckbox::new("handoff-strategy-form-active")
                                 .label("active only")
                                 .checked(true)
-                                .size(MoonCheckboxSize::Compact),
+                                .size(MoonSize::Sm),
                         )
                         .child(div().h(px(1.0)).bg(rgba_from(p.border, 1.0)))
                         .child(strategy_field_input(
@@ -2435,18 +2435,18 @@ fn handoff_strategy_editor(cx: &App) -> impl IntoElement {
                                     MoonCheckbox::new("handoff-silent")
                                         .label("SilentNoCharts")
                                         .checked(true)
-                                        .size(MoonCheckboxSize::Compact),
+                                        .size(MoonSize::Sm),
                                 )
                                 .child(
                                     MoonCheckbox::new("handoff-debug")
                                         .label("DebugLog")
-                                        .size(MoonCheckboxSize::Compact),
+                                        .size(MoonSize::Sm),
                                 )
                                 .child(
                                     MoonCheckbox::new("handoff-independent")
                                         .label("IndependentSignals")
                                         .checked(true)
-                                        .size(MoonCheckboxSize::Compact),
+                                        .size(MoonSize::Sm),
                                 ),
                         ),
                 ),

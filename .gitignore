@@ -2,6 +2,7 @@
 /crates/*/target
 .DS_Store
 .idea
+.vscode
 docs/plans
 docs/TODO-palette.md
 /AGENTS.md

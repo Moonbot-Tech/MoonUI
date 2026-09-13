@@ -186,13 +186,37 @@ pub trait StyledExt: Styled + Sized {
 
 impl<E: Styled> StyledExt for E {}
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// The shared size scale for Moon components, from smallest to largest.
+///
+/// A component renders only the tiers it supports (a checkbox has `Sm` and `Md`); any other
+/// tier resolves to the nearest supported one instead of failing.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub enum MoonSize {
-    XSmall,
-    Small,
+    #[serde(alias = "XSmall")]
+    Xs,
+    #[serde(alias = "Small")]
+    Sm,
     #[default]
-    Medium,
-    Large,
+    #[serde(alias = "Medium")]
+    Md,
+    #[serde(alias = "Large")]
+    Lg,
+    Xl,
+    Xxl,
+}
+
+#[allow(non_upper_case_globals)]
+impl MoonSize {
+    #[deprecated(note = "use `MoonSize::Xs`")]
+    pub const XSmall: Self = Self::Xs;
+    #[deprecated(note = "use `MoonSize::Sm`")]
+    pub const Small: Self = Self::Sm;
+    #[deprecated(note = "use `MoonSize::Md`")]
+    pub const Medium: Self = Self::Md;
+    #[deprecated(note = "use `MoonSize::Lg`")]
+    pub const Large: Self = Self::Lg;
 }
 
 pub type Size = MoonSize;
