@@ -1058,6 +1058,161 @@ enum InputModality {
     Keyboard,
 }
 
+/// Which kind of input the user touched last, for focus-visible styling and hover suppression.
+///
+/// A key PRESS and a mouse move or press switch the modality. A key auto-repeat switches it to
+/// `Keyboard` only while the pointer has not moved since the press that started the repeat: once
+/// it has, the repeats are the tail of a press the user has already moved on from, not new
+/// keyboard input. Counting every repeat as fresh keyboard input made a held key fight the mouse
+/// — with the pointer moving under a held key, every repeat flipped to `Keyboard` and every mouse
+/// move flipped back, and each flip is a whole-window `refresh` (measured downstream at 70–80
+/// full draws a second, with hover styles blinking out on every keyboard frame). The pointer
+/// gate rather than a blanket "repeats never count" keeps one case honest: a window that gains
+/// focus under an already-held key sees only repeats, and it still switches to `Keyboard` once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct InputModalityState {
+    modality: InputModality,
+    /// Whether a mouse move or press arrived after the last key press this window saw. A fresh
+    /// window has seen no press, so its first repeat counts as one.
+    pointer_moved_since_press: bool,
+}
+
+impl InputModalityState {
+    const INITIAL: Self = Self {
+        modality: InputModality::Mouse,
+        pointer_moved_since_press: false,
+    };
+
+    fn next(self, event: &PlatformInput) -> Self {
+        match event {
+            PlatformInput::KeyDown(key_down) if !key_down.is_held => Self {
+                modality: InputModality::Keyboard,
+                pointer_moved_since_press: false,
+            },
+            PlatformInput::KeyDown(_) if !self.pointer_moved_since_press => Self {
+                modality: InputModality::Keyboard,
+                ..self
+            },
+            PlatformInput::MouseMove(_) | PlatformInput::MouseDown(_) => Self {
+                modality: InputModality::Mouse,
+                pointer_moved_since_press: true,
+            },
+            _ => self,
+        }
+    }
+}
+
+#[cfg(test)]
+mod input_modality_tests {
+    use super::*;
+
+    fn key_down(is_held: bool) -> PlatformInput {
+        PlatformInput::KeyDown(KeyDownEvent {
+            keystroke: Keystroke::parse("tab").unwrap(),
+            is_held,
+            prefer_character_input: false,
+        })
+    }
+
+    fn mouse_move() -> PlatformInput {
+        PlatformInput::MouseMove(MouseMoveEvent {
+            position: Point::default(),
+            pressed_button: None,
+            modifiers: Modifiers::default(),
+        })
+    }
+
+    fn modalities(events: &[PlatformInput]) -> Vec<InputModality> {
+        let mut state = InputModalityState::INITIAL;
+        events
+            .iter()
+            .map(|event| {
+                state = state.next(event);
+                state.modality
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_press_switches_to_keyboard_and_a_mouse_move_back() {
+        assert_eq!(
+            modalities(&[key_down(false), mouse_move()]),
+            [InputModality::Keyboard, InputModality::Mouse]
+        );
+    }
+
+    #[test]
+    fn repeats_after_a_mouse_move_never_flip_back() {
+        // The desk holds a key and moves the pointer: after the first mouse move every repeat
+        // must leave the modality alone, or the two inputs alternate a whole-window refresh at
+        // the repeat rate.
+        assert_eq!(
+            modalities(&[
+                key_down(false),
+                mouse_move(),
+                key_down(true),
+                mouse_move(),
+                key_down(true),
+            ]),
+            [
+                InputModality::Keyboard,
+                InputModality::Mouse,
+                InputModality::Mouse,
+                InputModality::Mouse,
+                InputModality::Mouse
+            ]
+        );
+    }
+
+    #[test]
+    fn a_repeat_with_the_pointer_still_keeps_keyboard() {
+        assert_eq!(
+            modalities(&[key_down(false), key_down(true)]),
+            [InputModality::Keyboard, InputModality::Keyboard]
+        );
+    }
+
+    #[test]
+    fn a_window_focused_under_a_held_key_still_switches_once() {
+        // Only repeats reach a window that gained focus with the key already down; the first one
+        // counts as the press this window never saw, the mouse then takes over as usual.
+        assert_eq!(
+            modalities(&[key_down(true), key_down(true), mouse_move(), key_down(true)]),
+            [
+                InputModality::Keyboard,
+                InputModality::Keyboard,
+                InputModality::Mouse,
+                InputModality::Mouse
+            ]
+        );
+    }
+
+    #[test]
+    fn a_fresh_press_re_arms_the_repeat_rule() {
+        assert_eq!(
+            modalities(&[
+                key_down(false),
+                mouse_move(),
+                key_down(false),
+                key_down(true)
+            ]),
+            [
+                InputModality::Keyboard,
+                InputModality::Mouse,
+                InputModality::Keyboard,
+                InputModality::Keyboard
+            ]
+        );
+    }
+
+    #[test]
+    fn other_input_leaves_the_state_alone() {
+        let state = InputModalityState::INITIAL.next(&key_down(false));
+        let scroll = PlatformInput::ScrollWheel(crate::ScrollWheelEvent::default());
+        assert_eq!(state.next(&scroll), state);
+    }
+}
+
 /// Holds the state for a specific window.
 pub struct Window {
     pub(crate) handle: AnyWindowHandle,
@@ -1112,7 +1267,7 @@ pub struct Window {
     pub(crate) needs_present: Rc<Cell<bool>>,
     #[cfg(feature = "input-latency-histogram")]
     input_latency_tracker: InputLatencyTracker,
-    last_input_modality: InputModality,
+    input_modality: InputModalityState,
     pub(crate) refreshing: bool,
     pub(crate) activation_observers: SubscriberSet<(), AnyObserver>,
     pub(crate) focus: Option<FocusId>,
@@ -1735,7 +1890,7 @@ impl Window {
             needs_present,
             #[cfg(feature = "input-latency-histogram")]
             input_latency_tracker: InputLatencyTracker::new()?,
-            last_input_modality: InputModality::Mouse,
+            input_modality: InputModalityState::INITIAL,
             refreshing: false,
             activation_observers: SubscriberSet::new(),
             focus: None,
@@ -2606,7 +2761,7 @@ impl Window {
     /// Returns true if the last input event was keyboard-based (key press, tab navigation, etc.)
     /// This is used for focus-visible styling to show focus indicators only for keyboard navigation.
     pub fn last_input_was_keyboard(&self) -> bool {
-        self.last_input_modality == InputModality::Keyboard
+        self.input_modality.modality == InputModality::Keyboard
     }
 
     /// The current state of the keyboard's capslock
@@ -4688,13 +4843,11 @@ impl Window {
         // Track input modality for focus-visible styling and hover suppression.
         // Hover is suppressed during keyboard modality so that keyboard navigation
         // doesn't show hover highlights on the item under the mouse cursor.
-        let old_modality = self.last_input_modality;
-        self.last_input_modality = match &event {
-            PlatformInput::KeyDown(_) => InputModality::Keyboard,
-            PlatformInput::MouseMove(_) | PlatformInput::MouseDown(_) => InputModality::Mouse,
-            _ => self.last_input_modality,
-        };
-        if self.last_input_modality != old_modality {
+        // A key auto-repeat counts as keyboard input only until the pointer moves
+        // (`InputModalityState`).
+        let old_modality = self.input_modality.modality;
+        self.input_modality = self.input_modality.next(&event);
+        if self.input_modality.modality != old_modality {
             self.refresh();
         }
 

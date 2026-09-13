@@ -55,6 +55,18 @@ cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 
      all three, and with them both halves of the reporting rule: an empty list
      reports `0..0`, while a list that holds rows but renders none of them
      stays silent.
+   - `KeystrokeEvent::is_held`: keystroke observers and interceptors receive the
+     platform's auto-repeat flag, so an app-level interceptor can spend a repeat
+     before actions and element listeners see it.
+   - Input modality gates auto-repeat on the pointer (`InputModalityState` in
+     `window.rs`): once the mouse has moved after a key press, that key's
+     repeats no longer flip the modality back to `Keyboard`. Upstream counts
+     every `KeyDown`, and with the pointer moving under a held key that
+     alternated a whole-window `refresh` at the repeat rate. Only where the
+     backend reports `is_held` (Windows, macOS, Wayland, web) — X11 always sends
+     `false`, so there every repeat still counts as a press. A re-sync restores
+     the bare `last_input_modality` field and its `KeyDown(_)` arm; keep the
+     state struct and its unit tests.
 
 2. Zed bugfix candidates kept separate from `gpu_canvas` when possible:
    - Windows DPI/restore-bounds behavior
