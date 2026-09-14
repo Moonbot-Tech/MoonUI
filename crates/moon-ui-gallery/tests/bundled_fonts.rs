@@ -19,7 +19,7 @@ const WEIGHTS: [FontWeight; 4] = [
     FontWeight::BOLD,
 ];
 
-/// Resolves every bundled weight of `family` and checks each one draws with its own outlines.
+/// Resolves every bundled weight of `family` and checks each one resolves to its own registered face.
 ///
 /// DirectWrite hands out a new `FontId` for every requested weight, even one it serves with the
 /// nearest face, so distinct ids prove nothing. The stem of `|` does: it widens with every weight

@@ -46,30 +46,4 @@ pub(crate) fn init(cx: &mut App) {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::HashSet;
-
-    use ttf_parser::{Face, name_id};
-
-    use super::BUNDLED_FONTS;
-
-    /// macOS keeps one font per PostScript name, so a duplicate shapes with one file and draws with
-    /// the other (MoonTerminal#558).
-    #[test]
-    fn bundled_fonts_have_unique_postscript_names() {
-        let mut seen = HashSet::new();
-        for bytes in BUNDLED_FONTS {
-            let face = Face::parse(bytes, 0).expect("bundled font must parse");
-            let name = face
-                .names()
-                .into_iter()
-                .filter(|name| name.name_id == name_id::POST_SCRIPT_NAME)
-                .find_map(|name| name.to_string())
-                .expect("bundled font must carry a PostScript name");
-            assert!(
-                seen.insert(name.clone()),
-                "two bundled fonts share the PostScript name {name}"
-            );
-        }
-    }
-}
+mod tests;
