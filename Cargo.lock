@@ -4314,6 +4314,7 @@ dependencies = [
  "tree-sitter-typescript",
  "tree-sitter-yaml",
  "tree-sitter-zig",
+ "ttf-parser",
  "unicode-segmentation",
  "uuid",
  "windows 0.58.0",

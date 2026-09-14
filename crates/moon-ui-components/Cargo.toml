@@ -213,6 +213,7 @@ windows = { workspace = true, features = [
 image = { version = "0.25.1", default-features = false }
 gpui = { workspace = true, features = ["test-support"] }
 indoc = "2"
+ttf-parser = "0.25"
 
 [lints]
 workspace = true
