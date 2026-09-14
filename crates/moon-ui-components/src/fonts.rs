@@ -5,17 +5,25 @@ use std::borrow::Cow;
 
 use gpui::App;
 
-/// Inter (SIL Open Font License, see `assets/fonts/inter/OFL.txt`) at the weights MoonUI uses,
-/// and Geist Mono for mono text.
+/// Inter and Geist Mono (both SIL Open Font License, see each family's `OFL.txt` under
+/// `assets/fonts/`) at the weights MoonUI uses: Regular, Medium, SemiBold and Bold.
 ///
 /// The Inter files are the 18pt optical-size cut with their family renamed from "Inter 18pt" to
-/// "Inter", so the theme's `"Inter"` family resolves to them on every platform.
+/// "Inter", so the theme's `"Inter"` family resolves to them on every platform. The Geist Mono
+/// files are the unmodified static cuts from one Geist release, whose typographic family is
+/// already "Geist Mono".
+///
+/// Every file has its own PostScript name, and an app should not register its own copy of either
+/// family: the macOS text system maps a shaped run back to its font by PostScript name, so a
+/// second file under an existing name draws one cut's glyph ids from the other cut's outlines.
 pub(crate) const BUNDLED_FONTS: &[&[u8]] = &[
     include_bytes!("../../../assets/fonts/inter/Inter-Regular.ttf"),
     include_bytes!("../../../assets/fonts/inter/Inter-Medium.ttf"),
     include_bytes!("../../../assets/fonts/inter/Inter-SemiBold.ttf"),
     include_bytes!("../../../assets/fonts/inter/Inter-Bold.ttf"),
     include_bytes!("../../../assets/fonts/geist-mono/GeistMono-Regular.ttf"),
+    include_bytes!("../../../assets/fonts/geist-mono/GeistMono-Medium.ttf"),
+    include_bytes!("../../../assets/fonts/geist-mono/GeistMono-SemiBold.ttf"),
     include_bytes!("../../../assets/fonts/geist-mono/GeistMono-Bold.ttf"),
 ];
 
@@ -34,5 +42,34 @@ pub(crate) fn init(cx: &mut App) {
         .collect();
     if let Err(error) = cx.text_system().add_fonts(fonts) {
         log::error!("failed to register bundled MoonUI fonts: {error:#}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use ttf_parser::{Face, name_id};
+
+    use super::BUNDLED_FONTS;
+
+    /// macOS keeps one font per PostScript name, so a duplicate shapes with one file and draws with
+    /// the other (MoonTerminal#558).
+    #[test]
+    fn bundled_fonts_have_unique_postscript_names() {
+        let mut seen = HashSet::new();
+        for bytes in BUNDLED_FONTS {
+            let face = Face::parse(bytes, 0).expect("bundled font must parse");
+            let name = face
+                .names()
+                .into_iter()
+                .filter(|name| name.name_id == name_id::POST_SCRIPT_NAME)
+                .find_map(|name| name.to_string())
+                .expect("bundled font must carry a PostScript name");
+            assert!(
+                seen.insert(name.clone()),
+                "two bundled fonts share the PostScript name {name}"
+            );
+        }
     }
 }

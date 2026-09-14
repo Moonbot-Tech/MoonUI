@@ -20,6 +20,12 @@ Licensed under the SIL Open Font License 1.1. See `assets/fonts/inter/OFL.txt`.
 The bundled files are the 18pt optical-size static instances with their family
 name changed from "Inter 18pt" to "Inter" and the STAT table removed.
 
+Geist Mono, Copyright 2024 The Geist Project Authors
+(https://github.com/vercel/geist-font). Licensed under the SIL Open Font
+License 1.1. See `assets/fonts/geist-mono/OFL.txt`. The bundled files are the
+unmodified static TTF instances (Regular, Medium, SemiBold, Bold) from the
+Geist 1.8.0 release.
+
 Moonbot-specific additions:
 Copyright Moonbot-Tech.
 Licensed under Apache-2.0 unless a file or crate manifest says otherwise.
