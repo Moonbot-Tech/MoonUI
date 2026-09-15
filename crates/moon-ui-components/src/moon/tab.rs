@@ -468,10 +468,11 @@ fn scroll_selected_tab_into_view(handle: &ScrollHandle, tab: Bounds<Pixels>) {
     }
 }
 
-/// Акцентный underline активной вкладки (точный вид MoonTabStrip), адаптивный по ширине:
-/// fade-in слева, сплошной центр (растягивается), fade-out справа, с мягкой тенью.
-/// Абсолютно позиционируется по низу родителя (родитель должен быть `relative`).
-/// Единый источник вида для верхних (MoonTabStrip) и нижних (dock TabPanel) вкладок.
+/// Accent underline of the active tab (the exact look used by `MoonTabStrip`), adaptive to
+/// width: fade-in on the left, a solid stretching centre, fade-out on the right, with a soft
+/// shadow. Positioned absolutely against the parent's bottom edge (the parent must be
+/// `relative`). The single shared look for both top (`MoonTabStrip`) and bottom (dock
+/// `TabPanel`) tabs.
 pub fn moon_active_tab_underline(p: MoonPalette) -> Div {
     moon_active_tab_underline_scaled(p, MoonThemeTokens::default())
 }
