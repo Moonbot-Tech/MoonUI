@@ -362,7 +362,8 @@ impl MoonCheckboxMetrics {
 }
 
 /// Returns the text column beside a checkbox or radio box: the label, its description under it in
-/// `description_color`, then `children`, on the size's line height. Pair it with a box pushed down
+/// `description_color`, on the size's line height, then optional children separated by 4px.
+/// Children keep their inherited line height. Pair it with a box pushed down
 /// by [`MoonCheckboxMetrics::box_offset`] so the first line and the box stay centred on each other.
 /// `id` prefixes the parts' debug selectors.
 pub(crate) fn choice_text_column(
@@ -373,12 +374,10 @@ pub(crate) fn choice_text_column(
     description_color: Hsla,
     children: Vec<AnyElement>,
 ) -> Div {
-    v_flex()
-        .flex_1()
-        .overflow_hidden()
+    let has_label_or_description = label.is_some() || description.is_some();
+    let text = v_flex()
         .gap(metrics.description_gap)
         .line_height(metrics.line_height)
-        .mt(metrics.text_offset())
         .when_some(label, |this, label| {
             this.child(
                 div()
@@ -395,8 +394,19 @@ pub(crate) fn choice_text_column(
                     .font_weight(metrics.description_weight)
                     .child(description),
             )
-        })
-        .children(children)
+        });
+    let column = v_flex()
+        .flex_1()
+        .overflow_hidden()
+        .mt(metrics.text_offset());
+    if children.is_empty() {
+        column.child(text)
+    } else {
+        column
+            .gap_1()
+            .when(has_label_or_description, |this| this.child(text))
+            .children(children)
+    }
 }
 
 /// The colours of a checkbox or radio.
@@ -922,6 +932,69 @@ mod tests {
             assert_eq!(cx.debug_bounds("described:label"), Some(label_before));
             assert_eq!(ring.origin, box_before.origin - gpui::point(px(4.), px(4.)));
             assert_eq!(ring.size, box_before.size + gpui::size(px(8.), px(8.)));
+        }
+    }
+
+    /// A labelled or description-only checkbox with two ordinary child blocks.
+    struct CheckboxChildrenHarness {
+        size: Size,
+        label: bool,
+        description: bool,
+    }
+
+    impl gpui::Render for CheckboxChildrenHarness {
+        /// Returns a checkbox with fixed child heights to expose each vertical gap.
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            Checkbox::new("children")
+                .with_size(self.size)
+                .when(self.label, |checkbox| checkbox.label("Label"))
+                .when(self.description, |checkbox| checkbox.description("Support"))
+                .child(div().debug_selector(|| "child-one".into()).h(px(10.)))
+                .child(div().debug_selector(|| "child-two".into()).h(px(12.)))
+        }
+    }
+
+    /// Catches restoring the flat description-gap column: extra content must stay 4px below
+    /// the last text line and other children, while label/support keep their Sm/Md spacing.
+    #[gpui::test]
+    fn checkbox_children_keep_four_pixel_separation(cx: &mut gpui::TestAppContext) {
+        use crate::moon::{MoonTheme, ThemeMode};
+        cx.update(crate::init);
+        for mode in [ThemeMode::Dark, ThemeMode::Light] {
+            cx.update(|cx| MoonTheme::set_mode(mode, cx));
+            for (size, gap) in [(Size::Small, 0.), (Size::Medium, 2.)] {
+                for (label, description) in
+                    [(true, true), (true, false), (false, true), (false, false)]
+                {
+                    let window = cx.add_window(move |_, _| CheckboxChildrenHarness {
+                        size,
+                        label,
+                        description,
+                    });
+                    let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+                    visual.run_until_parked();
+                    let first = visual.debug_bounds("child-one").expect("first child");
+                    let second = visual.debug_bounds("child-two").expect("second child");
+                    assert_eq!(second.top() - first.bottom(), px(4.));
+                    if label || description {
+                        let last = visual
+                            .debug_bounds(if description {
+                                "children:description"
+                            } else {
+                                "children:label"
+                            })
+                            .expect("last text");
+                        assert_eq!(first.top() - last.bottom(), px(4.));
+                    }
+                    if label && description {
+                        let label = visual.debug_bounds("children:label").expect("label");
+                        let description = visual
+                            .debug_bounds("children:description")
+                            .expect("description");
+                        assert_eq!(description.top() - label.bottom(), px(gap));
+                    }
+                }
+            }
         }
     }
 
