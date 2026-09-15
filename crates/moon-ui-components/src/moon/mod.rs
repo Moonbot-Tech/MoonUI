@@ -39,6 +39,7 @@ mod picker_field;
 mod placement;
 mod popover;
 mod preset;
+mod primitives;
 mod progress;
 mod progress_circle;
 mod radio;
@@ -147,6 +148,7 @@ pub use popover::{MoonPopover, MoonPopoverPlacement};
 // compares whole re-export statements, and widening one reads as changing it.
 pub use popover::MoonPopoverChrome;
 pub use preset::{MoonPresetItem, MoonPresetStrip};
+pub use primitives::{MoonColor, MoonColorScale};
 pub use progress::MoonProgress;
 pub use progress_circle::{MoonProgressCircle, MoonProgressCircleSize};
 pub use radio::{MoonRadio, MoonRadioSize};
