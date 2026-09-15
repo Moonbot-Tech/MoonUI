@@ -198,11 +198,17 @@ impl RenderOnce for MoonCheckbox {
 
 fn size_for(size: MoonCheckboxSize) -> crate::Size {
     match size {
-        MoonCheckboxSize::Tier(MoonSize::Xs | MoonSize::Sm) => crate::Size::Small,
-        MoonCheckboxSize::Tier(MoonSize::Md | MoonSize::Lg | MoonSize::Xl | MoonSize::Xxl) => {
-            crate::Size::Medium
-        }
+        MoonCheckboxSize::Tier(tier) => tier_size(tier),
         MoonCheckboxSize::Custom { box_size, .. } => crate::Size::Size(px(box_size)),
+    }
+}
+
+/// Returns the checkbox size a tier renders at. Checkboxes, and radios with them, come in `Sm` and
+/// `Md`; every other tier renders as the nearest of the two.
+pub(crate) fn tier_size(tier: MoonSize) -> crate::Size {
+    match tier {
+        MoonSize::Xs | MoonSize::Sm => crate::Size::Small,
+        MoonSize::Md | MoonSize::Lg | MoonSize::Xl | MoonSize::Xxl => crate::Size::Medium,
     }
 }
 

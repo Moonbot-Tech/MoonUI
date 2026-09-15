@@ -3079,7 +3079,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/radio.rs",
-      "signature": "pub fn size(mut self, size: MoonRadioSize) -> Self"
+      "signature": "pub fn size(mut self, size: impl Into<MoonRadioSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/radio.rs",
