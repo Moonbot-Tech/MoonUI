@@ -707,37 +707,49 @@ impl Style {
         window.paint_drop_shadows(bounds, corner_radii, &self.box_shadow);
 
         let background_color = self.background.as_ref().and_then(Fill::color);
+        let border_joins_fill = self.border_joins_fill(background_color);
         if background_color.is_some_and(|color| !color.is_transparent()) {
-            let mut border_color = match background_color {
-                Some(color) => match color.tag {
-                    BackgroundTag::Solid
-                    | BackgroundTag::PatternSlash
-                    | BackgroundTag::Checkerboard => color.solid,
+            if border_joins_fill {
+                window.paint_quad(quad(
+                    bounds,
+                    corner_radii,
+                    background_color.unwrap_or_default(),
+                    self.border_widths.to_pixels(rem_size),
+                    self.border_color.unwrap_or_default(),
+                    self.border_style,
+                ));
+            } else {
+                let mut border_color = match background_color {
+                    Some(color) => match color.tag {
+                        BackgroundTag::Solid
+                        | BackgroundTag::PatternSlash
+                        | BackgroundTag::Checkerboard => color.solid,
 
-                    BackgroundTag::LinearGradient => color
-                        .colors
-                        .first()
-                        .map(|stop| stop.color)
-                        .unwrap_or_default(),
-                },
-                None => Hsla::default(),
-            };
-            border_color.a = 0.;
-            window.paint_quad(quad(
-                bounds,
-                corner_radii,
-                background_color.unwrap_or_default(),
-                Edges::default(),
-                border_color,
-                self.border_style,
-            ));
+                        BackgroundTag::LinearGradient => color
+                            .colors
+                            .first()
+                            .map(|stop| stop.color)
+                            .unwrap_or_default(),
+                    },
+                    None => Hsla::default(),
+                };
+                border_color.a = 0.;
+                window.paint_quad(quad(
+                    bounds,
+                    corner_radii,
+                    background_color.unwrap_or_default(),
+                    Edges::default(),
+                    border_color,
+                    self.border_style,
+                ));
+            }
         }
 
         window.paint_inset_shadows(bounds, corner_radii, &self.box_shadow);
 
         continuation(window, cx);
 
-        if self.is_border_visible() {
+        if self.is_border_visible() && !border_joins_fill {
             let border_widths = self.border_widths.to_pixels(rem_size);
             let mut background = self.border_color.unwrap_or_default();
             background.a = 0.;
@@ -761,6 +773,21 @@ impl Style {
         self.border_color
             .is_some_and(|color| !color.is_transparent())
             && self.border_widths.any(|length| !length.is_zero())
+    }
+
+    /// Whether the visible border is painted in one quad with the fill `background`.
+    ///
+    /// A border in the fill's own solid colour is part of the filled shape. Painted as a second
+    /// anti-aliased quad over the fill, every partially covered edge pixel is covered twice, so a
+    /// pixel half inside a rounded corner shows three-quarters covered and the corner turns heavy
+    /// and stepped. One quad carrying both keeps a single anti-aliased edge and still composites a
+    /// translucent border over its fill. The border then no longer paints over children that
+    /// overflow into it, which in its fill's colour hides nothing, and it is not merged under an
+    /// inset shadow, which must stay beneath the border.
+    fn border_joins_fill(&self, background: Option<Background>) -> bool {
+        self.is_border_visible()
+            && !self.box_shadow.iter().any(|shadow| shadow.inset)
+            && background.and_then(|background| background.as_solid()) == self.border_color
     }
 }
 
@@ -1521,5 +1548,68 @@ mod tests {
             Some(FontWeight::SEMIBOLD),
             style.text_style().unwrap().font_weight
         );
+    }
+
+    /// A filled box with a border in the fill's colour, beside one with a distinct outline.
+    struct BorderedBoxes;
+
+    impl crate::Render for BorderedBoxes {
+        fn render(
+            &mut self,
+            _: &mut crate::Window,
+            _: &mut crate::Context<Self>,
+        ) -> impl crate::IntoElement {
+            use crate::{ParentElement as _, Styled as _, div};
+
+            div()
+                .flex()
+                .child(
+                    div()
+                        .size(px(16.))
+                        .rounded(px(4.))
+                        .border_1()
+                        .border_color(blue())
+                        .bg(blue()),
+                )
+                .child(
+                    div()
+                        .size(px(16.))
+                        .rounded(px(4.))
+                        .border_1()
+                        .border_color(red())
+                        .bg(green()),
+                )
+        }
+    }
+
+    /// Catches `Style::paint` painting a border in its fill's own colour as a second quad over the
+    /// fill: both quads anti-alias the rounded edge, so a pixel half inside a corner shows
+    /// three-quarters covered and a filled shape such as a checked checkbox gets heavy, stepped
+    /// corners. That box must paint one quad carrying fill and border, while a box with a distinct
+    /// outline keeps a borderless fill and a border quad painted over its children.
+    #[crate::test]
+    fn border_in_its_fill_colour_paints_in_one_quad_with_the_fill(cx: &mut crate::TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| BorderedBoxes);
+        cx.run_until_parked();
+
+        // (has a border, has a visible background) for each quad in paint order.
+        let quads = cx.update(|window, _| {
+            window
+                .rendered_frame
+                .scene
+                .quads
+                .iter()
+                .map(|quad| {
+                    (
+                        quad.border_widths.top.0 > 0.0,
+                        quad.background
+                            .as_solid()
+                            .is_some_and(|color| color.a > 0.0),
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
+
+        assert_eq!(quads, vec![(true, true), (false, true), (true, false)]);
     }
 }
