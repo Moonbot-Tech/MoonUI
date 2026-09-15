@@ -10,6 +10,7 @@ mod button;
 mod checkbox;
 mod collapsible;
 mod color_picker;
+mod colors;
 mod combobox;
 mod context_menu;
 mod data_table;
@@ -39,6 +40,7 @@ mod picker_field;
 mod placement;
 mod popover;
 mod preset;
+mod primitives;
 mod progress;
 mod progress_circle;
 mod radio;
@@ -92,6 +94,7 @@ pub use button::{
 pub use checkbox::{MoonCheckbox, MoonCheckboxSize};
 pub use collapsible::MoonCollapsible;
 pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};
+pub use colors::MoonColors;
 pub use combobox::{
     MoonCombobox, MoonComboboxChange, MoonComboboxEvent, MoonComboboxMenuChrome, MoonComboboxState,
     MoonComboboxTriggerCtx, MoonComponentIndexPath, MoonSearchableGroup, MoonSearchableListChange,
@@ -147,6 +150,7 @@ pub use popover::{MoonPopover, MoonPopoverPlacement};
 // compares whole re-export statements, and widening one reads as changing it.
 pub use popover::MoonPopoverChrome;
 pub use preset::{MoonPresetItem, MoonPresetStrip};
+pub use primitives::{MoonColor, MoonColorScale};
 pub use progress::MoonProgress;
 pub use progress_circle::{MoonProgressCircle, MoonProgressCircleSize};
 pub use radio::{MoonRadio, MoonRadioSize};

@@ -678,6 +678,30 @@
       "signature": "pub struct MoonColorPickerState"
     },
     {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub const DARK: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub const LIGHT: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub fn active(cx: &App) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub fn from_palette(palette: MoonPalette) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub fn to_palette(self) -> MoonPalette"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub struct MoonColors"
+    },
+    {
       "file": "crates/moon-ui-components/src/moon/combobox.rs",
       "signature": "pub use crate::IndexPath as MoonComponentIndexPath;"
     },
@@ -2475,6 +2499,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use colors::MoonColors;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use combobox::{ MoonCombobox, MoonComboboxChange, MoonComboboxEvent, MoonComboboxMenuChrome, MoonComboboxState, MoonComboboxTriggerCtx, MoonComponentIndexPath, MoonSearchableGroup, MoonSearchableListChange, MoonSearchableListDelegate, MoonSearchableListItem, MoonSearchableListState, MoonSearchableVec, };"
     },
     {
@@ -2608,6 +2636,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use preset::{MoonPresetItem, MoonPresetStrip};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use primitives::{MoonColor, MoonColorScale};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -2968,6 +3000,154 @@
     {
       "file": "crates/moon-ui-components/src/moon/preset.rs",
       "signature": "pub struct MoonPresetStrip"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const AMBER: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const BLACK: Self = Self::rgb(0x000000);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const BLUE: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const BRAND: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const CYAN: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const EMERALD: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const FUCHSIA: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const GRAY: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const GREEN: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const INDIGO: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const LIME: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const MAUVE: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const MIST: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const NEUTRAL: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const NEUTRAL_ALPHA: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const OLIVE: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const ORANGE: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const PINK: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const PURPLE: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const RED: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const ROSE: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const SKY: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const SLATE: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const STONE: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const TAUPE: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const TEAL: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const TRANSPARENT: Self = Self::rgba(0xFFFFFF00);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const VIOLET: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const WHITE: Self = Self::rgb(0xFFFFFF);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const YELLOW: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const ZINC: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const fn rgb(hex: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const fn rgb_hex(self) -> u32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub const fn rgba(hex: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub fn alpha(self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub struct MoonColor(u32);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/primitives.rs",
+      "signature": "pub struct MoonColorScale"
     },
     {
       "file": "crates/moon-ui-components/src/moon/progress.rs",
@@ -4352,6 +4532,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn load_toml(path: impl AsRef<Path>) -> Result<MoonThemeConfig, MoonThemeConfigError>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn moon_color_modes() -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",

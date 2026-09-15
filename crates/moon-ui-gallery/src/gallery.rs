@@ -6,7 +6,7 @@ use super::*;
 /// Owns the interactive gallery window state.
 pub(super) struct Gallery {
     active_page: usize,
-    theme_mode: ThemeMode,
+    style: GalleryStyle,
     snapshot: Option<SnapshotRun>,
     button_clicks: usize,
     /// Opt-in for the indeterminate progress demo; see the comment at its render site.
@@ -51,6 +51,103 @@ pub(super) struct Gallery {
     virtual_scroll: MoonVirtualListScrollHandle,
     tooltip_view: Entity<MoonTooltipView>,
     dock: Entity<DockArea>,
+}
+
+/// A bundled theme the header's style dropdown can switch the gallery to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GalleryStyle {
+    Dark,
+    Graphite,
+    Light,
+    /// The dark colour mode, `MoonColors::DARK`.
+    DarkNew,
+    /// The light colour mode, `MoonColors::LIGHT`.
+    LightNew,
+}
+
+impl GalleryStyle {
+    /// Every style, in menu order.
+    const ALL: [Self; 5] = [
+        Self::Dark,
+        Self::Graphite,
+        Self::Light,
+        Self::DarkNew,
+        Self::LightNew,
+    ];
+
+    /// Returns the style a launch mode opens in: `Light` for the light mode, `Dark` otherwise,
+    /// since the system mode renders the dark theme.
+    fn for_mode(mode: ThemeMode) -> Self {
+        match mode {
+            ThemeMode::Light => Self::Light,
+            ThemeMode::Dark | ThemeMode::System => Self::Dark,
+        }
+    }
+
+    /// Returns the style's menu label, which is also its selection key.
+    fn name(self) -> &'static str {
+        match self {
+            Self::Dark => "Dark",
+            Self::Graphite => "Graphite",
+            Self::Light => "Light",
+            Self::DarkNew => "Dark (new)",
+            Self::LightNew => "Light (new)",
+        }
+    }
+
+    /// Returns whether the style is one of the colour modes rather than a legacy palette.
+    fn is_color_mode(self) -> bool {
+        matches!(self, Self::DarkNew | Self::LightNew)
+    }
+
+    /// Returns the style whose menu key is `key`, or `None` for an unknown key.
+    fn from_name(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|style| style.name() == key)
+    }
+
+    /// Returns `current` switched to this style.
+    ///
+    /// Only the mode and each side's palette and colour roles change, so the theme's scale,
+    /// metrics and typography carry over. Both sides are set for every style: switching back from
+    /// Graphite or a colour mode must put the legacy palettes back and drop the installed roles,
+    /// or the previous style's colours would stay behind the new label.
+    fn config(self, mut current: MoonThemeConfig) -> MoonThemeConfig {
+        if self.is_color_mode() {
+            let modes = MoonThemeConfig::moon_color_modes();
+            (current.dark.palette, current.dark.colors) = (modes.dark.palette, modes.dark.colors);
+            (current.light.palette, current.light.colors) =
+                (modes.light.palette, modes.light.colors);
+        } else {
+            current.dark.palette = if self == Self::Graphite {
+                MoonPalette::GRAPHITE
+            } else {
+                MoonPalette::TERMINAL
+            };
+            current.light.palette = MoonPalette::LIGHT;
+            current.dark.colors = None;
+            current.light.colors = None;
+        }
+        current.mode = match self {
+            Self::Light | Self::LightNew => ThemeMode::Light,
+            Self::Dark | Self::Graphite | Self::DarkNew => ThemeMode::Dark,
+        };
+        current
+    }
+
+    /// Returns the header dropdown's rows: the legacy styles, a separator, then the colour modes,
+    /// with `selected` marked.
+    fn menu_items(selected: Self) -> Vec<MoonMenuItem> {
+        let mut items = Vec::with_capacity(Self::ALL.len() + 1);
+        for style in Self::ALL {
+            if style == Self::DarkNew {
+                items.push(MoonMenuItem::separator());
+            }
+            items.push(
+                MoonMenuItem::with_key(style.name(), style.name()).selected(style == selected),
+            );
+        }
+        items
+    }
 }
 
 #[cfg_attr(not(feature = "snapshot"), allow(dead_code))]
@@ -219,7 +316,7 @@ impl Gallery {
 
         Self {
             active_page: active_page.min(GALLERY_PAGES.len().saturating_sub(1)),
-            theme_mode,
+            style: GalleryStyle::for_mode(theme_mode),
             snapshot: snapshot_dir.map(|dir| SnapshotRun {
                 dir,
                 page_ix: active_page.min(GALLERY_PAGES.len().saturating_sub(1)),
@@ -282,13 +379,19 @@ impl Gallery {
         self.push_event(format!("Page: {}", GALLERY_PAGES[self.active_page]), cx);
     }
 
-    fn set_theme_mode(&mut self, mode: ThemeMode, cx: &mut Context<Self>) {
-        if self.theme_mode == mode {
+    /// Installs `style` as the active theme and logs the switch; selecting the current style does
+    /// nothing.
+    fn set_style(&mut self, style: GalleryStyle, cx: &mut Context<Self>) {
+        if self.style == style {
             return;
         }
-        self.theme_mode = mode;
-        MoonTheme::set_mode(mode, std::borrow::BorrowMut::borrow_mut(cx));
-        self.push_event(format!("Theme: {}", theme_mode_name(mode)), cx);
+        self.style = style;
+        let app: &mut App = std::borrow::BorrowMut::borrow_mut(cx);
+        let current = MoonTheme::global(app)
+            .map(|theme| theme.config.clone())
+            .unwrap_or_else(MoonThemeConfig::moon_terminal);
+        MoonTheme::install_config(style.config(current), app);
+        self.push_event(format!("Theme: {}", style.name()), cx);
     }
 
     fn schedule_snapshot_capture(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -383,10 +486,6 @@ impl Gallery {
 
     fn render_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = MoonPalette::active(cx);
-        let next_mode = match self.theme_mode {
-            ThemeMode::Light => ThemeMode::Dark,
-            ThemeMode::Dark | ThemeMode::System => ThemeMode::Light,
-        };
         let frame = MoonWindowFrame::main("gallery-window-frame", 1260.0)
             .brand(MoonWindowFrameBrand::Full)
             .controls(MoonWindowFrameControls::MinimizeMaximizeClose);
@@ -418,13 +517,14 @@ impl Gallery {
             )
             .child(div().flex_1())
             .child(
-                MoonButton::new("gallery-theme-toggle")
-                    .label(theme_mode_name(self.theme_mode))
-                    .variant(MoonButtonVariant::Panel)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.set_theme_mode(next_mode, cx);
-                    }))
-                    .render(),
+                MoonDropdown::new("gallery-theme-style")
+                    .label(self.style.name())
+                    .trigger_variant(MoonButtonVariant::Panel)
+                    .trigger_caret(true)
+                    .fit_trigger_width(88.0, 160.0)
+                    .fit_menu_width(120.0, 200.0)
+                    .items(GalleryStyle::menu_items(self.style))
+                    .on_select(gallery_style_on_select(cx.entity())),
             )
             .child(frame.visual_controls(cx))
     }
@@ -3226,6 +3326,18 @@ fn gallery_dropdown_on_select(
             this.dropdown_value = key.clone();
             this.push_event(format!("Dropdown: {key}"), cx);
         });
+    }
+}
+
+/// Returns the header dropdown's handler, which switches the gallery to the selected style.
+fn gallery_style_on_select(
+    view: Entity<Gallery>,
+) -> impl Fn(&SharedString, &mut Window, &mut App) + 'static {
+    move |key, _, app| {
+        let Some(style) = GalleryStyle::from_name(key) else {
+            return;
+        };
+        view.update(app, |this, cx| this.set_style(style, cx));
     }
 }
 

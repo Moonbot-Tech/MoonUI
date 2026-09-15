@@ -4,6 +4,7 @@ use gpui::{App, Global, SharedString, px};
 use serde::{Deserialize, Serialize};
 
 use super::{
+    colors::MoonColors,
     foundation::selected_flat,
     foundation::{MoonSize, ThemeMode},
     tokens::{MoonMetrics, MoonPalette, rgba_from},
@@ -72,6 +73,14 @@ pub struct MoonThemeTokens {
     pub scale: MoonScale,
     pub metrics: MoonMetrics,
     pub typography: MoonTypography,
+    /// Colour roles installed as given, such as [`MoonColors::DARK`].
+    ///
+    /// `None` resolves the roles from `palette` with [`MoonColors::from_palette`]. When set,
+    /// `palette` should be the matching [`MoonColors::to_palette`], so components that still read
+    /// palette fields agree with the ones that read roles. Theme files cannot carry roles yet, so
+    /// this is skipped when a theme is read or written.
+    #[serde(skip)]
+    pub colors: Option<MoonColors>,
 }
 
 impl Default for MoonThemeTokens {
@@ -81,6 +90,7 @@ impl Default for MoonThemeTokens {
             scale: MoonScale::default(),
             metrics: MoonMetrics::TERMINAL,
             typography: MoonTypography::default(),
+            colors: None,
         }
     }
 }
@@ -149,7 +159,14 @@ impl MoonThemeTokens {
         self.font(self.typography.mono_font_size)
     }
 
-    fn theme_colors(&self) -> ThemeColor {
+    /// Build the base-theme colour table the inherited components paint with from this palette.
+    ///
+    /// Visible to the Moon module so the colour-role mapping can be checked against it: a role and
+    /// the base-theme entry for the same purpose must resolve to the same colour.
+    ///
+    /// Returns:
+    ///     The base-theme colours for this palette.
+    pub(super) fn theme_colors(&self) -> ThemeColor {
         let p = self.palette;
         let is_light = p.is_light();
         let selected_tint = selected_flat(p);
@@ -313,6 +330,7 @@ impl Default for MoonThemeConfig {
                 scale: MoonScale::default(),
                 metrics: MoonMetrics::TERMINAL,
                 typography: MoonTypography::default(),
+                colors: None,
             },
         }
     }
@@ -350,6 +368,29 @@ impl MoonThemeConfig {
     pub fn moon_graphite() -> Self {
         toml::from_str(include_str!("../../themes/moon-graphite.toml"))
             .expect("bundled moon-graphite theme must parse")
+    }
+
+    /// The colour modes: [`MoonColors::DARK`] on the dark side and [`MoonColors::LIGHT`] on the
+    /// light side, in `Dark` mode.
+    ///
+    /// Each side installs its roles as given, so components that paint with roles show the modes
+    /// exactly, and pairs them with the palette derived from those roles, so components that still
+    /// read palette fields take on the same colours. Scale, metrics and typography are the
+    /// defaults.
+    ///
+    /// Returns:
+    ///     The configuration for both colour modes.
+    pub fn moon_color_modes() -> Self {
+        let side = |colors: MoonColors| MoonThemeTokens {
+            palette: colors.to_palette(),
+            colors: Some(colors),
+            ..MoonThemeTokens::default()
+        };
+        Self {
+            mode: ThemeMode::Dark,
+            dark: side(MoonColors::DARK),
+            light: side(MoonColors::LIGHT),
+        }
     }
 
     /// Set the font delta on both themes, refusing a value that cannot render.
@@ -411,6 +452,8 @@ pub struct MoonTheme {
     pub scale: MoonScale,
     pub metrics: MoonMetrics,
     pub typography: MoonTypography,
+    /// The active side's installed colour roles; see [`MoonThemeTokens::colors`].
+    pub colors: Option<MoonColors>,
     pub config: MoonThemeConfig,
 }
 
@@ -437,6 +480,7 @@ impl MoonTheme {
             scale: tokens.scale,
             metrics: tokens.metrics,
             typography: tokens.typography,
+            colors: tokens.colors,
             config,
         }
     }
@@ -490,12 +534,7 @@ impl MoonTheme {
 
     pub fn active_tokens(cx: &App) -> MoonThemeTokens {
         cx.try_global::<Self>()
-            .map(|theme| MoonThemeTokens {
-                palette: theme.palette,
-                scale: theme.scale,
-                metrics: theme.metrics,
-                typography: theme.typography.clone(),
-            })
+            .map(|theme| theme.tokens())
             .unwrap_or_default()
     }
 
@@ -505,6 +544,7 @@ impl MoonTheme {
             scale: self.scale,
             metrics: self.metrics,
             typography: self.typography.clone(),
+            colors: self.colors,
         }
     }
 

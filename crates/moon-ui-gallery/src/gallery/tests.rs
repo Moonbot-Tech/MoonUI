@@ -1,5 +1,6 @@
+use super::GalleryStyle;
 use crate::{COMPONENT_COVERAGE, page_index, parse_theme_mode, theme_mode_name};
-use moon_ui::ThemeMode;
+use moon_ui::{MoonColors, MoonPalette, MoonThemeConfig, ThemeMode};
 use serde::Deserialize;
 
 const COMPONENT_MANIFEST_JSON: &str =
@@ -67,4 +68,43 @@ fn gallery_theme_cli_names_match_modes() {
     assert_eq!(theme_mode_name(ThemeMode::Dark), "Dark");
     assert_eq!(theme_mode_name(ThemeMode::Light), "Light");
     assert_eq!(theme_mode_name(ThemeMode::System), "System");
+}
+
+/// Catches `gallery.rs:GalleryStyle::config` leaving the previous style behind: choosing Dark after
+/// Graphite would keep the graphite surfaces under a "Dark" label, and choosing a legacy style
+/// after a colour mode would keep painting the mode's roles and derived palette.
+#[test]
+fn switching_styles_installs_each_styles_own_palette_and_mode() {
+    let graphite = GalleryStyle::Graphite.config(MoonThemeConfig::moon_terminal());
+    assert_eq!(graphite.mode, ThemeMode::Dark);
+    assert_eq!(graphite.dark.palette, MoonPalette::GRAPHITE);
+
+    let dark_new = GalleryStyle::DarkNew.config(graphite);
+    assert_eq!(dark_new.mode, ThemeMode::Dark);
+    assert_eq!(dark_new.dark.colors, Some(MoonColors::DARK));
+    assert_eq!(dark_new.dark.palette, MoonColors::DARK.to_palette());
+
+    let light_new = GalleryStyle::LightNew.config(dark_new);
+    assert_eq!(light_new.mode, ThemeMode::Light);
+    assert_eq!(light_new.light.colors, Some(MoonColors::LIGHT));
+    assert_eq!(light_new.light.palette, MoonColors::LIGHT.to_palette());
+
+    let light = GalleryStyle::Light.config(light_new);
+    assert_eq!(light.mode, ThemeMode::Light);
+    assert_eq!(light.light.palette, MoonPalette::LIGHT);
+    assert_eq!(light.light.colors, None);
+
+    let dark = GalleryStyle::Dark.config(light);
+    assert_eq!(dark.mode, ThemeMode::Dark);
+    assert_eq!(dark.dark.palette, MoonPalette::TERMINAL);
+    assert_eq!(dark.dark.colors, None);
+}
+
+/// Catches a style's menu label drifting from the key `GalleryStyle::from_name` looks up: the
+/// dropdown would show the option, but selecting it would silently do nothing.
+#[test]
+fn every_style_menu_key_selects_that_style() {
+    for style in GalleryStyle::ALL {
+        assert_eq!(GalleryStyle::from_name(style.name()), Some(style));
+    }
 }
