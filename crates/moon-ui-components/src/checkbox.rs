@@ -3,7 +3,7 @@ use std::{rc::Rc, time::Duration};
 use crate::{
     Disableable, Selectable, Sizable, Size, StyledExt as _,
     moon::MoonTone,
-    moon::{MoonPalette, MoonTheme, MoonThemeTokens, rgba_from, svg::moon_svg},
+    moon::{MoonColors, MoonPalette, MoonTheme, MoonThemeTokens, rgba_from, svg::moon_svg},
     text::Text,
     tooltip::ComponentTooltip,
     v_flex,
@@ -96,7 +96,8 @@ impl Checkbox {
         self
     }
 
-    /// Set the Moon tone used for the checked mark and box.
+    /// Fill a checked box with `tone` instead of the brand colour; its mark then takes the palette
+    /// ink that reads best on that tone. The focus ring keeps the theme's focus colour.
     pub fn tone(mut self, tone: MoonTone) -> Self {
         self.tone = Some(tone);
         self
@@ -419,33 +420,76 @@ pub(crate) struct ChoiceColors {
     pub(crate) label: Hsla,
     pub(crate) description: Hsla,
     pub(crate) focus_ring: Hsla,
+    /// Opacity of the box or circle together with its border, fill and mark. The label and
+    /// description dim through their own colours instead.
+    pub(crate) box_opacity: f32,
 }
 
 impl ChoiceColors {
-    /// Resolves the colours of a box in `tone`. A disabled box draws everything at 45% opacity.
+    /// Opacity of a disabled box or circle, applied to the whole box rather than to each colour.
+    const DISABLED_BOX_OPACITY: f32 = 0.5;
+
+    /// Alpha of a disabled control's label and description.
+    const DISABLED_TEXT_ALPHA: f32 = 0.45;
+
+    /// Resolves the colours of a checkbox or radio from the palette's colour roles.
     ///
-    /// A checked box is filled with the tone and draws no border, so its mark takes the palette ink
-    /// that reads best on that tone rather than the tone itself. The border stays transparent
-    /// rather than matching the fill: over a disabled box's translucent fill, a border in the same
-    /// tone would composite into a visibly brighter ring.
-    pub(crate) fn resolve(p: MoonPalette, tone: MoonTone, checked: bool, disabled: bool) -> Self {
-        let alpha = if disabled { 0.45 } else { 1.0 };
-        let tone = tone.color(p);
+    /// An unchecked box is a `border_primary` outline with no fill, and the outline stays
+    /// `border_primary` when hovered; once disabled it gains a `bg_tertiary` fill. A checked box is
+    /// filled with `bg_brand_solid` and draws no border, with its mark in `fg_white`. An explicit
+    /// `tone` replaces the brand fill, and the mark then takes the palette ink that reads best on
+    /// that tone. A disabled box, checked or not, renders at half opacity as a whole. The focus
+    /// ring is always `focus_ring`, whatever the tone.
+    ///
+    /// Args:
+    ///     p: The active palette, resolved to colour roles with `MoonColors::from_palette`.
+    ///     tone: The tone set on the control, or `None` for the brand fill.
+    ///     checked: Whether the box is checked or indeterminate.
+    ///     disabled: Whether the control is disabled.
+    ///
+    /// Returns:
+    ///     The colours to paint the control with and the opacity of its box.
+    pub(crate) fn resolve(
+        p: MoonPalette,
+        tone: Option<MoonTone>,
+        checked: bool,
+        disabled: bool,
+    ) -> Self {
+        let roles = MoonColors::from_palette(p);
+        let (checked_fill, mark) = match tone {
+            Some(tone) => {
+                let tone = tone.color(p);
+                (rgba_from(tone, 1.0), rgba_from(p.ink_on(tone), 1.0))
+            }
+            None => (roles.bg_brand_solid.into(), roles.fg_white.into()),
+        };
         let (border, fill) = if checked {
-            (transparent_black(), rgba_from(tone, alpha))
+            (transparent_black(), checked_fill)
+        } else if disabled {
+            (roles.border_primary.into(), roles.bg_tertiary.into())
         } else {
-            (
-                rgba_from(p.border, alpha),
-                rgba_from(p.shell_high, 0.95 * alpha),
-            )
+            (roles.border_primary.into(), transparent_black())
+        };
+        let text_alpha = if disabled {
+            Self::DISABLED_TEXT_ALPHA
+        } else {
+            1.0
         };
         Self {
             border,
             fill,
-            mark: rgba_from(p.ink_on(tone), alpha),
-            label: rgba_from(if disabled { p.text_muted } else { p.text_soft }, alpha),
-            description: rgba_from(p.text_muted, alpha),
-            focus_ring: rgba_from(tone, 1.0),
+            mark,
+            label: rgba_from(
+                if disabled { p.text_muted } else { p.text_soft },
+                text_alpha,
+            ),
+            description: rgba_from(p.text_muted, text_alpha),
+            focus_ring: roles.focus_ring.into(),
+            box_opacity: if disabled {
+                Self::DISABLED_BOX_OPACITY
+            } else {
+                1.0
+            },
         }
     }
 }
@@ -562,12 +606,7 @@ impl RenderOnce for Checkbox {
         let checked = self.checked || self.indeterminate;
         let tokens = MoonTheme::active_tokens(cx);
         let metrics = MoonCheckboxMetrics::resolve(self.size, &tokens);
-        let colors = ChoiceColors::resolve(
-            tokens.palette,
-            self.tone.unwrap_or(MoonTone::Info),
-            checked,
-            self.disabled,
-        );
+        let colors = ChoiceColors::resolve(tokens.palette, self.tone, checked, self.disabled);
 
         let focus_handle = window
             .use_keyed_state(self.id.clone(), cx, |_, cx| cx.focus_handle())
@@ -629,6 +668,7 @@ impl RenderOnce for Checkbox {
                         .border_color(colors.border)
                         .rounded(metrics.radius)
                         .bg(colors.fill)
+                        .opacity(colors.box_opacity)
                         .when(is_focused, |this| {
                             this.child(choice_focus_ring(
                                 &self.id,
@@ -755,26 +795,41 @@ mod tests {
         }
     }
 
-    /// Catches the shared checkbox and radio colours drifting from the reviewed design: a checked box
-    /// must be filled with its tone and draw no border (a tone border over a disabled box's
-    /// translucent fill shows as a brighter ring), with its mark in the palette ink that reads best
-    /// on that tone; an unchecked box keeps the neutral border and fill; disabled boxes fade to 45%;
-    /// and the focus ring stays the full tone.
+    /// Catches the shared checkbox and radio colours drifting from the reviewed design: an unchecked
+    /// box is a `border_primary` outline with no fill, filled with `bg_tertiary` only when disabled;
+    /// a checked box is `bg_brand_solid` with no border and an `fg_white` mark, unless an explicit
+    /// tone fills it with that tone and the ink that reads best on it; a disabled box dims to half
+    /// as a whole rather than fading its colours; and the focus ring is `focus_ring`, never the
+    /// tone.
     #[test]
-    fn test_choice_colors_fill_a_checked_box_with_its_tone() {
-        let p = crate::moon::MoonThemeConfig::moon_terminal().dark.palette;
-        for tone in [MoonTone::Info, MoonTone::Warning, MoonTone::Default] {
-            let tone_rgb = tone.color(p);
-            for (disabled, alpha) in [(false, 1.0), (true, 0.45)] {
-                let checked = ChoiceColors::resolve(p, tone, true, disabled);
-                assert!(checked.border.is_transparent());
-                assert_eq!(checked.fill, rgba_from(tone_rgb, alpha));
-                assert_eq!(checked.mark, rgba_from(p.ink_on(tone_rgb), alpha));
-                assert_eq!(checked.focus_ring, rgba_from(tone_rgb, 1.0));
+    fn test_choice_colors_follow_the_choice_roles() {
+        for p in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+            let roles = MoonColors::from_palette(p);
+            for (disabled, box_opacity) in [(false, 1.0), (true, 0.5)] {
+                let unchecked = ChoiceColors::resolve(p, None, false, disabled);
+                assert_eq!(unchecked.border, roles.border_primary.into());
+                if disabled {
+                    assert_eq!(unchecked.fill, roles.bg_tertiary.into());
+                } else {
+                    assert!(unchecked.fill.is_transparent());
+                }
+                assert_eq!(unchecked.box_opacity, box_opacity);
+                assert_eq!(unchecked.focus_ring, roles.focus_ring.into());
 
-                let unchecked = ChoiceColors::resolve(p, tone, false, disabled);
-                assert_eq!(unchecked.border, rgba_from(p.border, alpha));
-                assert_eq!(unchecked.fill, rgba_from(p.shell_high, 0.95 * alpha));
+                let checked = ChoiceColors::resolve(p, None, true, disabled);
+                assert!(checked.border.is_transparent());
+                assert_eq!(checked.fill, roles.bg_brand_solid.into());
+                assert_eq!(checked.mark, roles.fg_white.into());
+                assert_eq!(checked.box_opacity, box_opacity);
+                assert_eq!(checked.focus_ring, roles.focus_ring.into());
+
+                let warning = MoonTone::Warning.color(p);
+                let toned = ChoiceColors::resolve(p, Some(MoonTone::Warning), true, disabled);
+                assert!(toned.border.is_transparent());
+                assert_eq!(toned.fill, rgba_from(warning, 1.0));
+                assert_eq!(toned.mark, rgba_from(p.ink_on(warning), 1.0));
+                assert_eq!(toned.box_opacity, box_opacity);
+                assert_eq!(toned.focus_ring, roles.focus_ring.into());
             }
         }
     }

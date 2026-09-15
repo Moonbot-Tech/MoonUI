@@ -47,7 +47,7 @@ pub struct MoonCheckbox {
     disabled: bool,
     indeterminate: bool,
     size: Option<MoonCheckboxSize>,
-    tone: MoonTone,
+    tone: Option<MoonTone>,
     mono: bool,
     on_change: Option<std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
 }
@@ -65,7 +65,7 @@ impl MoonCheckbox {
             disabled: false,
             indeterminate: false,
             size: None,
-            tone: MoonTone::Info,
+            tone: None,
             mono: false,
             on_change: None,
         }
@@ -113,8 +113,10 @@ impl MoonCheckbox {
         self
     }
 
+    /// Fills the checked box with `tone` instead of the brand colour; the mark then takes the
+    /// palette ink that reads best on that tone. The focus ring keeps the theme's focus colour.
     pub fn tone(mut self, tone: MoonTone) -> Self {
-        self.tone = tone;
+        self.tone = Some(tone);
         self
     }
 
@@ -152,7 +154,6 @@ impl RenderOnce for MoonCheckbox {
             .checked(checked)
             .indeterminate(self.indeterminate)
             .disabled(self.disabled)
-            .tone(self.tone)
             .mono(self.mono)
             .with_size(size_for(size))
             .on_click(move |value, window, cx| {
@@ -167,6 +168,9 @@ impl RenderOnce for MoonCheckbox {
                 }
             });
 
+        if let Some(tone) = self.tone {
+            checkbox = checkbox.tone(tone);
+        }
         if let Some(label) = self.label {
             checkbox = checkbox.label(label);
         }

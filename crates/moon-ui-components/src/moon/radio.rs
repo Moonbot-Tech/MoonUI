@@ -91,7 +91,7 @@ pub struct MoonRadio {
     checked: bool,
     disabled: bool,
     size: Option<MoonRadioSize>,
-    tone: MoonTone,
+    tone: Option<MoonTone>,
     mono: bool,
     on_change: Option<std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
 }
@@ -107,7 +107,7 @@ impl MoonRadio {
             checked: false,
             disabled: false,
             size: None,
-            tone: MoonTone::Info,
+            tone: None,
             mono: false,
             on_change: None,
         }
@@ -147,8 +147,10 @@ impl MoonRadio {
         self
     }
 
+    /// Fills the checked circle with `tone` instead of the brand colour; the dot then takes the
+    /// palette ink that reads best on that tone. The focus ring keeps the theme's focus colour.
     pub fn tone(mut self, tone: MoonTone) -> Self {
-        self.tone = tone;
+        self.tone = Some(tone);
         self
     }
 
@@ -217,6 +219,7 @@ impl RenderOnce for MoonRadio {
             .border_1()
             .border_color(colors.border)
             .bg(colors.fill)
+            .opacity(colors.box_opacity)
             .when(is_focused, |this| {
                 this.child(choice_focus_ring(
                     &self.id,
