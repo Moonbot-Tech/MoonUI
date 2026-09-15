@@ -155,6 +155,21 @@
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleSize};",
       "reason": "The re-export gained MoonToggleMetrics so the toggle's resolved per-tier metrics are reachable as moon_ui::MoonToggleMetrics, which is what lets a consumer measure a toggle it does not draw instead of mirroring its geometry by hand; nothing was removed from it."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self",
+      "reason": "Menus moved onto the shared MoonSize scale, so menu_size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn size(mut self, size: MoonMenuSize) -> Self",
+      "reason": "Popup menus moved onto the shared MoonSize scale, so size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/select.rs",
+      "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self",
+      "reason": "Selects moved onto the shared MoonSize scale for API parity, so menu_size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
     }
   ]
 }

@@ -2,9 +2,43 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
-    theme::{MoonTheme, MoonThemeTokens},
+    theme::{MoonTextMetrics, MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, rgba_from},
 };
+
+/// Measure text at an already-rendered font size, with the same font family used by [`MoonText`].
+///
+/// The result sums individual glyph advances. It deliberately does not assume equal-width glyphs:
+/// fallback Unicode characters in a monospaced run may come from another font.
+///
+/// Args:
+///     cx: Application context providing the text system.
+///     tokens: Active theme tokens (font family only; size is not scaled again).
+///     text: Text to measure.
+///     rendered_font_size: Font size already in rendered pixels.
+///     weight: Numeric GPUI font weight.
+///     mono: Whether to use the configured monospaced family.
+///
+/// Returns:
+///     The rendered glyph-advance width in pixels.
+pub(crate) fn measure_rendered_text_width(
+    cx: &App,
+    tokens: &MoonThemeTokens,
+    text: &str,
+    rendered_font_size: f32,
+    weight: f32,
+    mono: bool,
+) -> f32 {
+    let font = Font {
+        weight: FontWeight(weight),
+        ..font(tokens.font_family(mono))
+    };
+    let font_id = cx.text_system().resolve_font(&font);
+    let size = px(rendered_font_size);
+    text.chars()
+        .map(|ch| f32::from(cx.text_system().layout_width(font_id, size, ch)))
+        .sum()
+}
 
 /// Measure text with the same font family and font scaling used by [`MoonText`].
 ///
@@ -29,15 +63,7 @@ pub(crate) fn measure_text_width(
     weight: f32,
     mono: bool,
 ) -> f32 {
-    let font = Font {
-        weight: FontWeight(weight),
-        ..font(tokens.font_family(mono))
-    };
-    let font_id = cx.text_system().resolve_font(&font);
-    let size = px(tokens.font(font_size));
-    text.chars()
-        .map(|ch| f32::from(cx.text_system().layout_width(font_id, size, ch)))
-        .sum()
+    measure_rendered_text_width(cx, tokens, text, tokens.font(font_size), weight, mono)
 }
 
 /// Fit text to a rendered-width ceiling with a trailing ellipsis when needed.
@@ -128,6 +154,7 @@ pub struct MoonTextStyle {
     pub tracking: f32,
     pub uppercase: bool,
     pub mono: bool,
+    pub rendered_metrics: Option<MoonTextMetrics>,
 }
 
 impl Default for MoonTextStyle {
@@ -141,6 +168,7 @@ impl Default for MoonTextStyle {
             tracking: 0.0,
             uppercase: true,
             mono: false,
+            rendered_metrics: None,
         }
     }
 }
@@ -198,6 +226,19 @@ impl MoonText {
         self
     }
 
+    /// Already scaled to rendered pixels; bypasses the theme's font scaling. For tier-driven
+    /// controls, whose metrics follow `tokens.ui()` alone.
+    ///
+    /// Args:
+    ///     metrics: Rendered font size and line height.
+    ///
+    /// Returns:
+    ///     The builder, using these metrics at render instead of `tokens.text(..)`.
+    pub fn rendered_metrics(mut self, metrics: MoonTextMetrics) -> Self {
+        self.style.rendered_metrics = Some(metrics);
+        self
+    }
+
     pub fn weight(mut self, weight: f32) -> Self {
         self.style.weight = weight;
         self
@@ -233,7 +274,9 @@ impl RenderOnce for MoonText {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let style = self.style;
         let tokens = MoonTheme::active_tokens(cx);
-        let text_metrics = tokens.text(style.font_size, style.line_height);
+        let text_metrics = style
+            .rendered_metrics
+            .unwrap_or_else(|| tokens.text(style.font_size, style.line_height));
         let text = if style.uppercase {
             self.text.as_ref().to_uppercase()
         } else {

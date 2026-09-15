@@ -970,8 +970,16 @@ impl Gallery {
                                             .placeholder("Select market")
                                             .cleanable(true)
                                             .searchable(true)
-                                            .menu_width(220.0)
-                                            .menu_size(MoonMenuSize::Normal),
+                                            .menu_width(220.0),
+                                    )
+                                    .child(
+                                        MoonText::new(
+                                            "Select menu rows follow the trigger size, not a menu tier.",
+                                        )
+                                        .uppercase(false)
+                                        .mono(true)
+                                        .color(p.text_soft)
+                                        .render(),
                                     )
                                     .child(
                                         MoonSlider::new(&self.slider_state)
@@ -993,6 +1001,7 @@ impl Gallery {
     }
 
     fn render_menus(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
         let view = cx.entity();
         section("Menus / Overlays", cx)
             .child(
@@ -1066,41 +1075,108 @@ impl Gallery {
                         .items_start()
                         .gap(px(14.0))
                         .child(
-                            MoonDropdown::new("gallery-dropdown")
-                                .label(format!("Scale {}", self.dropdown_value))
-                                .trigger_leading_icon(MoonButtonIconSlot::new(
-                                    moon_ui::MOON_ICON_CHECK,
-                                ))
-                                .trigger_caret(true)
-                                .fit_trigger_width(100.0, 180.0)
-                                .default_open(false)
-                                .fit_menu_width(220.0, 560.0)
-                                .items([
-                                    MoonMenuItem::with_key("Auto", "Auto")
-                                        .selected(self.dropdown_value.as_ref() == "Auto"),
-                                    MoonMenuItem::with_key("50", "50%")
-                                        .selected(self.dropdown_value.as_ref() == "50"),
-                                    MoonMenuItem::with_key("20", "20%")
-                                        .checked(self.dropdown_value.as_ref() == "20"),
-                                    MoonMenuItem::separator(),
-                                    MoonMenuItem::new("Advanced").right_label(">").submenu([
-                                        MoonMenuItem::new("Bid view"),
-                                        MoonMenuItem::new("Ask view"),
-                                    ]),
-                                    MoonMenuItem::new(
-                                        "Only current market orders with a long translated label",
-                                    ),
-                                ])
-                                .on_select({
-                                    let view = view.clone();
-                                    move |key, _, app| {
-                                        let key = key.clone();
-                                        view.update(app, |this, cx| {
-                                            this.dropdown_value = key.clone();
-                                            this.push_event(format!("Dropdown: {key}"), cx);
-                                        });
-                                    }
-                                }),
+                            h_flex()
+                                .items_start()
+                                .gap(px(10.0))
+                                .child(
+                                    v_flex()
+                                        .gap(px(4.0))
+                                        .child(
+                                            MoonText::new("Follows app density")
+                                                .uppercase(false)
+                                                .mono(true)
+                                                .color(p.text_soft)
+                                                .render(),
+                                        )
+                                        .child(
+                                            MoonDropdown::new("gallery-dropdown")
+                                                .label(format!("Scale {}", self.dropdown_value))
+                                                .trigger_leading_icon(MoonButtonIconSlot::new(
+                                                    moon_ui::MOON_ICON_CHECK,
+                                                ))
+                                                .trigger_caret(true)
+                                                .fit_trigger_width(100.0, 180.0)
+                                                .default_open(false)
+                                                .fit_menu_width(220.0, 560.0)
+                                                .items(gallery_dropdown_items(&self.dropdown_value))
+                                                .on_select(gallery_dropdown_on_select(view.clone())),
+                                        ),
+                                )
+                                .child(
+                                    v_flex()
+                                        .gap(px(4.0))
+                                        .child(
+                                            MoonText::new("Xs")
+                                                .uppercase(false)
+                                                .mono(true)
+                                                .color(p.text_soft)
+                                                .render(),
+                                        )
+                                        .child(
+                                            MoonDropdown::new("gallery-dropdown-xs")
+                                                .label("Xs")
+                                                .trigger_leading_icon(MoonButtonIconSlot::new(
+                                                    moon_ui::MOON_ICON_CHECK,
+                                                ))
+                                                .trigger_caret(true)
+                                                .fit_trigger_width(100.0, 180.0)
+                                                .default_open(false)
+                                                .fit_menu_width(220.0, 560.0)
+                                                .menu_size(MoonSize::Xs)
+                                                .items(gallery_dropdown_items(&self.dropdown_value))
+                                                .on_select(gallery_dropdown_on_select(view.clone())),
+                                        ),
+                                )
+                                .child(
+                                    v_flex()
+                                        .gap(px(4.0))
+                                        .child(
+                                            MoonText::new("Sm")
+                                                .uppercase(false)
+                                                .mono(true)
+                                                .color(p.text_soft)
+                                                .render(),
+                                        )
+                                        .child(
+                                            MoonDropdown::new("gallery-dropdown-sm")
+                                                .label("Sm")
+                                                .trigger_leading_icon(MoonButtonIconSlot::new(
+                                                    moon_ui::MOON_ICON_CHECK,
+                                                ))
+                                                .trigger_caret(true)
+                                                .fit_trigger_width(100.0, 180.0)
+                                                .default_open(false)
+                                                .fit_menu_width(220.0, 560.0)
+                                                .menu_size(MoonSize::Sm)
+                                                .items(gallery_dropdown_items(&self.dropdown_value))
+                                                .on_select(gallery_dropdown_on_select(view.clone())),
+                                        ),
+                                )
+                                .child(
+                                    v_flex()
+                                        .gap(px(4.0))
+                                        .child(
+                                            MoonText::new("Md")
+                                                .uppercase(false)
+                                                .mono(true)
+                                                .color(p.text_soft)
+                                                .render(),
+                                        )
+                                        .child(
+                                            MoonDropdown::new("gallery-dropdown-md")
+                                                .label("Md")
+                                                .trigger_leading_icon(MoonButtonIconSlot::new(
+                                                    moon_ui::MOON_ICON_CHECK,
+                                                ))
+                                                .trigger_caret(true)
+                                                .fit_trigger_width(100.0, 180.0)
+                                                .default_open(false)
+                                                .fit_menu_width(220.0, 560.0)
+                                                .menu_size(MoonSize::Md)
+                                                .items(gallery_dropdown_items(&self.dropdown_value))
+                                                .on_select(gallery_dropdown_on_select(view.clone())),
+                                        ),
+                                ),
                         )
                         .child(
                             MoonPopover::new("gallery-popover")
@@ -1216,15 +1292,84 @@ impl Gallery {
                         ),
                 )
                 .child(
-                    MoonPopupMenu::new("gallery-popup-menu")
-                        .width(190.0)
-                        .max_height_ui(130.0)
-                        .items([
-                            MoonMenuItem::new("Popup menu"),
-                            MoonMenuItem::new("Checked").checked(true),
-                            MoonMenuItem::new("Danger").tone(MoonTone::Danger),
-                        ])
-                        .render(),
+                    h_flex()
+                        .items_start()
+                        .gap(px(10.0))
+                        .child(
+                            v_flex()
+                                .gap(px(4.0))
+                                .child(
+                                    MoonText::new("Follows app density")
+                                        .uppercase(false)
+                                        .mono(true)
+                                        .color(p.text_soft)
+                                        .render(),
+                                )
+                                .child(
+                                    MoonPopupMenu::new("gallery-popup-menu")
+                                        .width(190.0)
+                                        .max_height_ui(130.0)
+                                        .items(gallery_popup_items())
+                                        .render(),
+                                ),
+                        )
+                        .child(
+                            v_flex()
+                                .gap(px(4.0))
+                                .child(
+                                    MoonText::new("Xs")
+                                        .uppercase(false)
+                                        .mono(true)
+                                        .color(p.text_soft)
+                                        .render(),
+                                )
+                                .child(
+                                    MoonPopupMenu::new("gallery-popup-menu-xs")
+                                        .width(190.0)
+                                        .max_height_ui(130.0)
+                                        .size(MoonSize::Xs)
+                                        .items(gallery_popup_items())
+                                        .render(),
+                                ),
+                        )
+                        .child(
+                            v_flex()
+                                .gap(px(4.0))
+                                .child(
+                                    MoonText::new("Sm")
+                                        .uppercase(false)
+                                        .mono(true)
+                                        .color(p.text_soft)
+                                        .render(),
+                                )
+                                .child(
+                                    MoonPopupMenu::new("gallery-popup-menu-sm")
+                                        .width(190.0)
+                                        .max_height_ui(130.0)
+                                        .size(MoonSize::Sm)
+                                        .items(gallery_popup_items())
+                                        .render(),
+                                ),
+                        )
+                        .child(
+                            v_flex()
+                                .gap(px(4.0))
+                                .child(
+                                    MoonText::new("Md")
+                                        .uppercase(false)
+                                        .mono(true)
+                                        .color(p.text_soft)
+                                        .render(),
+                                )
+                                .child(
+                                    MoonPopupMenu::new("gallery-popup-menu-md")
+                                        .width(190.0)
+                                        .max_height_ui(130.0)
+                                        .size(MoonSize::Md)
+                                        .items(gallery_popup_items())
+                                        .render(),
+                                ),
+                        ),
                 ),
             )
     }
@@ -3196,6 +3341,39 @@ impl Render for Gallery {
                     .child(self.render_event_log(cx)),
             )
     }
+}
+
+fn gallery_dropdown_items(selected: &SharedString) -> [MoonMenuItem; 6] {
+    [
+        MoonMenuItem::with_key("Auto", "Auto").selected(selected.as_ref() == "Auto"),
+        MoonMenuItem::with_key("50", "50%").selected(selected.as_ref() == "50"),
+        MoonMenuItem::with_key("20", "20%").checked(selected.as_ref() == "20"),
+        MoonMenuItem::separator(),
+        MoonMenuItem::new("Advanced")
+            .right_label(">")
+            .submenu([MoonMenuItem::new("Bid view"), MoonMenuItem::new("Ask view")]),
+        MoonMenuItem::new("Only current market orders with a long translated label"),
+    ]
+}
+
+fn gallery_dropdown_on_select(
+    view: Entity<Gallery>,
+) -> impl Fn(&SharedString, &mut Window, &mut App) + 'static {
+    move |key, _, app| {
+        let key = key.clone();
+        view.update(app, |this, cx| {
+            this.dropdown_value = key.clone();
+            this.push_event(format!("Dropdown: {key}"), cx);
+        });
+    }
+}
+
+fn gallery_popup_items() -> [MoonMenuItem; 3] {
+    [
+        MoonMenuItem::new("Popup menu"),
+        MoonMenuItem::new("Checked").checked(true),
+        MoonMenuItem::new("Danger").tone(MoonTone::Danger),
+    ]
 }
 
 fn section(title: &'static str, cx: &App) -> gpui::Div {

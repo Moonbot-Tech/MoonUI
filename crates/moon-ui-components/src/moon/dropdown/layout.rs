@@ -3,8 +3,8 @@
 use gpui::{App, SharedString};
 
 use super::super::{
-    text::{fit_text_to_width, measure_text_width},
-    theme::MoonThemeTokens,
+    text::{fit_text_to_width, measure_rendered_text_width},
+    theme::{MoonTextMetrics, MoonThemeTokens},
 };
 use super::{
     MoonMenuItem, MoonMenuItemKind, MoonMenuLevel, MoonMenuSize, VIRTUAL_MENU_ITEM_THRESHOLD,
@@ -59,8 +59,10 @@ impl MoonMenuMaxHeight {
     }
 }
 
+/// Rendered per-row geometry for one menu size and theme scale. All fields are already scaled:
+/// a tier follows UI zoom for everything, text included; a `Custom` size keeps its legacy
+/// font-scale and line-height text scaling.
 #[derive(Clone, Copy, Debug, PartialEq)]
-/// Resolved per-row geometry for one menu size and theme scale.
 pub(crate) struct MenuMetrics {
     pub(crate) row_height: f32,
     pub(crate) font_size: f32,
@@ -68,42 +70,42 @@ pub(crate) struct MenuMetrics {
     pub(crate) radius: f32,
     pub(crate) pad_x: f32,
     pub(crate) gap: f32,
+    /// Rendered text size over its design-reference size; scales `Scaled`/`Fit` width bounds.
+    pub(crate) text_scale: f32,
+    /// Rendered size of trailing text, one design step below the label, resolved by this size's
+    /// OWN scale function.
+    pub(crate) trailing_font_size: f32,
 }
 
-impl MenuMetrics {
-    /// Scale menu geometry while retaining design-reference text inputs.
-    pub(super) fn scaled(self, tokens: &MoonThemeTokens) -> Self {
-        let line_height = tokens.line_height(self.line_height);
-        Self {
-            row_height: tokens.ui(self.row_height).max(line_height + tokens.ui(4.0)),
-            font_size: self.font_size,
-            line_height: self.line_height,
-            radius: tokens.ui(self.radius),
-            pad_x: tokens.ui(self.pad_x),
-            gap: tokens.ui(self.gap),
+impl From<MenuMetrics> for MoonTextMetrics {
+    /// Label font size and line height as already-rendered `MoonText` metrics.
+    fn from(m: MenuMetrics) -> Self {
+        MoonTextMetrics {
+            font_size: m.font_size,
+            line_height: m.line_height,
         }
     }
 }
 
-/// Return unscaled row metrics for one menu size.
-pub(super) fn unscaled_menu_metrics(size: MoonMenuSize) -> MenuMetrics {
+/// Resolve one menu size against the active theme scale.
+pub(crate) fn menu_row_metrics(size: MoonMenuSize, tokens: &MoonThemeTokens) -> MenuMetrics {
     match size {
-        MoonMenuSize::Compact => MenuMetrics {
-            row_height: 20.0,
-            font_size: 9.5,
-            line_height: 12.0,
-            radius: 3.0,
-            pad_x: 6.0,
-            gap: 5.0,
-        },
-        MoonMenuSize::Normal => MenuMetrics {
-            row_height: 24.0,
-            font_size: 10.5,
-            line_height: 13.0,
-            radius: 4.0,
-            pad_x: 7.0,
-            gap: 6.0,
-        },
+        MoonMenuSize::Tier(tier) => {
+            let c = tier
+                .nearest(&MoonMenuSize::SUPPORTED_TIERS)
+                .control_metrics();
+            let line_height = tokens.ui(c.line_height);
+            MenuMetrics {
+                row_height: tokens.ui(c.height).max(line_height + tokens.ui(4.0)),
+                font_size: tokens.ui(c.font_size),
+                line_height,
+                radius: tokens.ui(c.radius),
+                pad_x: tokens.ui(c.pad_x),
+                gap: tokens.ui(c.gap),
+                text_scale: tokens.ui(1.0),
+                trailing_font_size: tokens.ui(c.font_size - MENU_TRAILING_FONT_DELTA),
+            }
+        }
         MoonMenuSize::Custom {
             row_height,
             font_size,
@@ -111,20 +113,20 @@ pub(super) fn unscaled_menu_metrics(size: MoonMenuSize) -> MenuMetrics {
             radius,
             pad_x,
             gap,
-        } => MenuMetrics {
-            row_height,
-            font_size,
-            line_height,
-            radius,
-            pad_x,
-            gap,
-        },
+        } => {
+            let rendered_line = tokens.line_height(line_height);
+            MenuMetrics {
+                row_height: tokens.ui(row_height).max(rendered_line + tokens.ui(4.0)),
+                font_size: tokens.font(font_size),
+                line_height: rendered_line,
+                radius: tokens.ui(radius),
+                pad_x: tokens.ui(pad_x),
+                gap: tokens.ui(gap),
+                text_scale: tokens.font(font_size) / font_size.max(1.0),
+                trailing_font_size: tokens.font(font_size - MENU_TRAILING_FONT_DELTA),
+            }
+        }
     }
-}
-
-/// Return menu row metrics resolved for the active scale.
-pub(crate) fn menu_row_metrics(size: MoonMenuSize, tokens: &MoonThemeTokens) -> MenuMetrics {
-    unscaled_menu_metrics(size).scaled(tokens)
 }
 
 /// Return the fixed outer chrome around a menu row.
@@ -225,7 +227,7 @@ fn trailing_label_widths(
     let Some(right_label) = right_label else {
         return (0.0, 0.0);
     };
-    let font_size = metrics.font_size - MENU_TRAILING_FONT_DELTA;
+    let font_size = metrics.trailing_font_size;
     let natural = measure(right_label.as_ref(), font_size, MENU_TRAILING_WEIGHT);
     let minimum = if right_label.is_empty() {
         0.0
@@ -256,7 +258,7 @@ fn fit_trailing_label(
             cx,
             tokens,
             text,
-            metrics.font_size - MENU_TRAILING_FONT_DELTA,
+            metrics.trailing_font_size,
             MENU_TRAILING_WEIGHT,
             mono,
         )
@@ -461,7 +463,7 @@ fn measure_menu_text_width(
     if text.starts_with(MENU_MEASUREMENT_PROBE_PREFIX) {
         MENU_MEASUREMENT_PROBE_COUNT.fetch_add(1, Ordering::Relaxed);
     }
-    measure_text_width(cx, tokens, text, font_size, weight, mono)
+    measure_rendered_text_width(cx, tokens, text, font_size, weight, mono)
 }
 
 /// Return the current sentinel-only measurement count.
@@ -483,7 +485,7 @@ pub(super) fn resolve_menu_width(
         return (width, false);
     }
 
-    let text_scale = tokens.font(metrics.font_size) / metrics.font_size.max(1.0);
+    let text_scale = metrics.text_scale;
     let requirements = menu_width_requirements(items, metrics, tokens, |text, size, weight| {
         measure_menu_text_width(cx, tokens, text, size, weight, mono)
     });
@@ -549,7 +551,7 @@ pub(super) fn resolve_virtual_menu_width(
 
     let initial_rows = virtual_menu_initial_rows(items, metrics, tokens, content_max);
     let measured_rows = menu_width_sample(items, initial_rows.len());
-    let text_scale = tokens.font(metrics.font_size) / metrics.font_size.max(1.0);
+    let text_scale = metrics.text_scale;
     let requirements =
         menu_width_requirements(measured_rows, metrics, tokens, |text, size, weight| {
             measure_menu_text_width(cx, tokens, text, size, weight, mono)
@@ -575,13 +577,12 @@ pub(super) fn resolve_virtual_menu_width(
 pub(in crate::moon) fn resolve_menu_level_width(
     policy: MoonMenuWidth,
     level: &MoonMenuLevel,
-    size: MoonMenuSize,
+    metrics: MenuMetrics,
     tokens: &MoonThemeTokens,
     cx: &App,
     mono: bool,
     rendered_max_width: Option<f32>,
 ) -> (f32, bool) {
-    let metrics = menu_row_metrics(size, tokens);
     let virtualized = menu_level_is_virtualized(level.len());
     let outer_max = resolve_menu_outer_max(None, tokens, virtualized);
     let content_max = menu_content_max(outer_max, tokens, 0.0, metrics);
@@ -611,11 +612,10 @@ pub(in crate::moon) fn resolve_menu_level_width(
 /// Resolve one retained level's natural outer height inside a rendered cap.
 pub(in crate::moon) fn menu_level_outer_height(
     level: &MoonMenuLevel,
-    size: MoonMenuSize,
+    metrics: MenuMetrics,
     tokens: &MoonThemeTokens,
     rendered_max_height: f32,
 ) -> f32 {
-    let metrics = menu_row_metrics(size, tokens);
     let chrome = menu_outer_chrome(tokens);
     let content_max = (rendered_max_height - chrome).max(metrics.row_height);
     let content = capped_menu_items_height(

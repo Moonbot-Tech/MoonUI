@@ -140,8 +140,9 @@ impl MoonMenuLevel {
 /// Row geometry policy used by popup menus and dropdown-owned menus.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonMenuSize {
-    Compact,
-    Normal,
+    /// A tier of the shared size scale. Menus come in `Xs` (20px rows), `Sm` (24px) and `Md`
+    /// (32px); `Lg` and above render as `Md`.
+    Tier(MoonSize),
     Custom {
         row_height: f32,
         font_size: f32,
@@ -150,6 +151,34 @@ pub enum MoonMenuSize {
         pad_x: f32,
         gap: f32,
     },
+}
+
+#[allow(non_upper_case_globals)]
+impl MoonMenuSize {
+    #[deprecated(note = "use `MoonSize::Sm`")]
+    pub const Compact: Self = Self::Tier(MoonSize::Sm);
+    #[deprecated(note = "use `MoonSize::Md`")]
+    pub const Normal: Self = Self::Tier(MoonSize::Md);
+
+    /// Tiers a menu renders; any other tier snaps to the nearest of these.
+    pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];
+
+    /// The size an unset menu resolves to: the theme's preferred tier, snapped.
+    ///
+    /// Args:
+    ///     tokens: Active theme tokens supplying the preferred density tier.
+    ///
+    /// Returns:
+    ///     A `Tier` snapped onto [`Self::SUPPORTED_TIERS`].
+    pub fn from_theme(tokens: &MoonThemeTokens) -> Self {
+        Self::Tier(tokens.tier().nearest(&Self::SUPPORTED_TIERS))
+    }
+}
+
+impl From<MoonSize> for MoonMenuSize {
+    fn from(size: MoonSize) -> Self {
+        Self::Tier(size)
+    }
 }
 
 /// Immutable-render menu row with shared handlers and nested menu storage.

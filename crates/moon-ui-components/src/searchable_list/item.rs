@@ -22,7 +22,7 @@ pub enum SearchableListRowLook {
     ///
     /// The check column is reserved whether or not the row is checked, so labels stay aligned and
     /// the cursor marker painted at the row's left edge falls inside it instead of on the first
-    /// glyph. Row height, radius, padding and label size come from the compact menu metrics — that
+    /// glyph. Row height, radius, padding and label size come from the menu's own metrics — that
     /// is what makes a popup opening beside dropdown menus indistinguishable from them.
     Menu,
 }
@@ -140,7 +140,7 @@ impl RenderOnce for SearchableListItemElement {
         let group_row = menu_look && self.group;
         // A menu row is not an input row scaled down: its height, radius, padding and label size
         // come from the menu's own metrics, so both open from one filter row looking the same.
-        let menu = menu_look.then(|| menu_row_metrics(MoonMenuSize::Compact, &tokens));
+        let menu = menu_look.then(|| menu_row_metrics(MoonMenuSize::from_theme(&tokens), &tokens));
         h_flex()
             .id(self.id)
             .relative()
@@ -160,8 +160,8 @@ impl RenderOnce for SearchableListItemElement {
                     .px(gpui::px(metrics.pad_x))
                     .rounded(gpui::px(metrics.radius))
                     .gap_x(gpui::px(metrics.gap))
-                    .text_size(gpui::px(tokens.font(metrics.font_size)))
-                    .line_height(gpui::px(tokens.line_height(metrics.line_height)))
+                    .text_size(gpui::px(metrics.font_size))
+                    .line_height(gpui::px(metrics.line_height))
             })
             .refine_style(&self.style)
             .when(!self.disabled, |this| {

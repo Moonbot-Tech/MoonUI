@@ -11,7 +11,7 @@ use super::{DockEvent, DockTabDrag, MoonTabPanelRuntimeState, TabPanel, tab_inte
 use crate::{
     event::InteractiveElementExt as _,
     moon::{
-        MOON_ICON_CARET_DOWN, MoonDropdown, MoonMenuItem, MoonMenuSize,
+        MOON_ICON_CARET_DOWN, MoonDropdown, MoonMenuItem,
         background::MoonBackgroundPolicy,
         button::{MoonButton, MoonButtonSize, MoonButtonVariant},
         h_flex,
@@ -370,7 +370,6 @@ impl RenderOnce for TabPanel {
                         .trigger_caret(false)
                         .trigger_variant(MoonButtonVariant::Ghost)
                         .trigger_size(MoonButtonSize::Micro)
-                        .menu_size(MoonMenuSize::Compact)
                         .items(overflow_items),
                 ),
             );

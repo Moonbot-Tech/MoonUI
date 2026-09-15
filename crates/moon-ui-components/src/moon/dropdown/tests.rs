@@ -8,10 +8,10 @@ use super::{
     MoonMenuItemKind, MoonMenuMaxHeight, MoonMenuSize, MoonMenuWidth, MoonPalette, MoonPopupMenu,
     MoonRect, MoonThemeTokens, SUBMENU_OFFSET_X, capped_menu_items_height, clamp_header_budget,
     fit_dropdown_trigger_label, fit_menu_item_labels, menu_content_max,
-    menu_measurement_probe_count, natural_menu_width, resolve_menu_width,
+    menu_measurement_probe_count, menu_row_metrics, natural_menu_width, resolve_menu_width,
     resolve_virtual_menu_width, take_menu_item_clone_probe_count, take_palette_probe_shell,
 };
-use crate::moon::{MoonScale, MoonTheme, ThemeMode};
+use crate::moon::{MoonScale, MoonSize, MoonTheme, ThemeMode};
 use gpui::{ParentElement as _, Styled as _};
 use std::{
     cell::{Cell, RefCell},
@@ -58,6 +58,8 @@ fn virtual_menu_height_stops_scanning_once_the_viewport_is_full() {
         radius: 4.0,
         pad_x: 7.0,
         gap: 6.0,
+        text_scale: 1.0,
+        trailing_font_size: 10.0,
     };
     let inspected = Cell::new(0);
     let kinds = (0..1_000).map(|_| {
@@ -488,9 +490,8 @@ fn menu_width_sample_ignores_where_a_long_label_sits(cx: &mut gpui::TestAppConte
     cx.update(|cx| {
         let tokens = MoonThemeTokens::default();
         let metrics = MoonPopupMenu::new("width-sample-order")
-            .size(MoonMenuSize::Compact)
-            .metrics()
-            .scaled(&tokens);
+            .size(MoonSize::Sm)
+            .resolved_metrics(&tokens);
         // Small height budget: the height-only prefix covers only a handful of rows, far short of
         // both the 80-row list and the 128-row sample floor.
         let content_max = 100.0;
@@ -535,9 +536,8 @@ fn menu_width_sample_stays_bounded_for_a_pathological_menu(cx: &mut gpui::TestAp
     cx.update(|cx| {
         let tokens = MoonThemeTokens::default();
         let metrics = MoonPopupMenu::new("width-sample-bound")
-            .size(MoonMenuSize::Compact)
-            .metrics()
-            .scaled(&tokens);
+            .size(MoonSize::Sm)
+            .resolved_metrics(&tokens);
         let items: Vec<_> = (0..5_000)
             .map(|ix| MoonMenuItem::new(format!("{MENU_MEASUREMENT_PROBE_PREFIX}{ix}")))
             .collect();
@@ -581,9 +581,8 @@ fn virtual_menu_width_truncation_follows_the_measured_sample(cx: &mut gpui::Test
     cx.update(|cx| {
         let tokens = MoonThemeTokens::default();
         let metrics = MoonPopupMenu::new("width-sample-truncation")
-            .size(MoonMenuSize::Compact)
-            .metrics()
-            .scaled(&tokens);
+            .size(MoonSize::Sm)
+            .resolved_metrics(&tokens);
         // Over the 64-row virtualization threshold but comfortably under the 128-row sample, so
         // the whole list is measured; a small height budget keeps the height-only prefix (a
         // handful of rows) far shorter than the full 100-row list.
@@ -721,14 +720,13 @@ fn scaled_menu_width_retains_fitted_rows_at_independent_scale_extremes(
                     tier: Default::default(),
                 };
                 let metrics = MoonPopupMenu::new("scaled-menu-test")
-                    .size(MoonMenuSize::Compact)
-                    .metrics()
-                    .scaled(&tokens);
+                    .size(MoonSize::Sm)
+                    .resolved_metrics(&tokens);
                 let mut items = vec![
                     MoonMenuItem::new("a deliberately long menu label for truncation")
                         .right_label("12:34:56"),
                 ];
-                let text_scale = tokens.font(metrics.font_size) / metrics.font_size;
+                let text_scale = metrics.text_scale;
                 let requested = 160.0 * text_scale;
                 let (width, truncate) = resolve_menu_width(
                     MoonMenuWidth::Scaled(160.0),
@@ -1282,15 +1280,17 @@ fn palette_only_menu_render_rejects_measured_width_policies() {
 #[test]
 fn fitted_menu_accounts_for_right_label_and_its_gap() {
     let tokens = MoonThemeTokens::default();
-    let metrics = MenuMetrics {
-        row_height: 20.0,
-        font_size: 9.5,
-        line_height: 12.0,
-        radius: 3.0,
-        pad_x: 6.0,
-        gap: 5.0,
-    }
-    .scaled(&tokens);
+    let metrics = menu_row_metrics(
+        MoonMenuSize::Custom {
+            row_height: 20.0,
+            font_size: 9.5,
+            line_height: 12.0,
+            radius: 3.0,
+            pad_x: 6.0,
+            gap: 5.0,
+        },
+        &tokens,
+    );
     let plain = [MoonMenuItem::new("UTC+12")];
     let with_right = [MoonMenuItem::new("UTC+12").right_label("12:34:56")];
     let measure = |text: &str, _size: f32, _weight: f32| text.chars().count() as f32;
@@ -1322,7 +1322,7 @@ impl gpui::Render for FittedSubmenuHarness {
         _cx: &mut gpui::Context<Self>,
     ) -> impl gpui::IntoElement {
         MoonPopupMenu::new("fit-parent")
-            .size(MoonMenuSize::Compact)
+            .size(MoonSize::Sm)
             .fit_width(80.0, 400.0)
             .item(
                 MoonMenuItem::new("More")
@@ -1391,15 +1391,17 @@ fn fitted_submenu_resolves_width_from_its_own_items(cx: &mut gpui::TestAppContex
 #[test]
 fn fitted_label_row_accounts_for_right_label_and_its_gap() {
     let tokens = MoonThemeTokens::default();
-    let metrics = MenuMetrics {
-        row_height: 20.0,
-        font_size: 9.5,
-        line_height: 12.0,
-        radius: 3.0,
-        pad_x: 6.0,
-        gap: 5.0,
-    }
-    .scaled(&tokens);
+    let metrics = menu_row_metrics(
+        MoonMenuSize::Custom {
+            row_height: 20.0,
+            font_size: 9.5,
+            line_height: 12.0,
+            radius: 3.0,
+            pad_x: 6.0,
+            gap: 5.0,
+        },
+        &tokens,
+    );
     let plain = [MoonMenuItem::label("Exchanges")];
     let with_right = [MoonMenuItem::label("Exchanges").right_label("42")];
     let measure = |text: &str, _size: f32, _weight: f32| text.chars().count() as f32;
@@ -1421,15 +1423,17 @@ fn fitted_label_row_accounts_for_right_label_and_its_gap() {
 #[test]
 fn menu_content_max_charges_the_header_budget_to_the_row_list() {
     let tokens = MoonThemeTokens::default();
-    let metrics = MenuMetrics {
-        row_height: 24.0,
-        font_size: 10.5,
-        line_height: 13.0,
-        radius: 4.0,
-        pad_x: 7.0,
-        gap: 6.0,
-    }
-    .scaled(&tokens);
+    let metrics = menu_row_metrics(
+        MoonMenuSize::Custom {
+            row_height: 24.0,
+            font_size: 10.5,
+            line_height: 13.0,
+            radius: 4.0,
+            pad_x: 7.0,
+            gap: 6.0,
+        },
+        &tokens,
+    );
     let outer_max = 400.0;
     let header_budget = 50.0;
 

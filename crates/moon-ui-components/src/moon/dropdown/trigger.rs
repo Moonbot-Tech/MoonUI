@@ -91,7 +91,7 @@ pub struct MoonDropdown {
     menu_width: MoonMenuWidth,
     menu_offset_x: f32,
     menu_offset_y: f32,
-    menu_size: MoonMenuSize,
+    menu_size: Option<MoonMenuSize>,
     menu_max_height: Option<MoonMenuMaxHeight>,
     close_on_select: bool,
     on_select: Option<MoonSelectHandler>,
@@ -128,7 +128,7 @@ impl MoonDropdown {
             menu_width: MoonMenuWidth::Rendered(160.0),
             menu_offset_x: 0.0,
             menu_offset_y: 4.0,
-            menu_size: MoonMenuSize::Normal,
+            menu_size: None,
             menu_max_height: None,
             close_on_select: true,
             on_select: None,
@@ -345,9 +345,12 @@ impl MoonDropdown {
         self
     }
 
-    /// Set the density preset used by popup rows.
-    pub fn menu_size(mut self, size: MoonMenuSize) -> Self {
-        self.menu_size = size;
+    /// Set the density size used by popup rows: a tier such as `MoonSize::Sm`, or a
+    /// `MoonMenuSize::Custom`.
+    ///
+    /// An unset size follows the theme's density tier.
+    pub fn menu_size(mut self, size: impl Into<MoonMenuSize>) -> Self {
+        self.menu_size = Some(size.into());
         self
     }
 
@@ -639,6 +642,7 @@ impl RenderOnce for MoonDropdown {
             .trigger_any(trigger)
             .content(move |_, window, cx| {
                 let tokens = MoonTheme::active_tokens(cx);
+                let menu_size = menu_size.unwrap_or_else(|| MoonMenuSize::from_theme(&tokens));
                 let mut menu = MoonPopupMenu::new(menu_id.clone())
                     .shared_level(popup_level.clone())
                     .dropdown_selection(dropdown_selection.clone())

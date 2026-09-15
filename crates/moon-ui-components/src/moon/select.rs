@@ -11,6 +11,7 @@ use super::{
     button::{MoonButtonSize, MoonButtonVariant},
     dropdown::MoonMenuSize,
     index_path::IndexPath,
+    theme::MoonTheme,
     tokens::MoonRect,
 };
 
@@ -265,7 +266,7 @@ where
     trigger_size: MoonButtonSize,
     menu_width: f32,
     menu_max_height: Option<f32>,
-    menu_size: MoonMenuSize,
+    menu_size: Option<MoonMenuSize>,
     in_popover: bool,
 }
 
@@ -290,7 +291,7 @@ where
             trigger_size: MoonButtonSize::Toolbar,
             menu_width: 180.0,
             menu_max_height: None,
-            menu_size: MoonMenuSize::Normal,
+            menu_size: None,
             in_popover: false,
         }
     }
@@ -360,8 +361,13 @@ where
         self
     }
 
-    pub fn menu_size(mut self, size: MoonMenuSize) -> Self {
-        self.menu_size = size;
+    /// Set the menu size for API parity with other menus: a tier such as `MoonSize::Sm`, or a
+    /// `MoonMenuSize::Custom`.
+    ///
+    /// MoonSelect rows follow the trigger size; this value is stored and forwarded but does not
+    /// change row chrome.
+    pub fn menu_size(mut self, size: impl Into<MoonMenuSize>) -> Self {
+        self.menu_size = Some(size.into());
         self
     }
 
@@ -385,6 +391,9 @@ where
         });
 
         let core = self.state.read(cx).core.clone();
+        let menu_size = self
+            .menu_size
+            .unwrap_or_else(|| MoonMenuSize::from_theme(&MoonTheme::active_tokens(cx)));
         let mut select = CoreSelect::new(&core)
             .placeholder(self.placeholder)
             .cleanable(self.cleanable)
@@ -392,7 +401,7 @@ where
             .disabled(self.disabled)
             .appearance(self.appearance)
             .menu_width(px(self.menu_width))
-            .with_size(size_for(self.trigger_size, self.menu_size));
+            .with_size(size_for(self.trigger_size, menu_size));
 
         if self.in_popover {
             select = select.menu_priority(super::popover::MOON_POPOVER_PRIORITY + 1);
