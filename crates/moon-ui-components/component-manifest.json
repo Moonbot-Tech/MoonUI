@@ -603,7 +603,7 @@
       "theme_source": "MoonTheme tokens",
       "public_path": "moon_ui::MoonRadio",
       "upstream_ref": null,
-      "fork_reason": "MoonBot compact radio metrics and visual state",
+      "fork_reason": "Moon radio on the checkbox's Sm/Md size tiers, sharing its metrics, colours, focus ring, mark fade and text column",
       "contracts": ["radio.click_behavior", "gallery.visual_coverage"]
     },
     {
