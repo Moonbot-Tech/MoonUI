@@ -59,6 +59,7 @@ mod spinner;
 mod status_bar;
 mod stepper;
 mod surface;
+pub(crate) mod svg;
 mod switch;
 mod tab;
 mod table;

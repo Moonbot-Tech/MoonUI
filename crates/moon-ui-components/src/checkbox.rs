@@ -1,23 +1,18 @@
-use std::{
-    collections::HashMap,
-    rc::Rc,
-    sync::{Arc, LazyLock, Mutex},
-    time::Duration,
-};
+use std::{rc::Rc, time::Duration};
 
 use crate::{
     Disableable, Selectable, Sizable, Size, StyledExt as _,
     moon::MoonTone,
-    moon::{MoonPalette, MoonTheme, MoonThemeTokens, rgba_from},
+    moon::{MoonTheme, MoonThemeTokens, rgba_from, svg::moon_svg},
     text::Text,
     tooltip::ComponentTooltip,
     v_flex,
 };
 use gpui::{
-    Animation, AnimationExt, AnyElement, App, Div, ElementId, FontWeight, InteractiveElement,
-    IntoElement, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
-    StyleRefinement, Styled, TransformationMatrix, Window, canvas, div,
-    prelude::FluentBuilder as _, px,
+    Animation, AnimationExt, AnyElement, App, Div, ElementId, Empty, FontWeight, Hsla,
+    InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
+    StatefulInteractiveElement, StyleRefinement, Styled, Window, div, prelude::FluentBuilder as _,
+    px,
 };
 
 /// A Checkbox element.
@@ -188,15 +183,38 @@ impl Sizable for Checkbox {
     }
 }
 
-// Mark icons for the checked and indeterminate states. Their shapes come from the files; their
-// stroke width is rewritten per size at paint time and their colour is applied as a tint.
+// Mark icons for the checked and indeterminate states. Their shapes come from the files; the
+// stroke width comes from the size's metrics and the colour is applied as a tint.
 const CHECK_ICON: &str = "icons/moon-checkbox-check.svg";
 const MINUS_ICON: &str = "icons/moon-checkbox-minus.svg";
 
-/// Stroke-rewritten mark icon text by atlas key, so each SVG is edited once per stroke ratio
-/// rather than on every paint.
-static STROKED_MARK_ICONS: LazyLock<Mutex<HashMap<SharedString, Arc<[u8]>>>> =
-    LazyLock::new(Default::default);
+/// Whether a box shows its mark, and whether the mark arrived with a fade.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum MarkState {
+    Hidden,
+    /// Checked since the box first rendered, so the mark shows without a fade.
+    Shown,
+    /// Checked after the box first rendered. The mark keeps its fade wrapper while it shows, so
+    /// the one-shot fade runs to the end instead of being cut off by the next render.
+    FadingIn,
+}
+
+impl MarkState {
+    /// Returns the state of a box first rendered `checked`: an already checked box (such as a
+    /// checked row scrolling into view) shows its mark at once.
+    fn initial(checked: bool) -> Self {
+        if checked { Self::Shown } else { Self::Hidden }
+    }
+
+    /// Returns the state after a render with `checked`: only a box that becomes checked fades in.
+    fn next(self, checked: bool) -> Self {
+        match (checked, self) {
+            (false, _) => Self::Hidden,
+            (true, Self::Hidden) => Self::FadingIn,
+            (true, shown) => shown,
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 struct MoonCheckboxMetrics {
@@ -328,72 +346,7 @@ impl MoonCheckboxMetrics {
     }
 }
 
-/// Rewrites every `stroke-width` in `svg` so the stroke renders `stroke` wide when the SVG is
-/// drawn `drawn_size` wide, scaling against the SVG's own `viewBox`.
-///
-/// Returns `None` when `svg` has no parsable `viewBox` width or an unterminated `stroke-width`.
-fn with_rendered_stroke(svg: &str, stroke: f32, drawn_size: f32) -> Option<String> {
-    let view_box_width: f32 = svg
-        .split_once("viewBox=\"")?
-        .1
-        .split('"')
-        .next()?
-        .split_whitespace()
-        .nth(2)?
-        .parse()
-        .ok()?;
-    let width = format!("{:.4}", stroke * view_box_width / drawn_size);
-
-    let mut rewritten = String::with_capacity(svg.len());
-    let mut rest = svg;
-    while let Some((before, after)) = rest.split_once("stroke-width=\"") {
-        rewritten.push_str(before);
-        rewritten.push_str("stroke-width=\"");
-        rewritten.push_str(&width);
-        rewritten.push('"');
-        rest = after.split_once('"')?.1;
-    }
-    rewritten.push_str(rest);
-    Some(rewritten)
-}
-
-/// Returns the sprite-atlas key and SVG bytes to paint the mark `icon` with a `stroke`-wide stroke
-/// at `mark_size`. Without a `stroke` the icon is painted as authored, and the bytes are `None` so
-/// the atlas loads the file itself.
-///
-/// Returns `None` when the icon asset cannot be loaded or rewritten, in which case nothing paints.
-fn mark_icon_svg(
-    icon: &'static str,
-    stroke: Option<gpui::Pixels>,
-    mark_size: gpui::Pixels,
-    cx: &App,
-) -> Option<(SharedString, Option<Arc<[u8]>>)> {
-    let Some(stroke) = stroke else {
-        return Some((icon.into(), None));
-    };
-    // The ratio, not the pixel width, names the variant: UI scaling changes both the stroke and
-    // the mark, and the atlas key already carries the drawn size.
-    let key = SharedString::from(format!(
-        "{icon}#stroke={:.4}",
-        stroke.as_f32() / mark_size.as_f32()
-    ));
-    let mut cache = STROKED_MARK_ICONS.lock().ok()?;
-    if let Some(bytes) = cache.get(&key) {
-        return Some((key, Some(bytes.clone())));
-    }
-    let source = cx.asset_source().load(icon).ok()??;
-    let svg = with_rendered_stroke(
-        std::str::from_utf8(&source).ok()?,
-        stroke.as_f32(),
-        mark_size.as_f32(),
-    )?;
-    let bytes: Arc<[u8]> = svg.into_bytes().into();
-    cache.insert(key.clone(), bytes.clone());
-    Some((key, Some(bytes)))
-}
-
-/// Renders the check mark SVG centred in the box and fades it in or out when the checked state
-/// flips.
+/// Renders the check mark centred in a checkbox-sized box, for the base radio.
 pub(crate) fn checkbox_check_icon(
     id: ElementId,
     size: Size,
@@ -403,98 +356,72 @@ pub(crate) fn checkbox_check_icon(
     window: &mut Window,
     cx: &mut App,
 ) -> impl IntoElement {
+    let color = rgba_from(checked_color, if disabled { 0.45 } else { 1.0 });
     checkbox_mark(
         id,
-        size,
+        MoonCheckboxMetrics::for_size(size, cx),
         checked,
-        disabled,
-        checked_color,
+        color,
         CHECK_ICON,
         window,
         cx,
     )
+    .unwrap_or_else(|| Empty.into_any_element())
 }
 
-/// Renders the mark `icon` centred in the box and fades it in or out when the checked state flips.
-#[allow(clippy::too_many_arguments)]
+/// Returns the mark `icon` tinted `color`, drawn at the size's stroke and centred in a box of
+/// `metrics.box_size`, fading in when the box becomes checked; `None` for an unchecked box, which
+/// draws no mark.
 fn checkbox_mark(
     id: ElementId,
-    size: Size,
+    metrics: MoonCheckboxMetrics,
     checked: bool,
-    disabled: bool,
-    checked_color: u32,
+    color: Hsla,
     icon: &'static str,
     window: &mut Window,
     cx: &mut App,
-) -> AnyElement {
-    let selector = format!("{id}:mark");
-    let toggle_state = window.use_keyed_state(id, cx, |_, _| checked);
-    let metrics = MoonCheckboxMetrics::for_size(size, cx);
-    let color = rgba_from(checked_color, if disabled { 0.45 } else { 1.0 });
+) -> Option<AnyElement> {
+    let state = window.use_keyed_state(id.clone(), cx, |_, _| MarkState::initial(checked));
+    let previous = *state.read(cx);
+    let current = previous.next(checked);
+    if current != previous {
+        state.update(cx, |state, _| *state = current);
+    }
+    if current == MarkState::Hidden {
+        return None;
+    }
+
     // Absolute insets start inside the box's 1px border (`border_1` on both the checkbox and radio
     // boxes), so centring within the outer box takes that border back off.
-    let mark_offset = (metrics.box_size - metrics.mark_size) * 0.5 - px(1.);
-
-    div()
-        .debug_selector(|| selector)
+    let offset = (metrics.box_size - metrics.mark_size) * 0.5 - px(1.);
+    let mark = moon_svg(icon)
+        .debug_selector(|| format!("{id}:mark"))
         .absolute()
-        .top(mark_offset)
-        .left(mark_offset)
+        .top(offset)
+        .left(offset)
         .size(metrics.mark_size)
-        .child(
-            canvas(
-                |_, _, _| {},
-                move |bounds, _, window, cx| {
-                    // Loaded from the embedded MoonAssets source by asset path, so the mark also
-                    // renders in distributed builds.
-                    if checked
-                        && let Some((key, bytes)) =
-                            mark_icon_svg(icon, metrics.mark_stroke, metrics.mark_size, cx)
-                    {
-                        _ = window.paint_svg(
-                            bounds,
-                            key,
-                            bytes.as_deref(),
-                            TransformationMatrix::default(),
-                            color.into(),
-                            cx,
-                        );
-                    }
-                },
-            )
-            .size_full(),
-        )
-        .map(|this| {
-            if !disabled && checked != *toggle_state.read(cx) {
-                let duration = Duration::from_secs_f64(0.25);
-                cx.spawn({
-                    let toggle_state = toggle_state.clone();
-                    async move |cx| {
-                        cx.background_executor().timer(duration).await;
-                        _ = toggle_state.update(cx, |this, _| *this = checked);
-                    }
-                })
-                .detach();
-
-                this.with_animation(
-                    ElementId::NamedInteger("toggle".into(), checked as u64),
-                    Animation::new(Duration::from_secs_f64(0.25)),
-                    move |this, delta| {
-                        this.opacity(if checked { 1.0 * delta } else { 1.0 - delta })
-                    },
-                )
-                .into_any_element()
-            } else {
-                this.into_any_element()
-            }
+        .when_some(metrics.mark_stroke, |mark, stroke| {
+            mark.stroke_width(stroke)
         })
+        .text_color(color);
+    Some(if current == MarkState::FadingIn {
+        mark.with_animation(
+            "fade-in",
+            Animation::new(Duration::from_millis(250)),
+            |mark, delta| mark.opacity(delta),
+        )
+        .into_any_element()
+    } else {
+        mark.into_any_element()
+    })
 }
 
 impl RenderOnce for Checkbox {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let checked = self.checked || self.indeterminate;
-        let metrics = MoonCheckboxMetrics::for_size(self.size, cx);
-        let p = MoonPalette::active(cx);
+        let tokens = MoonTheme::active_tokens(cx);
+        let metrics = MoonCheckboxMetrics::resolve(self.size, &tokens);
+        let p = tokens.palette;
         let checked_tone = self.tone.unwrap_or(MoonTone::Info).color(p);
         let alpha = if self.disabled { 0.45 } else { 1.0 };
 
@@ -515,11 +442,14 @@ impl RenderOnce for Checkbox {
                 rgba_from(p.shell_high, 0.95 * alpha),
             )
         };
-        let label_color = if self.disabled {
-            rgba_from(p.text_muted, alpha)
-        } else {
-            rgba_from(p.text_soft, alpha)
-        };
+        let label_color = rgba_from(
+            if self.disabled {
+                p.text_muted
+            } else {
+                p.text_soft
+            },
+            alpha,
+        );
         let description_color = rgba_from(p.text_muted, alpha);
         // Empty text counts as no text, so a bare checkbox never gains the text column and, with
         // it, the box-to-text gap and a text line's height.
@@ -535,10 +465,22 @@ impl RenderOnce for Checkbox {
         // pushing whichever of the two is shorter down by half the difference.
         let box_offset = ((metrics.line_height - metrics.box_size) * 0.5).max(px(0.));
         let text_offset = ((metrics.box_size - metrics.line_height) * 0.5).max(px(0.));
-        let focus_ring_selector = format!("{}:focus-ring", self.id);
-        let label_selector = format!("{}:label", self.id);
-        let description_selector = format!("{}:description", self.id);
+        let mark = checkbox_mark(
+            self.id.clone(),
+            metrics,
+            checked,
+            rgba_from(p.ink_on(checked_tone), alpha),
+            if self.indeterminate {
+                MINUS_ICON
+            } else {
+                CHECK_ICON
+            },
+            window,
+            cx,
+        );
 
+        // The plain wrapper keeps the row at its content height inside a flex parent that
+        // stretches its items, so the hit area and the vertical alignment stay on the control.
         div().child(
             self.base
                 .id(self.id.clone())
@@ -549,20 +491,13 @@ impl RenderOnce for Checkbox {
                             .tab_index(self.tab_index),
                     )
                 })
+                // `h_flex` centres the box on the text; a description top-aligns them instead.
                 .h_flex()
+                .when(has_description, |this| this.items_start())
                 .gap(metrics.gap)
-                .map(|this| {
-                    if has_description {
-                        this.items_start()
-                    } else {
-                        this.items_center()
-                    }
-                })
                 .text_size(metrics.font_size)
                 .text_color(label_color)
-                .when(self.mono, |this| {
-                    this.font_family(MoonTheme::active_tokens(cx).font_family(true))
-                })
+                .when(self.mono, |this| this.font_family(tokens.font_family(true)))
                 .when(!self.disabled, |this| this.cursor_pointer())
                 .refine_style(&self.style)
                 .child(
@@ -582,7 +517,7 @@ impl RenderOnce for Checkbox {
                             let inset = -(metrics.focus_ring_distance + px(1.));
                             this.child(
                                 div()
-                                    .debug_selector(|| focus_ring_selector)
+                                    .debug_selector(|| format!("{}:focus-ring", self.id))
                                     .absolute()
                                     .top(inset)
                                     .left(inset)
@@ -593,20 +528,7 @@ impl RenderOnce for Checkbox {
                                     .rounded(metrics.radius + metrics.focus_ring_distance),
                             )
                         })
-                        .child(checkbox_mark(
-                            self.id,
-                            self.size,
-                            checked,
-                            self.disabled,
-                            p.ink_on(checked_tone),
-                            if self.indeterminate {
-                                MINUS_ICON
-                            } else {
-                                CHECK_ICON
-                            },
-                            window,
-                            cx,
-                        )),
+                        .children(mark),
                 )
                 // Label, description and any extra children share one text column; without text
                 // there is no column, so the row is only the box and the gap never applies.
@@ -621,7 +543,7 @@ impl RenderOnce for Checkbox {
                             .when_some(label, |this, label| {
                                 this.child(
                                     div()
-                                        .debug_selector(|| label_selector)
+                                        .debug_selector(|| format!("{}:label", self.id))
                                         .font_weight(metrics.label_weight)
                                         .child(label),
                                 )
@@ -629,7 +551,7 @@ impl RenderOnce for Checkbox {
                             .when_some(description, |this, description| {
                                 this.child(
                                     div()
-                                        .debug_selector(|| description_selector)
+                                        .debug_selector(|| format!("{}:description", self.id))
                                         .text_color(description_color)
                                         .font_weight(metrics.description_weight)
                                         .child(description),
@@ -657,6 +579,7 @@ impl RenderOnce for Checkbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::moon::svg::with_rendered_stroke;
     use std::{cell::RefCell, rc::Rc};
 
     #[test]
@@ -737,6 +660,62 @@ mod tests {
                 assert!(svg.contains(&format!("stroke-width=\"{file_width}\"")));
                 assert_eq!(svg.matches("stroke-width=").count(), 1);
                 assert!(svg.contains(shape));
+            }
+        }
+    }
+
+    /// Catches the check mark fading when it should simply show, or showing when it should fade: a
+    /// box already checked when it first renders (a checked row scrolling into view) must show its
+    /// mark at once, while checking a rendered box must fade the mark in and keep that fade until
+    /// the box is unchecked, so the fade is neither cut off nor replayed.
+    #[test]
+    fn test_mark_fades_in_only_when_checked_after_first_render() {
+        assert_eq!(MarkState::initial(true), MarkState::Shown);
+        assert_eq!(MarkState::initial(false), MarkState::Hidden);
+        assert_eq!(MarkState::Shown.next(true), MarkState::Shown);
+        assert_eq!(MarkState::Hidden.next(true), MarkState::FadingIn);
+        assert_eq!(MarkState::FadingIn.next(true), MarkState::FadingIn);
+        for state in [MarkState::Hidden, MarkState::Shown, MarkState::FadingIn] {
+            assert_eq!(state.next(false), MarkState::Hidden);
+        }
+    }
+
+    struct ToggledCheckboxHarness {
+        checked: bool,
+    }
+
+    impl gpui::Render for ToggledCheckboxHarness {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            div().child(Checkbox::new("toggled").checked(self.checked).small())
+        }
+    }
+
+    /// Catches checking a rendered box failing to draw its mark: when an unchecked box becomes
+    /// checked, `checkbox_mark` must draw the fading mark at its reviewed 12px size (not skip it or
+    /// panic updating its state mid-render), and must drop the mark again once unchecked.
+    #[gpui::test]
+    fn test_checking_a_rendered_box_draws_its_mark(cx: &mut gpui::TestAppContext) {
+        cx.update(crate::init);
+        let window = cx.add_window(|_, _| ToggledCheckboxHarness { checked: false });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("toggled:mark").is_none());
+
+        for checked in [true, false] {
+            window
+                .update(&mut cx, |view, _, cx| {
+                    view.checked = checked;
+                    cx.notify();
+                })
+                .expect("window must stay open");
+            cx.run_until_parked();
+
+            let mark = cx.debug_bounds("toggled:mark");
+            if checked {
+                let mark = mark.expect("a box checked after rendering must draw its mark");
+                assert_eq!(mark.size, gpui::size(px(12.), px(12.)));
+            } else {
+                assert!(mark.is_none(), "an unchecked box must draw no mark");
             }
         }
     }
@@ -866,7 +845,7 @@ mod tests {
         label: Option<&'static str>,
     ) -> gpui::VisualTestContext {
         let window = cx.add_window(move |_, _| ProbedCheckboxHarness { size, label });
-        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        let cx = gpui::VisualTestContext::from_window(window.into(), cx);
         cx.run_until_parked();
         cx
     }
