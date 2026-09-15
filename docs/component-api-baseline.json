@@ -1847,6 +1847,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub const fn control_metrics(self) -> MoonControlMetrics"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
       "signature": "pub enum MoonSize"
     },
     {
@@ -1871,6 +1875,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn nearest(self, supported: &[MoonSize]) -> MoonSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
       "signature": "pub fn selected_background(p: MoonPalette) -> Background"
     },
     {
@@ -1880,6 +1888,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
       "signature": "pub fn v_flex() -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub struct MoonControlMetrics"
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",

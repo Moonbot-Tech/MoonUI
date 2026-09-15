@@ -139,6 +139,16 @@ because the GPUI Windows backend still reports `render_to_image` as
 unimplemented. This is good enough to catch visual regressions in normal local
 developer runs, but backend `render_to_image` remains the cleaner final target.
 
+## Shared Control Size Scale
+
+`MoonSize::control_metrics()` returns the shared `MoonControlMetrics` table in
+[`moon/foundation.rs`](../crates/moon-ui-components/src/moon/foundation.rs).
+Its doc comment defines every tier's design-reference values, the WCAG target-size
+floor (`Sm` is the intended terminal default; `Xs` needs the spacing exception),
+and zoom-only scaling for tiers, including text; custom sizes retain text scaling.
+`MoonSize::nearest(&supported)` snaps by tier steps, with ties going down, and
+requires a non-empty list. Component migrations adopt this table separately.
+
 ## Public API Snapshot
 
 The second guardrail records the Moon-facing public API surface.
