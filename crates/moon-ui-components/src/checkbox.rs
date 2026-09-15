@@ -12,7 +12,7 @@ use gpui::{
     Animation, AnimationExt, AnyElement, App, Div, ElementId, Empty, FontWeight, Hsla,
     InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, StyleRefinement, Styled, Window, div, prelude::FluentBuilder as _,
-    px,
+    px, transparent_black,
 };
 
 /// A Checkbox element.
@@ -412,14 +412,17 @@ pub(crate) struct ChoiceColors {
 }
 
 impl ChoiceColors {
-    /// Resolves the colours of a box in `tone`. A checked box is one solid tone, border and fill
-    /// alike, so its mark takes the palette ink that reads best on that tone rather than the tone
-    /// itself. A disabled box draws everything at 45% opacity.
+    /// Resolves the colours of a box in `tone`. A disabled box draws everything at 45% opacity.
+    ///
+    /// A checked box is filled with the tone and draws no border, so its mark takes the palette ink
+    /// that reads best on that tone rather than the tone itself. The border stays transparent
+    /// rather than matching the fill: over a disabled box's translucent fill, a border in the same
+    /// tone would composite into a visibly brighter ring.
     pub(crate) fn resolve(p: MoonPalette, tone: MoonTone, checked: bool, disabled: bool) -> Self {
         let alpha = if disabled { 0.45 } else { 1.0 };
         let tone = tone.color(p);
         let (border, fill) = if checked {
-            (rgba_from(tone, alpha), rgba_from(tone, alpha))
+            (transparent_black(), rgba_from(tone, alpha))
         } else {
             (
                 rgba_from(p.border, alpha),
@@ -743,9 +746,10 @@ mod tests {
     }
 
     /// Catches the shared checkbox and radio colours drifting from the reviewed design: a checked box
-    /// must be one solid tone, border and fill alike, with its mark in the palette ink that reads
-    /// best on that tone; an unchecked box keeps the neutral border and fill; disabled boxes fade to
-    /// 45%; and the focus ring stays the full tone.
+    /// must be filled with its tone and draw no border (a tone border over a disabled box's
+    /// translucent fill shows as a brighter ring), with its mark in the palette ink that reads best
+    /// on that tone; an unchecked box keeps the neutral border and fill; disabled boxes fade to 45%;
+    /// and the focus ring stays the full tone.
     #[test]
     fn test_choice_colors_fill_a_checked_box_with_its_tone() {
         let p = crate::moon::MoonThemeConfig::moon_terminal().dark.palette;
@@ -753,7 +757,7 @@ mod tests {
             let tone_rgb = tone.color(p);
             for (disabled, alpha) in [(false, 1.0), (true, 0.45)] {
                 let checked = ChoiceColors::resolve(p, tone, true, disabled);
-                assert_eq!(checked.border, rgba_from(tone_rgb, alpha));
+                assert!(checked.border.is_transparent());
                 assert_eq!(checked.fill, rgba_from(tone_rgb, alpha));
                 assert_eq!(checked.mark, rgba_from(p.ink_on(tone_rgb), alpha));
                 assert_eq!(checked.focus_ring, rgba_from(tone_rgb, 1.0));
