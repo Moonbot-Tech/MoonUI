@@ -889,12 +889,12 @@ impl CaseGallery {
             "radio.checked" => MoonRadio::new("handoff-radio-checked")
                 .label("Market")
                 .checked(true)
-                .size(MoonRadioSize::Normal)
+                .size(MoonSize::Md)
                 .into_any_element(),
             "radio.unchecked" => MoonRadio::new("handoff-radio-unchecked")
                 .label("Market")
                 .checked(false)
-                .size(MoonRadioSize::Normal)
+                .size(MoonSize::Md)
                 .into_any_element(),
             "rating.stars" => MoonRating::new("handoff-rating")
                 .value(3)

@@ -3,7 +3,7 @@ use std::{rc::Rc, time::Duration};
 use crate::{
     Disableable, Selectable, Sizable, Size, StyledExt as _,
     moon::MoonTone,
-    moon::{MoonTheme, MoonThemeTokens, rgba_from, svg::moon_svg},
+    moon::{MoonPalette, MoonTheme, MoonThemeTokens, rgba_from, svg::moon_svg},
     text::Text,
     tooltip::ComponentTooltip,
     v_flex,
@@ -217,24 +217,26 @@ impl MarkState {
     }
 }
 
-#[derive(Clone, Copy)]
-struct MoonCheckboxMetrics {
-    box_size: gpui::Pixels,
+/// The geometry of a checkbox size. Radios share it, so a radio lines up with the checkbox of the
+/// same size.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct MoonCheckboxMetrics {
+    pub(crate) box_size: gpui::Pixels,
     /// Font size and line height shared by the label and the description.
-    font_size: gpui::Pixels,
-    line_height: gpui::Pixels,
-    label_weight: FontWeight,
-    description_weight: FontWeight,
-    gap: gpui::Pixels,
+    pub(crate) font_size: gpui::Pixels,
+    pub(crate) line_height: gpui::Pixels,
+    pub(crate) label_weight: FontWeight,
+    pub(crate) description_weight: FontWeight,
+    pub(crate) gap: gpui::Pixels,
     /// Space between the label and the description under it.
-    description_gap: gpui::Pixels,
-    radius: gpui::Pixels,
+    pub(crate) description_gap: gpui::Pixels,
+    pub(crate) radius: gpui::Pixels,
     /// Gap from the box edge to the focus ring's outer edge; the ring's stroke lies inside it.
-    focus_ring_distance: gpui::Pixels,
-    focus_ring_width: gpui::Pixels,
-    mark_size: gpui::Pixels,
+    pub(crate) focus_ring_distance: gpui::Pixels,
+    pub(crate) focus_ring_width: gpui::Pixels,
+    pub(crate) mark_size: gpui::Pixels,
     /// Rendered stroke width of the mark; `None` keeps the stroke authored in the icon file.
-    mark_stroke: Option<gpui::Pixels>,
+    pub(crate) mark_stroke: Option<gpui::Pixels>,
 }
 
 impl MoonCheckboxMetrics {
@@ -247,7 +249,7 @@ impl MoonCheckboxMetrics {
     /// The `Sm` and `Md` tiers are reviewed designs with fixed geometry, so they follow only the UI
     /// zoom (`scale.ui`): the theme's text scaling (`scale.font`, `scale.font_delta`) does not
     /// grow their box or their text. A `Size::Size` box keeps following text scaling.
-    fn resolve(size: Size, tokens: &MoonThemeTokens) -> Self {
+    pub(crate) fn resolve(size: Size, tokens: &MoonThemeTokens) -> Self {
         let base = Self::base_for_size(size);
         match size {
             Size::Size(_) => base.scaled(tokens),
@@ -345,6 +347,149 @@ impl MoonCheckboxMetrics {
                 .map(|stroke| px(tokens.ui(stroke.as_f32()))),
         }
     }
+
+    /// Returns the top margin that centres the box on the first line of a row with text, which is
+    /// top-aligned so the box stays on that line however far the text wraps. Zero when the box is
+    /// at least a line tall.
+    pub(crate) fn box_offset(&self) -> gpui::Pixels {
+        ((self.line_height - self.box_size) * 0.5).max(px(0.))
+    }
+
+    /// Returns the top margin of the text column when the box is taller than a line of text.
+    fn text_offset(&self) -> gpui::Pixels {
+        ((self.box_size - self.line_height) * 0.5).max(px(0.))
+    }
+}
+
+/// Returns the text column beside a checkbox or radio box: the label, its description under it in
+/// `description_color`, then `children`, on the size's line height. Pair it with a box pushed down
+/// by [`MoonCheckboxMetrics::box_offset`] so the first line and the box stay centred on each other.
+/// `id` prefixes the parts' debug selectors.
+pub(crate) fn choice_text_column(
+    id: &dyn std::fmt::Display,
+    metrics: MoonCheckboxMetrics,
+    label: Option<impl IntoElement>,
+    description: Option<SharedString>,
+    description_color: Hsla,
+    children: Vec<AnyElement>,
+) -> Div {
+    v_flex()
+        .flex_1()
+        .overflow_hidden()
+        .gap(metrics.description_gap)
+        .line_height(metrics.line_height)
+        .mt(metrics.text_offset())
+        .when_some(label, |this, label| {
+            this.child(
+                div()
+                    .debug_selector(|| format!("{id}:label"))
+                    .font_weight(metrics.label_weight)
+                    .child(label),
+            )
+        })
+        .when_some(description, |this, description| {
+            this.child(
+                div()
+                    .debug_selector(|| format!("{id}:description"))
+                    .text_color(description_color)
+                    .font_weight(metrics.description_weight)
+                    .child(description),
+            )
+        })
+        .children(children)
+}
+
+/// The colours of a checkbox or radio.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ChoiceColors {
+    pub(crate) border: Hsla,
+    pub(crate) fill: Hsla,
+    /// The checkbox's check or minus, or the radio's dot.
+    pub(crate) mark: Hsla,
+    pub(crate) label: Hsla,
+    pub(crate) description: Hsla,
+    pub(crate) focus_ring: Hsla,
+}
+
+impl ChoiceColors {
+    /// Resolves the colours of a box in `tone`. A checked box is one solid tone, border and fill
+    /// alike, so its mark takes the palette ink that reads best on that tone rather than the tone
+    /// itself. A disabled box draws everything at 45% opacity.
+    pub(crate) fn resolve(p: MoonPalette, tone: MoonTone, checked: bool, disabled: bool) -> Self {
+        let alpha = if disabled { 0.45 } else { 1.0 };
+        let tone = tone.color(p);
+        let (border, fill) = if checked {
+            (rgba_from(tone, alpha), rgba_from(tone, alpha))
+        } else {
+            (
+                rgba_from(p.border, alpha),
+                rgba_from(p.shell_high, 0.95 * alpha),
+            )
+        };
+        Self {
+            border,
+            fill,
+            mark: rgba_from(p.ink_on(tone), alpha),
+            label: rgba_from(if disabled { p.text_muted } else { p.text_soft }, alpha),
+            description: rgba_from(p.text_muted, alpha),
+            focus_ring: rgba_from(tone, 1.0),
+        }
+    }
+}
+
+/// Returns the focus ring for a checkbox or radio box whose corners have `box_radius`, to add as
+/// the box's child. The ring is an absolute overlay, so it never changes the control's size; its
+/// outer edge sits the size's focus ring distance outside the box, with corners that follow the
+/// box's.
+pub(crate) fn choice_focus_ring(
+    id: &dyn std::fmt::Display,
+    metrics: MoonCheckboxMetrics,
+    box_radius: gpui::Pixels,
+    color: Hsla,
+) -> Div {
+    // Insets start inside the box's 1px border, hence the extra pixel.
+    let inset = -(metrics.focus_ring_distance + px(1.));
+    div()
+        .debug_selector(|| format!("{id}:focus-ring"))
+        .absolute()
+        .top(inset)
+        .left(inset)
+        .right(inset)
+        .bottom(inset)
+        .border(metrics.focus_ring_width)
+        .border_color(color)
+        .rounded(box_radius + metrics.focus_ring_distance)
+}
+
+/// Returns the mark built by `mark` while a box is `checked`, fading it in when the box becomes
+/// checked after its first render; `None` for an unchecked box, which draws no mark. `id` keys the
+/// box's mark state.
+pub(crate) fn fading_mark<E: Styled + IntoElement + 'static>(
+    id: ElementId,
+    checked: bool,
+    window: &mut Window,
+    cx: &mut App,
+    mark: impl FnOnce() -> E,
+) -> Option<AnyElement> {
+    let state = window.use_keyed_state(id, cx, |_, _| MarkState::initial(checked));
+    let previous = *state.read(cx);
+    let current = previous.next(checked);
+    if current != previous {
+        state.update(cx, |state, _| *state = current);
+    }
+    match current {
+        MarkState::Hidden => None,
+        MarkState::Shown => Some(mark().into_any_element()),
+        MarkState::FadingIn => Some(
+            mark()
+                .with_animation(
+                    "fade-in",
+                    Animation::new(Duration::from_millis(250)),
+                    |mark, delta| mark.opacity(delta),
+                )
+                .into_any_element(),
+        ),
+    }
 }
 
 /// Renders the check mark centred in a checkbox-sized box, for the base radio.
@@ -382,38 +527,20 @@ fn checkbox_mark(
     window: &mut Window,
     cx: &mut App,
 ) -> Option<AnyElement> {
-    let state = window.use_keyed_state(id.clone(), cx, |_, _| MarkState::initial(checked));
-    let previous = *state.read(cx);
-    let current = previous.next(checked);
-    if current != previous {
-        state.update(cx, |state, _| *state = current);
-    }
-    if current == MarkState::Hidden {
-        return None;
-    }
-
-    // Absolute insets start inside the box's 1px border (`border_1` on both the checkbox and radio
-    // boxes), so centring within the outer box takes that border back off.
-    let offset = (metrics.box_size - metrics.mark_size) * 0.5 - px(1.);
-    let mark = moon_svg(icon)
-        .debug_selector(|| format!("{id}:mark"))
-        .absolute()
-        .top(offset)
-        .left(offset)
-        .size(metrics.mark_size)
-        .when_some(metrics.mark_stroke, |mark, stroke| {
-            mark.stroke_width(stroke)
-        })
-        .text_color(color);
-    Some(if current == MarkState::FadingIn {
-        mark.with_animation(
-            "fade-in",
-            Animation::new(Duration::from_millis(250)),
-            |mark, delta| mark.opacity(delta),
-        )
-        .into_any_element()
-    } else {
-        mark.into_any_element()
+    fading_mark(id.clone(), checked, window, cx, || {
+        // Absolute insets start inside the box's 1px border (`border_1` on both the checkbox and
+        // radio boxes), so centring within the outer box takes that border back off.
+        let offset = (metrics.box_size - metrics.mark_size) * 0.5 - px(1.);
+        moon_svg(icon)
+            .debug_selector(|| format!("{id}:mark"))
+            .absolute()
+            .top(offset)
+            .left(offset)
+            .size(metrics.mark_size)
+            .when_some(metrics.mark_stroke, |mark, stroke| {
+                mark.stroke_width(stroke)
+            })
+            .text_color(color)
     })
 }
 
@@ -422,9 +549,12 @@ impl RenderOnce for Checkbox {
         let checked = self.checked || self.indeterminate;
         let tokens = MoonTheme::active_tokens(cx);
         let metrics = MoonCheckboxMetrics::resolve(self.size, &tokens);
-        let p = tokens.palette;
-        let checked_tone = self.tone.unwrap_or(MoonTone::Info).color(p);
-        let alpha = if self.disabled { 0.45 } else { 1.0 };
+        let colors = ChoiceColors::resolve(
+            tokens.palette,
+            self.tone.unwrap_or(MoonTone::Info),
+            checked,
+            self.disabled,
+        );
 
         let focus_handle = window
             .use_keyed_state(self.id.clone(), cx, |_, cx| cx.focus_handle())
@@ -432,26 +562,6 @@ impl RenderOnce for Checkbox {
             .clone();
         let is_focused = focus_handle.is_focused(window);
 
-        // A checked box is one solid tone, border and fill alike, so the mark takes the palette
-        // ink that reads best on that tone rather than the tone itself.
-        let (border_color, bg_color) = if checked {
-            let tone = rgba_from(checked_tone, alpha);
-            (tone, tone)
-        } else {
-            (
-                rgba_from(p.border, alpha),
-                rgba_from(p.shell_high, 0.95 * alpha),
-            )
-        };
-        let label_color = rgba_from(
-            if self.disabled {
-                p.text_muted
-            } else {
-                p.text_soft
-            },
-            alpha,
-        );
-        let description_color = rgba_from(p.text_muted, alpha);
         // Empty text counts as no text, so a bare checkbox never gains the text column and, with
         // it, the box-to-text gap and a text line's height.
         let label = self
@@ -461,16 +571,11 @@ impl RenderOnce for Checkbox {
             .description
             .filter(|description| !description.is_empty());
         let has_text = label.is_some() || description.is_some() || !self.children.is_empty();
-        // Rows with text are top-aligned so the box stays on the first line however far the text
-        // wraps; centre that line on the box by pushing whichever of the two is shorter down by
-        // half the difference.
-        let box_offset = ((metrics.line_height - metrics.box_size) * 0.5).max(px(0.));
-        let text_offset = ((metrics.box_size - metrics.line_height) * 0.5).max(px(0.));
         let mark = checkbox_mark(
             self.id.clone(),
             metrics,
             checked,
-            rgba_from(p.ink_on(checked_tone), alpha),
+            colors.mark,
             if self.indeterminate {
                 MINUS_ICON
             } else {
@@ -496,7 +601,7 @@ impl RenderOnce for Checkbox {
                 .when(has_text, |this| this.items_start())
                 .gap(metrics.gap)
                 .text_size(metrics.font_size)
-                .text_color(label_color)
+                .text_color(colors.label)
                 .when(self.mono, |this| this.font_family(tokens.font_family(true)))
                 .when(!self.disabled, |this| this.cursor_pointer())
                 .refine_style(&self.style)
@@ -504,61 +609,34 @@ impl RenderOnce for Checkbox {
                     div()
                         .debug_selector(|| format!("{}:box", self.id))
                         .relative()
-                        .when(has_text, |this| this.mt(box_offset))
+                        .when(has_text, |this| this.mt(metrics.box_offset()))
                         .size(metrics.box_size)
                         .flex_shrink_0()
                         .border_1()
-                        .border_color(border_color)
+                        .border_color(colors.border)
                         .rounded(metrics.radius)
-                        .bg(bg_color)
+                        .bg(colors.fill)
                         .when(is_focused, |this| {
-                            // An absolute overlay, so the ring never changes the control's size.
-                            // Insets start inside the box's 1px border, hence the extra pixel.
-                            let inset = -(metrics.focus_ring_distance + px(1.));
-                            this.child(
-                                div()
-                                    .debug_selector(|| format!("{}:focus-ring", self.id))
-                                    .absolute()
-                                    .top(inset)
-                                    .left(inset)
-                                    .right(inset)
-                                    .bottom(inset)
-                                    .border(metrics.focus_ring_width)
-                                    .border_color(rgba_from(checked_tone, 1.0))
-                                    .rounded(metrics.radius + metrics.focus_ring_distance),
-                            )
+                            this.child(choice_focus_ring(
+                                &self.id,
+                                metrics,
+                                metrics.radius,
+                                colors.focus_ring,
+                            ))
                         })
                         .children(mark),
                 )
                 // Label, description and any extra children share one text column; without text
                 // there is no column, so the row is only the box and the gap never applies.
                 .when(has_text, |this| {
-                    this.child(
-                        v_flex()
-                            .flex_1()
-                            .overflow_hidden()
-                            .gap(metrics.description_gap)
-                            .line_height(metrics.line_height)
-                            .mt(text_offset)
-                            .when_some(label, |this, label| {
-                                this.child(
-                                    div()
-                                        .debug_selector(|| format!("{}:label", self.id))
-                                        .font_weight(metrics.label_weight)
-                                        .child(label),
-                                )
-                            })
-                            .when_some(description, |this, description| {
-                                this.child(
-                                    div()
-                                        .debug_selector(|| format!("{}:description", self.id))
-                                        .text_color(description_color)
-                                        .font_weight(metrics.description_weight)
-                                        .child(description),
-                                )
-                            })
-                            .children(self.children),
-                    )
+                    this.child(choice_text_column(
+                        &self.id,
+                        metrics,
+                        label,
+                        description,
+                        colors.description,
+                        self.children,
+                    ))
                 })
                 // Pressing an enabled checkbox focuses it (the focus handle is only tracked when
                 // enabled), so Tab navigation continues from the clicked control.
@@ -660,6 +738,29 @@ mod tests {
                 assert!(svg.contains(&format!("stroke-width=\"{file_width}\"")));
                 assert_eq!(svg.matches("stroke-width=").count(), 1);
                 assert!(svg.contains(shape));
+            }
+        }
+    }
+
+    /// Catches the shared checkbox and radio colours drifting from the reviewed design: a checked box
+    /// must be one solid tone, border and fill alike, with its mark in the palette ink that reads
+    /// best on that tone; an unchecked box keeps the neutral border and fill; disabled boxes fade to
+    /// 45%; and the focus ring stays the full tone.
+    #[test]
+    fn test_choice_colors_fill_a_checked_box_with_its_tone() {
+        let p = crate::moon::MoonThemeConfig::moon_terminal().dark.palette;
+        for tone in [MoonTone::Info, MoonTone::Warning, MoonTone::Default] {
+            let tone_rgb = tone.color(p);
+            for (disabled, alpha) in [(false, 1.0), (true, 0.45)] {
+                let checked = ChoiceColors::resolve(p, tone, true, disabled);
+                assert_eq!(checked.border, rgba_from(tone_rgb, alpha));
+                assert_eq!(checked.fill, rgba_from(tone_rgb, alpha));
+                assert_eq!(checked.mark, rgba_from(p.ink_on(tone_rgb), alpha));
+                assert_eq!(checked.focus_ring, rgba_from(tone_rgb, 1.0));
+
+                let unchecked = ChoiceColors::resolve(p, tone, false, disabled);
+                assert_eq!(unchecked.border, rgba_from(p.border, alpha));
+                assert_eq!(unchecked.fill, rgba_from(p.shell_high, 0.95 * alpha));
             }
         }
     }

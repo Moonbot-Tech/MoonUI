@@ -3023,6 +3023,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/radio.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/radio.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/radio.rs",
       "signature": "pub enum MoonRadioSize"
     },
     {
@@ -3032,6 +3040,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/radio.rs",
       "signature": "pub fn checked(mut self, checked: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/radio.rs",
+      "signature": "pub fn description(mut self, description: impl Into<SharedString>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/radio.rs",
@@ -3055,7 +3067,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/radio.rs",
-      "signature": "pub fn size(mut self, size: MoonRadioSize) -> Self"
+      "signature": "pub fn size(mut self, size: impl Into<MoonRadioSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/radio.rs",

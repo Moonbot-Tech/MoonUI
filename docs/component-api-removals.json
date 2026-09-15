@@ -145,6 +145,11 @@
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use foundation::{StyledExt, ThemeMode, h_flex, init, v_flex};",
       "reason": "The re-export gained MoonSize so the shared size scale is reachable as moon_ui::MoonSize; nothing was removed from it."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/radio.rs",
+      "signature": "pub fn size(mut self, size: MoonRadioSize) -> Self",
+      "reason": "Radios moved onto the checkbox's MoonSize tiers, so size now takes impl Into<MoonRadioSize> and accepts a MoonSize tier directly. Existing MoonRadioSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
     }
   ]
 }
