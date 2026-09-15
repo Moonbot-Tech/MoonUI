@@ -145,17 +145,17 @@ impl MoonColorScale {
 
     /// The brand scale.
     pub const BRAND: Self = Self {
-        c50: MoonColor::rgb(0xF9F5FF),
-        c100: MoonColor::rgb(0xF4EBFF),
-        c200: MoonColor::rgb(0xE9D7FE),
-        c300: MoonColor::rgb(0xD6BBFB),
-        c400: MoonColor::rgb(0xB692F6),
-        c500: MoonColor::rgb(0x9E77ED),
-        c600: MoonColor::rgb(0x7F56D9),
-        c700: MoonColor::rgb(0x6941C6),
-        c800: MoonColor::rgb(0x53389E),
-        c900: MoonColor::rgb(0x42307D),
-        c950: MoonColor::rgb(0x2C1C5F),
+        c50: MoonColor::rgb(0xEFF6FF),
+        c100: MoonColor::rgb(0xDBEAFE),
+        c200: MoonColor::rgb(0xBFDBFE),
+        c300: MoonColor::rgb(0x93C5FD),
+        c400: MoonColor::rgb(0x60A5FA),
+        c500: MoonColor::rgb(0x3B82F6),
+        c600: MoonColor::rgb(0x2563EB),
+        c700: MoonColor::rgb(0x1D4ED8),
+        c800: MoonColor::rgb(0x1E40AF),
+        c900: MoonColor::rgb(0x1E3A8A),
+        c950: MoonColor::rgb(0x172554),
     };
 
     /// The red scale.
