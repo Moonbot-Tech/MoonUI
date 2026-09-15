@@ -173,12 +173,12 @@
       "local_paths": [
         "checkbox.rs"
       ],
-      "local_hash": "d92eccbbd720a853",
+      "local_hash": "e12f8107934cf7c4",
       "local_files": [
         {
           "path": "checkbox.rs",
-          "hash": "2233ba6b1742643e",
-          "bytes": 39099
+          "hash": "501a7f7e85b9b365",
+          "bytes": 40626
         }
       ],
       "donor_hash": "c665cd46d9f5aa2a",

@@ -67,7 +67,8 @@ impl Checkbox {
 
     /// Set the label for the checkbox.
     ///
-    /// An empty label renders no text, so the checkbox stays exactly its box with no gap.
+    /// The box stays on the label's first line when the label wraps. An empty label renders no
+    /// text, so the checkbox stays exactly its box with no gap.
     pub fn label(mut self, label: impl Into<Text>) -> Self {
         self.label = Some(label.into());
         self
@@ -75,8 +76,8 @@ impl Checkbox {
 
     /// Set supporting text shown under the label in the muted text colour.
     ///
-    /// With a description the box aligns to the label's line instead of centring on both lines. An
-    /// empty description renders nothing.
+    /// The box stays on the label's first line rather than centring on label and description
+    /// together. An empty description renders nothing.
     pub fn description(mut self, description: impl Into<SharedString>) -> Self {
         self.description = Some(description.into());
         self
@@ -459,10 +460,10 @@ impl RenderOnce for Checkbox {
         let description = self
             .description
             .filter(|description| !description.is_empty());
-        let has_description = description.is_some();
-        let has_text = label.is_some() || has_description || !self.children.is_empty();
-        // Rows with a description are top-aligned; centre the label's first line on the box by
-        // pushing whichever of the two is shorter down by half the difference.
+        let has_text = label.is_some() || description.is_some() || !self.children.is_empty();
+        // Rows with text are top-aligned so the box stays on the first line however far the text
+        // wraps; centre that line on the box by pushing whichever of the two is shorter down by
+        // half the difference.
         let box_offset = ((metrics.line_height - metrics.box_size) * 0.5).max(px(0.));
         let text_offset = ((metrics.box_size - metrics.line_height) * 0.5).max(px(0.));
         let mark = checkbox_mark(
@@ -491,9 +492,8 @@ impl RenderOnce for Checkbox {
                             .tab_index(self.tab_index),
                     )
                 })
-                // `h_flex` centres the box on the text; a description top-aligns them instead.
                 .h_flex()
-                .when(has_description, |this| this.items_start())
+                .when(has_text, |this| this.items_start())
                 .gap(metrics.gap)
                 .text_size(metrics.font_size)
                 .text_color(label_color)
@@ -504,7 +504,7 @@ impl RenderOnce for Checkbox {
                     div()
                         .debug_selector(|| format!("{}:box", self.id))
                         .relative()
-                        .when(has_description, |this| this.mt(box_offset))
+                        .when(has_text, |this| this.mt(box_offset))
                         .size(metrics.box_size)
                         .flex_shrink_0()
                         .border_1()
@@ -539,7 +539,7 @@ impl RenderOnce for Checkbox {
                             .overflow_hidden()
                             .gap(metrics.description_gap)
                             .line_height(metrics.line_height)
-                            .when(has_description, |this| this.mt(text_offset))
+                            .mt(text_offset)
                             .when_some(label, |this, label| {
                                 this.child(
                                     div()
@@ -887,6 +887,43 @@ mod tests {
             assert_eq!(control.size.height, px(line_px));
             assert_eq!(label.size.height, px(line_px));
             assert_eq!(label.center().y, box_bounds.center().y);
+        }
+    }
+
+    struct WrappingCheckboxHarness {
+        size: Size,
+    }
+
+    impl gpui::Render for WrappingCheckboxHarness {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            div().w(px(160.)).child(
+                Checkbox::new("wrapping")
+                    .label("Close every open position when the stop price is reached")
+                    .with_size(self.size),
+            )
+        }
+    }
+
+    /// Catches the box following a label as it wraps: without a description the row must still be
+    /// top-aligned, so the box stays centred on the first line (20px small, 24px medium) instead of
+    /// sliding to the middle of the wrapped block.
+    #[gpui::test]
+    fn test_wrapping_label_keeps_box_on_its_first_line(cx: &mut gpui::TestAppContext) {
+        cx.update(crate::init);
+        for (size, line_px) in [(Size::Small, 20.), (Size::Medium, 24.)] {
+            let window = cx.add_window(move |_, _| WrappingCheckboxHarness { size });
+            let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+            cx.run_until_parked();
+
+            let box_bounds = cx.debug_bounds("wrapping:box").expect("box must render");
+            let label = cx
+                .debug_bounds("wrapping:label")
+                .expect("label must render");
+            assert!(
+                label.size.height >= px(line_px * 2.),
+                "{size:?} label must wrap for this case to mean anything"
+            );
+            assert_eq!(box_bounds.center().y, label.top() + px(line_px / 2.));
         }
     }
 
