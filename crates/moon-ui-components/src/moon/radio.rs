@@ -1,3 +1,5 @@
+//! Radio choices with density-selected tiers and checkbox-shared visuals.
+
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
@@ -12,6 +14,7 @@ use super::{
     tokens::{MoonRect, MoonTone},
 };
 
+/// Shared size tier or explicitly scaled custom radio metrics.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonRadioSize {
     /// A tier of the shared size scale. Radios come in the checkbox's tiers with the same text and
@@ -28,6 +31,7 @@ pub enum MoonRadioSize {
 }
 
 impl From<MoonSize> for MoonRadioSize {
+    /// Wraps a shared tier; unsupported tiers snap when metrics are resolved.
     fn from(size: MoonSize) -> Self {
         Self::Tier(size)
     }
@@ -77,6 +81,7 @@ fn moon_radio_click_value(disabled: bool) -> Option<bool> {
     if disabled { None } else { Some(true) }
 }
 
+/// A controlled choice whose omitted size follows density; a handler enables keyboard focus.
 #[derive(IntoElement)]
 pub struct MoonRadio {
     id: SharedString,
@@ -92,6 +97,7 @@ pub struct MoonRadio {
 }
 
 impl MoonRadio {
+    /// Creates an unchecked choice with a density-selected size.
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
@@ -151,6 +157,7 @@ impl MoonRadio {
         self
     }
 
+    /// Installs the selection handler and makes an enabled choice focusable.
     pub fn on_change(mut self, handler: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_change = Some(std::rc::Rc::new(handler));
         self
@@ -174,6 +181,7 @@ impl RenderOnce for MoonRadio {
         let metrics = self.metrics(&tokens);
         let choice = metrics.choice;
         let disabled = self.disabled;
+        let interactive = !disabled && self.on_change.is_some();
         let checked = self.checked;
         let colors = ChoiceColors::resolve(tokens.palette, self.tone, checked, disabled);
         let state_id = ElementId::from(self.id.clone());
@@ -224,10 +232,10 @@ impl RenderOnce for MoonRadio {
                 "{}:root",
                 self.id
             ))))
-            .when(!disabled, |this| {
+            .when(interactive, |this| {
                 this.track_focus(&focus_handle.clone().tab_stop(true))
-                    .cursor_pointer()
             })
+            .when(!disabled, |this| this.cursor_pointer())
             .relative()
             .flex()
             .items_center()
@@ -260,10 +268,10 @@ impl RenderOnce for MoonRadio {
 
         root = root.on_mouse_down(MouseButton::Left, move |_, window, cx| {
             cx.stop_propagation();
-            if disabled {
+            if !interactive {
                 return;
             }
-            // Pressing an enabled radio focuses it, so Tab navigation continues from the clicked
+            // Pressing an enabled radio with a handler focuses it, so Tab continues from the clicked
             // control. Focus is set here because this listener stops the press before the
             // element's own focus-on-press listener would see it.
             window.focus(&focus_handle, cx);

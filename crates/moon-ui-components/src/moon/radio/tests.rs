@@ -70,14 +70,16 @@ impl Render for CheckboxAndRadioHarness {
                     .size(self.size)
                     .label(WRAPPING_LABEL)
                     .description(DESCRIPTION)
-                    .checked(true),
+                    .checked(true)
+                    .on_change(|_, _, _| {}),
             )
             .child(
                 MoonRadio::new("radio")
                     .size(self.size)
                     .label(WRAPPING_LABEL)
                     .description(DESCRIPTION)
-                    .checked(true),
+                    .checked(true)
+                    .on_change(|_, _, _| {}),
             )
     }
 }
@@ -153,28 +155,36 @@ fn radio_focus_ring_surrounds_the_circle_without_moving_layout(cx: &mut TestAppC
     }
 }
 
-/// A group of three labelled radios whose middle one is disabled, recording every change.
+/// A group containing disabled and handler-free radios between two actionable choices.
 struct RadioGroupHarness {
     changes: Rc<RefCell<Vec<(&'static str, bool)>>>,
 }
 
 impl Render for RadioGroupHarness {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().children([("first", false), ("second", true), ("third", false)].map(
-            |(id, disabled)| {
+        div().children(
+            [
+                ("first", false),
+                ("second", true),
+                ("inert", false),
+                ("third", false),
+            ]
+            .map(|(id, disabled)| {
                 let changes = self.changes.clone();
-                MoonRadio::new(id)
-                    .label(id)
-                    .disabled(disabled)
-                    .on_change(move |value, _, _| changes.borrow_mut().push((id, *value)))
-            },
-        ))
+                let radio = MoonRadio::new(id).label(id).disabled(disabled);
+                if id == "inert" {
+                    radio
+                } else {
+                    radio.on_change(move |value, _, _| changes.borrow_mut().push((id, *value)))
+                }
+            }),
+        )
     }
 }
 
 /// Catches a radio that swallows focus on press or can't be used from the keyboard: pressing an
 /// enabled radio must focus it (its listener stops the press before GPUI's own focus-on-press),
-/// Tab must move on past a disabled radio to the next enabled one, and Space on the focused radio
+/// Tab must skip disabled and handler-free radios; Space and Enter on the focused radio
 /// must select it.
 #[gpui::test]
 fn pressing_a_radio_focuses_it_and_the_keyboard_selects(cx: &mut TestAppContext) {
@@ -203,6 +213,7 @@ fn pressing_a_radio_focuses_it_and_the_keyboard_selects(cx: &mut TestAppContext)
     cx.run_until_parked();
     assert!(cx.debug_bounds("first:focus-ring").is_none());
     assert!(cx.debug_bounds("second:focus-ring").is_none());
+    assert!(cx.debug_bounds("inert:focus-ring").is_none());
     assert!(cx.debug_bounds("third:focus-ring").is_some());
 
     // GPUI clicks a focused element when Space is released; `simulate_keystrokes` only presses.
@@ -212,6 +223,15 @@ fn pressing_a_radio_focuses_it_and_the_keyboard_selects(cx: &mut TestAppContext)
     });
     cx.run_until_parked();
     assert_eq!(&*changes.borrow(), &[("first", true), ("third", true)]);
+    cx.simulate_keystrokes("enter");
+    cx.simulate_event(KeyUpEvent {
+        keystroke: Keystroke::parse("enter").expect("enter must parse"),
+    });
+    cx.run_until_parked();
+    assert_eq!(
+        &*changes.borrow(),
+        &[("first", true), ("third", true), ("third", true)]
+    );
 }
 
 /// A radio with an optional label in a flex row that shrinks the probe to the radio.
