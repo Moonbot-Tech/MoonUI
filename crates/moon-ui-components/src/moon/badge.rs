@@ -1,9 +1,11 @@
+//! Text-height badges that follow density tiers, with explicit legacy custom sizing.
+
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
+    foundation::MoonSize,
     icons::moon_icon,
-    text::MoonText,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
@@ -15,10 +17,11 @@ pub enum MoonBadgeVariant {
     Outline,
 }
 
+/// Shared density tier or explicit badge geometry and legacy-scaled text.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonBadgeSize {
-    Tiny,
-    Status,
+    /// Xs, Sm and Md; larger requests snap to Md.
+    Tier(MoonSize),
     Custom {
         height: f32,
         radius: f32,
@@ -29,6 +32,24 @@ pub enum MoonBadgeSize {
     },
 }
 
+#[allow(non_upper_case_globals)]
+impl MoonBadgeSize {
+    /// Compatibility name for the extra-small tier.
+    #[deprecated(note = "use MoonSize::Xs.into()")]
+    pub const Tiny: Self = Self::Tier(MoonSize::Xs);
+    /// Compatibility name for the small tier.
+    #[deprecated(note = "use MoonSize::Sm.into()")]
+    pub const Status: Self = Self::Tier(MoonSize::Sm);
+}
+
+impl From<MoonSize> for MoonBadgeSize {
+    /// Convert a shared tier; unsupported tiers snap when metrics are resolved.
+    fn from(size: MoonSize) -> Self {
+        Self::Tier(size)
+    }
+}
+
+/// Badge geometry and text metrics in design-reference or resolved pixels.
 #[derive(Clone, Copy, Debug)]
 struct BadgeMetrics {
     height: f32,
@@ -40,6 +61,7 @@ struct BadgeMetrics {
 }
 
 impl BadgeMetrics {
+    /// Resolve custom geometry and legacy text scaling, expanding the box to fit its line.
     fn scaled(self, tokens: &MoonThemeTokens) -> Self {
         let line_height = tokens.line_height(self.line_height);
         let pad_y = ((self.height - self.line_height) * 0.5).max(0.0);
@@ -48,8 +70,8 @@ impl BadgeMetrics {
                 .ui(self.height)
                 .max(line_height + tokens.ui(pad_y) * 2.0),
             radius: tokens.ui(self.radius),
-            font_size: self.font_size,
-            line_height: self.line_height,
+            font_size: tokens.font(self.font_size),
+            line_height,
             pad_x: tokens.ui(self.pad_x),
             min_width: tokens.ui(self.min_width),
         }
@@ -74,13 +96,14 @@ pub enum MoonBadgeContent {
     Icon(&'static str),
 }
 
+/// Theme-aware text, count, dot or icon badge with density-driven chrome.
 #[derive(IntoElement)]
 pub struct MoonBadge {
     bounds: Option<MoonRect>,
     content: MoonBadgeContent,
     tone: MoonTone,
     variant: MoonBadgeVariant,
-    size: MoonBadgeSize,
+    size: Option<MoonBadgeSize>,
     disabled: bool,
     mono: bool,
     weight: f32,
@@ -94,13 +117,14 @@ pub struct MoonBadge {
 }
 
 impl MoonBadge {
+    /// Create a badge using the active density unless an explicit size is supplied.
     pub fn new(label: impl Into<SharedString>) -> Self {
         Self {
             bounds: None,
             content: MoonBadgeContent::Text(label.into()),
             tone: MoonTone::Default,
             variant: MoonBadgeVariant::Soft,
-            size: MoonBadgeSize::Tiny,
+            size: None,
             disabled: false,
             mono: true,
             weight: 500.0,
@@ -157,8 +181,9 @@ impl MoonBadge {
         self
     }
 
+    /// Override density using a shared tier or custom design-reference metrics.
     pub fn size(mut self, size: MoonBadgeSize) -> Self {
-        self.size = size;
+        self.size = Some(size);
         self
     }
 
@@ -220,8 +245,9 @@ impl MoonBadge {
         self.render_with_theme(p, MoonThemeTokens::default())
     }
 
+    /// Render with the supplied palette and tokens, scaling text and chrome exactly once.
     pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
-        let metrics = self.metrics().scaled(&tokens);
+        let metrics = self.metrics(&tokens);
         let style = self.style(p);
         let disabled_scale = if self.disabled { 0.5 } else { 1.0 };
         let border_alpha = style.border_alpha * disabled_scale;
@@ -260,15 +286,13 @@ impl MoonBadge {
         match self.content {
             MoonBadgeContent::Dot => badge,
             MoonBadgeContent::Text(text) => badge.child(
-                MoonText::new(text)
-                    .color(style.fg)
-                    .alpha(style.fg_alpha * disabled_scale)
-                    .font_size(metrics.font_size)
-                    .line_height(metrics.line_height)
-                    .weight(self.weight)
-                    .mono(self.mono)
-                    .uppercase(false)
-                    .render(),
+                div()
+                    .text_color(rgba_from(style.fg, style.fg_alpha * disabled_scale))
+                    .text_size(px(metrics.font_size))
+                    .line_height(px(metrics.line_height))
+                    .font_weight(FontWeight(self.weight))
+                    .font_family(tokens.font_family(self.mono))
+                    .child(text),
             ),
             MoonBadgeContent::Count { value, max } => {
                 let text = max
@@ -276,44 +300,50 @@ impl MoonBadge {
                     .map(|max| format!("{max}+"))
                     .unwrap_or_else(|| value.to_string());
                 badge.child(
-                    MoonText::new(text)
-                        .color(style.fg)
-                        .alpha(style.fg_alpha * disabled_scale)
-                        .font_size(metrics.font_size)
-                        .line_height(metrics.line_height)
-                        .weight(self.weight)
-                        .mono(self.mono)
-                        .uppercase(false)
-                        .render(),
+                    div()
+                        .text_color(rgba_from(style.fg, style.fg_alpha * disabled_scale))
+                        .text_size(px(metrics.font_size))
+                        .line_height(px(metrics.line_height))
+                        .font_weight(FontWeight(self.weight))
+                        .font_family(tokens.font_family(self.mono))
+                        .child(text),
                 )
             }
             MoonBadgeContent::Icon(path) => badge.child(moon_icon(
                 path,
-                tokens.font(metrics.font_size) + tokens.ui(2.0),
+                metrics.font_size + tokens.ui(2.0),
                 style.fg,
                 style.fg_alpha,
             )),
         }
     }
 
-    fn metrics(&self) -> BadgeMetrics {
-        match self.size {
-            MoonBadgeSize::Tiny => BadgeMetrics {
-                height: 13.0,
-                radius: 4.0,
-                font_size: 8.5,
-                line_height: 11.0,
-                pad_x: 4.0,
-                min_width: 16.0,
-            },
-            MoonBadgeSize::Status => BadgeMetrics {
-                height: 17.0,
-                radius: 4.0,
-                font_size: 9.5,
-                line_height: 12.0,
-                pad_x: 7.0,
-                min_width: 0.0,
-            },
+    /// Return rendered pixels; tiers use UI zoom only and custom text keeps font scaling.
+    fn metrics(&self, tokens: &MoonThemeTokens) -> BadgeMetrics {
+        match self.size.unwrap_or(MoonBadgeSize::Tier(tokens.tier())) {
+            MoonBadgeSize::Tier(size) => {
+                let tier = size.nearest(&[MoonSize::Xs, MoonSize::Sm, MoonSize::Md]);
+                let m = tier.control_metrics();
+                let font_size = match tier {
+                    MoonSize::Xs => 11.0,
+                    MoonSize::Sm => 12.0,
+                    _ => 14.0,
+                };
+                // Preserve the old Tiny padding ratio at Xs and Status ratio above it.
+                let ratio = if tier == MoonSize::Xs {
+                    4.0 / 13.0
+                } else {
+                    7.0 / 17.0
+                };
+                BadgeMetrics {
+                    height: tokens.ui(m.line_height),
+                    radius: tokens.ui(m.radius),
+                    font_size: tokens.ui(font_size),
+                    line_height: tokens.ui(m.line_height),
+                    pad_x: tokens.ui(m.line_height * ratio),
+                    min_width: tokens.ui(m.line_height),
+                }
+            }
             MoonBadgeSize::Custom {
                 height,
                 radius,
@@ -328,7 +358,8 @@ impl MoonBadge {
                 line_height,
                 pad_x,
                 min_width,
-            },
+            }
+            .scaled(tokens),
         }
     }
 
@@ -378,3 +409,6 @@ impl RenderOnce for MoonBadge {
         self.render_with_theme(MoonPalette::active(cx), tokens)
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -490,7 +490,7 @@ impl Gallery {
         body
     }
 
-    /// Render the controls gallery with interactive button, input, and selector examples.
+    /// Render controls and badges, including all supported badge tiers and density defaults.
     ///
     /// Args:
     ///     cx: Gallery context used for theme lookup and interaction listeners.
@@ -639,6 +639,11 @@ impl Gallery {
             )
             .child(
                 card("Badges / Checkbox / Segmented", cx)
+                    .children([moon_ui::MoonSize::Xs, moon_ui::MoonSize::Sm, moon_ui::MoonSize::Md].into_iter().map(|tier| {
+                        h_flex().gap(px(8.0)).children([MoonBadgeVariant::Soft, MoonBadgeVariant::Solid, MoonBadgeVariant::Outline].into_iter().map(move |variant| {
+                            MoonBadge::new(format!("{tier:?}")).size(tier.into()).variant(variant)
+                        }))
+                    }))
                     .child(
                         h_flex()
                             .gap(px(8.0))
@@ -1495,6 +1500,7 @@ impl Gallery {
             )
     }
 
+    /// Render form primitives with explicit stepper tiers and an interactive density default.
     fn render_new_controls(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let view = cx.entity();

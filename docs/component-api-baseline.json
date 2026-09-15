@@ -155,6 +155,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub const Status: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub const Tiny: Self = Self::Tier(MoonSize::Xs);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
       "signature": "pub enum MoonBadgeContent"
     },
     {
