@@ -149,7 +149,14 @@ impl MoonThemeTokens {
         self.font(self.typography.mono_font_size)
     }
 
-    fn theme_colors(&self) -> ThemeColor {
+    /// Build the base-theme colour table the inherited components paint with from this palette.
+    ///
+    /// Visible to the Moon module so the colour-role mapping can be checked against it: a role and
+    /// the base-theme entry for the same purpose must resolve to the same colour.
+    ///
+    /// Returns:
+    ///     The base-theme colours for this palette.
+    pub(super) fn theme_colors(&self) -> ThemeColor {
         let p = self.palette;
         let is_light = p.is_light();
         let selected_tint = selected_flat(p);

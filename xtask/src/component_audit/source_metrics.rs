@@ -144,8 +144,10 @@ fn scan_raw_hex_in_moon(root: &Path) -> Result<Vec<SourceHit>> {
 /// module that happens to share a file name elsewhere in the tree is still audited. `tokens.rs`
 /// needs no entry: its palette constants are bare integers (`shell: 0x131416`) the scan never
 /// matches. The primitive colour scales are built with `MoonColor::rgb(0x..)` because they carry
-/// alpha, and would otherwise count as hundreds of component-level raw colours.
-const RAW_HEX_TOKEN_SOURCES: &[&str] = &["primitives.rs"];
+/// alpha, and would otherwise count as hundreds of component-level raw colours; the colour modes
+/// write the few roles with no scale step behind them, such as shadows at a set opacity, the same
+/// way.
+const RAW_HEX_TOKEN_SOURCES: &[&str] = &["primitives.rs", "colors/modes.rs"];
 
 /// Find unapproved raw color literals in the audited inherited base components.
 fn scan_raw_hex_in_moon_base(src: &Path) -> Result<Vec<SourceHit>> {

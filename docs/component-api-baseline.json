@@ -678,6 +678,26 @@
       "signature": "pub struct MoonColorPickerState"
     },
     {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub const DARK: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub const LIGHT: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub fn active(cx: &App) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub fn from_palette(palette: MoonPalette) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub struct MoonColors"
+    },
+    {
       "file": "crates/moon-ui-components/src/moon/combobox.rs",
       "signature": "pub use crate::IndexPath as MoonComponentIndexPath;"
     },
@@ -2472,6 +2492,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use colors::MoonColors;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
