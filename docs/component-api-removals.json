@@ -145,6 +145,16 @@
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use foundation::{StyledExt, ThemeMode, h_flex, init, v_flex};",
       "reason": "The re-export gained MoonSize so the shared size scale is reachable as moon_ui::MoonSize; nothing was removed from it."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub fn size(mut self, size: MoonToggleSize) -> Self",
+      "reason": "Toggles moved onto the shared MoonSize scale, so size now takes impl Into<MoonToggleSize> and accepts a MoonSize tier directly. Existing MoonToggleSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleSize};",
+      "reason": "The re-export gained MoonToggleMetrics so the toggle's resolved per-tier metrics are reachable as moon_ui::MoonToggleMetrics, which is what lets a consumer measure a toggle it does not draw instead of mirroring its geometry by hand; nothing was removed from it."
     }
   ]
 }

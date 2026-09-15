@@ -1670,13 +1670,36 @@ impl Gallery {
                                 MoonToggle::new("new-controls-toggle-compact")
                                     .checked(false)
                                     .label("compact")
-                                    .size(MoonToggleSize::Compact),
+                                    .size(MoonSize::Sm),
                             )
                             .child(MoonSpinner::new().tone(MoonTone::Info))
                             .child(MoonKbd::new("Xs").size(MoonSize::Xs.into()))
                             .child(MoonKbd::new("Sm").size(MoonSize::Sm.into()))
                             .child(MoonKbd::new("Md").size(MoonSize::Md.into()))
                             .child(MoonKbd::new("Esc").outline(true)),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(18.0))
+                            .items_start()
+                            .flex_wrap()
+                            .child(
+                                MoonToggle::new("new-controls-toggle-description-sm")
+                                    .label("Overlay hints")
+                                    .description("Show hints over the chart")
+                                    .size(MoonSize::Sm),
+                            )
+                            .child(
+                                MoonToggle::new("new-controls-toggle-description-md")
+                                    .label("Overlay hints")
+                                    .description("Show hints over the chart")
+                                    .default_checked(true)
+                                    .size(MoonSize::Md),
+                            )
+                            .child(
+                                MoonToggle::new("new-controls-toggle-density")
+                                    .label("density default"),
+                            ),
                     )
                     .child(
                         h_flex()

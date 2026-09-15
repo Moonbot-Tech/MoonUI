@@ -905,12 +905,12 @@ impl CaseGallery {
             "toggle.checked" => MoonToggle::new("handoff-toggle-checked")
                 .label("Live")
                 .checked(true)
-                .size(MoonToggleSize::Normal)
+                .size(MoonSize::Md)
                 .into_any_element(),
             "toggle.unchecked" => MoonToggle::new("handoff-toggle-unchecked")
                 .label("Live")
                 .checked(false)
-                .size(MoonToggleSize::Normal)
+                .size(MoonSize::Md)
                 .into_any_element(),
             "switch.checked" => MoonSwitch::new("handoff-switch-checked")
                 .label("Live")
