@@ -4359,6 +4359,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn set_tier(&mut self, tier: MoonSize)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn set_ui_scale(&mut self, ui_scale: f32)"
     },
     {
@@ -4367,11 +4371,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn tier(&self) -> MoonSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn ui(&self, value: f32) -> f32"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn with_font_delta(mut self, font_delta: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn with_tier(mut self, tier: MoonSize) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",

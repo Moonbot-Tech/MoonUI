@@ -115,6 +115,7 @@ fn fitted_item_preserves_the_boundary_and_ellipsizes_one_past_it() {
                 ui,
                 font,
                 font_delta,
+                tier: Default::default(),
             };
             let min = tokens.font_width(34.0);
             let max = tokens.font_width(104.0);
@@ -340,6 +341,7 @@ fn fitted_segment_width_survives_high_ui_low_font_render(cx: &mut gpui::TestAppC
         ui: 2.5,
         font: 0.25,
         font_delta: 0.0,
+        tier: Default::default(),
     };
     let item = cx.update(|cx| {
         MoonTheme::global_mut(cx).scale = scale;

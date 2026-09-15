@@ -4,12 +4,13 @@ use gpui::{App, Global, SharedString, px};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    foundation::ThemeMode,
     foundation::selected_flat,
+    foundation::{MoonSize, ThemeMode},
     tokens::{MoonMetrics, MoonPalette, rgba_from},
 };
 use crate::theme::{Theme as BaseTheme, ThemeColor, ThemeMode as BaseThemeMode};
 
+/// Geometry, text scaling and the preferred component size tier for a theme.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MoonScale {
@@ -20,14 +21,18 @@ pub struct MoonScale {
     /// Adds logical pixels to all Moon text metrics. This is the user-facing
     /// "font +X" knob, kept separate from full UI zoom.
     pub font_delta: f32,
+    /// Preferred component density; independent of geometry and text scaling.
+    pub tier: MoonSize,
 }
 
 impl Default for MoonScale {
+    /// Return unscaled metrics and MoonUI's default medium tier.
     fn default() -> Self {
         Self {
             ui: 1.0,
             font: 1.0,
             font_delta: 0.0,
+            tier: MoonSize::default(),
         }
     }
 }
@@ -81,6 +86,11 @@ impl Default for MoonThemeTokens {
 }
 
 impl MoonThemeTokens {
+    /// Return the preferred component tier, without applying UI zoom.
+    pub fn tier(&self) -> MoonSize {
+        self.scale.tier
+    }
+
     pub fn ui(&self, value: f32) -> f32 {
         value * self.scale.ui.max(0.25)
     }
@@ -309,6 +319,18 @@ impl Default for MoonThemeConfig {
 }
 
 impl MoonThemeConfig {
+    /// Set the preferred component tier on both dark and light theme tokens.
+    pub fn set_tier(&mut self, tier: MoonSize) {
+        self.dark.scale.tier = tier;
+        self.light.scale.tier = tier;
+    }
+
+    /// Return this configuration with the supplied tier on both themes.
+    pub fn with_tier(mut self, tier: MoonSize) -> Self {
+        self.set_tier(tier);
+        self
+    }
+
     pub fn moon_terminal() -> Self {
         toml::from_str(include_str!("../../themes/moon-terminal.toml"))
             .expect("bundled moon-terminal theme must parse")
