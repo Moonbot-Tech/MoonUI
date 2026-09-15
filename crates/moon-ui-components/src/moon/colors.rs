@@ -677,20 +677,92 @@ impl MoonColors {
         }
     }
 
+    /// Derive a legacy palette that paints like these roles.
+    ///
+    /// This is what lets a colour mode drive a whole interface while most components still read
+    /// palette fields: each field takes the role that plays its part, so surfaces, borders, inks
+    /// and status colours match the roles that migrated components paint with. Only opaque roles
+    /// are used, since a palette field has no alpha. `accent_tint_a`, which is not a colour, keeps
+    /// the strength the bundled palette of the same side uses.
+    ///
+    /// Returns:
+    ///     The palette to install alongside these roles.
+    pub fn to_palette(self) -> MoonPalette {
+        let hex = |color: MoonColor| color.rgb_hex();
+        let mut palette = MoonPalette {
+            shell: hex(self.bg_primary),
+            shell_high: hex(self.bg_secondary),
+            window: hex(self.bg_primary),
+            surface: hex(self.bg_primary_alt),
+            panel: hex(self.bg_secondary),
+            panel_high: hex(self.bg_primary_alt),
+            chrome: hex(self.bg_secondary),
+            tabbar: hex(self.bg_secondary),
+            panel_head: hex(self.bg_secondary_hover),
+            gutter: hex(self.bg_secondary_alt),
+            chart_bg: hex(self.bg_primary),
+            card: hex(self.bg_primary_alt),
+            row_alt: hex(self.bg_secondary_alt),
+            head_row: hex(self.bg_tertiary),
+            border: hex(self.border_primary),
+            border_soft: hex(self.border_secondary),
+            border_card: hex(self.border_secondary),
+            border_hover: hex(self.fg_quaternary),
+            row_line: hex(self.border_tertiary),
+            shadow: hex(MoonColor::BLACK),
+            // The ink overlays lighten a dark theme and darken a light one, as the opaque end of
+            // the ink ramp does.
+            overlay: hex(self.alpha_black_100),
+            on_accent: hex(self.text_white),
+            text: hex(self.text_primary),
+            text_soft: hex(self.text_secondary),
+            text_dim: hex(self.text_secondary_hover),
+            text_muted: hex(self.text_tertiary),
+            text_faint: hex(self.text_quaternary),
+            table_head: hex(self.bg_tertiary),
+            table_body: hex(self.bg_primary_alt),
+            table_selected: hex(self.bg_brand_solid),
+            // One step off the row fill on either side, so a hovered row stays visible.
+            table_hover: hex(self.bg_secondary_hover),
+            green: hex(self.fg_success_primary),
+            green_btn: hex(self.bg_success_solid),
+            green_text: hex(self.text_success_primary),
+            red: hex(self.fg_error_primary),
+            red_text: hex(self.text_error_primary),
+            red_soft_bd: hex(self.border_error_subtle),
+            orange: hex(self.utility_orange_500),
+            amber: hex(self.fg_warning_primary),
+            blue: hex(self.utility_blue_600),
+            accent: hex(self.bg_brand_solid),
+            accent_fg: hex(self.text_brand_secondary),
+            accent_tint_a: 0.0,
+            yellow: hex(self.fg_warning_secondary),
+        };
+        palette.accent_tint_a = if palette.is_light() {
+            MoonPalette::LIGHT.accent_tint_a
+        } else {
+            MoonPalette::TERMINAL.accent_tint_a
+        };
+        palette
+    }
+
     /// The roles for the active theme.
     ///
-    /// Resolved from the active palette on every call rather than stored on the theme: code and
-    /// tests replace `MoonTheme::palette` in place, and a stored copy would keep painting the
-    /// palette it replaced.
+    /// A theme installed with roles, such as [`crate::moon::MoonThemeConfig::moon_color_modes`],
+    /// answers with those roles as given. Otherwise the roles are resolved from the active palette
+    /// on every call rather than stored: code and tests replace `MoonTheme::palette` in place, and
+    /// a stored copy would keep painting the palette it replaced.
     ///
     /// Args:
     ///     cx: The app holding the installed theme.
     ///
     /// Returns:
-    ///     [`Self::from_palette`] of the active palette, or of the default palette when no theme is
-    ///     installed.
+    ///     The installed roles, or [`Self::from_palette`] of the active palette, or of the default
+    ///     palette when no theme is installed.
     pub fn active(cx: &App) -> Self {
-        Self::from_palette(MoonPalette::active(cx))
+        super::theme::MoonTheme::global(cx)
+            .and_then(|theme| theme.colors)
+            .unwrap_or_else(|| Self::from_palette(MoonPalette::active(cx)))
     }
 }
 

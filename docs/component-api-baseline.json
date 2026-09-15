@@ -695,6 +695,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/colors.rs",
+      "signature": "pub fn to_palette(self) -> MoonPalette"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/colors.rs",
       "signature": "pub struct MoonColors"
     },
     {
@@ -4528,6 +4532,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn load_toml(path: impl AsRef<Path>) -> Result<MoonThemeConfig, MoonThemeConfigError>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn moon_color_modes() -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",

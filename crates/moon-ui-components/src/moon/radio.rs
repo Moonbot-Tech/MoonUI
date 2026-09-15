@@ -9,6 +9,7 @@ use crate::checkbox::{
 
 use super::{
     checkbox::tier_size,
+    colors::MoonColors,
     foundation::MoonSize,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, MoonTone},
@@ -185,7 +186,13 @@ impl RenderOnce for MoonRadio {
         let disabled = self.disabled;
         let interactive = !disabled && self.on_change.is_some();
         let checked = self.checked;
-        let colors = ChoiceColors::resolve(tokens.palette, self.tone, checked, disabled);
+        let colors = ChoiceColors::resolve(
+            tokens.palette,
+            MoonColors::active(cx),
+            self.tone,
+            checked,
+            disabled,
+        );
         let state_id = ElementId::from(self.id.clone());
         let focus_handle = window
             .use_keyed_state(state_id.clone(), cx, |_, cx| cx.focus_handle())

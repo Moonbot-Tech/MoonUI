@@ -1,10 +1,11 @@
 //! Regression coverage for the colour modes and the legacy-palette role mapping.
 
-use gpui::Hsla;
+use gpui::{Hsla, TestAppContext};
 
 use super::MoonColors;
 use crate::moon::{
-    theme::MoonThemeTokens,
+    foundation::ThemeMode,
+    theme::{MoonTheme, MoonThemeConfig, MoonThemeTokens},
     tokens::{MoonPalette, MoonTone, contrast_ratio, rgba_from},
 };
 
@@ -44,6 +45,58 @@ fn text_roles_clear_the_contrast_floor_on_the_main_backgrounds_in_both_modes() {
             }
         }
     }
+}
+
+/// Catches `colors.rs:MoonColors::to_palette` giving a colour mode a palette that breaks the
+/// palette rules components rely on: `shell` from the other side's background flips every
+/// `is_light` branch, and `text_muted` taken from the placeholder role (4.18:1 in the dark mode)
+/// fails the body-ink floor `docs/PALETTE_SPEC.md` sets on `shell`, `window` and `panel`.
+#[test]
+fn derived_palettes_stay_on_their_side_and_keep_body_ink_readable() {
+    for (mode, colors, light) in [
+        ("dark", MoonColors::DARK, false),
+        ("light", MoonColors::LIGHT, true),
+    ] {
+        let p = colors.to_palette();
+        assert_eq!(
+            p.is_light(),
+            light,
+            "{mode} mode palette landed on the wrong side"
+        );
+        for (ink_name, ink) in [("text", p.text), ("text_muted", p.text_muted)] {
+            for (surface_name, surface) in
+                [("shell", p.shell), ("window", p.window), ("panel", p.panel)]
+            {
+                let ratio = contrast_ratio(ink, surface);
+                assert!(
+                    ratio >= TEXT_CONTRAST_FLOOR,
+                    "{mode} mode palette: {ink_name} #{ink:06X} on {surface_name} #{surface:06X} is {ratio:.2}:1"
+                );
+            }
+        }
+    }
+}
+
+/// Catches `colors.rs:MoonColors::active` recomputing roles from the palette when the theme
+/// carries roles of its own. Under the colour modes that would paint migrated components from the
+/// derived palette instead of the modes — the dark mode's focus ring would turn from the brand
+/// blue to the palette's info blue. A theme without roles must keep following its palette.
+#[gpui::test]
+fn active_roles_follow_the_installed_colour_mode(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        crate::init(cx);
+        MoonTheme::install_config(MoonThemeConfig::moon_color_modes(), cx);
+        assert_eq!(MoonColors::active(cx), MoonColors::DARK);
+
+        MoonTheme::set_mode(ThemeMode::Light, cx);
+        assert_eq!(MoonColors::active(cx), MoonColors::LIGHT);
+
+        MoonTheme::install_config(MoonThemeConfig::moon_terminal(), cx);
+        assert_eq!(
+            MoonColors::active(cx),
+            MoonColors::from_palette(MoonPalette::TERMINAL)
+        );
+    });
 }
 
 /// Catches `colors.rs:MoonColors::from_palette` resolving a role differently from the colour

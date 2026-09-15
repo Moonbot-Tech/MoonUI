@@ -432,7 +432,7 @@ impl ChoiceColors {
     /// Alpha of a disabled control's label and description.
     const DISABLED_TEXT_ALPHA: f32 = 0.45;
 
-    /// Resolves the colours of a checkbox or radio from the palette's colour roles.
+    /// Resolves the colours of a checkbox or radio from the theme's colour roles.
     ///
     /// An unchecked box is a `border_primary` outline with no fill, and the outline stays
     /// `border_primary` when hovered; once disabled it gains a `bg_tertiary` fill. A checked box is
@@ -442,7 +442,8 @@ impl ChoiceColors {
     /// ring is always `focus_ring`, whatever the tone.
     ///
     /// Args:
-    ///     p: The active palette, resolved to colour roles with `MoonColors::from_palette`.
+    ///     p: The active palette, for tones and the label and description inks.
+    ///     roles: The active colour roles, normally `MoonColors::active`.
     ///     tone: The tone set on the control, or `None` for the brand fill.
     ///     checked: Whether the box is checked or indeterminate.
     ///     disabled: Whether the control is disabled.
@@ -451,11 +452,11 @@ impl ChoiceColors {
     ///     The colours to paint the control with and the opacity of its box.
     pub(crate) fn resolve(
         p: MoonPalette,
+        roles: MoonColors,
         tone: Option<MoonTone>,
         checked: bool,
         disabled: bool,
     ) -> Self {
-        let roles = MoonColors::from_palette(p);
         let (checked_fill, mark) = match tone {
             Some(tone) => {
                 let tone = tone.color(p);
@@ -606,7 +607,13 @@ impl RenderOnce for Checkbox {
         let checked = self.checked || self.indeterminate;
         let tokens = MoonTheme::active_tokens(cx);
         let metrics = MoonCheckboxMetrics::resolve(self.size, &tokens);
-        let colors = ChoiceColors::resolve(tokens.palette, self.tone, checked, self.disabled);
+        let colors = ChoiceColors::resolve(
+            tokens.palette,
+            MoonColors::active(cx),
+            self.tone,
+            checked,
+            self.disabled,
+        );
 
         let focus_handle = window
             .use_keyed_state(self.id.clone(), cx, |_, cx| cx.focus_handle())
@@ -806,7 +813,7 @@ mod tests {
         for p in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
             let roles = MoonColors::from_palette(p);
             for (disabled, box_opacity) in [(false, 1.0), (true, 0.5)] {
-                let unchecked = ChoiceColors::resolve(p, None, false, disabled);
+                let unchecked = ChoiceColors::resolve(p, roles, None, false, disabled);
                 assert_eq!(unchecked.border, roles.border_primary.into());
                 if disabled {
                     assert_eq!(unchecked.fill, roles.bg_tertiary.into());
@@ -816,7 +823,7 @@ mod tests {
                 assert_eq!(unchecked.box_opacity, box_opacity);
                 assert_eq!(unchecked.focus_ring, roles.focus_ring.into());
 
-                let checked = ChoiceColors::resolve(p, None, true, disabled);
+                let checked = ChoiceColors::resolve(p, roles, None, true, disabled);
                 assert!(checked.border.is_transparent());
                 assert_eq!(checked.fill, roles.bg_brand_solid.into());
                 assert_eq!(checked.mark, roles.fg_white.into());
@@ -824,7 +831,8 @@ mod tests {
                 assert_eq!(checked.focus_ring, roles.focus_ring.into());
 
                 let warning = MoonTone::Warning.color(p);
-                let toned = ChoiceColors::resolve(p, Some(MoonTone::Warning), true, disabled);
+                let toned =
+                    ChoiceColors::resolve(p, roles, Some(MoonTone::Warning), true, disabled);
                 assert!(toned.border.is_transparent());
                 assert_eq!(toned.fill, rgba_from(warning, 1.0));
                 assert_eq!(toned.mark, rgba_from(p.ink_on(warning), 1.0));
