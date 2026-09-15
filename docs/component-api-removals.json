@@ -159,17 +159,17 @@
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self",
-      "reason": "Menus moved onto the shared MoonSize scale, so menu_size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
+      "reason": "Menus moved onto the shared MoonSize scale, so menu_size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md — which renders one tier larger than the old Compact/Normal geometry (20px/24px rows become 24px/32px)."
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn size(mut self, size: MoonMenuSize) -> Self",
-      "reason": "Popup menus moved onto the shared MoonSize scale, so size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
+      "reason": "Popup menus moved onto the shared MoonSize scale, so size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md — which renders one tier larger than the old Compact/Normal geometry (20px/24px rows become 24px/32px)."
     },
     {
       "file": "crates/moon-ui-components/src/moon/select.rs",
       "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self",
-      "reason": "Selects moved onto the shared MoonSize scale for API parity, so menu_size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
+      "reason": "Selects moved onto the shared MoonSize scale for API parity, so menu_size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md — which renders one tier larger than the old Compact/Normal geometry (20px/24px rows become 24px/32px)."
     }
   ]
 }

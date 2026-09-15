@@ -1078,105 +1078,69 @@ impl Gallery {
                             h_flex()
                                 .items_start()
                                 .gap(px(10.0))
-                                .child(
-                                    v_flex()
-                                        .gap(px(4.0))
-                                        .child(
-                                            MoonText::new("Follows app density")
-                                                .uppercase(false)
-                                                .mono(true)
-                                                .color(p.text_soft)
-                                                .render(),
-                                        )
-                                        .child(
-                                            MoonDropdown::new("gallery-dropdown")
-                                                .label(format!("Scale {}", self.dropdown_value))
-                                                .trigger_leading_icon(MoonButtonIconSlot::new(
-                                                    moon_ui::MOON_ICON_CHECK,
-                                                ))
-                                                .trigger_caret(true)
-                                                .fit_trigger_width(100.0, 180.0)
-                                                .default_open(false)
-                                                .fit_menu_width(220.0, 560.0)
-                                                .items(gallery_dropdown_items(&self.dropdown_value))
-                                                .on_select(gallery_dropdown_on_select(view.clone())),
-                                        ),
-                                )
-                                .child(
-                                    v_flex()
-                                        .gap(px(4.0))
-                                        .child(
-                                            MoonText::new("Xs")
-                                                .uppercase(false)
-                                                .mono(true)
-                                                .color(p.text_soft)
-                                                .render(),
-                                        )
-                                        .child(
-                                            MoonDropdown::new("gallery-dropdown-xs")
-                                                .label("Xs")
-                                                .trigger_leading_icon(MoonButtonIconSlot::new(
-                                                    moon_ui::MOON_ICON_CHECK,
-                                                ))
-                                                .trigger_caret(true)
-                                                .fit_trigger_width(100.0, 180.0)
-                                                .default_open(false)
-                                                .fit_menu_width(220.0, 560.0)
-                                                .menu_size(MoonSize::Xs)
-                                                .items(gallery_dropdown_items(&self.dropdown_value))
-                                                .on_select(gallery_dropdown_on_select(view.clone())),
-                                        ),
-                                )
-                                .child(
-                                    v_flex()
-                                        .gap(px(4.0))
-                                        .child(
-                                            MoonText::new("Sm")
-                                                .uppercase(false)
-                                                .mono(true)
-                                                .color(p.text_soft)
-                                                .render(),
-                                        )
-                                        .child(
-                                            MoonDropdown::new("gallery-dropdown-sm")
-                                                .label("Sm")
-                                                .trigger_leading_icon(MoonButtonIconSlot::new(
-                                                    moon_ui::MOON_ICON_CHECK,
-                                                ))
-                                                .trigger_caret(true)
-                                                .fit_trigger_width(100.0, 180.0)
-                                                .default_open(false)
-                                                .fit_menu_width(220.0, 560.0)
-                                                .menu_size(MoonSize::Sm)
-                                                .items(gallery_dropdown_items(&self.dropdown_value))
-                                                .on_select(gallery_dropdown_on_select(view.clone())),
-                                        ),
-                                )
-                                .child(
-                                    v_flex()
-                                        .gap(px(4.0))
-                                        .child(
-                                            MoonText::new("Md")
-                                                .uppercase(false)
-                                                .mono(true)
-                                                .color(p.text_soft)
-                                                .render(),
-                                        )
-                                        .child(
-                                            MoonDropdown::new("gallery-dropdown-md")
-                                                .label("Md")
-                                                .trigger_leading_icon(MoonButtonIconSlot::new(
-                                                    moon_ui::MOON_ICON_CHECK,
-                                                ))
-                                                .trigger_caret(true)
-                                                .fit_trigger_width(100.0, 180.0)
-                                                .default_open(false)
-                                                .fit_menu_width(220.0, 560.0)
-                                                .menu_size(MoonSize::Md)
-                                                .items(gallery_dropdown_items(&self.dropdown_value))
-                                                .on_select(gallery_dropdown_on_select(view.clone())),
-                                        ),
-                                ),
+                                .child(labeled_example(
+                                    "Follows app density",
+                                    p,
+                                    MoonDropdown::new("gallery-dropdown")
+                                        .label(format!("Scale {}", self.dropdown_value))
+                                        .trigger_leading_icon(MoonButtonIconSlot::new(
+                                            moon_ui::MOON_ICON_CHECK,
+                                        ))
+                                        .trigger_caret(true)
+                                        .fit_trigger_width(100.0, 180.0)
+                                        .default_open(false)
+                                        .fit_menu_width(220.0, 560.0)
+                                        .items(gallery_dropdown_items(&self.dropdown_value))
+                                        .on_select(gallery_dropdown_on_select(view.clone())),
+                                ))
+                                .child(labeled_example(
+                                    "Xs",
+                                    p,
+                                    MoonDropdown::new("gallery-dropdown-xs")
+                                        .label("Xs")
+                                        .trigger_leading_icon(MoonButtonIconSlot::new(
+                                            moon_ui::MOON_ICON_CHECK,
+                                        ))
+                                        .trigger_caret(true)
+                                        .fit_trigger_width(100.0, 180.0)
+                                        .default_open(false)
+                                        .fit_menu_width(220.0, 560.0)
+                                        .menu_size(MoonSize::Xs)
+                                        .items(gallery_dropdown_items(&self.dropdown_value))
+                                        .on_select(gallery_dropdown_on_select(view.clone())),
+                                ))
+                                .child(labeled_example(
+                                    "Sm",
+                                    p,
+                                    MoonDropdown::new("gallery-dropdown-sm")
+                                        .label("Sm")
+                                        .trigger_leading_icon(MoonButtonIconSlot::new(
+                                            moon_ui::MOON_ICON_CHECK,
+                                        ))
+                                        .trigger_caret(true)
+                                        .fit_trigger_width(100.0, 180.0)
+                                        .default_open(false)
+                                        .fit_menu_width(220.0, 560.0)
+                                        .menu_size(MoonSize::Sm)
+                                        .items(gallery_dropdown_items(&self.dropdown_value))
+                                        .on_select(gallery_dropdown_on_select(view.clone())),
+                                ))
+                                .child(labeled_example(
+                                    "Md",
+                                    p,
+                                    MoonDropdown::new("gallery-dropdown-md")
+                                        .label("Md")
+                                        .trigger_leading_icon(MoonButtonIconSlot::new(
+                                            moon_ui::MOON_ICON_CHECK,
+                                        ))
+                                        .trigger_caret(true)
+                                        .fit_trigger_width(100.0, 180.0)
+                                        .default_open(false)
+                                        .fit_menu_width(220.0, 560.0)
+                                        .menu_size(MoonSize::Md)
+                                        .items(gallery_dropdown_items(&self.dropdown_value))
+                                        .on_select(gallery_dropdown_on_select(view.clone())),
+                                )),
                         )
                         .child(
                             MoonPopover::new("gallery-popover")
@@ -1295,81 +1259,45 @@ impl Gallery {
                     h_flex()
                         .items_start()
                         .gap(px(10.0))
-                        .child(
-                            v_flex()
-                                .gap(px(4.0))
-                                .child(
-                                    MoonText::new("Follows app density")
-                                        .uppercase(false)
-                                        .mono(true)
-                                        .color(p.text_soft)
-                                        .render(),
-                                )
-                                .child(
-                                    MoonPopupMenu::new("gallery-popup-menu")
-                                        .width(190.0)
-                                        .max_height_ui(130.0)
-                                        .items(gallery_popup_items())
-                                        .render(),
-                                ),
-                        )
-                        .child(
-                            v_flex()
-                                .gap(px(4.0))
-                                .child(
-                                    MoonText::new("Xs")
-                                        .uppercase(false)
-                                        .mono(true)
-                                        .color(p.text_soft)
-                                        .render(),
-                                )
-                                .child(
-                                    MoonPopupMenu::new("gallery-popup-menu-xs")
-                                        .width(190.0)
-                                        .max_height_ui(130.0)
-                                        .size(MoonSize::Xs)
-                                        .items(gallery_popup_items())
-                                        .render(),
-                                ),
-                        )
-                        .child(
-                            v_flex()
-                                .gap(px(4.0))
-                                .child(
-                                    MoonText::new("Sm")
-                                        .uppercase(false)
-                                        .mono(true)
-                                        .color(p.text_soft)
-                                        .render(),
-                                )
-                                .child(
-                                    MoonPopupMenu::new("gallery-popup-menu-sm")
-                                        .width(190.0)
-                                        .max_height_ui(130.0)
-                                        .size(MoonSize::Sm)
-                                        .items(gallery_popup_items())
-                                        .render(),
-                                ),
-                        )
-                        .child(
-                            v_flex()
-                                .gap(px(4.0))
-                                .child(
-                                    MoonText::new("Md")
-                                        .uppercase(false)
-                                        .mono(true)
-                                        .color(p.text_soft)
-                                        .render(),
-                                )
-                                .child(
-                                    MoonPopupMenu::new("gallery-popup-menu-md")
-                                        .width(190.0)
-                                        .max_height_ui(130.0)
-                                        .size(MoonSize::Md)
-                                        .items(gallery_popup_items())
-                                        .render(),
-                                ),
-                        ),
+                        .child(labeled_example(
+                            "Follows app density",
+                            p,
+                            MoonPopupMenu::new("gallery-popup-menu")
+                                .width(190.0)
+                                .max_height_ui(130.0)
+                                .items(gallery_popup_items())
+                                .render(),
+                        ))
+                        .child(labeled_example(
+                            "Xs",
+                            p,
+                            MoonPopupMenu::new("gallery-popup-menu-xs")
+                                .width(190.0)
+                                .max_height_ui(130.0)
+                                .size(MoonSize::Xs)
+                                .items(gallery_popup_items())
+                                .render(),
+                        ))
+                        .child(labeled_example(
+                            "Sm",
+                            p,
+                            MoonPopupMenu::new("gallery-popup-menu-sm")
+                                .width(190.0)
+                                .max_height_ui(130.0)
+                                .size(MoonSize::Sm)
+                                .items(gallery_popup_items())
+                                .render(),
+                        ))
+                        .child(labeled_example(
+                            "Md",
+                            p,
+                            MoonPopupMenu::new("gallery-popup-menu-md")
+                                .width(190.0)
+                                .max_height_ui(130.0)
+                                .size(MoonSize::Md)
+                                .items(gallery_popup_items())
+                                .render(),
+                        )),
                 ),
             )
     }
@@ -3341,6 +3269,28 @@ impl Render for Gallery {
                     .child(self.render_event_log(cx)),
             )
     }
+}
+
+/// Caption plus control used by the menu-tier gallery row.
+///
+/// Args:
+///     label: Caption rendered above the control.
+///     p: Active palette for caption colour.
+///     child: The labelled control.
+///
+/// Returns:
+///     A column with the caption and the control.
+fn labeled_example(label: &str, p: MoonPalette, child: impl IntoElement) -> impl IntoElement {
+    v_flex()
+        .gap(px(4.0))
+        .child(
+            MoonText::new(label)
+                .uppercase(false)
+                .mono(true)
+                .color(p.text_soft)
+                .render(),
+        )
+        .child(child)
 }
 
 fn gallery_dropdown_items(selected: &SharedString) -> [MoonMenuItem; 6] {

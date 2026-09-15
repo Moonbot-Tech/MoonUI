@@ -1,6 +1,7 @@
 //! Input and rendered-geometry regressions for cascading menus.
 
 use super::{MoonMenuItem, MoonPopupMenu};
+use crate::moon::foundation::MoonSize;
 use crate::moon::{MoonScale, MoonTheme, ThemeMode};
 use gpui::{ParentElement as _, Styled as _};
 use std::{cell::Cell, rc::Rc};
@@ -32,6 +33,14 @@ impl gpui::Render for CascadeHarness {
         gpui::div().size_full().child(
             gpui::div().absolute().left(pos.x).top(pos.y).child(
                 MoonPopupMenu::new("cascade")
+                    // Pinned to the pre-density default's row geometry: an unset menu used to
+                    // render at the old fixed `Normal` (24px) rows, but now follows the theme
+                    // tier, which defaults to `Md` (32px). This is a rendered-geometry
+                    // hover/flip regression whose viewport-corner placement and submenu-open
+                    // assertions depend on exact row height, so it must keep testing against
+                    // the geometry it was written for rather than silently drifting with the
+                    // new default.
+                    .size(MoonSize::Sm)
                     .width(180.0)
                     .items([
                         MoonMenuItem::new("First").submenu((0..self.count).map(|ix| {

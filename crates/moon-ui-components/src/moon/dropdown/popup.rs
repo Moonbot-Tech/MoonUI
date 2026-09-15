@@ -567,8 +567,13 @@ impl MoonPopupMenu {
             // from the layout in either direction: an over-declared header would otherwise shrink
             // the row list without using the space, and an under-declared one would push the list
             // past the menu's maximum.
+            // Column + main-axis centre: a short caption sits in the declared band without
+            // becoming a flex row (`.items_center()` would shrink a full-width header to content).
             menu = menu.child(
                 div()
+                    .flex()
+                    .flex_col()
+                    .justify_center()
                     .flex_none()
                     .h(px(height))
                     .overflow_hidden()

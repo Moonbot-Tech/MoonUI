@@ -723,6 +723,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn size(mut self, size: impl Into<MoonMenuSize>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
       "signature": "pub fn width(mut self, width: f32) -> Self"
     },
     {
@@ -1575,6 +1579,18 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub enum MoonMenuItemKind"
     },
     {
@@ -1624,6 +1640,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn fitted_trigger_label( cx: &App, label: &str, size: MoonButtonSize, min_width: f32, max_width: f32, ) -> (SharedString, f32)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn from_theme(tokens: &MoonThemeTokens) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -1683,7 +1703,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
-      "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self"
+      "signature": "pub fn menu_size(mut self, size: impl Into<MoonMenuSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -1747,7 +1767,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
-      "signature": "pub fn size(mut self, size: MoonMenuSize) -> Self"
+      "signature": "pub fn size(mut self, size: impl Into<MoonMenuSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -3323,7 +3343,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/select.rs",
-      "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self"
+      "signature": "pub fn menu_size(mut self, size: impl Into<MoonMenuSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/select.rs",
@@ -4196,6 +4216,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/text.rs",
       "signature": "pub fn render(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn rendered_metrics(mut self, metrics: MoonTextMetrics) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/text.rs",
