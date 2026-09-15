@@ -1831,6 +1831,11 @@ impl Gallery {
                                                             .render(),
                                                         ),
                                                     )
+                                                    .children([moon_ui::MoonSize::Xs, moon_ui::MoonSize::Sm, moon_ui::MoonSize::Md].into_iter().map(|tier| {
+                                                        MoonStepper::new(format!("stepper-{tier:?}"))
+                                                            .size(tier.into())
+                                                            .value(42.0)
+                                                    }))
                                                     .child(
                                                         MoonFormRow::new(
                                                             "new-controls-form-row-stepper",

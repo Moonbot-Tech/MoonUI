@@ -3791,6 +3791,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/stepper.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stepper.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stepper.rs",
       "signature": "pub enum MoonStepperSize"
     },
     {

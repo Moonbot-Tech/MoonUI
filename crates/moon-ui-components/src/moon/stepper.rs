@@ -1,10 +1,14 @@
+//! Density-tier numeric stepper with bounded, controlled or local value changes.
+
+use crate::{
+    Disableable,
+    button::{Button, ButtonRounded, ButtonVariant, ButtonVariants},
+};
 use gpui::*;
 
 use super::{
-    button::{MoonButton, MoonButtonSegment, MoonButtonSize, MoonButtonVariant},
-    foundation::MoonF32ChangeHandler,
-    text::MoonText,
-    theme::MoonTheme,
+    foundation::{MoonF32ChangeHandler, MoonSize},
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, MoonTone, rgba_from},
 };
 
@@ -13,10 +17,11 @@ struct MoonStepperRuntimeState {
     value: f32,
 }
 
+/// Shared density tier or explicit legacy-scaled stepper dimensions.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonStepperSize {
-    Compact,
-    Normal,
+    /// Xs, Sm and Md are supported; larger tiers snap to Md.
+    Tier(MoonSize),
     Custom {
         height: f32,
         button_width: f32,
@@ -26,8 +31,27 @@ pub enum MoonStepperSize {
     },
 }
 
+#[allow(non_upper_case_globals)]
+impl MoonStepperSize {
+    /// Compatibility name for the small tier.
+    #[deprecated(note = "use MoonSize::Sm.into()")]
+    pub const Compact: Self = Self::Tier(MoonSize::Sm);
+    /// Compatibility name for the medium tier.
+    #[deprecated(note = "use MoonSize::Md.into()")]
+    pub const Normal: Self = Self::Tier(MoonSize::Md);
+}
+
+impl From<MoonSize> for MoonStepperSize {
+    /// Convert a shared tier; unsupported tiers snap during rendering.
+    fn from(size: MoonSize) -> Self {
+        Self::Tier(size)
+    }
+}
+
+/// Unscaled geometry and typography resolved from the requested size.
 #[derive(Clone, Copy, Debug)]
 struct StepperMetrics {
+    radius: f32,
     height: f32,
     button_width: f32,
     value_width: f32,
@@ -67,12 +91,13 @@ pub struct MoonStepper {
     step: f32,
     precision: usize,
     disabled: bool,
-    size: MoonStepperSize,
+    size: Option<MoonStepperSize>,
     tone: MoonTone,
     on_change: Option<MoonF32ChangeHandler>,
 }
 
 impl MoonStepper {
+    /// Create a stepper that follows the active density unless a size is set.
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
@@ -84,7 +109,7 @@ impl MoonStepper {
             step: 1.0,
             precision: 0,
             disabled: false,
-            size: MoonStepperSize::Normal,
+            size: None,
             tone: MoonTone::Info,
             on_change: None,
         }
@@ -136,8 +161,9 @@ impl MoonStepper {
         self
     }
 
+    /// Override density with explicit tier or custom design-reference dimensions.
     pub fn size(mut self, size: MoonStepperSize) -> Self {
-        self.size = size;
+        self.size = Some(size);
         self
     }
 
@@ -155,22 +181,37 @@ impl MoonStepper {
         self
     }
 
-    fn metrics(&self) -> StepperMetrics {
-        match self.size {
-            MoonStepperSize::Compact => StepperMetrics {
-                height: 22.0,
-                button_width: 24.0,
-                value_width: 52.0,
-                font_size: 10.0,
-                line_height: 13.0,
-            },
-            MoonStepperSize::Normal => StepperMetrics {
-                height: 26.0,
-                button_width: 28.0,
-                value_width: 64.0,
-                font_size: 10.5,
-                line_height: 14.0,
-            },
+    /// Return rendered text metrics, applying exactly one scale for the selected size mode.
+    fn text_metrics(&self, tokens: &MoonThemeTokens) -> (f32, f32) {
+        let m = self.metrics(tokens);
+        if matches!(self.size, Some(MoonStepperSize::Custom { .. })) {
+            (tokens.font(m.font_size), tokens.line_height(m.line_height))
+        } else {
+            (tokens.ui(m.font_size), tokens.ui(m.line_height))
+        }
+    }
+
+    /// Resolve design-reference metrics using density when no override was supplied.
+    fn metrics(&self, tokens: &MoonThemeTokens) -> StepperMetrics {
+        match self.size.unwrap_or(MoonStepperSize::Tier(tokens.tier())) {
+            MoonStepperSize::Tier(size) => {
+                let tier = size.nearest(&[MoonSize::Xs, MoonSize::Sm, MoonSize::Md]);
+                let m = tier.control_metrics();
+                // Preserve the compact ratio below Md, and the normal ratio at Md.
+                let ratio = if tier == MoonSize::Md {
+                    64.0 / 26.0
+                } else {
+                    52.0 / 22.0
+                };
+                StepperMetrics {
+                    height: m.height,
+                    radius: m.radius,
+                    button_width: m.height,
+                    value_width: (m.height * ratio).round(),
+                    font_size: m.font_size,
+                    line_height: m.line_height,
+                }
+            }
             MoonStepperSize::Custom {
                 height,
                 button_width,
@@ -178,6 +219,7 @@ impl MoonStepper {
                 font_size,
                 line_height,
             } => StepperMetrics {
+                radius: 4.0,
                 height,
                 button_width,
                 value_width,
@@ -189,9 +231,11 @@ impl MoonStepper {
 }
 
 impl RenderOnce for MoonStepper {
+    /// Render tier geometry and text with UI zoom, retaining legacy text scaling for Custom.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let metrics = self.metrics();
         let tokens = MoonTheme::active_tokens(cx);
+        let metrics = self.metrics(&tokens);
+        let (font_size, line_height) = self.text_metrics(&tokens);
         let p = tokens.palette;
         let state = window.use_keyed_state(
             ElementId::from(SharedString::from(format!("{}:state", self.id))),
@@ -226,23 +270,25 @@ impl RenderOnce for MoonStepper {
             .flex()
             .items_center()
             .overflow_hidden()
-            .rounded(px(tokens.ui(4.0)))
+            .rounded(px(tokens.ui(metrics.radius)))
             .border(px(tokens.ui(1.0)))
             .border_color(rgba_from(p.border, if disabled { 0.45 } else { 1.0 }))
             .bg(rgba_from(p.shell_high, if disabled { 0.38 } else { 0.96 }))
             .child(
-                MoonButton::new(minus_id)
-                    .variant(MoonButtonVariant::Ghost)
-                    .size(MoonButtonSize::Custom {
-                        height: metrics.height,
-                        radius: 0.0,
-                        font_size: metrics.font_size,
-                        line_height: metrics.line_height,
-                        gap: 0.0,
-                    })
+                Button::new(minus_id)
+                    .with_variant(ButtonVariant::Ghost)
+                    .rounded(ButtonRounded::None)
+                    .h(px(tokens.ui(metrics.height)))
                     .disabled(disabled || value <= min)
-                    .width(metrics.button_width)
-                    .segment(MoonButtonSegment::new("-").color(p.text_soft).weight(600.0))
+                    .w(px(tokens.ui(metrics.button_width)))
+                    .child(
+                        div()
+                            .text_size(px(font_size))
+                            .line_height(px(line_height))
+                            .font_weight(FontWeight(600.0))
+                            .text_color(rgba_from(p.text_soft, 1.0))
+                            .child("-"),
+                    )
                     .on_click(move |_, window, cx| {
                         let next = moon_stepper_next_value(
                             value,
@@ -258,8 +304,7 @@ impl RenderOnce for MoonStepper {
                             on_change(next, window, cx);
                         }
                         cx.notify(parent_view);
-                    })
-                    .render(),
+                    }),
             )
             .child(
                 div()
@@ -272,30 +317,33 @@ impl RenderOnce for MoonStepper {
                     .items_center()
                     .justify_center()
                     .child(
-                        MoonText::new(value_text)
-                            .color(if disabled { p.text_muted } else { tone_color })
-                            .alpha(if disabled { 0.50 } else { 1.0 })
-                            .font_size(metrics.font_size)
-                            .line_height(metrics.line_height)
-                            .weight(600.0)
-                            .mono(true)
-                            .uppercase(false)
-                            .render(),
+                        div()
+                            .text_color(rgba_from(
+                                if disabled { p.text_muted } else { tone_color },
+                                if disabled { 0.50 } else { 1.0 },
+                            ))
+                            .text_size(px(font_size))
+                            .line_height(px(line_height))
+                            .font_weight(FontWeight(600.0))
+                            .font_family(tokens.font_family(true))
+                            .child(value_text),
                     ),
             )
             .child(
-                MoonButton::new(plus_id)
-                    .variant(MoonButtonVariant::Ghost)
-                    .size(MoonButtonSize::Custom {
-                        height: metrics.height,
-                        radius: 0.0,
-                        font_size: metrics.font_size,
-                        line_height: metrics.line_height,
-                        gap: 0.0,
-                    })
+                Button::new(plus_id)
+                    .with_variant(ButtonVariant::Ghost)
+                    .rounded(ButtonRounded::None)
+                    .h(px(tokens.ui(metrics.height)))
                     .disabled(disabled || value >= max)
-                    .width(metrics.button_width)
-                    .segment(MoonButtonSegment::new("+").color(p.text_soft).weight(600.0))
+                    .w(px(tokens.ui(metrics.button_width)))
+                    .child(
+                        div()
+                            .text_size(px(font_size))
+                            .line_height(px(line_height))
+                            .font_weight(FontWeight(600.0))
+                            .text_color(rgba_from(p.text_soft, 1.0))
+                            .child("+"),
+                    )
                     .on_click(move |_, window, cx| {
                         let next = moon_stepper_next_value(
                             value,
@@ -311,8 +359,7 @@ impl RenderOnce for MoonStepper {
                             on_change(next, window, cx);
                         }
                         cx.notify(parent_view);
-                    })
-                    .render(),
+                    }),
             );
 
         if let Some(bounds) = self.bounds {
