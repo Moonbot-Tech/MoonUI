@@ -2291,6 +2291,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/kbd.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Xs);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/kbd.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/kbd.rs",
       "signature": "pub enum MoonKbdSize"
     },
     {

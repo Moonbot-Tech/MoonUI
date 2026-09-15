@@ -1667,7 +1667,9 @@ impl Gallery {
                                     .size(MoonToggleSize::Compact),
                             )
                             .child(MoonSpinner::new().tone(MoonTone::Info))
-                            .child(MoonKbd::new("Ctrl+K"))
+                            .child(MoonKbd::new("Xs").size(MoonSize::Xs.into()))
+                            .child(MoonKbd::new("Sm").size(MoonSize::Sm.into()))
+                            .child(MoonKbd::new("Md").size(MoonSize::Md.into()))
                             .child(MoonKbd::new("Esc").outline(true)),
                     )
                     .child(
