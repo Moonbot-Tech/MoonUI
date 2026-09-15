@@ -1,16 +1,19 @@
+//! Radio choices with density-selected tiers and optional supporting text.
+
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use super::{
-    text::MoonText,
-    theme::MoonTheme,
+    foundation::MoonSize,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, MoonTone, rgba_from},
 };
 
+/// Shared size tier or explicitly scaled legacy radio metrics.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonRadioSize {
-    Compact,
-    Normal,
+    /// Supports Sm and Md; other tiers snap to the nearest supported size.
+    Tier(MoonSize),
     Custom {
         dot_size: f32,
         font_size: f32,
@@ -19,6 +22,22 @@ pub enum MoonRadioSize {
     },
 }
 
+#[allow(non_upper_case_globals)]
+impl MoonRadioSize {
+    #[deprecated(note = "use MoonRadioSize::Tier(MoonSize::Sm)")]
+    pub const Compact: Self = Self::Tier(MoonSize::Sm);
+    #[deprecated(note = "use MoonRadioSize::Tier(MoonSize::Md)")]
+    pub const Normal: Self = Self::Tier(MoonSize::Md);
+}
+
+impl From<MoonSize> for MoonRadioSize {
+    /// Wraps a shared tier; unsupported tiers snap when metrics are resolved.
+    fn from(size: MoonSize) -> Self {
+        Self::Tier(size)
+    }
+}
+
+/// Final pixel metrics, with legacy text scaling applied only to Custom.
 #[derive(Clone, Copy, Debug)]
 struct RadioMetrics {
     outer_size: f32,
@@ -26,34 +45,39 @@ struct RadioMetrics {
     font_size: f32,
     line_height: f32,
     gap: f32,
+    description_gap: f32,
 }
 
 fn moon_radio_click_value(disabled: bool) -> Option<bool> {
     if disabled { None } else { Some(true) }
 }
 
+/// A controlled radio choice whose omitted size follows the active density.
 #[derive(IntoElement)]
 pub struct MoonRadio {
     id: SharedString,
     bounds: Option<MoonRect>,
     label: Option<SharedString>,
+    description: Option<SharedString>,
     checked: bool,
     disabled: bool,
-    size: MoonRadioSize,
+    size: Option<MoonRadioSize>,
     tone: MoonTone,
     mono: bool,
     on_change: Option<std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
 }
 
 impl MoonRadio {
+    /// Creates an unchecked choice with a density-selected size.
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
             bounds: None,
             label: None,
+            description: None,
             checked: false,
             disabled: false,
-            size: MoonRadioSize::Normal,
+            size: None,
             tone: MoonTone::Info,
             mono: true,
             on_change: None,
@@ -70,6 +94,12 @@ impl MoonRadio {
         self
     }
 
+    /// Sets supporting text below the label, keeping the mark centred on its first line.
+    pub fn description(mut self, description: impl Into<SharedString>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
     pub fn checked(mut self, checked: bool) -> Self {
         self.checked = checked;
         self
@@ -80,8 +110,9 @@ impl MoonRadio {
         self
     }
 
+    /// Overrides the density with a tier (via Into) or custom metrics.
     pub fn size(mut self, size: MoonRadioSize) -> Self {
-        self.size = size;
+        self.size = Some(size);
         self
     }
 
@@ -100,50 +131,58 @@ impl MoonRadio {
         self
     }
 
-    fn metrics(&self) -> RadioMetrics {
-        match self.size {
-            MoonRadioSize::Compact => RadioMetrics {
-                outer_size: 12.0,
-                inner_size: 5.0,
-                font_size: 9.5,
-                line_height: 12.0,
-                gap: 6.0,
-            },
-            MoonRadioSize::Normal => RadioMetrics {
-                outer_size: 14.0,
-                inner_size: 6.0,
-                font_size: 10.5,
-                line_height: 13.0,
-                gap: 7.0,
-            },
+    /// Resolves density, snapping and scaling into final pixels.
+    fn metrics(&self, tokens: &MoonThemeTokens) -> RadioMetrics {
+        match self.size.unwrap_or(MoonRadioSize::Tier(tokens.tier())) {
+            MoonRadioSize::Tier(tier) => {
+                let tier = tier.nearest(&[MoonSize::Sm, MoonSize::Md]);
+                let control = tier.control_metrics();
+                let outer_size: f32 = if tier == MoonSize::Sm { 16.0 } else { 20.0 };
+                RadioMetrics {
+                    outer_size: tokens.ui(outer_size),
+                    inner_size: tokens.ui((outer_size * 0.44).round()),
+                    font_size: tokens.ui(control.font_size),
+                    line_height: tokens.ui(control.line_height),
+                    gap: tokens.ui(control.gap),
+                    description_gap: tokens.ui(if tier == MoonSize::Sm { 0.0 } else { 2.0 }),
+                }
+            }
             MoonRadioSize::Custom {
                 dot_size,
                 font_size,
                 line_height,
                 gap,
             } => RadioMetrics {
-                outer_size: dot_size,
-                inner_size: (dot_size * 0.44).round(),
-                font_size,
-                line_height,
-                gap,
+                outer_size: tokens.ui(dot_size),
+                inner_size: tokens.ui((dot_size * 0.44).round()),
+                font_size: tokens.font(font_size),
+                line_height: tokens.line_height(line_height),
+                gap: tokens.ui(gap),
+                description_gap: 0.0,
             },
         }
     }
 }
 
 impl RenderOnce for MoonRadio {
+    /// Renders one selectable row, stacking supporting text beneath the label.
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
-        let metrics = self.metrics();
+        let metrics = self.metrics(&tokens);
+        let has_description = self.description.is_some();
         let p = tokens.palette;
         let accent = self.tone.color(p);
         let alpha = if self.disabled { 0.45 } else { 1.0 };
         let disabled = self.disabled;
         let checked = self.checked;
-        let outer_size = tokens.ui(metrics.outer_size);
-        let inner_size = tokens.ui(metrics.inner_size);
+        let outer_size = metrics.outer_size;
+        let inner_size = metrics.inner_size;
         let mut mark = div()
+            .debug_selector(|| format!("{}:mark", self.id))
+            .flex_shrink_0()
+            .when(has_description, |this| {
+                this.mt(px(((metrics.line_height - outer_size) * 0.5).max(0.0)))
+            })
             .relative()
             .w(px(outer_size))
             .h(px(outer_size))
@@ -162,8 +201,8 @@ impl RenderOnce for MoonRadio {
             mark = mark.child(
                 div()
                     .absolute()
-                    .left(px((outer_size - inner_size) * 0.5))
-                    .top(px((outer_size - inner_size) * 0.5))
+                    .left(px((outer_size - inner_size) * 0.5 - tokens.ui(1.0)))
+                    .top(px((outer_size - inner_size) * 0.5 - tokens.ui(1.0)))
                     .w(px(inner_size))
                     .h(px(inner_size))
                     .rounded(px(inner_size * 0.5))
@@ -178,8 +217,14 @@ impl RenderOnce for MoonRadio {
             ))))
             .relative()
             .flex()
-            .items_center()
-            .gap(px(tokens.ui(metrics.gap)))
+            .map(|this| {
+                if has_description {
+                    this.items_start()
+                } else {
+                    this.items_center()
+                }
+            })
+            .gap(px(metrics.gap))
             .rounded(px(tokens.ui(4.0)))
             .cursor_default()
             .when(!disabled, |this| {
@@ -188,19 +233,39 @@ impl RenderOnce for MoonRadio {
             })
             .child(mark);
 
-        if let Some(label) = self.label {
-            let text = tokens.text(metrics.font_size, metrics.line_height);
-            root = root.child(
-                MoonText::new(label)
-                    .color(if disabled { p.text_muted } else { p.text_soft })
-                    .alpha(alpha)
-                    .font_size(text.font_size)
-                    .line_height(text.line_height)
-                    .weight(400.0)
-                    .mono(self.mono)
-                    .uppercase(false)
-                    .render(),
-            );
+        if self.label.is_some() || has_description {
+            let mut text = div()
+                .flex()
+                .flex_col()
+                .gap(px(metrics.description_gap))
+                .font_family(tokens.font_family(self.mono))
+                .text_size(px(metrics.font_size))
+                .line_height(px(metrics.line_height))
+                .when(has_description, |this| {
+                    this.mt(px(((outer_size - metrics.line_height) * 0.5).max(0.0)))
+                });
+            if let Some(label) = self.label {
+                text = text.child(
+                    div()
+                        .debug_selector(|| format!("{}:label", self.id))
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(rgba_from(
+                            if disabled { p.text_muted } else { p.text_soft },
+                            alpha,
+                        ))
+                        .child(label),
+                );
+            }
+            if let Some(description) = self.description {
+                text = text.child(
+                    div()
+                        .debug_selector(|| format!("{}:description", self.id))
+                        .font_weight(FontWeight::NORMAL)
+                        .text_color(rgba_from(p.text_muted, alpha))
+                        .child(description),
+                );
+            }
+            root = root.child(text);
         }
 
         if let Some(bounds) = self.bounds {

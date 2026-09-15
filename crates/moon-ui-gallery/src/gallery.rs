@@ -1740,7 +1740,9 @@ impl Gallery {
                             .flex_wrap()
                             .child(
                                 MoonRadio::new("new-controls-radio-fast")
-                                    .label("fast")
+                                    .label("fast (Sm)")
+                                    .size(MoonSize::Sm.into())
+                                    .description("Small radio with supporting text")
                                     .checked(self.new_radio_index == 0)
                                     .on_change({
                                         let view = view.clone();
@@ -1754,7 +1756,9 @@ impl Gallery {
                             )
                             .child(
                                 MoonRadio::new("new-controls-radio-balanced")
-                                    .label("balanced")
+                                    .label("balanced (Md)")
+                                    .size(MoonSize::Md.into())
+                                    .description("Medium radio with supporting text")
                                     .checked(self.new_radio_index == 1)
                                     .on_change({
                                         let view = view.clone();
