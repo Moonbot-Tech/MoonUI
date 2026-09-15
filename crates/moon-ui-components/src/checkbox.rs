@@ -17,7 +17,7 @@ use gpui::{
     Animation, AnimationExt, AnyElement, App, Div, ElementId, FontWeight, InteractiveElement,
     IntoElement, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
     StyleRefinement, Styled, TransformationMatrix, Window, canvas, div,
-    prelude::FluentBuilder as _, px, relative,
+    prelude::FluentBuilder as _, px,
 };
 
 /// A Checkbox element.
@@ -71,6 +71,8 @@ impl Checkbox {
     }
 
     /// Set the label for the checkbox.
+    ///
+    /// An empty label renders no text, so the checkbox stays exactly its box with no gap.
     pub fn label(mut self, label: impl Into<Text>) -> Self {
         self.label = Some(label.into());
         self
@@ -78,7 +80,8 @@ impl Checkbox {
 
     /// Set supporting text shown under the label in the muted text colour.
     ///
-    /// With a description the box aligns to the label's line instead of centring on both lines.
+    /// With a description the box aligns to the label's line instead of centring on both lines. An
+    /// empty description renders nothing.
     pub fn description(mut self, description: impl Into<SharedString>) -> Self {
         self.description = Some(description.into());
         self
@@ -493,8 +496,7 @@ impl RenderOnce for Checkbox {
         let metrics = MoonCheckboxMetrics::for_size(self.size, cx);
         let p = MoonPalette::active(cx);
         let checked_tone = self.tone.unwrap_or(MoonTone::Info).color(p);
-        let box_alpha = if self.disabled { 0.45 } else { 1.0 };
-        let label_alpha = if self.disabled { 0.45 } else { 1.0 };
+        let alpha = if self.disabled { 0.45 } else { 1.0 };
 
         let focus_handle = window
             .use_keyed_state(self.id.clone(), cx, |_, cx| cx.focus_handle())
@@ -505,21 +507,30 @@ impl RenderOnce for Checkbox {
         // A checked box is one solid tone, border and fill alike, so the mark takes the palette
         // ink that reads best on that tone rather than the tone itself.
         let (border_color, bg_color) = if checked {
-            let tone = rgba_from(checked_tone, box_alpha);
+            let tone = rgba_from(checked_tone, alpha);
             (tone, tone)
         } else {
             (
-                rgba_from(p.border, box_alpha),
-                rgba_from(p.shell_high, 0.95 * box_alpha),
+                rgba_from(p.border, alpha),
+                rgba_from(p.shell_high, 0.95 * alpha),
             )
         };
         let label_color = if self.disabled {
-            rgba_from(p.text_muted, label_alpha)
+            rgba_from(p.text_muted, alpha)
         } else {
-            rgba_from(p.text_soft, label_alpha)
+            rgba_from(p.text_soft, alpha)
         };
-        let description_color = rgba_from(p.text_muted, label_alpha);
-        let has_description = self.description.is_some();
+        let description_color = rgba_from(p.text_muted, alpha);
+        // Empty text counts as no text, so a bare checkbox never gains the text column and, with
+        // it, the box-to-text gap and a text line's height.
+        let label = self
+            .label
+            .filter(|label| !matches!(label, Text::String(text) if text.is_empty()));
+        let description = self
+            .description
+            .filter(|description| !description.is_empty());
+        let has_description = description.is_some();
+        let has_text = label.is_some() || has_description || !self.children.is_empty();
         // Rows with a description are top-aligned; centre the label's first line on the box by
         // pushing whichever of the two is shorter down by half the difference.
         let box_offset = ((metrics.line_height - metrics.box_size) * 0.5).max(px(0.));
@@ -547,13 +558,11 @@ impl RenderOnce for Checkbox {
                         this.items_center()
                     }
                 })
-                .line_height(metrics.line_height)
                 .text_size(metrics.font_size)
                 .text_color(label_color)
                 .when(self.mono, |this| {
                     this.font_family(MoonTheme::active_tokens(cx).font_family(true))
                 })
-                .rounded(px(4.))
                 .when(!self.disabled, |this| this.cursor_pointer())
                 .refine_style(&self.style)
                 .child(
@@ -599,47 +608,36 @@ impl RenderOnce for Checkbox {
                             cx,
                         )),
                 )
-                .when(
-                    self.label.is_some() || self.description.is_some() || !self.children.is_empty(),
-                    |this| {
-                        this.child(
-                            v_flex()
-                                .flex_1()
-                                .overflow_hidden()
-                                .line_height(relative(1.2))
-                                .gap_1()
-                                .when(has_description, |this| this.mt(text_offset))
-                                .when(self.label.is_some() || has_description, |this| {
-                                    this.child(
-                                        v_flex()
-                                            .gap(metrics.description_gap)
-                                            .when_some(self.label, |this, label| {
-                                                this.child(
-                                                    div()
-                                                        .debug_selector(|| label_selector)
-                                                        .size_full()
-                                                        .text_color(label_color)
-                                                        .font_weight(metrics.label_weight)
-                                                        .line_height(metrics.line_height)
-                                                        .child(label),
-                                                )
-                                            })
-                                            .when_some(self.description, |this, description| {
-                                                this.child(
-                                                    div()
-                                                        .debug_selector(|| description_selector)
-                                                        .text_color(description_color)
-                                                        .font_weight(metrics.description_weight)
-                                                        .line_height(metrics.line_height)
-                                                        .child(description),
-                                                )
-                                            }),
-                                    )
-                                })
-                                .children(self.children),
-                        )
-                    },
-                )
+                // Label, description and any extra children share one text column; without text
+                // there is no column, so the row is only the box and the gap never applies.
+                .when(has_text, |this| {
+                    this.child(
+                        v_flex()
+                            .flex_1()
+                            .overflow_hidden()
+                            .gap(metrics.description_gap)
+                            .line_height(metrics.line_height)
+                            .when(has_description, |this| this.mt(text_offset))
+                            .when_some(label, |this, label| {
+                                this.child(
+                                    div()
+                                        .debug_selector(|| label_selector)
+                                        .font_weight(metrics.label_weight)
+                                        .child(label),
+                                )
+                            })
+                            .when_some(description, |this, description| {
+                                this.child(
+                                    div()
+                                        .debug_selector(|| description_selector)
+                                        .text_color(description_color)
+                                        .font_weight(metrics.description_weight)
+                                        .child(description),
+                                )
+                            })
+                            .children(self.children),
+                    )
+                })
                 // Pressing an enabled checkbox focuses it (the focus handle is only tracked when
                 // enabled), so Tab navigation continues from the clicked control.
                 .when(!self.disabled, |this| {
@@ -840,6 +838,76 @@ mod tests {
             assert_eq!(cx.debug_bounds("described:label"), Some(label_before));
             assert_eq!(ring.origin, box_before.origin - gpui::point(px(4.), px(4.)));
             assert_eq!(ring.size, box_before.size + gpui::size(px(8.), px(8.)));
+        }
+    }
+
+    struct ProbedCheckboxHarness {
+        size: Size,
+        label: Option<&'static str>,
+    }
+
+    impl gpui::Render for ProbedCheckboxHarness {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            let checkbox = Checkbox::new("probed").checked(true).with_size(self.size);
+            // A flex row shrinks the probe to its content, so the probe measures the checkbox.
+            crate::h_flex().child(div().debug_selector(|| "probed-control".into()).child(
+                match self.label {
+                    Some(label) => checkbox.label(label),
+                    None => checkbox,
+                },
+            ))
+        }
+    }
+
+    /// Renders a `ProbedCheckboxHarness` window and returns its visual test context.
+    fn probe_checkbox(
+        cx: &mut gpui::TestAppContext,
+        size: Size,
+        label: Option<&'static str>,
+    ) -> gpui::VisualTestContext {
+        let window = cx.add_window(move |_, _| ProbedCheckboxHarness { size, label });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        cx
+    }
+
+    /// Catches `Checkbox::render` reserving text space on a checkbox with no text: adding the text
+    /// column (and with it the box-to-text gap) for a missing or empty label would widen a bare
+    /// checkbox, such as a tree row's, by 8px (small) or 12px (medium) and push the next cell away.
+    #[gpui::test]
+    fn test_checkbox_without_text_renders_only_its_box(cx: &mut gpui::TestAppContext) {
+        cx.update(crate::init);
+        for (size, box_px) in [(Size::Small, 16.), (Size::Medium, 20.)] {
+            for label in [None, Some("")] {
+                let mut cx = probe_checkbox(cx, size, label);
+                let control = cx
+                    .debug_bounds("probed-control")
+                    .expect("probe must render");
+                assert_eq!(
+                    control.size,
+                    gpui::size(px(box_px), px(box_px)),
+                    "{size:?} checkbox with label {label:?} must be exactly its box"
+                );
+            }
+        }
+    }
+
+    /// Catches a label-only row losing its reviewed line: if the text column stops giving the label
+    /// the tier's line height (20px small, 24px medium) or the row stops centring the box on it,
+    /// the label sits cramped or the box drifts off the text.
+    #[gpui::test]
+    fn test_label_only_row_centres_box_on_one_text_line(cx: &mut gpui::TestAppContext) {
+        cx.update(crate::init);
+        for (size, line_px) in [(Size::Small, 20.), (Size::Medium, 24.)] {
+            let mut cx = probe_checkbox(cx, size, Some("Only active"));
+            let control = cx
+                .debug_bounds("probed-control")
+                .expect("probe must render");
+            let box_bounds = cx.debug_bounds("probed:box").expect("box must render");
+            let label = cx.debug_bounds("probed:label").expect("label must render");
+            assert_eq!(control.size.height, px(line_px));
+            assert_eq!(label.size.height, px(line_px));
+            assert_eq!(label.center().y, box_bounds.center().y);
         }
     }
 
