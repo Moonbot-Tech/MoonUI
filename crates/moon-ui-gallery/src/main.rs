@@ -150,6 +150,7 @@ const GALLERY_PAGES: &[&str] = &[
     "NewControls",
     "Composites",
     "Stateful",
+    "Checkboxes",
 ];
 
 #[cfg(feature = "snapshot")]

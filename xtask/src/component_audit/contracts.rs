@@ -767,6 +767,7 @@ fn missing_visual_baselines(root: &Path) -> Vec<String> {
         "NewControls",
         "Composites",
         "Stateful",
+        "Checkboxes",
     ];
 
     let baseline_root = root.join("crates/moon-ui-gallery/snapshots/baseline");

@@ -42,6 +42,7 @@ through all pages itself:
 - NewControls
 - Composites
 - Stateful
+- Checkboxes
 
 Each page is captured in both Dark and Light mode as a PNG and compared against
 the committed baseline (`Dark-*` and `Light-*`). The gallery clears its snapshot

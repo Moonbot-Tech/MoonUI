@@ -9,12 +9,15 @@ pub(super) struct Gallery {
     theme_mode: ThemeMode,
     snapshot: Option<SnapshotRun>,
     button_clicks: usize,
-    alerts_enabled: bool,
     /// Opt-in for the indeterminate progress demo; see the comment at its render site.
     progress_loading_demo: bool,
-    compact_checked: bool,
+    /// Checked values of the controlled checkboxes on the Checkboxes page.
+    checkbox_sm_checked: bool,
+    checkbox_md_checked: bool,
+    /// Selected option of the live radio groups on the Checkboxes page.
+    radio_sm_index: usize,
+    radio_md_index: usize,
     new_toggle_checked: bool,
-    new_radio_index: usize,
     new_stepper_value: f32,
     new_switch_checked: bool,
     new_rating_value: usize,
@@ -226,11 +229,12 @@ impl Gallery {
                 cleaned_dir: false,
             }),
             button_clicks: 0,
-            alerts_enabled: true,
             progress_loading_demo: false,
-            compact_checked: true,
+            checkbox_sm_checked: true,
+            checkbox_md_checked: true,
+            radio_sm_index: 0,
+            radio_md_index: 1,
             new_toggle_checked: true,
-            new_radio_index: 1,
             new_stepper_value: 3.0,
             new_switch_checked: true,
             new_rating_value: 3,
@@ -638,7 +642,7 @@ impl Gallery {
                 ),
             )
             .child(
-                card("Badges / Checkbox / Segmented", cx)
+                card("Badges / Segmented", cx)
                     .child(
                         h_flex()
                             .gap(px(8.0))
@@ -725,74 +729,6 @@ impl Gallery {
                                             });
                                         }
                                     }),
-                            ),
-                    )
-                    .child(
-                        h_flex()
-                            .gap(px(14.0))
-                            .child(
-                                MoonCheckbox::new("check-normal")
-                                    .label("checked")
-                                    .checked(self.alerts_enabled)
-                                    .on_change({
-                                        let view = view.clone();
-                                        move |checked, _, app| {
-                                            let checked = *checked;
-                                            view.update(app, |this, cx| {
-                                                this.alerts_enabled = checked;
-                                                this.push_event(
-                                                    format!("Alerts checked: {checked}"),
-                                                    cx,
-                                                );
-                                            });
-                                        }
-                                    }),
-                            )
-                            .child(
-                                MoonCheckbox::new("check-compact")
-                                    .label("compact")
-                                    .size(MoonSize::Sm)
-                                    .checked(self.compact_checked)
-                                    .on_change({
-                                        let view = view.clone();
-                                        move |checked, _, app| {
-                                            let checked = *checked;
-                                            view.update(app, |this, cx| {
-                                                this.compact_checked = checked;
-                                                this.push_event(
-                                                    format!("Compact checked: {checked}"),
-                                                    cx,
-                                                );
-                                            });
-                                        }
-                                    }),
-                            )
-                            .child(
-                                MoonCheckbox::new("check-indeterminate")
-                                    .label("indeterminate")
-                                    .indeterminate(true),
-                            )
-                            .child(
-                                MoonCheckbox::new("check-disabled")
-                                    .label("disabled")
-                                    .disabled(true),
-                            ),
-                    )
-                    .child(
-                        h_flex()
-                            .gap(px(14.0))
-                            .items_start()
-                            .child(
-                                MoonCheckbox::new("check-description-sm")
-                                    .label("Remember me")
-                                    .description("Save my login details for next time")
-                                    .size(MoonSize::Sm),
-                            )
-                            .child(
-                                MoonCheckbox::new("check-description-md")
-                                    .label("Remember me")
-                                    .description("Save my login details for next time")
-                                    .default_checked(true),
                             ),
                     )
                     .child(
@@ -1732,45 +1668,6 @@ impl Gallery {
                                             .height(8.0)
                                             .animated(false),
                                     ),
-                            ),
-                    )
-                    .child(
-                        h_flex()
-                            .gap(px(14.0))
-                            .flex_wrap()
-                            .child(
-                                MoonRadio::new("new-controls-radio-fast")
-                                    .label("fast")
-                                    .checked(self.new_radio_index == 0)
-                                    .on_change({
-                                        let view = view.clone();
-                                        move |_, _, app| {
-                                            view.update(app, |this, cx| {
-                                                this.new_radio_index = 0;
-                                                this.push_event("MoonRadio: fast", cx);
-                                            });
-                                        }
-                                    }),
-                            )
-                            .child(
-                                MoonRadio::new("new-controls-radio-balanced")
-                                    .label("balanced")
-                                    .checked(self.new_radio_index == 1)
-                                    .on_change({
-                                        let view = view.clone();
-                                        move |_, _, app| {
-                                            view.update(app, |this, cx| {
-                                                this.new_radio_index = 1;
-                                                this.push_event("MoonRadio: balanced", cx);
-                                            });
-                                        }
-                                    }),
-                            )
-                            .child(
-                                MoonRadio::new("new-controls-radio-safe")
-                                    .label("safe")
-                                    .checked(self.new_radio_index == 2)
-                                    .disabled(true),
                             ),
                     ),
             )
@@ -3130,7 +3027,8 @@ impl Render for Gallery {
             4 => self.render_navigation(cx).into_any_element(),
             5 => self.render_new_controls(cx).into_any_element(),
             6 => self.render_composites(cx).into_any_element(),
-            _ => self.render_stateful(cx).into_any_element(),
+            7 => self.render_stateful(cx).into_any_element(),
+            _ => self.render_checkboxes(cx).into_any_element(),
         };
 
         v_flex()
@@ -3270,5 +3168,6 @@ fn open_detached_gallery_panel(panel_name: SharedString, cx: &mut App) {
     }
 }
 
+mod checkboxes;
 #[cfg(test)]
 mod tests;
