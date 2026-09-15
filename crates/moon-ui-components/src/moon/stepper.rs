@@ -31,16 +31,6 @@ pub enum MoonStepperSize {
     },
 }
 
-#[allow(non_upper_case_globals)]
-impl MoonStepperSize {
-    /// Compatibility name for the small tier.
-    #[deprecated(note = "use MoonSize::Sm.into()")]
-    pub const Compact: Self = Self::Tier(MoonSize::Sm);
-    /// Compatibility name for the medium tier.
-    #[deprecated(note = "use MoonSize::Md.into()")]
-    pub const Normal: Self = Self::Tier(MoonSize::Md);
-}
-
 impl From<MoonSize> for MoonStepperSize {
     /// Convert a shared tier; unsupported tiers snap during rendering.
     fn from(size: MoonSize) -> Self {

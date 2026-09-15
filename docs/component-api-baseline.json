@@ -155,14 +155,6 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/badge.rs",
-      "signature": "pub const Status: Self = Self::Tier(MoonSize::Sm);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/badge.rs",
-      "signature": "pub const Tiny: Self = Self::Tier(MoonSize::Xs);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/badge.rs",
       "signature": "pub enum MoonBadgeContent"
     },
     {
@@ -307,27 +299,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
-      "signature": "pub const Action: Self = Self::Tier(MoonSize::Sm);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/button.rs",
-      "signature": "pub const Micro: Self = Self::Tier(MoonSize::Xs);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/button.rs",
-      "signature": "pub const Pill: Self = Self::Tier(MoonSize::Md);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub const SUPPORTED: &'static [MoonSize] = &[MoonSize::Xs, MoonSize::Sm, MoonSize::Md, MoonSize::Lg];"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/button.rs",
-      "signature": "pub const Toolbar: Self = Self::Tier(MoonSize::Md);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/button.rs",
-      "signature": "pub const ToolbarCompact: Self = Self::Tier(MoonSize::Sm);"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
@@ -511,10 +483,6 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
-      "signature": "pub fn toolbar_compact(self) -> Self"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self"
     },
     {
@@ -556,14 +524,6 @@
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub struct MoonButtonSegment"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
-      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
-      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
     },
     {
       "file": "crates/moon-ui-components/src/moon/checkbox.rs",
@@ -1623,14 +1583,6 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
-      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
-      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];"
     },
     {
@@ -1900,22 +1852,6 @@
     {
       "file": "crates/moon-ui-components/src/moon/form.rs",
       "signature": "pub struct MoonFormRow"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/foundation.rs",
-      "signature": "pub const Large: Self = Self::Lg;"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/foundation.rs",
-      "signature": "pub const Medium: Self = Self::Md;"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/foundation.rs",
-      "signature": "pub const Small: Self = Self::Sm;"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/foundation.rs",
-      "signature": "pub const XSmall: Self = Self::Xs;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
@@ -2360,14 +2296,6 @@
     {
       "file": "crates/moon-ui-components/src/moon/input_mask.rs",
       "signature": "pub fn unmask(&self, masked_text: &str) -> String"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/kbd.rs",
-      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Xs);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/kbd.rs",
-      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Sm);"
     },
     {
       "file": "crates/moon-ui-components/src/moon/kbd.rs",
@@ -3115,14 +3043,6 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/radio.rs",
-      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/radio.rs",
-      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/radio.rs",
       "signature": "pub enum MoonRadioSize"
     },
     {
@@ -3863,14 +3783,6 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/stepper.rs",
-      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/stepper.rs",
-      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/stepper.rs",
       "signature": "pub enum MoonStepperSize"
     },
     {
@@ -4580,14 +4492,6 @@
     {
       "file": "crates/moon-ui-components/src/moon/time_picker.rs",
       "signature": "pub struct MoonTimePickerState"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/toggle.rs",
-      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/toggle.rs",
-      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",

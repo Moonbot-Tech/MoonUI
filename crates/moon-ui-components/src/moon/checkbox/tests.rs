@@ -17,15 +17,6 @@ fn checkbox_tiers_resolve_to_nearest_supported_size() {
     assert_eq!(box_for(MoonSize::Xxl), crate::Size::Medium);
 }
 
-/// Catches the deprecated `Compact`/`Normal` aliases drifting from the tiers they replaced, which
-/// would silently resize checkboxes in apps that have not migrated yet.
-#[test]
-#[allow(deprecated)]
-fn deprecated_checkbox_sizes_keep_their_tiers() {
-    assert_eq!(MoonCheckboxSize::Compact, MoonSize::Sm.into());
-    assert_eq!(MoonCheckboxSize::Normal, MoonSize::Md.into());
-}
-
 /// Catches renaming `MoonSize` variants without a serde alias, which would fail to load sizes
 /// saved under the previous `XSmall`/`Small`/`Medium`/`Large` names.
 #[test]

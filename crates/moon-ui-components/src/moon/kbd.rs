@@ -22,14 +22,6 @@ pub enum MoonKbdSize {
     },
 }
 
-#[allow(non_upper_case_globals)]
-impl MoonKbdSize {
-    #[deprecated(note = "use MoonKbdSize::Tier(MoonSize::Xs)")]
-    pub const Compact: Self = Self::Tier(MoonSize::Xs);
-    #[deprecated(note = "use MoonKbdSize::Tier(MoonSize::Sm)")]
-    pub const Normal: Self = Self::Tier(MoonSize::Sm);
-}
-
 impl From<MoonSize> for MoonKbdSize {
     /// Wraps a shared tier; metrics snap unsupported sizes when rendered.
     fn from(size: MoonSize) -> Self {

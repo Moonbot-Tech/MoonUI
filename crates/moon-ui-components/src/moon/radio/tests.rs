@@ -30,25 +30,24 @@ fn radio_metrics_match_designer_reference() {
     }
 }
 
-/// Catches losing old aliases or scaling Custom like a tier, breaking existing explicit sizes.
+/// Catches ignoring explicit tiers or scaling Custom like a tier, breaking pinned radio sizes.
 #[test]
-#[allow(deprecated)]
-fn radio_aliases_and_custom_scaling_survive() {
-    use crate::moon::MoonThemeTokens;
+fn radio_tiers_and_custom_scaling_survive() {
+    use crate::moon::{MoonSize, MoonThemeTokens};
     let mut tokens = MoonThemeTokens::default();
     tokens.scale.ui = 2.0;
     tokens.scale.font = 3.0;
     tokens.scale.font_delta = 6.0;
     assert_eq!(
         MoonRadio::new("sm")
-            .size(MoonRadioSize::Compact)
+            .size(MoonRadioSize::Tier(MoonSize::Sm))
             .metrics(&tokens)
             .outer_size,
         32.0
     );
     assert_eq!(
         MoonRadio::new("md")
-            .size(MoonRadioSize::Normal)
+            .size(MoonRadioSize::Tier(MoonSize::Md))
             .metrics(&tokens)
             .outer_size,
         40.0

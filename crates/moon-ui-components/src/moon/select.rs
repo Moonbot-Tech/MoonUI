@@ -263,7 +263,7 @@ where
     search_placeholder: SharedString,
     appearance: bool,
     trigger_variant: Option<MoonButtonVariant>,
-    trigger_size: MoonButtonSize,
+    trigger_size: Option<MoonButtonSize>,
     menu_width: f32,
     menu_max_height: Option<f32>,
     menu_size: Option<MoonMenuSize>,
@@ -274,7 +274,7 @@ impl<T> MoonSelect<T>
 where
     T: Clone + PartialEq + 'static,
 {
-    /// Create a select using the ordinary menu layer; popover hosts must opt in explicitly.
+    /// Create a density-sized select on the ordinary menu layer; popover hosts opt in explicitly.
     pub fn new(state: &Entity<MoonSelectState<T>>) -> Self {
         Self {
             id: SharedString::from(format!("moon-select:{}", state.entity_id())),
@@ -288,7 +288,7 @@ where
             search_placeholder: SharedString::from("Search..."),
             appearance: true,
             trigger_variant: None,
-            trigger_size: MoonButtonSize::Toolbar,
+            trigger_size: None,
             menu_width: 180.0,
             menu_max_height: None,
             menu_size: None,
@@ -346,8 +346,9 @@ where
         self
     }
 
+    /// Override the density-selected trigger size with an explicit tier or custom metrics.
     pub fn trigger_size(mut self, size: MoonButtonSize) -> Self {
-        self.trigger_size = size;
+        self.trigger_size = Some(size);
         self
     }
 
@@ -391,6 +392,9 @@ where
         });
 
         let core = self.state.read(cx).core.clone();
+        let trigger_size = self
+            .trigger_size
+            .unwrap_or_else(|| MoonButtonSize::density(cx));
         let menu_size = self
             .menu_size
             .unwrap_or_else(|| MoonMenuSize::from_theme(&MoonTheme::active_tokens(cx)));
@@ -401,7 +405,7 @@ where
             .disabled(self.disabled)
             .appearance(self.appearance)
             .menu_width(px(self.menu_width))
-            .with_size(size_for(self.trigger_size, menu_size));
+            .with_size(size_for(trigger_size, menu_size));
 
         if self.in_popover {
             select = select.menu_priority(super::popover::MOON_POPOVER_PRIORITY + 1);

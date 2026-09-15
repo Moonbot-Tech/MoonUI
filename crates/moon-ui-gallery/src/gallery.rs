@@ -688,7 +688,7 @@ impl Gallery {
                             .child(
                                 MoonBadge::new("")
                                     .icon(moon_ui::MOON_ICON_CHECK)
-                                    .size(MoonBadgeSize::Status)
+                                    .size(MoonBadgeSize::Tier(MoonSize::Sm))
                                     .render(),
                             ),
                     )
@@ -2624,7 +2624,7 @@ impl Gallery {
                                         } else {
                                             "strategy"
                                         })
-                                        .size(MoonBadgeSize::Tiny),
+                                        .size(MoonBadgeSize::Tier(MoonSize::Xs)),
                                     )
                             },
                         )),

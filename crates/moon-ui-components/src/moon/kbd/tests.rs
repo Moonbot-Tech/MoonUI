@@ -30,25 +30,24 @@ fn kbd_metrics_match_designer_reference() {
     }
 }
 
-/// Catches losing aliases or legacy Custom text scaling, resizing existing explicit chips.
+/// Catches ignoring explicit tiers or legacy Custom text scaling, resizing pinned shortcut chips.
 #[test]
-#[allow(deprecated)]
-fn kbd_aliases_and_custom_scaling_survive() {
-    use crate::moon::MoonThemeTokens;
+fn kbd_tiers_and_custom_scaling_survive() {
+    use crate::moon::{MoonSize, MoonThemeTokens};
     let mut tokens = MoonThemeTokens::default();
     tokens.scale.ui = 2.0;
     tokens.scale.font = 3.0;
     tokens.scale.font_delta = 6.0;
     assert_eq!(
         MoonKbd::new("Esc")
-            .size(MoonKbdSize::Compact)
+            .size(MoonKbdSize::Tier(MoonSize::Xs))
             .metrics(&tokens)
             .height,
         32.0
     );
     assert_eq!(
         MoonKbd::new("Esc")
-            .size(MoonKbdSize::Normal)
+            .size(MoonKbdSize::Tier(MoonSize::Sm))
             .metrics(&tokens)
             .height,
         40.0

@@ -152,7 +152,7 @@ impl gpui::Render for DropdownHarness {
         let mut dropdown = MoonDropdown::new(DROPDOWN_ID)
             .label("trigger")
             // Use a fixed non-default size so the measured trigger box is known.
-            .trigger_size(MoonButtonSize::Action)
+            .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
             .default_open(true)
             .item(MoonMenuItem::new("only item"));
         if let Some(rect) = self.trigger_rect {
@@ -266,12 +266,12 @@ fn labelled_trigger_icon_adds_width_in_both_palettes(cx: &mut gpui::TestAppConte
         let plain = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("plain-labelled-trigger")
                 .label("Settings")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
         });
         let with_icon = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("icon-labelled-trigger")
                 .label("Settings")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
                 .trigger_leading_icon(MoonButtonIconSlot::new("icons/settings.svg"))
         });
 
@@ -297,12 +297,12 @@ fn fitted_labelled_trigger_reserves_rendered_icon_chrome_in_both_palettes(
         let plain = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("plain-icon-reservation-probe")
                 .label("Settings")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
         });
         let with_icon = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("icon-reservation-probe")
                 .label("Settings")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
                 .trigger_icon("icons/settings.svg")
         });
         let rendered_icon_chrome = with_icon.size.width - plain.size.width;
@@ -312,7 +312,8 @@ fn fitted_labelled_trigger_reserves_rendered_icon_chrome_in_both_palettes(
         };
         let font_size = 10.5;
         let measure = |text: &str| text.chars().count() as f32 * 8.0;
-        let reservation = button_leading_icon_reservation(MoonButtonSize::Action, &tokens);
+        let reservation =
+            button_leading_icon_reservation(MoonButtonSize::Tier(MoonSize::Sm), &tokens);
         let (label, width) = fit_dropdown_trigger_label(
             "a deliberately long translated settings label",
             DROPDOWN_CARET,
@@ -351,7 +352,7 @@ fn icon_only_trigger_stays_square_in_both_palettes(cx: &mut gpui::TestAppContext
         cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
         let bounds = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("icon-only-trigger")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
                 .trigger_icon("icons/settings.svg")
         });
 
@@ -1972,15 +1973,6 @@ fn unsupported_menu_tiers_snap_to_the_nearest_supported_one() {
     );
 }
 
-/// Catches repointing the deprecated `Compact`/`Normal` consts. `dropdown/model.rs` — every
-/// un-migrated caller would silently change menu tier.
-#[test]
-#[allow(deprecated)]
-fn deprecated_menu_sizes_keep_their_tiers() {
-    assert_eq!(MoonMenuSize::Compact, MoonSize::Sm.into());
-    assert_eq!(MoonMenuSize::Normal, MoonSize::Md.into());
-}
-
 /// Catches `MoonMenuWidth::Scaled` being re-pointed at the font scale for a Tier size.
 /// `dropdown/layout.rs:resolve_menu_width` — Consequence: fixed-width menus resize with the font
 /// delta again.
@@ -2028,21 +2020,20 @@ fn scaled_menu_width_at_a_tier_follows_ui_zoom_never_font_delta(cx: &mut gpui::T
 /// `dropdown/trigger.rs:MoonDropdown::fitted_trigger_label` — Consequence: the caret contract
 /// breaks and trigger labels truncate.
 #[gpui::test]
-#[allow(deprecated)]
 fn fitted_trigger_label_ignores_menu_tier_and_menu_size(cx: &mut gpui::TestAppContext) {
     cx.update(crate::init);
     let plain = laid_out_trigger_bounds(cx, || {
         MoonDropdown::new("trigger-tier-probe-a")
             .label("Settings")
-            .trigger_size(MoonButtonSize::Action)
-            .menu_size(MoonMenuSize::Compact)
+            .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
+            .menu_size(MoonMenuSize::Tier(MoonSize::Sm))
     });
     cx.update(|cx| MoonTheme::global_mut(cx).scale.tier = MoonSize::Xl);
     let denser = laid_out_trigger_bounds(cx, || {
         MoonDropdown::new("trigger-tier-probe-b")
             .label("Settings")
-            .trigger_size(MoonButtonSize::Action)
-            .menu_size(MoonMenuSize::Normal)
+            .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
+            .menu_size(MoonMenuSize::Tier(MoonSize::Md))
     });
     assert_eq!(
         plain.size.width, denser.size.width,
@@ -2135,4 +2126,39 @@ fn open_menu_first_row_height_follows_the_theme_density_tier(cx: &mut gpui::Test
         .expect("open dropdown must render its first menu row");
     let tokens = MoonThemeTokens::default();
     assert_eq!(row.size.height, gpui::px(tokens.ui(32.0)));
+}
+
+/// Catches restoring a fixed Md default in trigger.rs or ignoring explicit overrides:
+/// density must resize ordinary triggers while fixed strip triggers remain 20 pixels high.
+#[gpui::test]
+fn dropdown_trigger_defaults_follow_density_and_preserve_fixed_tiers(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(crate::init);
+    for (tier, height) in [
+        (MoonSize::Xs, 20.0),
+        (MoonSize::Sm, 24.0),
+        (MoonSize::Md, 32.0),
+        (MoonSize::Lg, 40.0),
+        (MoonSize::Xxl, 40.0),
+    ] {
+        cx.update(|cx| MoonTheme::global_mut(cx).scale.tier = tier);
+        let default =
+            laid_out_trigger_bounds(cx, || MoonDropdown::new("density-default").label("Default"));
+        let fixed = laid_out_trigger_bounds(cx, || {
+            MoonDropdown::new("density-fixed")
+                .label("Fixed")
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Xs))
+        });
+        assert_eq!(
+            default.size.height,
+            gpui::px(height),
+            "default trigger at {tier:?}"
+        );
+        assert_eq!(
+            fixed.size.height,
+            gpui::px(20.0),
+            "fixed trigger at {tier:?}"
+        );
+    }
 }

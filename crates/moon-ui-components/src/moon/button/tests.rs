@@ -120,7 +120,7 @@ fn laid_out_bounds(
 fn icon_only_button_lays_out_square(cx: &mut gpui::TestAppContext) {
     let bounds = laid_out_bounds(cx, || {
         MoonButton::new("icon-only")
-            .size(MoonButtonSize::ToolbarCompact)
+            .size(MoonButtonSize::Tier(MoonSize::Sm))
             .leading_icon(MoonButtonIconSlot::new("icons/settings.svg"))
     });
 
@@ -138,7 +138,7 @@ fn icon_only_button_lays_out_square(cx: &mut gpui::TestAppContext) {
 fn trailing_only_icon_button_lays_out_square(cx: &mut gpui::TestAppContext) {
     let bounds = laid_out_bounds(cx, || {
         MoonButton::new("trailing-only")
-            .size(MoonButtonSize::ToolbarCompact)
+            .size(MoonButtonSize::Tier(MoonSize::Sm))
             .trailing_icon(MoonButtonIconSlot::new("icons/settings.svg"))
     });
 
@@ -156,7 +156,7 @@ fn trailing_only_icon_button_lays_out_square(cx: &mut gpui::TestAppContext) {
 fn leading_and_trailing_icons_keep_both_slots(cx: &mut gpui::TestAppContext) {
     let bounds = laid_out_bounds(cx, || {
         MoonButton::new("two-icons")
-            .size(MoonButtonSize::ToolbarCompact)
+            .size(MoonButtonSize::Tier(MoonSize::Sm))
             .leading_icon(MoonButtonIconSlot::new("icons/settings.svg"))
             .trailing_icon(MoonButtonIconSlot::new("icons/settings.svg"))
     });
@@ -174,7 +174,7 @@ fn leading_and_trailing_icons_keep_both_slots(cx: &mut gpui::TestAppContext) {
 fn icon_with_label_button_stays_wide(cx: &mut gpui::TestAppContext) {
     let bounds = laid_out_bounds(cx, || {
         MoonButton::new("icon-and-label")
-            .size(MoonButtonSize::ToolbarCompact)
+            .size(MoonButtonSize::Tier(MoonSize::Sm))
             .leading_icon(MoonButtonIconSlot::new("icons/settings.svg"))
             .text_segment("Settings", 0xFFFFFF, 500.0)
     });
@@ -400,21 +400,6 @@ fn xl_and_xxl_tiers_snap_down_to_the_largest_supported_tier() {
         MoonButtonSize::Tier(MoonSize::Xxl).snapped(),
         MoonButtonSize::Tier(MoonSize::Lg)
     );
-}
-
-/// [Breakage 5, band C] Catches repointing a deprecated alias (e.g. `Action` -> `Tier(Md)`),
-/// which would jump every un-migrated external caller a tier the instant this ships.
-#[test]
-#[allow(deprecated)]
-fn deprecated_size_aliases_map_to_their_owner_decided_tier() {
-    assert_eq!(MoonButtonSize::Micro, MoonButtonSize::Tier(MoonSize::Xs));
-    assert_eq!(
-        MoonButtonSize::ToolbarCompact,
-        MoonButtonSize::Tier(MoonSize::Sm)
-    );
-    assert_eq!(MoonButtonSize::Action, MoonButtonSize::Tier(MoonSize::Sm));
-    assert_eq!(MoonButtonSize::Toolbar, MoonButtonSize::Tier(MoonSize::Md));
-    assert_eq!(MoonButtonSize::Pill, MoonButtonSize::Tier(MoonSize::Md));
 }
 
 /// [Breakage 7, band B - part 1/2] Catches an icon-only button losing its square aspect at any

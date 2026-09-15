@@ -24,14 +24,6 @@ pub enum MoonCheckboxSize {
     },
 }
 
-#[allow(non_upper_case_globals)]
-impl MoonCheckboxSize {
-    #[deprecated(note = "use `MoonSize::Sm`")]
-    pub const Compact: Self = Self::Tier(MoonSize::Sm);
-    #[deprecated(note = "use `MoonSize::Md`")]
-    pub const Normal: Self = Self::Tier(MoonSize::Md);
-}
-
 impl From<MoonSize> for MoonCheckboxSize {
     fn from(size: MoonSize) -> Self {
         Self::Tier(size)

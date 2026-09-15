@@ -60,20 +60,9 @@ pub enum MoonButtonSize {
     },
 }
 
-#[allow(non_upper_case_globals)]
 impl MoonButtonSize {
     pub const SUPPORTED: &'static [MoonSize] =
         &[MoonSize::Xs, MoonSize::Sm, MoonSize::Md, MoonSize::Lg];
-    #[deprecated(note = "use `MoonSize::Xs`")]
-    pub const Micro: Self = Self::Tier(MoonSize::Xs);
-    #[deprecated(note = "use `MoonSize::Sm`")]
-    pub const ToolbarCompact: Self = Self::Tier(MoonSize::Sm);
-    #[deprecated(note = "use `MoonSize::Sm`")]
-    pub const Action: Self = Self::Tier(MoonSize::Sm);
-    #[deprecated(note = "use `MoonSize::Md`")]
-    pub const Toolbar: Self = Self::Tier(MoonSize::Md);
-    #[deprecated(note = "use `MoonSize::Md` and `MoonButton::pill()`")]
-    pub const Pill: Self = Self::Tier(MoonSize::Md);
 
     /// The app's density tier snapped to what buttons support.
     ///
@@ -389,11 +378,6 @@ impl MoonButton {
 
     pub fn medium(self) -> Self {
         self.size(MoonSize::Md)
-    }
-
-    #[deprecated(note = "use `MoonSize::Sm`")]
-    pub fn toolbar_compact(self) -> Self {
-        self.size(MoonSize::Sm)
     }
 
     pub fn primary(self) -> Self {

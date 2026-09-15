@@ -32,16 +32,6 @@ pub enum MoonBadgeSize {
     },
 }
 
-#[allow(non_upper_case_globals)]
-impl MoonBadgeSize {
-    /// Compatibility name for the extra-small tier.
-    #[deprecated(note = "use MoonSize::Xs.into()")]
-    pub const Tiny: Self = Self::Tier(MoonSize::Xs);
-    /// Compatibility name for the small tier.
-    #[deprecated(note = "use MoonSize::Sm.into()")]
-    pub const Status: Self = Self::Tier(MoonSize::Sm);
-}
-
 impl From<MoonSize> for MoonBadgeSize {
     /// Convert a shared tier; unsupported tiers snap when metrics are resolved.
     fn from(size: MoonSize) -> Self {

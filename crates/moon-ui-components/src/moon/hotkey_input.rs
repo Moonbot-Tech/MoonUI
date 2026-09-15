@@ -4,6 +4,7 @@ use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 use super::{
+    foundation::MoonSize,
     kbd::{MoonKbd, MoonKbdSize},
     text::MoonText,
     theme::MoonTheme,
@@ -237,6 +238,7 @@ impl MoonHotkeyInput {
 }
 
 impl RenderOnce for MoonHotkeyInput {
+    /// Renders the input and sizes its shortcut chip from the active density tier.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
@@ -435,11 +437,11 @@ impl RenderOnce for MoonHotkeyInput {
                 .into_any_element()
         } else if let Some(stroke) = current_value.clone() {
             MoonKbd::from_keystroke(stroke)
-                .size(if matches!(self.size, MoonHotkeyInputSize::Compact) {
-                    MoonKbdSize::Compact
-                } else {
-                    MoonKbdSize::Normal
-                })
+                .size(MoonKbdSize::Tier(tokens.tier().nearest(&[
+                    MoonSize::Xs,
+                    MoonSize::Sm,
+                    MoonSize::Md,
+                ])))
                 .into_any_element()
         } else {
             MoonText::new(self.placeholder)

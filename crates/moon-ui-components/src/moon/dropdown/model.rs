@@ -153,13 +153,7 @@ pub enum MoonMenuSize {
     },
 }
 
-#[allow(non_upper_case_globals)]
 impl MoonMenuSize {
-    #[deprecated(note = "use `MoonSize::Sm`")]
-    pub const Compact: Self = Self::Tier(MoonSize::Sm);
-    #[deprecated(note = "use `MoonSize::Md`")]
-    pub const Normal: Self = Self::Tier(MoonSize::Md);
-
     /// Tiers a menu renders; any other tier snaps to the nearest of these.
     pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];
 

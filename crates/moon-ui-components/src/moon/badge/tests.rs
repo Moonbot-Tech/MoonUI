@@ -1,4 +1,4 @@
-//! Badge density, alias and custom-scaling regression coverage.
+//! Badge density, tier and custom-scaling regression coverage.
 use super::super::{foundation::MoonSize, theme::MoonThemeTokens};
 use super::{MoonBadge, MoonBadgeSize};
 
@@ -25,18 +25,17 @@ fn badge_density_is_text_height_and_zoom_only() {
     }
 }
 
-/// Catches ignoring explicit size overrides or remapping the compatibility aliases.
+/// Catches ignoring explicit tiers when density differs, which resizes pinned badges.
 #[test]
-#[allow(deprecated)]
-fn badge_aliases_override_density() {
+fn badge_tiers_override_density() {
     let tokens = MoonThemeTokens::default();
     for (size, height) in [
-        (MoonBadgeSize::Tiny, 16.0),
-        (MoonBadgeSize::Status, 20.0),
+        (MoonBadgeSize::Tier(MoonSize::Xs), 16.0),
+        (MoonBadgeSize::Tier(MoonSize::Sm), 20.0),
         (MoonSize::Lg.into(), 24.0),
     ] {
         assert_eq!(
-            MoonBadge::new("alias").size(size).metrics(&tokens).height,
+            MoonBadge::new("tier").size(size).metrics(&tokens).height,
             height
         );
     }

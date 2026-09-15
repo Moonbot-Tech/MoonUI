@@ -28,19 +28,6 @@ pub enum MoonToggleSize {
     },
 }
 
-/// Former enum variants kept as associated consts so expression-position call sites still compile.
-///
-/// They cannot be used in a pattern (`match`, `if let`, `matches!`): `MoonToggleSize` cannot
-/// derive `Eq` because `Custom` holds `f32` fields, and Rust requires `Eq` for a constant in
-/// pattern position.
-#[allow(non_upper_case_globals)]
-impl MoonToggleSize {
-    #[deprecated(note = "use `MoonSize::Sm`")]
-    pub const Compact: Self = Self::Tier(MoonSize::Sm);
-    #[deprecated(note = "use `MoonSize::Md`")]
-    pub const Normal: Self = Self::Tier(MoonSize::Md);
-}
-
 impl From<MoonSize> for MoonToggleSize {
     fn from(size: MoonSize) -> Self {
         Self::Tier(size)

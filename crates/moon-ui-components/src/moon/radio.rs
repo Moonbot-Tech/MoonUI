@@ -22,14 +22,6 @@ pub enum MoonRadioSize {
     },
 }
 
-#[allow(non_upper_case_globals)]
-impl MoonRadioSize {
-    #[deprecated(note = "use MoonRadioSize::Tier(MoonSize::Sm)")]
-    pub const Compact: Self = Self::Tier(MoonSize::Sm);
-    #[deprecated(note = "use MoonRadioSize::Tier(MoonSize::Md)")]
-    pub const Normal: Self = Self::Tier(MoonSize::Md);
-}
-
 impl From<MoonSize> for MoonRadioSize {
     /// Wraps a shared tier; unsupported tiers snap when metrics are resolved.
     fn from(size: MoonSize) -> Self {

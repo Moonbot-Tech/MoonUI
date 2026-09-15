@@ -175,6 +175,126 @@
       "file": "crates/moon-ui-components/src/moon/select.rs",
       "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self",
       "reason": "Selects moved onto the shared MoonSize scale for API parity, so menu_size now takes impl Into<MoonMenuSize> and accepts a MoonSize tier directly. Existing MoonMenuSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md — which renders one tier larger than the old Compact/Normal geometry (20px/24px rows become 24px/32px)."
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub const Tiny: Self = Self::Tier(MoonSize::Xs);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/badge.rs",
+      "signature": "pub const Status: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const Micro: Self = Self::Tier(MoonSize::Xs);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const ToolbarCompact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const Action: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const Toolbar: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const Pill: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn toolbar_compact(self) -> Self"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub const XSmall: Self = Self::Xs;"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub const Small: Self = Self::Sm;"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub const Medium: Self = Self::Md;"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub const Large: Self = Self::Lg;"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/kbd.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Xs);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/kbd.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/radio.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/radio.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/stepper.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/stepper.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
     }
   ]
 }

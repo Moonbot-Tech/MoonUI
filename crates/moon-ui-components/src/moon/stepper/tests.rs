@@ -24,19 +24,18 @@ fn stepper_metrics_match_designer_reference() {
     }
 }
 
-/// Catches ignoring explicit aliases when the active density differs.
+/// Catches ignoring explicit tiers when the active density differs, which resizes pinned steppers.
 #[test]
-#[allow(deprecated)]
-fn stepper_aliases_override_density() {
+fn stepper_tiers_override_density() {
     use super::super::{foundation::MoonSize, theme::MoonThemeTokens};
     let tokens = MoonThemeTokens::default();
     for (size, height) in [
-        (MoonStepperSize::Compact, 24.0),
-        (MoonStepperSize::Normal, 32.0),
+        (MoonStepperSize::Tier(MoonSize::Sm), 24.0),
+        (MoonStepperSize::Tier(MoonSize::Md), 32.0),
         (MoonSize::Lg.into(), 32.0),
     ] {
         assert_eq!(
-            MoonStepper::new("alias").size(size).metrics(&tokens).height,
+            MoonStepper::new("tier").size(size).metrics(&tokens).height,
             height
         );
     }

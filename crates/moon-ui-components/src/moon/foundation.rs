@@ -288,18 +288,6 @@ impl MoonSize {
     }
 }
 
-#[allow(non_upper_case_globals)]
-impl MoonSize {
-    #[deprecated(note = "use `MoonSize::Xs`")]
-    pub const XSmall: Self = Self::Xs;
-    #[deprecated(note = "use `MoonSize::Sm`")]
-    pub const Small: Self = Self::Sm;
-    #[deprecated(note = "use `MoonSize::Md`")]
-    pub const Medium: Self = Self::Md;
-    #[deprecated(note = "use `MoonSize::Lg`")]
-    pub const Large: Self = Self::Lg;
-}
-
 pub type Size = MoonSize;
 
 pub trait Sizable<S = MoonSize>: Sized {

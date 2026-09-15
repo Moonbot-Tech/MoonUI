@@ -195,13 +195,3 @@ fn click_focuses_toggle_so_the_ring_appears(cx: &mut gpui::TestAppContext) {
         "click must explicitly focus the toggle so the ring renders"
     );
 }
-
-/// Breakage 6 (band C) -- the deprecated `Compact`/`Normal` aliases must keep mapping to
-/// `Tier(Sm)`/`Tier(Md)`. A plausible future edit remaps `Compact -> Tier(Xs)` because "Compact
-/// means smallest", which would resize every external caller's toggle on upgrade.
-#[test]
-#[allow(deprecated)]
-fn deprecated_toggle_sizes_keep_their_tiers() {
-    assert_eq!(MoonToggleSize::Compact, MoonToggleSize::Tier(MoonSize::Sm));
-    assert_eq!(MoonToggleSize::Normal, MoonToggleSize::Tier(MoonSize::Md));
-}

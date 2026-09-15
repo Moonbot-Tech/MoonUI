@@ -9,7 +9,7 @@ use crate::ElementExt;
 use super::badge::{MoonBadge, MoonBadgeSize, MoonBadgeVariant};
 use super::button::{MoonButtonSize, MoonButtonVariant};
 use super::dropdown::{MoonDropdown, MoonMenuItem};
-use super::foundation::{accent_underline, h_flex};
+use super::foundation::{MoonSize, accent_underline, h_flex};
 use super::icons::MOON_ICON_CARET_DOWN;
 use super::text::MoonText;
 use super::theme::{MoonTheme, MoonThemeTokens};
@@ -376,7 +376,7 @@ fn render_moon_tab(
     if let Some(badge) = item.badge {
         tab = tab.child(
             MoonBadge::new(badge)
-                .size(MoonBadgeSize::Tiny)
+                .size(MoonBadgeSize::Tier(MoonSize::Xs))
                 .variant(if active {
                     MoonBadgeVariant::Solid
                 } else {
@@ -435,7 +435,7 @@ fn overflow_menu_dropdown(
         .trigger_icon(MOON_ICON_CARET_DOWN)
         .trigger_caret(false)
         .trigger_variant(MoonButtonVariant::Ghost)
-        .trigger_size(MoonButtonSize::Micro);
+        .trigger_size(MoonButtonSize::Tier(MoonSize::Xs));
     for (ix, (label, selected, disabled)) in items.into_iter().enumerate() {
         let mut item = MoonMenuItem::with_key(format!("{strip_id}-overflow-{ix}"), label)
             .checked(selected)

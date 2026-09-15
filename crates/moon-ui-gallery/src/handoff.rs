@@ -890,12 +890,10 @@ impl CaseGallery {
             "radio.checked" => MoonRadio::new("handoff-radio-checked")
                 .label("Market")
                 .checked(true)
-                .size(MoonRadioSize::Normal)
                 .into_any_element(),
             "radio.unchecked" => MoonRadio::new("handoff-radio-unchecked")
                 .label("Market")
                 .checked(false)
-                .size(MoonRadioSize::Normal)
                 .into_any_element(),
             "rating.stars" => MoonRating::new("handoff-rating")
                 .value(3)
@@ -1909,7 +1907,7 @@ impl CaseGallery {
             "kbd.spinner.skeleton" => h_flex()
                 .gap(px(10.0))
                 .items_center()
-                .child(MoonKbd::new("Ctrl+K").size(MoonKbdSize::Normal))
+                .child(MoonKbd::new("Ctrl+K"))
                 .child(MoonSpinner::new().size(MoonSpinnerSize::Normal))
                 .child(
                     MoonSkeleton::new("handoff-skeleton")
