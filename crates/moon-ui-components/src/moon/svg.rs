@@ -96,6 +96,7 @@ impl Element for MoonSvg {
         )
     }
 
+    /// Paints a rewritten stroke when possible, logging rewrite failures and using authored strokes.
     fn paint(
         &mut self,
         global_id: Option<&GlobalElementId>,
@@ -123,7 +124,12 @@ impl Element for MoonSvg {
                     None => (path.clone(), None),
                     Some(stroke) => match stroked_svg(path, stroke, bounds.size.width, cx) {
                         Some((key, bytes)) => (key, Some(bytes)),
-                        None => return,
+                        None => {
+                            log::error!(
+                                "failed to rewrite svg stroke {path}; painting authored stroke"
+                            );
+                            (path.clone(), None)
+                        }
                     },
                 };
                 if let Err(error) = window.paint_svg(
@@ -191,7 +197,7 @@ fn stroke_atlas_key(path: &str, ratio: u32) -> SharedString {
 /// `drawn_width`, rewriting and caching the file on first use.
 ///
 /// Returns `None` when the drawn width is unusable, or the icon cannot be loaded from the asset
-/// source, is not UTF-8, or has no parsable `viewBox`; in each case nothing paints.
+/// source, is not UTF-8, or has no parsable `viewBox`; the caller falls back to authored strokes.
 fn stroked_svg(
     path: &SharedString,
     stroke: Pixels,
@@ -230,7 +236,8 @@ pub(crate) fn with_rendered_stroke(svg: &str, stroke: f32, drawn_size: f32) -> O
         .1
         .split('"')
         .next()?
-        .split_whitespace()
+        .split(|character: char| character == ',' || character.is_ascii_whitespace())
+        .filter(|part| !part.is_empty())
         .nth(2)?
         .parse()
         .ok()?;
