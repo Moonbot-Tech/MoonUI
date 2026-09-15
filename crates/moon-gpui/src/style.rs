@@ -781,9 +781,11 @@ impl Style {
     /// anti-aliased quad over the fill, every partially covered edge pixel is covered twice, so a
     /// pixel half inside a rounded corner shows three-quarters covered and the corner turns heavy
     /// and stepped. One quad carrying both keeps a single anti-aliased edge and still composites a
-    /// translucent border over its fill. The border then no longer paints over children that
-    /// overflow into it, which in its fill's colour hides nothing, and it is not merged under an
-    /// inset shadow, which must stay beneath the border.
+    /// translucent border over its fill. This changes paint order for overflow-visible children
+    /// reaching into the border band: the former border quad covered those children regardless
+    /// of their colour; the joined border paints beneath them. Overflow-hidden content is already
+    /// clipped inside the visible border by `overflow_mask`. An inset shadow prevents joining
+    /// because it must remain beneath the border.
     fn border_joins_fill(&self, background: Option<Background>) -> bool {
         self.is_border_visible()
             && !self.box_shadow.iter().any(|shadow| shadow.inset)
@@ -1592,16 +1594,21 @@ mod tests {
         let (_, cx) = cx.add_window_view(|_, _| BorderedBoxes);
         cx.run_until_parked();
 
-        // (has a border, has a visible background) for each quad in paint order.
+        // Select the two 16px boxes so unrelated scene decoration cannot change the oracle.
         let quads = cx.update(|window, _| {
             window
                 .rendered_frame
                 .scene
                 .quads
                 .iter()
+                .filter(|quad| {
+                    let side = 16.0 * window.scale_factor();
+                    quad.bounds.size.width.0 == side && quad.bounds.size.height.0 == side
+                })
                 .map(|quad| {
                     (
                         quad.border_widths.top.0 > 0.0,
+                        quad.border_color,
                         quad.background
                             .as_solid()
                             .is_some_and(|color| color.a > 0.0),
@@ -1610,6 +1617,13 @@ mod tests {
                 .collect::<Vec<_>>()
         });
 
-        assert_eq!(quads, vec![(true, true), (false, true), (true, false)]);
+        assert_eq!(
+            quads.len(),
+            3,
+            "the joined box and distinct outline need three quads"
+        );
+        assert_eq!(quads[0], (true, blue(), true));
+        assert_eq!((quads[1].0, quads[1].2), (false, true));
+        assert_eq!(quads[2], (true, red(), false));
     }
 }
