@@ -441,8 +441,11 @@ impl ChoiceColors {
     /// that tone. A disabled box, checked or not, renders at half opacity as a whole. The focus
     /// ring is always `focus_ring`, whatever the tone.
     ///
+    /// The label is `text_secondary` and the supporting text `text_tertiary`; a disabled control
+    /// keeps those roles and dims both to 45%.
+    ///
     /// Args:
-    ///     p: The active palette, for tones and the label and description inks.
+    ///     p: The active palette, for a tone's fill and the ink that reads on it.
     ///     roles: The active colour roles, normally `MoonColors::active`.
     ///     tone: The tone set on the control, or `None` for the brand fill.
     ///     checked: Whether the box is checked or indeterminate.
@@ -471,20 +474,19 @@ impl ChoiceColors {
         } else {
             (roles.border_primary.into(), transparent_black())
         };
-        let text_alpha = if disabled {
-            Self::DISABLED_TEXT_ALPHA
-        } else {
-            1.0
+        let text = |role: Hsla| {
+            if disabled {
+                role.opacity(Self::DISABLED_TEXT_ALPHA)
+            } else {
+                role
+            }
         };
         Self {
             border,
             fill,
             mark,
-            label: rgba_from(
-                if disabled { p.text_muted } else { p.text_soft },
-                text_alpha,
-            ),
-            description: rgba_from(p.text_muted, text_alpha),
+            label: text(roles.text_secondary.into()),
+            description: text(roles.text_tertiary.into()),
             focus_ring: roles.focus_ring.into(),
             box_opacity: if disabled {
                 Self::DISABLED_BOX_OPACITY
@@ -806,14 +808,22 @@ mod tests {
     /// box is a `border_primary` outline with no fill, filled with `bg_tertiary` only when disabled;
     /// a checked box is `bg_brand_solid` with no border and an `fg_white` mark, unless an explicit
     /// tone fills it with that tone and the ink that reads best on it; a disabled box dims to half
-    /// as a whole rather than fading its colours; and the focus ring is `focus_ring`, never the
-    /// tone.
+    /// as a whole rather than fading its colours; the focus ring is `focus_ring`, never the tone;
+    /// and the label and supporting text are `text_secondary` and `text_tertiary`, dimmed to 45%
+    /// when disabled. Each palette is paired with a colour mode's roles rather than its own, so a
+    /// colour read from the palette instead of the roles cannot pass by coinciding.
     #[test]
     fn test_choice_colors_follow_the_choice_roles() {
-        for p in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
-            let roles = MoonColors::from_palette(p);
-            for (disabled, box_opacity) in [(false, 1.0), (true, 0.5)] {
+        for (p, roles) in [
+            (MoonPalette::TERMINAL, MoonColors::DARK),
+            (MoonPalette::LIGHT, MoonColors::LIGHT),
+        ] {
+            for (disabled, box_opacity, text_alpha) in [(false, 1.0, 1.0), (true, 0.5, 0.45)] {
+                let text = |role: crate::moon::MoonColor| Hsla::from(role).opacity(text_alpha);
                 let unchecked = ChoiceColors::resolve(p, roles, None, false, disabled);
+                assert_eq!(unchecked.label, text(roles.text_secondary));
+                assert_eq!(unchecked.description, text(roles.text_tertiary));
+
                 assert_eq!(unchecked.border, roles.border_primary.into());
                 if disabled {
                     assert_eq!(unchecked.fill, roles.bg_tertiary.into());
