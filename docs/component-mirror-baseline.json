@@ -62,12 +62,12 @@
       "local_paths": [
         "button"
       ],
-      "local_hash": "52c4338d2274d3a8",
+      "local_hash": "070d99ef6e1f79a8",
       "local_files": [
         {
           "path": "button/button.rs",
-          "hash": "66b1c6a827009699",
-          "bytes": 41505
+          "hash": "9c982d6195216000",
+          "bytes": 42342
         },
         {
           "path": "button/button/tests.rs",

@@ -142,6 +142,11 @@
       "reason": "Checkboxes moved onto the shared MoonSize scale, so size now takes impl Into<MoonCheckboxSize> and accepts a MoonSize tier directly. Existing MoonCheckboxSize arguments still compile; Compact and Normal remain as deprecated aliases for Sm and Md."
     },
     {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn size(mut self, size: MoonButtonSize) -> Self",
+      "reason": "Buttons moved onto the shared MoonSize scale, so size now takes impl Into<MoonButtonSize> and accepts a MoonSize tier directly. Existing MoonButtonSize arguments still compile; Micro, ToolbarCompact, Action, Toolbar and Pill remain as deprecated aliases for Xs, Sm, Sm, Md and Md."
+    },
+    {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use foundation::{StyledExt, ThemeMode, h_flex, init, v_flex};",
       "reason": "The re-export gained MoonSize so the shared size scale is reachable as moon_ui::MoonSize; nothing was removed from it."

@@ -307,6 +307,30 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const Action: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const Micro: Self = Self::Tier(MoonSize::Xs);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const Pill: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const SUPPORTED: &'static [MoonSize] = &[MoonSize::Xs, MoonSize::Sm, MoonSize::Md, MoonSize::Lg];"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const Toolbar: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const ToolbarCompact: Self = Self::Tier(MoonSize::Sm);"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub enum MoonButtonSize"
     },
     {
@@ -332,6 +356,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn danger(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn density(cx: &App) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
@@ -415,6 +443,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn pill(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn primary(self) -> Self"
     },
     {
@@ -439,15 +471,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
-      "signature": "pub fn size(mut self, size: MoonButtonSize) -> Self"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn size(mut self, size: f32) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn size(mut self, size: impl Into<MoonButtonSize>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn small(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn snapped(self) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
@@ -464,6 +500,14 @@
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn text_segment(mut self, text: impl Into<SharedString>, color: u32, weight: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn tier(self) -> Option<MoonSize>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn tier_icon_size(tier: MoonSize) -> f32"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",

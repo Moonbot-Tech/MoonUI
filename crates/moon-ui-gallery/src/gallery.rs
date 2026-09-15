@@ -577,27 +577,44 @@ impl Gallery {
                         h_flex()
                             .gap(px(8.0))
                             .child(
-                                MoonButton::new("btn-micro")
-                                    .label("Micro")
-                                    .size(MoonButtonSize::Micro)
+                                MoonButton::new("btn-xs")
+                                    .label("Xs")
+                                    .size(MoonSize::Xs)
                                     .render(),
                             )
                             .child(
-                                MoonButton::new("btn-action")
-                                    .label("Action")
-                                    .size(MoonButtonSize::Action)
-                                    .padding_x(7.0)
+                                MoonButton::new("btn-sm")
+                                    .label("Sm")
+                                    .size(MoonSize::Sm)
+                                    .render(),
+                            )
+                            .child(
+                                MoonButton::new("btn-md")
+                                    .label("Md")
+                                    .size(MoonSize::Md)
+                                    .render(),
+                            )
+                            .child(
+                                MoonButton::new("btn-lg")
+                                    .label("Lg")
+                                    .size(MoonSize::Lg)
                                     .render(),
                             )
                             .child(
                                 MoonButton::new("btn-pill")
                                     .label("Pill selected")
-                                    .size(MoonButtonSize::Pill)
+                                    .size(MoonSize::Md)
+                                    .pill()
                                     .variant(MoonButtonVariant::Panel)
                                     .selected(true)
                                     .trailing_icon(MoonButtonIconSlot::new(
                                         moon_ui::MOON_ICON_CHECK,
                                     ))
+                                    .render(),
+                            )
+                            .child(
+                                MoonButton::new("btn-density-default")
+                                    .label("Density default")
                                     .render(),
                             )
                             .child(

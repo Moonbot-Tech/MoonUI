@@ -680,17 +680,18 @@ impl CaseGallery {
                 .into_any_element(),
             "button.micro" => MoonButton::new("handoff-button-micro")
                 .label("Micro")
-                .size(MoonButtonSize::Micro)
+                .size(MoonSize::Xs)
                 .render()
                 .into_any_element(),
             "button.action" => MoonButton::new("handoff-button-action")
                 .label("Action")
-                .size(MoonButtonSize::Action)
+                .size(MoonSize::Sm)
                 .render()
                 .into_any_element(),
             "button.pill" => MoonButton::new("handoff-button-pill")
                 .label("Pill")
-                .size(MoonButtonSize::Pill)
+                .size(MoonSize::Md)
+                .pill()
                 .variant(MoonButtonVariant::Panel)
                 .selected(true)
                 .render()
