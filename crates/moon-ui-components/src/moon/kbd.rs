@@ -1,15 +1,18 @@
+//! Monospaced shortcut chips sized to the active density tier.
+
 use gpui::*;
 
 use super::{
-    text::MoonText,
-    theme::MoonTheme,
+    foundation::MoonSize,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, rgba_from},
 };
 
+/// A shared text-height tier or custom legacy chip metrics.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonKbdSize {
-    Compact,
-    Normal,
+    /// Supports Xs, Sm and Md; larger tiers snap to Md.
+    Tier(MoonSize),
     Custom {
         height: f32,
         font_size: f32,
@@ -19,6 +22,14 @@ pub enum MoonKbdSize {
     },
 }
 
+impl From<MoonSize> for MoonKbdSize {
+    /// Wraps a shared tier; metrics snap unsupported sizes when rendered.
+    fn from(size: MoonSize) -> Self {
+        Self::Tier(size)
+    }
+}
+
+/// Final pixel metrics; only Custom text follows legacy font scaling.
 #[derive(Clone, Copy, Debug)]
 struct KbdMetrics {
     height: f32,
@@ -28,20 +39,22 @@ struct KbdMetrics {
     pad_x: f32,
 }
 
+/// A shortcut chip whose omitted size follows the active density.
 #[derive(IntoElement)]
 pub struct MoonKbd {
     bounds: Option<MoonRect>,
     label: SharedString,
-    size: MoonKbdSize,
+    size: Option<MoonKbdSize>,
     outline: bool,
 }
 
 impl MoonKbd {
+    /// Creates a shortcut chip with a density-selected size.
     pub fn new(label: impl Into<SharedString>) -> Self {
         Self {
             bounds: None,
             label: label.into(),
-            size: MoonKbdSize::Normal,
+            size: None,
             outline: false,
         }
     }
@@ -183,8 +196,9 @@ impl MoonKbd {
         self
     }
 
+    /// Overrides density with a tier (via Into) or custom metrics.
     pub fn size(mut self, size: MoonKbdSize) -> Self {
-        self.size = size;
+        self.size = Some(size);
         self
     }
 
@@ -193,22 +207,25 @@ impl MoonKbd {
         self
     }
 
-    fn metrics(&self) -> KbdMetrics {
-        match self.size {
-            MoonKbdSize::Compact => KbdMetrics {
-                height: 17.0,
-                font_size: 8.5,
-                line_height: 11.0,
-                radius: 3.0,
-                pad_x: 5.0,
-            },
-            MoonKbdSize::Normal => KbdMetrics {
-                height: 20.0,
-                font_size: 9.5,
-                line_height: 12.0,
-                radius: 4.0,
-                pad_x: 6.0,
-            },
+    /// Resolves final pixels, using text-line height instead of pointer-target height.
+    fn metrics(&self, tokens: &MoonThemeTokens) -> KbdMetrics {
+        match self.size.unwrap_or(MoonKbdSize::Tier(tokens.tier())) {
+            MoonKbdSize::Tier(tier) => {
+                let tier = tier.nearest(&[MoonSize::Xs, MoonSize::Sm, MoonSize::Md]);
+                let control = tier.control_metrics();
+                let font_size = match tier {
+                    MoonSize::Xs => 11.0,
+                    MoonSize::Sm => 12.0,
+                    _ => 14.0,
+                };
+                KbdMetrics {
+                    height: tokens.ui(control.line_height),
+                    font_size: tokens.ui(font_size),
+                    line_height: tokens.ui(control.line_height),
+                    radius: tokens.ui(control.radius * (2.0 / 3.0)),
+                    pad_x: tokens.ui(control.pad_x * (2.0 / 3.0)),
+                }
+            }
             MoonKbdSize::Custom {
                 height,
                 font_size,
@@ -216,11 +233,11 @@ impl MoonKbd {
                 radius,
                 pad_x,
             } => KbdMetrics {
-                height,
-                font_size,
-                line_height,
-                radius,
-                pad_x,
+                height: tokens.ui(height),
+                font_size: tokens.font(font_size),
+                line_height: tokens.line_height(line_height),
+                radius: tokens.ui(radius),
+                pad_x: tokens.ui(pad_x),
             },
         }
     }
@@ -233,16 +250,16 @@ impl From<Keystroke> for MoonKbd {
 }
 
 impl RenderOnce for MoonKbd {
+    /// Renders resolved text and chrome without double scaling.
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
-        let metrics = self.metrics();
-        let text = tokens.text(metrics.font_size, metrics.line_height);
+        let metrics = self.metrics(&tokens);
         let mut root = div()
             .relative()
-            .h(px(tokens.ui(metrics.height)))
-            .px(px(tokens.ui(metrics.pad_x)))
-            .rounded(px(tokens.ui(metrics.radius)))
+            .h(px(metrics.height))
+            .px(px(metrics.pad_x))
+            .rounded(px(metrics.radius))
             .border(px(tokens.ui(1.0)))
             .border_color(rgba_from(p.border, if self.outline { 1.0 } else { 0.72 }))
             .bg(rgba_from(
@@ -253,14 +270,14 @@ impl RenderOnce for MoonKbd {
             .items_center()
             .justify_center()
             .child(
-                MoonText::new(self.label)
-                    .color(p.text_soft)
-                    .font_size(text.font_size)
-                    .line_height(text.line_height)
-                    .weight(600.0)
-                    .mono(true)
-                    .uppercase(false)
-                    .render(),
+                div()
+                    .font_family(tokens.font_family(true))
+                    .text_color(rgba_from(p.text_soft, 1.0))
+                    .text_size(px(metrics.font_size))
+                    .line_height(px(metrics.line_height))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .whitespace_nowrap()
+                    .child(self.label),
             );
 
         if let Some(bounds) = self.bounds {

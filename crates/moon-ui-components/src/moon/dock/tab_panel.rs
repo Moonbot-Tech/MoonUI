@@ -11,7 +11,7 @@ use super::{DockEvent, DockTabDrag, MoonTabPanelRuntimeState, TabPanel, tab_inte
 use crate::{
     event::InteractiveElementExt as _,
     moon::{
-        MOON_ICON_CARET_DOWN, MoonDropdown, MoonMenuItem, MoonMenuSize,
+        MOON_ICON_CARET_DOWN, MoonDropdown, MoonMenuItem, MoonSize,
         background::MoonBackgroundPolicy,
         button::{MoonButton, MoonButtonSize, MoonButtonVariant},
         h_flex,
@@ -369,8 +369,7 @@ impl RenderOnce for TabPanel {
                         .trigger_icon(MOON_ICON_CARET_DOWN)
                         .trigger_caret(false)
                         .trigger_variant(MoonButtonVariant::Ghost)
-                        .trigger_size(MoonButtonSize::Micro)
-                        .menu_size(MoonMenuSize::Compact)
+                        .trigger_size(MoonButtonSize::Tier(MoonSize::Xs))
                         .items(overflow_items),
                 ),
             );
@@ -391,7 +390,7 @@ impl RenderOnce for TabPanel {
                         tools = tools.child(
                             MoonButton::new(format!("{}:detach", self.id))
                                 .label("⧉")
-                                .size(MoonButtonSize::Micro)
+                                .size(MoonButtonSize::Tier(MoonSize::Xs))
                                 .variant(MoonButtonVariant::Ghost)
                                 .on_click({
                                     let panel_name = panel_name.clone();
@@ -428,7 +427,7 @@ impl RenderOnce for TabPanel {
                         tools = tools.child(
                             MoonButton::new(format!("{}:zoom", self.id))
                                 .label(zoom_label)
-                                .size(MoonButtonSize::Micro)
+                                .size(MoonButtonSize::Tier(MoonSize::Xs))
                                 .variant(MoonButtonVariant::Ghost)
                                 .on_click({
                                     let panel_name = panel_name.clone();
@@ -454,7 +453,7 @@ impl RenderOnce for TabPanel {
                         tools = tools.child(
                             MoonButton::new(format!("{}:close", self.id))
                                 .label("×")
-                                .size(MoonButtonSize::Micro)
+                                .size(MoonButtonSize::Tier(MoonSize::Xs))
                                 .variant(MoonButtonVariant::Ghost)
                                 .on_click({
                                     let panel_name = panel_name.clone();

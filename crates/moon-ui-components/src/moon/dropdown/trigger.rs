@@ -80,7 +80,7 @@ pub struct MoonDropdown {
     items: Vec<MoonMenuItem>,
     menu_layout: MenuLayoutFingerprint,
     trigger_variant: MoonButtonVariant,
-    trigger_size: MoonButtonSize,
+    trigger_size: Option<MoonButtonSize>,
     trigger_leading_icon: Option<MoonButtonIconSlot>,
     trigger_width: MoonDropdownTriggerWidth,
     trigger_caret: bool,
@@ -91,7 +91,7 @@ pub struct MoonDropdown {
     menu_width: MoonMenuWidth,
     menu_offset_x: f32,
     menu_offset_y: f32,
-    menu_size: MoonMenuSize,
+    menu_size: Option<MoonMenuSize>,
     menu_max_height: Option<MoonMenuMaxHeight>,
     close_on_select: bool,
     on_select: Option<MoonSelectHandler>,
@@ -101,7 +101,7 @@ pub struct MoonDropdown {
 }
 
 impl MoonDropdown {
-    /// Create a dropdown with an intrinsic trigger and legacy rendered menu width.
+    /// Create a dropdown with a density-sized intrinsic trigger and legacy rendered menu width.
     ///
     /// Args:
     ///     id: Stable element identity shared by the trigger and popup.
@@ -117,7 +117,7 @@ impl MoonDropdown {
             items: Vec::new(),
             menu_layout: MenuLayoutFingerprint::new(),
             trigger_variant: MoonButtonVariant::Neutral,
-            trigger_size: MoonButtonSize::Toolbar,
+            trigger_size: None,
             trigger_leading_icon: None,
             trigger_width: MoonDropdownTriggerWidth::Intrinsic,
             trigger_caret: false,
@@ -128,7 +128,7 @@ impl MoonDropdown {
             menu_width: MoonMenuWidth::Rendered(160.0),
             menu_offset_x: 0.0,
             menu_offset_y: 4.0,
-            menu_size: MoonMenuSize::Normal,
+            menu_size: None,
             menu_max_height: None,
             close_on_select: true,
             on_select: None,
@@ -192,7 +192,7 @@ impl MoonDropdown {
 
     /// Set the Moon button size used by the trigger.
     pub fn trigger_size(mut self, size: MoonButtonSize) -> Self {
-        self.trigger_size = size;
+        self.trigger_size = Some(size);
         self
     }
 
@@ -345,9 +345,12 @@ impl MoonDropdown {
         self
     }
 
-    /// Set the density preset used by popup rows.
-    pub fn menu_size(mut self, size: MoonMenuSize) -> Self {
-        self.menu_size = size;
+    /// Set the density size used by popup rows: a tier such as `MoonSize::Sm`, or a
+    /// `MoonMenuSize::Custom`.
+    ///
+    /// An unset size follows the theme's density tier.
+    pub fn menu_size(mut self, size: impl Into<MoonMenuSize>) -> Self {
+        self.menu_size = Some(size.into());
         self
     }
 
@@ -484,20 +487,23 @@ impl MoonDropdown {
     /// Returns:
     ///     The rendered MoonButton trigger.
     fn render_trigger(&self, cx: &App) -> impl IntoElement {
+        let trigger_size = self
+            .trigger_size
+            .unwrap_or_else(|| MoonButtonSize::density(cx));
         let trigger_id = SharedString::from(format!("{}:trigger", self.id));
         let mut trigger = MoonButton::new(trigger_id)
             .variant(self.trigger_variant)
-            .size(self.trigger_size)
+            .size(trigger_size)
             .selected(self.selected)
             .disabled(self.disabled);
         if self.segments.is_empty() {
             trigger = trigger.mono(DROPDOWN_TRIGGER_MONO);
         }
 
-        let (font_size, _, _) = button_text_metrics(self.trigger_size);
+        let (font_size, _, _) = button_text_metrics(trigger_size);
         let tokens = MoonTheme::active_tokens(cx);
         let reserved_content_width = self.trigger_leading_icon.map_or(0.0, |_| {
-            button_leading_icon_reservation(self.trigger_size, &tokens)
+            button_leading_icon_reservation(trigger_size, &tokens)
         });
         let suffix = if self.trigger_caret && self.segments.is_empty() {
             DROPDOWN_CARET
@@ -639,6 +645,7 @@ impl RenderOnce for MoonDropdown {
             .trigger_any(trigger)
             .content(move |_, window, cx| {
                 let tokens = MoonTheme::active_tokens(cx);
+                let menu_size = menu_size.unwrap_or_else(|| MoonMenuSize::from_theme(&tokens));
                 let mut menu = MoonPopupMenu::new(menu_id.clone())
                     .shared_level(popup_level.clone())
                     .dropdown_selection(dropdown_selection.clone())

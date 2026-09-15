@@ -240,8 +240,9 @@ pub(crate) struct MoonButtonMetrics {
     pub(crate) radius: Pixels,
     pub(crate) font_size: Pixels,
     pub(crate) line_height: Pixels,
-    gap: Pixels,
+    pub(crate) gap: Pixels,
     pub(crate) pad_x: Pixels,
+    pub(crate) icon_size: Pixels,
 }
 
 impl MoonButtonMetrics {
@@ -258,6 +259,7 @@ impl MoonButtonMetrics {
                 line_height: px(12.),
                 gap: px(4.),
                 pad_x: px(7.),
+                icon_size: px(0.),
             },
             Size::Small => Self {
                 height: px(26.),
@@ -266,6 +268,7 @@ impl MoonButtonMetrics {
                 line_height: px(14.),
                 gap: px(6.),
                 pad_x: px(0.),
+                icon_size: px(0.),
             },
             Size::Medium => Self {
                 height: px(28.),
@@ -274,6 +277,7 @@ impl MoonButtonMetrics {
                 line_height: px(14.),
                 gap: px(6.),
                 pad_x: px(0.),
+                icon_size: px(0.),
             },
             Size::Large => Self {
                 height: px(30.),
@@ -282,6 +286,7 @@ impl MoonButtonMetrics {
                 line_height: px(14.),
                 gap: px(6.),
                 pad_x: px(0.),
+                icon_size: px(0.),
             },
             Size::Size(height) => Self {
                 height,
@@ -290,6 +295,7 @@ impl MoonButtonMetrics {
                 line_height: height * 0.55,
                 gap: px(6.),
                 pad_x: px(0.),
+                icon_size: px(0.),
             },
         }
     }
@@ -300,15 +306,17 @@ impl MoonButtonMetrics {
         let base_line_height = self.line_height.as_f32();
         let base_pad_y = ((base_height - base_line_height) * 0.5).max(0.0);
         let line_height = tokens.line_height(base_line_height);
+        let font_size = tokens.font(self.font_size.as_f32());
         Self {
             height: px(tokens
                 .ui(base_height)
                 .max(line_height + tokens.ui(base_pad_y) * 2.0)),
             radius: px(tokens.ui(self.radius.as_f32())),
-            font_size: px(tokens.font(self.font_size.as_f32())),
+            font_size: px(font_size),
             line_height: px(line_height),
             gap: px(tokens.ui(self.gap.as_f32())),
             pad_x: px(tokens.ui(self.pad_x.as_f32())),
+            icon_size: px((font_size + 1.0).clamp(10.0, 14.0)),
         }
     }
 }
@@ -331,6 +339,7 @@ pub struct Button {
     border_edges: Edges<bool>,
     dropdown_caret: bool,
     size: Size,
+    moon_metrics: Option<MoonButtonMetrics>,
     compact: bool,
     tooltip: Option<(
         SharedString,
@@ -376,6 +385,7 @@ impl Button {
             },
             border_edges: Edges::all(true),
             size: Size::Medium,
+            moon_metrics: None,
             tooltip: None,
             tooltip_builder: None,
             on_click: None,
@@ -412,6 +422,18 @@ impl Button {
     /// Set the border edges of the Button.
     pub(crate) fn border_edges(mut self, edges: impl Into<Edges<bool>>) -> Self {
         self.border_edges = edges.into();
+        self
+    }
+
+    /// Use already-scaled Moon metrics instead of deriving them from `self.size`.
+    ///
+    /// Args:
+    ///     metrics: Height, type, gap, and icon size to render with.
+    ///
+    /// Returns:
+    ///     The button with native size derivation skipped at render.
+    pub(crate) fn with_moon_metrics(mut self, metrics: MoonButtonMetrics) -> Self {
+        self.moon_metrics = Some(metrics);
         self
     }
 
@@ -579,9 +601,11 @@ impl RenderOnce for Button {
         let is_disabled = self.disabled;
         let hoverable = self.hoverable();
         let pointer_feedback = pointer_feedback_enabled(self.disabled, self.loading);
-        let metrics = MoonButtonMetrics::for_size(self.size, cx);
+        let metrics = self
+            .moon_metrics
+            .unwrap_or_else(|| MoonButtonMetrics::for_size(self.size, cx));
         let normal_style = style.normal(self.outline, cx);
-        let icon_size = Size::Size(px((metrics.font_size.as_f32() + 1.0).clamp(10.0, 14.0)));
+        let icon_size = Size::Size(metrics.icon_size);
 
         let focus_handle = window
             .use_keyed_state(self.id.clone(), cx, |_, cx| cx.focus_handle())

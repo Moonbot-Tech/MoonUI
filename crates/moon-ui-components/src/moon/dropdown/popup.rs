@@ -1,5 +1,6 @@
 //! Popup-menu rendering, virtualization state, and nested-menu composition.
 
+use super::super::theme::MoonTextMetrics;
 use super::*;
 
 mod submenu;
@@ -92,8 +93,10 @@ fn menu_trailing_label(
     MoonText::new(right_label)
         .color(p.text_muted)
         .alpha(alpha)
-        .font_size(metrics.font_size - MENU_TRAILING_FONT_DELTA)
-        .line_height(metrics.line_height)
+        .rendered_metrics(MoonTextMetrics {
+            font_size: metrics.trailing_font_size,
+            line_height: metrics.line_height,
+        })
         .weight(MENU_TRAILING_WEIGHT)
         .mono(mono)
         .uppercase(false)
@@ -117,7 +120,7 @@ pub struct MoonPopupMenu {
     headers: Vec<(f32, AnyElement)>,
     items: std::rc::Rc<Vec<MoonMenuItem>>,
     pub(super) layout: MenuLayoutFingerprint,
-    size: MoonMenuSize,
+    size: Option<MoonMenuSize>,
     width: MoonMenuWidth,
     rendered_max_width: Option<f32>,
     max_height: Option<MoonMenuMaxHeight>,
@@ -135,7 +138,8 @@ struct MoonPopupMenuResolvedTheme {
 }
 
 impl MoonPopupMenu {
-    /// Create a popup menu with normal rows and the legacy rendered default width.
+    /// Create a popup menu that follows the theme's density tier unless a size is set, with the
+    /// legacy rendered default width.
     ///
     /// Args:
     ///     id: Stable element identity used by rows and nested submenus.
@@ -148,7 +152,7 @@ impl MoonPopupMenu {
             headers: Vec::new(),
             items: std::rc::Rc::new(Vec::new()),
             layout: MenuLayoutFingerprint::new(),
-            size: MoonMenuSize::Normal,
+            size: None,
             width: MoonMenuWidth::Rendered(160.0),
             rendered_max_width: None,
             max_height: None,
@@ -223,9 +227,11 @@ impl MoonPopupMenu {
         self
     }
 
-    /// Set the density preset used for menu row geometry and typography.
-    pub fn size(mut self, size: MoonMenuSize) -> Self {
-        self.size = size;
+    /// Set the row-geometry size: a tier such as `MoonSize::Sm`, or a `MoonMenuSize::Custom`.
+    ///
+    /// An unset size follows the theme's density tier.
+    pub fn size(mut self, size: impl Into<MoonMenuSize>) -> Self {
+        self.size = Some(size.into());
         self
     }
 
@@ -371,7 +377,7 @@ impl MoonPopupMenu {
         cx: &mut App,
     ) -> Option<ListState> {
         menu_level_is_virtualized(self.items.len()).then(|| {
-            let metrics = self.metrics().scaled(tokens);
+            let metrics = self.resolved_metrics(tokens);
             window
                 .use_keyed_state(
                     ElementId::from(SharedString::from(format!("{}:virtual-list", self.id))),
@@ -430,7 +436,7 @@ impl MoonPopupMenu {
         cx: Option<&App>,
         virtual_list_state: Option<ListState>,
     ) -> AnyElement {
-        let metrics = self.metrics().scaled(&tokens);
+        let metrics = self.resolved_metrics(&tokens);
         self.render_with_metrics(p, metrics, tokens, cx, virtual_list_state)
     }
 
@@ -561,8 +567,13 @@ impl MoonPopupMenu {
             // from the layout in either direction: an over-declared header would otherwise shrink
             // the row list without using the space, and an under-declared one would push the list
             // past the menu's maximum.
+            // Column + main-axis centre: a short caption sits in the declared band without
+            // becoming a flex row (`.items_center()` would shrink a full-width header to content).
             menu = menu.child(
                 div()
+                    .flex()
+                    .flex_col()
+                    .justify_center()
                     .flex_none()
                     .h(px(height))
                     .overflow_hidden()
@@ -575,7 +586,9 @@ impl MoonPopupMenu {
             mono,
             metrics,
             width_policy: self.width,
-            size: self.size,
+            size: self
+                .size
+                .unwrap_or_else(|| MoonMenuSize::from_theme(&tokens)),
             width,
             truncate_labels,
             palette: p,
@@ -723,8 +736,7 @@ impl MoonPopupMenu {
                         MoonText::new(item.label)
                             .color(p.text_muted)
                             .alpha(0.88)
-                            .font_size(metrics.font_size)
-                            .line_height(metrics.line_height)
+                            .rendered_metrics(metrics.into())
                             .weight(500.0)
                             .mono(mono)
                             .uppercase(false)
@@ -794,7 +806,7 @@ impl MoonPopupMenu {
                     .child(
                         div()
                             .w(px(menu_check_width(&tokens)))
-                            .h(px(tokens.line_height(metrics.line_height)))
+                            .h(px(metrics.line_height))
                             .flex()
                             .items_center()
                             .justify_center()
@@ -811,8 +823,7 @@ impl MoonPopupMenu {
                         MoonText::new(item.label)
                             .color(fg)
                             .alpha(alpha)
-                            .font_size(metrics.font_size)
-                            .line_height(metrics.line_height)
+                            .rendered_metrics(metrics.into())
                             .weight(if selected { 600.0 } else { 400.0 })
                             .mono(mono)
                             .uppercase(false)
@@ -833,8 +844,7 @@ impl MoonPopupMenu {
                         MoonText::new("›")
                             .color(p.text_muted)
                             .alpha(alpha * 0.88)
-                            .font_size(metrics.font_size)
-                            .line_height(metrics.line_height)
+                            .rendered_metrics(metrics.into())
                             .weight(600.0)
                             .mono(mono)
                             .uppercase(false)
@@ -911,12 +921,19 @@ impl MoonPopupMenu {
         ));
     }
 
-    /// Return unscaled row metrics for the configured menu size.
+    /// Return rendered row metrics for the configured menu size.
+    ///
+    /// Args:
+    ///     tokens: Theme tokens used to resolve an unset size and scale the metrics.
     ///
     /// Returns:
-    ///     Design-reference row metrics.
-    pub(super) fn metrics(&self) -> MenuMetrics {
-        unscaled_menu_metrics(self.size)
+    ///     Already-scaled row metrics.
+    pub(super) fn resolved_metrics(&self, tokens: &MoonThemeTokens) -> MenuMetrics {
+        menu_row_metrics(
+            self.size
+                .unwrap_or_else(|| MoonMenuSize::from_theme(tokens)),
+            tokens,
+        )
     }
 }
 

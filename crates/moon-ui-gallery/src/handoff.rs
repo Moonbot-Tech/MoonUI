@@ -680,17 +680,18 @@ impl CaseGallery {
                 .into_any_element(),
             "button.micro" => MoonButton::new("handoff-button-micro")
                 .label("Micro")
-                .size(MoonButtonSize::Micro)
+                .size(MoonSize::Xs)
                 .render()
                 .into_any_element(),
             "button.action" => MoonButton::new("handoff-button-action")
                 .label("Action")
-                .size(MoonButtonSize::Action)
+                .size(MoonSize::Sm)
                 .render()
                 .into_any_element(),
             "button.pill" => MoonButton::new("handoff-button-pill")
                 .label("Pill")
-                .size(MoonButtonSize::Pill)
+                .size(MoonSize::Md)
+                .pill()
                 .variant(MoonButtonVariant::Panel)
                 .selected(true)
                 .render()
@@ -889,12 +890,10 @@ impl CaseGallery {
             "radio.checked" => MoonRadio::new("handoff-radio-checked")
                 .label("Market")
                 .checked(true)
-                .size(MoonRadioSize::Normal)
                 .into_any_element(),
             "radio.unchecked" => MoonRadio::new("handoff-radio-unchecked")
                 .label("Market")
                 .checked(false)
-                .size(MoonRadioSize::Normal)
                 .into_any_element(),
             "rating.stars" => MoonRating::new("handoff-rating")
                 .value(3)
@@ -905,12 +904,12 @@ impl CaseGallery {
             "toggle.checked" => MoonToggle::new("handoff-toggle-checked")
                 .label("Live")
                 .checked(true)
-                .size(MoonToggleSize::Normal)
+                .size(MoonSize::Md)
                 .into_any_element(),
             "toggle.unchecked" => MoonToggle::new("handoff-toggle-unchecked")
                 .label("Live")
                 .checked(false)
-                .size(MoonToggleSize::Normal)
+                .size(MoonSize::Md)
                 .into_any_element(),
             "switch.checked" => MoonSwitch::new("handoff-switch-checked")
                 .label("Live")
@@ -1908,7 +1907,7 @@ impl CaseGallery {
             "kbd.spinner.skeleton" => h_flex()
                 .gap(px(10.0))
                 .items_center()
-                .child(MoonKbd::new("Ctrl+K").size(MoonKbdSize::Normal))
+                .child(MoonKbd::new("Ctrl+K"))
                 .child(MoonSpinner::new().size(MoonSpinnerSize::Normal))
                 .child(
                     MoonSkeleton::new("handoff-skeleton")

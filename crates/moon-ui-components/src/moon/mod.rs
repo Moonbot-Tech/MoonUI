@@ -192,7 +192,7 @@ pub use theme::{
     MoonTypography,
 };
 pub use time_picker::{MoonTimePicker, MoonTimePickerEvent, MoonTimePickerState};
-pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleSize};
+pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleMetrics, MoonToggleSize};
 pub use tokens::{MoonMetrics, MoonPalette, MoonRect, MoonTone, rgba_from};
 pub use tooltip::{MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView};
 pub use tree::{

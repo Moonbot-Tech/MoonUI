@@ -2,16 +2,18 @@
 
 use super::button_leading_icon_reservation;
 use super::{
-    DROPDOWN_CARET, DROPDOWN_TRIGGER_PAD_X, MENU_CLONE_PROBE_PREFIX, MENU_MEASUREMENT_PROBE_PREFIX,
-    MENU_PADDING, MENU_PALETTE_PROBE_PREFIX, MENU_WIDTH_SAMPLE_ROWS, MenuMetrics,
-    MoonButtonIconSlot, MoonButtonSize, MoonDropdown, MoonDropdownTriggerWidth, MoonMenuItem,
-    MoonMenuItemKind, MoonMenuMaxHeight, MoonMenuSize, MoonMenuWidth, MoonPalette, MoonPopupMenu,
-    MoonRect, MoonThemeTokens, SUBMENU_OFFSET_X, capped_menu_items_height, clamp_header_budget,
-    fit_dropdown_trigger_label, fit_menu_item_labels, menu_content_max,
-    menu_measurement_probe_count, natural_menu_width, resolve_menu_width,
-    resolve_virtual_menu_width, take_menu_item_clone_probe_count, take_palette_probe_shell,
+    DROPDOWN_CARET, DROPDOWN_TRIGGER_PAD_X, MENU_CLONE_PROBE_PREFIX, MENU_GAP,
+    MENU_MEASUREMENT_PROBE_PREFIX, MENU_PADDING, MENU_PALETTE_PROBE_PREFIX, MENU_WIDTH_SAMPLE_ROWS,
+    MenuMetrics, MoonButtonIconSlot, MoonButtonSize, MoonDropdown, MoonDropdownTriggerWidth,
+    MoonMenuItem, MoonMenuItemKind, MoonMenuMaxHeight, MoonMenuSize, MoonMenuWidth, MoonPalette,
+    MoonPopupMenu, MoonRect, MoonThemeTokens, SUBMENU_OFFSET_X, capped_menu_items_height,
+    clamp_header_budget, fit_dropdown_trigger_label, fit_menu_item_labels, menu_content_max,
+    menu_measurement_probe_count, menu_outer_chrome, menu_row_metrics, natural_menu_width,
+    resolve_menu_width, resolve_virtual_menu_width, take_menu_item_clone_probe_count,
+    take_palette_probe_shell,
 };
-use crate::moon::{MoonScale, MoonTheme, ThemeMode};
+use crate::moon::text::measure_rendered_text_width;
+use crate::moon::{MoonScale, MoonSize, MoonTheme, ThemeMode};
 use gpui::{ParentElement as _, Styled as _};
 use std::{
     cell::{Cell, RefCell},
@@ -58,6 +60,8 @@ fn virtual_menu_height_stops_scanning_once_the_viewport_is_full() {
         radius: 4.0,
         pad_x: 7.0,
         gap: 6.0,
+        text_scale: 1.0,
+        trailing_font_size: 10.0,
     };
     let inspected = Cell::new(0);
     let kinds = (0..1_000).map(|_| {
@@ -148,7 +152,7 @@ impl gpui::Render for DropdownHarness {
         let mut dropdown = MoonDropdown::new(DROPDOWN_ID)
             .label("trigger")
             // Use a fixed non-default size so the measured trigger box is known.
-            .trigger_size(MoonButtonSize::Action)
+            .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
             .default_open(true)
             .item(MoonMenuItem::new("only item"));
         if let Some(rect) = self.trigger_rect {
@@ -262,12 +266,12 @@ fn labelled_trigger_icon_adds_width_in_both_palettes(cx: &mut gpui::TestAppConte
         let plain = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("plain-labelled-trigger")
                 .label("Settings")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
         });
         let with_icon = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("icon-labelled-trigger")
                 .label("Settings")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
                 .trigger_leading_icon(MoonButtonIconSlot::new("icons/settings.svg"))
         });
 
@@ -293,12 +297,12 @@ fn fitted_labelled_trigger_reserves_rendered_icon_chrome_in_both_palettes(
         let plain = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("plain-icon-reservation-probe")
                 .label("Settings")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
         });
         let with_icon = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("icon-reservation-probe")
                 .label("Settings")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
                 .trigger_icon("icons/settings.svg")
         });
         let rendered_icon_chrome = with_icon.size.width - plain.size.width;
@@ -308,7 +312,8 @@ fn fitted_labelled_trigger_reserves_rendered_icon_chrome_in_both_palettes(
         };
         let font_size = 10.5;
         let measure = |text: &str| text.chars().count() as f32 * 8.0;
-        let reservation = button_leading_icon_reservation(MoonButtonSize::Action, &tokens);
+        let reservation =
+            button_leading_icon_reservation(MoonButtonSize::Tier(MoonSize::Sm), &tokens);
         let (label, width) = fit_dropdown_trigger_label(
             "a deliberately long translated settings label",
             DROPDOWN_CARET,
@@ -347,7 +352,7 @@ fn icon_only_trigger_stays_square_in_both_palettes(cx: &mut gpui::TestAppContext
         cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
         let bounds = laid_out_trigger_bounds(cx, || {
             MoonDropdown::new("icon-only-trigger")
-                .trigger_size(MoonButtonSize::Action)
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
                 .trigger_icon("icons/settings.svg")
         });
 
@@ -408,6 +413,7 @@ fn fitted_dropdown_stays_inside_both_viewport_edges_at_independent_scales(
                 ui: 0.9,
                 font: 1.35,
                 font_delta: 2.0,
+                tier: Default::default(),
             },
         ),
         (
@@ -416,6 +422,7 @@ fn fitted_dropdown_stays_inside_both_viewport_edges_at_independent_scales(
                 ui: 1.35,
                 font: 0.9,
                 font_delta: 2.0,
+                tier: Default::default(),
             },
         ),
     ] {
@@ -486,9 +493,8 @@ fn menu_width_sample_ignores_where_a_long_label_sits(cx: &mut gpui::TestAppConte
     cx.update(|cx| {
         let tokens = MoonThemeTokens::default();
         let metrics = MoonPopupMenu::new("width-sample-order")
-            .size(MoonMenuSize::Compact)
-            .metrics()
-            .scaled(&tokens);
+            .size(MoonSize::Sm)
+            .resolved_metrics(&tokens);
         // Small height budget: the height-only prefix covers only a handful of rows, far short of
         // both the 80-row list and the 128-row sample floor.
         let content_max = 100.0;
@@ -533,9 +539,8 @@ fn menu_width_sample_stays_bounded_for_a_pathological_menu(cx: &mut gpui::TestAp
     cx.update(|cx| {
         let tokens = MoonThemeTokens::default();
         let metrics = MoonPopupMenu::new("width-sample-bound")
-            .size(MoonMenuSize::Compact)
-            .metrics()
-            .scaled(&tokens);
+            .size(MoonSize::Sm)
+            .resolved_metrics(&tokens);
         let items: Vec<_> = (0..5_000)
             .map(|ix| MoonMenuItem::new(format!("{MENU_MEASUREMENT_PROBE_PREFIX}{ix}")))
             .collect();
@@ -579,9 +584,8 @@ fn virtual_menu_width_truncation_follows_the_measured_sample(cx: &mut gpui::Test
     cx.update(|cx| {
         let tokens = MoonThemeTokens::default();
         let metrics = MoonPopupMenu::new("width-sample-truncation")
-            .size(MoonMenuSize::Compact)
-            .metrics()
-            .scaled(&tokens);
+            .size(MoonSize::Sm)
+            .resolved_metrics(&tokens);
         // Over the 64-row virtualization threshold but comfortably under the 128-row sample, so
         // the whole list is measured; a small height budget keeps the height-only prefix (a
         // handful of rows) far shorter than the full 100-row list.
@@ -624,6 +628,7 @@ fn fitted_trigger_preserves_caret_at_independent_scale_extremes() {
                 ui,
                 font,
                 font_delta,
+                tier: Default::default(),
             };
             let font_size = 10.5;
             let text_scale = tokens.font(font_size) / font_size;
@@ -668,6 +673,7 @@ fn scaled_trigger_uses_font_width_without_clipping_component_chrome() {
                 ui,
                 font,
                 font_delta,
+                tier: Default::default(),
             };
             let font_size = 10.5;
             let text_scale = tokens.font(font_size) / font_size;
@@ -695,9 +701,9 @@ fn scaled_trigger_uses_font_width_without_clipping_component_chrome() {
     }
 }
 
-/// `dropdown/layout.rs:MoonMenuWidth::Scaled` must follow font width without shrinking below UI-scaled
-/// row chrome. Using only either scale makes a fixed Terminal menu overflow in the
-/// high-UI/low-font cross-product.
+/// `dropdown/layout.rs:MoonMenuWidth::Scaled` must reserve enough width for the tier's own fitted
+/// rows, measured the way production measures a Tier row: at the metrics' already-rendered
+/// `font_size` (UI zoom only), never re-applying the font scale on top.
 #[gpui::test]
 fn scaled_menu_width_retains_fitted_rows_at_independent_scale_extremes(
     cx: &mut gpui::TestAppContext,
@@ -714,16 +720,16 @@ fn scaled_menu_width_retains_fitted_rows_at_independent_scale_extremes(
                     ui,
                     font,
                     font_delta,
+                    tier: Default::default(),
                 };
                 let metrics = MoonPopupMenu::new("scaled-menu-test")
-                    .size(MoonMenuSize::Compact)
-                    .metrics()
-                    .scaled(&tokens);
+                    .size(MoonSize::Sm)
+                    .resolved_metrics(&tokens);
                 let mut items = vec![
                     MoonMenuItem::new("a deliberately long menu label for truncation")
                         .right_label("12:34:56"),
                 ];
-                let text_scale = tokens.font(metrics.font_size) / metrics.font_size;
+                let text_scale = metrics.text_scale;
                 let requested = 160.0 * text_scale;
                 let (width, truncate) = resolve_menu_width(
                     MoonMenuWidth::Scaled(160.0),
@@ -737,9 +743,14 @@ fn scaled_menu_width_retains_fitted_rows_at_independent_scale_extremes(
                 assert!(truncate);
                 assert!(width >= requested);
                 fit_menu_item_labels(&mut items, width, metrics, &tokens, cx, true);
+                // `metrics.font_size` is already UI-rendered for a Tier size (see
+                // `menu_row_metrics`'s Tier arm), so the oracle measures at that rendered size
+                // directly -- exactly what `measure_menu_text_width` does in production. Routing
+                // it back through `measure_text_width` would re-apply `tokens.font()` on top and
+                // inflate the oracle past what the row actually paints.
                 let fitted_natural =
                     natural_menu_width(&items, metrics, &tokens, |text, size, weight| {
-                        super::measure_text_width(cx, &tokens, text, size, weight, true)
+                        measure_rendered_text_width(cx, &tokens, text, size, weight, true)
                     });
                 assert!(
                     fitted_natural <= width,
@@ -760,6 +771,7 @@ fn menu_max_height_distinguishes_ui_scaled_and_rendered_values() {
         ui: 2.5,
         font: 0.25,
         font_delta: 0.0,
+        tier: Default::default(),
     };
 
     assert_eq!(
@@ -1276,15 +1288,17 @@ fn palette_only_menu_render_rejects_measured_width_policies() {
 #[test]
 fn fitted_menu_accounts_for_right_label_and_its_gap() {
     let tokens = MoonThemeTokens::default();
-    let metrics = MenuMetrics {
-        row_height: 20.0,
-        font_size: 9.5,
-        line_height: 12.0,
-        radius: 3.0,
-        pad_x: 6.0,
-        gap: 5.0,
-    }
-    .scaled(&tokens);
+    let metrics = menu_row_metrics(
+        MoonMenuSize::Custom {
+            row_height: 20.0,
+            font_size: 9.5,
+            line_height: 12.0,
+            radius: 3.0,
+            pad_x: 6.0,
+            gap: 5.0,
+        },
+        &tokens,
+    );
     let plain = [MoonMenuItem::new("UTC+12")];
     let with_right = [MoonMenuItem::new("UTC+12").right_label("12:34:56")];
     let measure = |text: &str, _size: f32, _weight: f32| text.chars().count() as f32;
@@ -1316,7 +1330,7 @@ impl gpui::Render for FittedSubmenuHarness {
         _cx: &mut gpui::Context<Self>,
     ) -> impl gpui::IntoElement {
         MoonPopupMenu::new("fit-parent")
-            .size(MoonMenuSize::Compact)
+            .size(MoonSize::Sm)
             .fit_width(80.0, 400.0)
             .item(
                 MoonMenuItem::new("More")
@@ -1338,6 +1352,7 @@ fn fitted_submenu_resolves_width_from_its_own_items(cx: &mut gpui::TestAppContex
         ui: 2.5,
         font: 0.75,
         font_delta: 4.0,
+        tier: Default::default(),
     };
     cx.update(|cx| {
         MoonTheme::global_mut(cx).scale = scale;
@@ -1384,15 +1399,17 @@ fn fitted_submenu_resolves_width_from_its_own_items(cx: &mut gpui::TestAppContex
 #[test]
 fn fitted_label_row_accounts_for_right_label_and_its_gap() {
     let tokens = MoonThemeTokens::default();
-    let metrics = MenuMetrics {
-        row_height: 20.0,
-        font_size: 9.5,
-        line_height: 12.0,
-        radius: 3.0,
-        pad_x: 6.0,
-        gap: 5.0,
-    }
-    .scaled(&tokens);
+    let metrics = menu_row_metrics(
+        MoonMenuSize::Custom {
+            row_height: 20.0,
+            font_size: 9.5,
+            line_height: 12.0,
+            radius: 3.0,
+            pad_x: 6.0,
+            gap: 5.0,
+        },
+        &tokens,
+    );
     let plain = [MoonMenuItem::label("Exchanges")];
     let with_right = [MoonMenuItem::label("Exchanges").right_label("42")];
     let measure = |text: &str, _size: f32, _weight: f32| text.chars().count() as f32;
@@ -1414,15 +1431,17 @@ fn fitted_label_row_accounts_for_right_label_and_its_gap() {
 #[test]
 fn menu_content_max_charges_the_header_budget_to_the_row_list() {
     let tokens = MoonThemeTokens::default();
-    let metrics = MenuMetrics {
-        row_height: 24.0,
-        font_size: 10.5,
-        line_height: 13.0,
-        radius: 4.0,
-        pad_x: 7.0,
-        gap: 6.0,
-    }
-    .scaled(&tokens);
+    let metrics = menu_row_metrics(
+        MoonMenuSize::Custom {
+            row_height: 24.0,
+            font_size: 10.5,
+            line_height: 13.0,
+            radius: 4.0,
+            pad_x: 7.0,
+            gap: 6.0,
+        },
+        &tokens,
+    );
     let outer_max = 400.0;
     let header_budget = 50.0;
 
@@ -1502,6 +1521,13 @@ impl gpui::Render for HeaderHeightHarness {
 /// `dropdown/popup.rs:MoonPopupMenu::render_with_metrics`. Without it the wrapper shrinks to the
 /// header's own natural content size instead of the height its budget reserved, so an
 /// over-declared header wastes list space and an under-declared one pushes rows past the cap.
+///
+/// The wrapper carries no debug selector of its own, and its content is now vertically CENTRED
+/// inside it (`.justify_center()`), so the header child's own bounds no longer sit flush with the
+/// wrapper's top edge and cannot stand in for it. Instead this derives the wrapper's own reserved
+/// height from the outer menu's bounds (`header-height-probe`, the popup's own debug selector)
+/// plus the same padding/border/gap constants production spends to place it
+/// (`menu_outer_chrome`, `MENU_GAP`), and measures down to where the first row starts.
 #[gpui::test]
 fn pinned_header_wrapper_enforces_its_declared_height(cx: &mut gpui::TestAppContext) {
     cx.update(crate::init);
@@ -1510,6 +1536,7 @@ fn pinned_header_wrapper_enforces_its_declared_height(cx: &mut gpui::TestAppCont
             ui: 1.0,
             font: 1.0,
             font_delta: 0.0,
+            tier: Default::default(),
         };
     });
     let window = cx.add_window(|_, _| HeaderHeightHarness);
@@ -1517,22 +1544,23 @@ fn pinned_header_wrapper_enforces_its_declared_height(cx: &mut gpui::TestAppCont
 
     cx.update(|window, _| window.refresh());
     cx.run_until_parked();
-    let header = cx
-        .debug_bounds("header-height-probe:header")
-        .expect("pinned header must render");
+    let menu = cx
+        .debug_bounds("header-height-probe")
+        .expect("popup menu must render");
     let row = cx
         .debug_bounds("header-height-probe:item:0")
         .expect("first row must render");
+    let tokens = MoonThemeTokens::default();
 
-    let observed_gap = row.origin.y - (header.origin.y + header.size.height);
+    let wrapper_top = menu.origin.y + gpui::px(menu_outer_chrome(&tokens) / 2.0);
+    let wrapper_bottom = row.origin.y - gpui::px(tokens.ui(MENU_GAP));
+    let observed_height = f32::from(wrapper_bottom) - f32::from(wrapper_top);
 
     assert!(
-        observed_gap >= gpui::px(HEADER_HEIGHT_UI - 4.0),
-        "row started at {:?}, only {:?} below the header's own 4px content; the wrapper must be \
-         pinned to its declared {HEADER_HEIGHT_UI}px height rather than shrinking to the header's \
-         natural size",
-        row.origin,
-        observed_gap
+        (observed_height - HEADER_HEIGHT_UI).abs() < 1.0,
+        "wrapper reserved {observed_height}px between the menu's own top edge and the first row; \
+         the wrapper must stay pinned to its declared {HEADER_HEIGHT_UI}px height regardless of \
+         where its centred content sits inside it"
     );
 }
 
@@ -1762,6 +1790,7 @@ fn pinned_header_scaling_shrinks_the_wrapper_when_the_clamp_engages(cx: &mut gpu
             ui: 1.0,
             font: 1.0,
             font_delta: 0.0,
+            tier: Default::default(),
         };
     });
     let window = cx.add_window(|_, _| HeaderClampScalingHarness);
@@ -1793,4 +1822,343 @@ fn pinned_header_scaling_shrinks_the_wrapper_when_the_clamp_engages(cx: &mut gpu
          {HEADER_CLAMP_MENU_MAX_HEIGHT}px maximum; an unscaled header pushes the row list past the \
          cap, and the outer overflow_hidden then clips it silently",
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// `MoonMenuSize` density-tier coverage: `Tier(MoonSize) | Custom { .. }`, its theme-driven
+// default, and the geometry each tier resolves to.
+// ---------------------------------------------------------------------------------------------
+
+/// Catches a hand-copied metric literal drifting from `MoonSize::control_metrics()`.
+/// `dropdown/layout.rs:menu_row_metrics` — a future edit that hardcodes a Tier's row geometry
+/// instead of reading the shared table would render that tier at stale geometry forever.
+#[test]
+fn tier_menu_metrics_match_the_shared_control_table() {
+    let tokens = MoonThemeTokens::default();
+    for t in [MoonSize::Xs, MoonSize::Sm, MoonSize::Md] {
+        let c = t.control_metrics();
+        let metrics = menu_row_metrics(MoonMenuSize::Tier(t), &tokens);
+        assert_eq!(metrics.row_height, c.height, "row_height drifted for {t:?}");
+        assert_eq!(
+            metrics.font_size, c.font_size,
+            "font_size drifted for {t:?}"
+        );
+        assert_eq!(
+            metrics.line_height, c.line_height,
+            "line_height drifted for {t:?}"
+        );
+        assert_eq!(metrics.radius, c.radius, "radius drifted for {t:?}");
+        assert_eq!(metrics.pad_x, c.pad_x, "pad_x drifted for {t:?}");
+        assert_eq!(metrics.gap, c.gap, "gap drifted for {t:?}");
+        assert_eq!(
+            metrics.text_scale, 1.0,
+            "text_scale must be 1.0 at unscaled tokens for {t:?}"
+        );
+    }
+}
+
+/// Catches "fixing" the Tier arm of `menu_row_metrics` to scale text by `tokens.font()` for
+/// symmetry with `Custom`. `dropdown/layout.rs:menu_row_metrics` — a Tier's text must follow UI
+/// zoom only, or menu text double-scales at every zoom level. `Custom` keeps its legacy
+/// font-scaled text so its own callers are unaffected.
+#[test]
+fn tier_menu_text_follows_ui_zoom_never_font_scale() {
+    let tokens = MoonThemeTokens {
+        scale: MoonScale {
+            ui: 2.0,
+            font: 1.75,
+            font_delta: 4.0,
+            tier: Default::default(),
+        },
+        ..MoonThemeTokens::default()
+    };
+    for t in [MoonSize::Xs, MoonSize::Sm, MoonSize::Md] {
+        let c = t.control_metrics();
+        let metrics = menu_row_metrics(MoonMenuSize::Tier(t), &tokens);
+        assert_eq!(
+            metrics.font_size,
+            tokens.ui(c.font_size),
+            "Tier font_size must scale by ui only for {t:?}"
+        );
+        assert_eq!(
+            metrics.line_height,
+            tokens.ui(c.line_height),
+            "Tier line_height must scale by ui only for {t:?}"
+        );
+        assert_eq!(metrics.radius, tokens.ui(c.radius));
+        assert_eq!(metrics.pad_x, tokens.ui(c.pad_x));
+        assert_eq!(metrics.gap, tokens.ui(c.gap));
+    }
+
+    let custom = MoonMenuSize::Custom {
+        row_height: 24.0,
+        font_size: 14.0,
+        line_height: 20.0,
+        radius: 4.0,
+        pad_x: 8.0,
+        gap: 8.0,
+    };
+    let custom_metrics = menu_row_metrics(custom, &tokens);
+    assert_eq!(
+        custom_metrics.font_size,
+        tokens.font(14.0),
+        "Custom must keep its legacy font-scaled text"
+    );
+    assert_eq!(
+        custom_metrics.line_height,
+        tokens.line_height(20.0),
+        "Custom must keep its legacy font-scaled line height"
+    );
+}
+
+/// Catches `tokens.font` creeping back into `dropdown/layout.rs:measure_menu_text_width`. A
+/// tier's menu-row width-fitting must track UI zoom only, via already-rendered text — Consequence:
+/// menu labels truncate or over-reserve width at every non-default font delta.
+#[gpui::test]
+fn tier_menu_width_follows_ui_zoom_never_font_delta(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let items = vec![MoonMenuItem::new("a moderately long menu label").right_label("12:34")];
+    let width_policy = MoonMenuWidth::Fit {
+        min: 0.0,
+        max: 10_000.0,
+    };
+    let mut widths = Vec::new();
+    for (ui, font, font_delta) in [(1.0, 1.0, 0.0), (1.0, 3.0, 20.0), (2.0, 1.0, 0.0)] {
+        let width = cx.update(|cx| {
+            let tokens = MoonThemeTokens {
+                scale: MoonScale {
+                    ui,
+                    font,
+                    font_delta,
+                    tier: Default::default(),
+                },
+                ..MoonThemeTokens::default()
+            };
+            let metrics = menu_row_metrics(MoonMenuSize::Tier(MoonSize::Md), &tokens);
+            resolve_menu_width(width_policy, &items, metrics, &tokens, cx, true).0
+        });
+        widths.push(width);
+    }
+    assert_eq!(
+        widths[0], widths[1],
+        "a tier's fitted menu width must be invariant under font/font_delta"
+    );
+    assert!(
+        widths[2] > widths[0],
+        "a tier's fitted menu width must grow with UI zoom"
+    );
+}
+
+/// Catches dropping the `nearest(&SUPPORTED_TIERS)` snap from Tier resolution. Without it, an
+/// unsupported tier like `Lg` would render at an unsupported 40px row the menu chrome was never
+/// built for.
+#[test]
+fn unsupported_menu_tiers_snap_to_the_nearest_supported_one() {
+    assert_eq!(
+        MoonSize::Lg.nearest(&MoonMenuSize::SUPPORTED_TIERS),
+        MoonSize::Md
+    );
+    assert_eq!(
+        MoonSize::Xl.nearest(&MoonMenuSize::SUPPORTED_TIERS),
+        MoonSize::Md
+    );
+    assert_eq!(
+        MoonSize::Xxl.nearest(&MoonMenuSize::SUPPORTED_TIERS),
+        MoonSize::Md
+    );
+    assert_eq!(
+        MoonSize::Xs.nearest(&MoonMenuSize::SUPPORTED_TIERS),
+        MoonSize::Xs,
+        "Xs is itself supported and must not snap up to Sm"
+    );
+}
+
+/// Catches `MoonMenuWidth::Scaled` being re-pointed at the font scale for a Tier size.
+/// `dropdown/layout.rs:resolve_menu_width` — Consequence: fixed-width menus resize with the font
+/// delta again.
+#[gpui::test]
+fn scaled_menu_width_at_a_tier_follows_ui_zoom_never_font_delta(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let items = vec![MoonMenuItem::new("x")];
+    let mut widths = Vec::new();
+    for (ui, font, font_delta) in [(1.0, 1.0, 0.0), (1.0, 3.0, 30.0), (2.0, 1.0, 0.0)] {
+        let width = cx.update(|cx| {
+            let tokens = MoonThemeTokens {
+                scale: MoonScale {
+                    ui,
+                    font,
+                    font_delta,
+                    tier: Default::default(),
+                },
+                ..MoonThemeTokens::default()
+            };
+            let metrics = menu_row_metrics(MoonMenuSize::Tier(MoonSize::Md), &tokens);
+            resolve_menu_width(
+                MoonMenuWidth::Scaled(160.0),
+                &items,
+                metrics,
+                &tokens,
+                cx,
+                true,
+            )
+            .0
+        });
+        widths.push(width);
+    }
+    assert_eq!(
+        widths[0], widths[1],
+        "a tier's Scaled width must not move with font/font_delta"
+    );
+    assert_eq!(
+        widths[2],
+        widths[0] * 2.0,
+        "a tier's Scaled width must track UI zoom exactly"
+    );
+}
+
+/// REGRESSION GUARD: catches "fixing" the trigger to measure at the menu tier for consistency.
+/// `dropdown/trigger.rs:MoonDropdown::fitted_trigger_label` — Consequence: the caret contract
+/// breaks and trigger labels truncate.
+#[gpui::test]
+fn fitted_trigger_label_ignores_menu_tier_and_menu_size(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let plain = laid_out_trigger_bounds(cx, || {
+        MoonDropdown::new("trigger-tier-probe-a")
+            .label("Settings")
+            .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
+            .menu_size(MoonMenuSize::Tier(MoonSize::Sm))
+    });
+    cx.update(|cx| MoonTheme::global_mut(cx).scale.tier = MoonSize::Xl);
+    let denser = laid_out_trigger_bounds(cx, || {
+        MoonDropdown::new("trigger-tier-probe-b")
+            .label("Settings")
+            .trigger_size(MoonButtonSize::Tier(MoonSize::Sm))
+            .menu_size(MoonMenuSize::Tier(MoonSize::Md))
+    });
+    assert_eq!(
+        plain.size.width, denser.size.width,
+        "trigger width must not move with the theme tier or the dropdown's menu_size"
+    );
+}
+
+/// Catches `MoonMenuSize::from_theme` failing to snap the theme's density tier to a supported
+/// menu tier.
+#[test]
+fn menu_size_from_theme_snaps_the_density_tier() {
+    let mut tokens = MoonThemeTokens::default();
+    tokens.scale.tier = MoonSize::Lg;
+    assert_eq!(
+        MoonMenuSize::from_theme(&tokens),
+        MoonMenuSize::Tier(MoonSize::Md)
+    );
+    tokens.scale.tier = MoonSize::Xs;
+    assert_eq!(
+        MoonMenuSize::from_theme(&tokens),
+        MoonMenuSize::Tier(MoonSize::Xs)
+    );
+}
+
+/// Catches replacing `MoonPopupMenu::resolved_metrics`'s
+/// `unwrap_or_else(|| MoonMenuSize::from_theme(tokens))` with a hardcoded default.
+/// `dropdown/popup.rs:MoonPopupMenu::resolved_metrics` — Consequence: density silently stops
+/// reaching menus, undoing the whole goal with nothing else red.
+#[test]
+fn unset_popup_menu_follows_theme_tier_but_an_explicit_size_overrides_it() {
+    let mut tokens = MoonThemeTokens::default();
+    tokens.scale.tier = MoonSize::Xs;
+    let unset = MoonPopupMenu::new("density-unset").resolved_metrics(&tokens);
+    assert_eq!(
+        unset,
+        menu_row_metrics(MoonMenuSize::Tier(MoonSize::Xs), &tokens)
+    );
+
+    let overridden_at_xs_theme = MoonPopupMenu::new("density-set")
+        .size(MoonSize::Xs)
+        .resolved_metrics(&tokens);
+    tokens.scale.tier = MoonSize::Md;
+    let overridden_at_md_theme = MoonPopupMenu::new("density-set")
+        .size(MoonSize::Xs)
+        .resolved_metrics(&tokens);
+    assert_eq!(
+        overridden_at_xs_theme, overridden_at_md_theme,
+        "an explicit .size() must ignore the theme tier"
+    );
+}
+
+/// Render one permanently open dropdown so its first menu row can be measured.
+struct DensityProbeHarness;
+
+impl gpui::Render for DensityProbeHarness {
+    /// Render an always-open dropdown with a single row.
+    ///
+    /// Args:
+    ///     _window: Test window.
+    ///     _cx: View context unused by the static probe.
+    ///
+    /// Returns:
+    ///     An open dropdown exposing its first row under `density-probe:menu:item:0`.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        MoonDropdown::new("density-probe")
+            .label("probe")
+            .default_open(true)
+            .item(MoonMenuItem::new("row"))
+    }
+}
+
+/// Rendered-bounds probe for the same regression, in case a future edit leaves `resolved_metrics`
+/// correct while the render path itself reads a stale cached value instead of calling it.
+#[gpui::test]
+fn open_menu_first_row_height_follows_the_theme_density_tier(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    cx.update(|cx| MoonTheme::global_mut(cx).scale.tier = MoonSize::Md);
+    let window = cx.add_window(|_, _| DensityProbeHarness);
+    let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+    let row = (0..8)
+        .find_map(|_| {
+            visual.update(|window, _| window.refresh());
+            visual.run_until_parked();
+            visual.debug_bounds("density-probe:menu:item:0")
+        })
+        .expect("open dropdown must render its first menu row");
+    let tokens = MoonThemeTokens::default();
+    assert_eq!(row.size.height, gpui::px(tokens.ui(32.0)));
+}
+
+/// Catches restoring a fixed Md default in trigger.rs or ignoring explicit overrides:
+/// density must resize ordinary triggers while fixed strip triggers remain 20 pixels high.
+#[gpui::test]
+fn dropdown_trigger_defaults_follow_density_and_preserve_fixed_tiers(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(crate::init);
+    for (tier, height) in [
+        (MoonSize::Xs, 20.0),
+        (MoonSize::Sm, 24.0),
+        (MoonSize::Md, 32.0),
+        (MoonSize::Lg, 40.0),
+        (MoonSize::Xxl, 40.0),
+    ] {
+        cx.update(|cx| MoonTheme::global_mut(cx).scale.tier = tier);
+        let default =
+            laid_out_trigger_bounds(cx, || MoonDropdown::new("density-default").label("Default"));
+        let fixed = laid_out_trigger_bounds(cx, || {
+            MoonDropdown::new("density-fixed")
+                .label("Fixed")
+                .trigger_size(MoonButtonSize::Tier(MoonSize::Xs))
+        });
+        assert_eq!(
+            default.size.height,
+            gpui::px(height),
+            "default trigger at {tier:?}"
+        );
+        assert_eq!(
+            fixed.size.height,
+            gpui::px(20.0),
+            "fixed trigger at {tier:?}"
+        );
+    }
 }

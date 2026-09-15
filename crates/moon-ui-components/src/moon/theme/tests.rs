@@ -1,4 +1,4 @@
-//! Guards on the scale setters: a value that cannot render must not reach the tokens.
+//! Guards scale validity and density propagation through theme loading and mode selection.
 
 use super::{MoonScale, MoonThemeConfig, MoonThemeTokens};
 use crate::moon::tokens::{MoonPalette, contrast_ratio};
@@ -125,4 +125,38 @@ fn graphite_theme_config_matches_the_bundled_dark_and_light_palettes() {
     assert_eq!(config.dark.palette, MoonPalette::GRAPHITE);
     assert_eq!(config.light.palette, MoonPalette::LIGHT);
     assert_eq!(config.mode, crate::moon::foundation::ThemeMode::Dark);
+}
+
+/// Catches dropping the light-side tier assignment: changing theme must preserve density.
+#[test]
+fn density_survives_theme_selection_and_scaling() {
+    use super::{MoonSize, MoonTheme, ThemeMode};
+    for mode in [ThemeMode::Dark, ThemeMode::Light] {
+        let mut config = MoonThemeConfig::moon_terminal()
+            .with_tier(MoonSize::Sm)
+            .with_ui_scale(1.25)
+            .with_font_delta(3.0);
+        config.mode = mode;
+        let theme = MoonTheme::from_config(config);
+        assert_eq!(theme.tokens().tier(), MoonSize::Sm);
+        assert_eq!(theme.tokens().ui(20.0), 25.0);
+        assert_eq!(theme.tokens().font(10.0), 13.0);
+    }
+}
+
+/// Catches removing serde defaults for the new tier, which would reject existing theme files.
+#[test]
+fn legacy_theme_toml_uses_medium_density() {
+    use super::MoonSize;
+    let config: MoonThemeConfig = toml::from_str(
+        "[dark.scale]
+ui = 1.2
+[light.scale]
+font = 1.1
+",
+    )
+    .unwrap();
+    assert_eq!(config.dark.tier(), MoonSize::Md);
+    assert_eq!(config.light.tier(), MoonSize::Md);
+    assert_eq!(MoonThemeConfig::default().dark.tier(), MoonSize::Md);
 }

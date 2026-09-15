@@ -119,6 +119,7 @@ fn fitted_root_context_menu_grows_and_stays_inside_scaled_viewports(cx: &mut gpu
                 ui: 0.9,
                 font: 1.35,
                 font_delta: 2.0,
+                tier: Default::default(),
             },
         ),
         (
@@ -127,6 +128,7 @@ fn fitted_root_context_menu_grows_and_stays_inside_scaled_viewports(cx: &mut gpu
                 ui: 1.35,
                 font: 0.9,
                 font_delta: 2.0,
+                tier: Default::default(),
             },
         ),
     ] {

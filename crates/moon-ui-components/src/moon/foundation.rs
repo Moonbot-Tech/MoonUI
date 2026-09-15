@@ -207,16 +207,85 @@ pub enum MoonSize {
     Xxl,
 }
 
-#[allow(non_upper_case_globals)]
+/// Shared control metrics in unscaled design-reference pixels.
+///
+/// | Tier | Height | Text / line | Radius | Horizontal padding | Icon / label gap |
+/// | --- | --- | --- | --- | --- | --- |
+/// | Xs | 20 | 12 / 16 | 4 | 6 | 4 |
+/// | Sm | 24 | 14 / 20 | 4 | 8 | 8 |
+/// | Md | 32 | 16 / 24 | 6 | 12 | 12 |
+/// | Lg | 40 | 18 / 28 | 8 | 16 | 12 |
+/// | Xl | 48 | 20 / 28 | 8 | 20 | 16 |
+/// | Xxl | 56 | 24 / 32 | 10 | 24 | 16 |
+///
+/// [WCAG 2.2 SC 2.5.8 (Target Size, Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html)
+/// sets a 24 by 24 CSS pixel pointer-target minimum, subject to exceptions. `Sm` is the
+/// smallest tier meeting the height floor and the intended default for terminal controls;
+/// consumers must also provide adequate target width. This does not change [`MoonSize`]'s
+/// existing `Md` default. `Xs` is the sole tier below the floor, reserved for fixed-height
+/// dense strips (header ticker, status bar) where the spacing exception is satisfied:
+/// 24px diameter circles centred on undersized targets must not intersect another target
+/// or another undersized target's circle. Density alone does not grant the exception.
+///
+/// Tier metrics follow UI zoom only: apply `tokens.ui(value)` to every field, text included,
+/// never `tokens.font()` or `font_delta`. A component's `Custom { .. }` size retains its
+/// existing text scaling. These are reference values, not already scaled pixels.
+///
+/// `Sm` / `Md` text and radius match the reviewed checkbox values so controls align on a row;
+/// control height is not checkbox box size. Larger tiers extend the stepped scale for future
+/// consumers; adding this table does not migrate any component.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MoonControlMetrics {
+    /// Overall control height.
+    pub height: f32,
+    /// Text font size.
+    pub font_size: f32,
+    /// Text line height.
+    pub line_height: f32,
+    /// Corner radius.
+    pub radius: f32,
+    /// Padding on each horizontal side.
+    pub pad_x: f32,
+    /// Spacing between icon and text, or box and label.
+    pub gap: f32,
+}
+
 impl MoonSize {
-    #[deprecated(note = "use `MoonSize::Xs`")]
-    pub const XSmall: Self = Self::Xs;
-    #[deprecated(note = "use `MoonSize::Sm`")]
-    pub const Small: Self = Self::Sm;
-    #[deprecated(note = "use `MoonSize::Md`")]
-    pub const Medium: Self = Self::Md;
-    #[deprecated(note = "use `MoonSize::Lg`")]
-    pub const Large: Self = Self::Lg;
+    /// Returns this tier's shared control metrics in unscaled design-reference pixels.
+    pub const fn control_metrics(self) -> MoonControlMetrics {
+        let (height, font_size, line_height, radius, pad_x, gap) = match self {
+            Self::Xs => (20., 12., 16., 4., 6., 4.),
+            Self::Sm => (24., 14., 20., 4., 8., 8.),
+            Self::Md => (32., 16., 24., 6., 12., 12.),
+            Self::Lg => (40., 18., 28., 8., 16., 12.),
+            Self::Xl => (48., 20., 28., 8., 20., 16.),
+            Self::Xxl => (56., 24., 32., 10., 24., 16.),
+        };
+        MoonControlMetrics {
+            height,
+            font_size,
+            line_height,
+            radius,
+            pad_x,
+            gap,
+        }
+    }
+
+    /// Returns the supported tier nearest to `self` by number of steps in the size scale.
+    ///
+    /// Equal distances resolve to the smaller tier. `supported` may be unordered or contain
+    /// duplicates; neither changes the result. Distance is ordinal, not measured in pixels.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `supported` is empty.
+    pub fn nearest(self, supported: &[MoonSize]) -> MoonSize {
+        supported
+            .iter()
+            .copied()
+            .min_by_key(|tier| ((self as u8).abs_diff(*tier as u8), *tier))
+            .expect("MoonSize::nearest requires at least one supported tier")
+    }
 }
 
 pub type Size = MoonSize;
@@ -255,3 +324,6 @@ pub enum ThemeMode {
 pub struct Theme {
     pub mode: ThemeMode,
 }
+
+#[cfg(test)]
+mod tests;

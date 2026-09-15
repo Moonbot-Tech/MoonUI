@@ -299,6 +299,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub const SUPPORTED: &'static [MoonSize] = &[MoonSize::Xs, MoonSize::Sm, MoonSize::Md, MoonSize::Lg];"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub enum MoonButtonSize"
     },
     {
@@ -324,6 +328,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn danger(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn density(cx: &App) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
@@ -407,6 +415,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn pill(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn primary(self) -> Self"
     },
     {
@@ -431,15 +443,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
-      "signature": "pub fn size(mut self, size: MoonButtonSize) -> Self"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn size(mut self, size: f32) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn size(mut self, size: impl Into<MoonButtonSize>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn small(self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn snapped(self) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
@@ -459,7 +475,11 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
-      "signature": "pub fn toolbar_compact(self) -> Self"
+      "signature": "pub fn tier(self) -> Option<MoonSize>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn tier_icon_size(tier: MoonSize) -> f32"
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
@@ -504,14 +524,6 @@
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub struct MoonButtonSegment"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
-      "signature": "pub const Compact: Self = Self::Tier(MoonSize::Sm);"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/checkbox.rs",
-      "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
     },
     {
       "file": "crates/moon-ui-components/src/moon/checkbox.rs",
@@ -712,6 +724,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/context_menu.rs",
       "signature": "pub fn position(mut self, position: Point<Pixels>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/context_menu.rs",
+      "signature": "pub fn size(mut self, size: impl Into<MoonMenuSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/context_menu.rs",
@@ -1567,6 +1583,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub enum MoonMenuItemKind"
     },
     {
@@ -1616,6 +1636,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn fitted_trigger_label( cx: &App, label: &str, size: MoonButtonSize, min_width: f32, max_width: f32, ) -> (SharedString, f32)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn from_theme(tokens: &MoonThemeTokens) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -1675,7 +1699,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
-      "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self"
+      "signature": "pub fn menu_size(mut self, size: impl Into<MoonMenuSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -1739,7 +1763,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
-      "signature": "pub fn size(mut self, size: MoonMenuSize) -> Self"
+      "signature": "pub fn size(mut self, size: impl Into<MoonMenuSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -1831,19 +1855,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
-      "signature": "pub const Large: Self = Self::Lg;"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/foundation.rs",
-      "signature": "pub const Medium: Self = Self::Md;"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/foundation.rs",
-      "signature": "pub const Small: Self = Self::Sm;"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/foundation.rs",
-      "signature": "pub const XSmall: Self = Self::Xs;"
+      "signature": "pub const fn control_metrics(self) -> MoonControlMetrics"
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
@@ -1871,6 +1883,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn nearest(self, supported: &[MoonSize]) -> MoonSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
       "signature": "pub fn selected_background(p: MoonPalette) -> Background"
     },
     {
@@ -1880,6 +1896,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
       "signature": "pub fn v_flex() -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub struct MoonControlMetrics"
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
@@ -2707,7 +2727,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleSize};"
+      "signature": "pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleMetrics, MoonToggleSize};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -3035,6 +3055,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/radio.rs",
+      "signature": "pub fn description(mut self, description: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/radio.rs",
       "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
     },
     {
@@ -3283,7 +3307,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/select.rs",
-      "signature": "pub fn menu_size(mut self, size: MoonMenuSize) -> Self"
+      "signature": "pub fn menu_size(mut self, size: impl Into<MoonMenuSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/select.rs",
@@ -4151,6 +4175,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/text.rs",
+      "signature": "pub fn rendered_metrics(mut self, metrics: MoonTextMetrics) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/text.rs",
       "signature": "pub fn style(mut self, style: MoonTextStyle) -> Self"
     },
     {
@@ -4347,6 +4375,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn set_tier(&mut self, tier: MoonSize)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn set_ui_scale(&mut self, ui_scale: f32)"
     },
     {
@@ -4355,11 +4387,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn tier(&self) -> MoonSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn ui(&self, value: f32) -> f32"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn with_font_delta(mut self, font_delta: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn with_tier(mut self, tier: MoonSize) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
@@ -4455,6 +4495,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub const SUPPORTED_TIERS: [MoonSize; 2] = [MoonSize::Sm, MoonSize::Md];"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub enum MoonToggleLabelSide"
     },
     {
@@ -4475,11 +4519,23 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub fn density_default(tokens: &MoonThemeTokens) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub fn description(mut self, description: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub fn label(mut self, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub fn label_color(mut self, color: u32) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
@@ -4499,7 +4555,11 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
-      "signature": "pub fn size(mut self, size: MoonToggleSize) -> Self"
+      "signature": "pub fn reference_metrics(self) -> MoonToggleMetrics"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub fn size(mut self, size: impl Into<MoonToggleSize>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
@@ -4508,6 +4568,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub struct MoonToggle"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub struct MoonToggleMetrics"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tokens.rs",

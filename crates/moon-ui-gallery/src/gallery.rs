@@ -490,7 +490,7 @@ impl Gallery {
         body
     }
 
-    /// Render the controls gallery with interactive button, input, and selector examples.
+    /// Render controls and badges, including all supported badge tiers and density defaults.
     ///
     /// Args:
     ///     cx: Gallery context used for theme lookup and interaction listeners.
@@ -577,27 +577,44 @@ impl Gallery {
                         h_flex()
                             .gap(px(8.0))
                             .child(
-                                MoonButton::new("btn-micro")
-                                    .label("Micro")
-                                    .size(MoonButtonSize::Micro)
+                                MoonButton::new("btn-xs")
+                                    .label("Xs")
+                                    .size(MoonSize::Xs)
                                     .render(),
                             )
                             .child(
-                                MoonButton::new("btn-action")
-                                    .label("Action")
-                                    .size(MoonButtonSize::Action)
-                                    .padding_x(7.0)
+                                MoonButton::new("btn-sm")
+                                    .label("Sm")
+                                    .size(MoonSize::Sm)
+                                    .render(),
+                            )
+                            .child(
+                                MoonButton::new("btn-md")
+                                    .label("Md")
+                                    .size(MoonSize::Md)
+                                    .render(),
+                            )
+                            .child(
+                                MoonButton::new("btn-lg")
+                                    .label("Lg")
+                                    .size(MoonSize::Lg)
                                     .render(),
                             )
                             .child(
                                 MoonButton::new("btn-pill")
                                     .label("Pill selected")
-                                    .size(MoonButtonSize::Pill)
+                                    .size(MoonSize::Md)
+                                    .pill()
                                     .variant(MoonButtonVariant::Panel)
                                     .selected(true)
                                     .trailing_icon(MoonButtonIconSlot::new(
                                         moon_ui::MOON_ICON_CHECK,
                                     ))
+                                    .render(),
+                            )
+                            .child(
+                                MoonButton::new("btn-density-default")
+                                    .label("Density default")
                                     .render(),
                             )
                             .child(
@@ -639,6 +656,11 @@ impl Gallery {
             )
             .child(
                 card("Badges / Checkbox / Segmented", cx)
+                    .children([moon_ui::MoonSize::Xs, moon_ui::MoonSize::Sm, moon_ui::MoonSize::Md].into_iter().map(|tier| {
+                        h_flex().gap(px(8.0)).children([MoonBadgeVariant::Soft, MoonBadgeVariant::Solid, MoonBadgeVariant::Outline].into_iter().map(move |variant| {
+                            MoonBadge::new(format!("{tier:?}")).size(tier.into()).variant(variant)
+                        }))
+                    }))
                     .child(
                         h_flex()
                             .gap(px(8.0))
@@ -666,7 +688,7 @@ impl Gallery {
                             .child(
                                 MoonBadge::new("")
                                     .icon(moon_ui::MOON_ICON_CHECK)
-                                    .size(MoonBadgeSize::Status)
+                                    .size(MoonBadgeSize::Tier(MoonSize::Sm))
                                     .render(),
                             ),
                     )
@@ -965,8 +987,16 @@ impl Gallery {
                                             .placeholder("Select market")
                                             .cleanable(true)
                                             .searchable(true)
-                                            .menu_width(220.0)
-                                            .menu_size(MoonMenuSize::Normal),
+                                            .menu_width(220.0),
+                                    )
+                                    .child(
+                                        MoonText::new(
+                                            "Select menu rows follow the trigger size, not a menu tier.",
+                                        )
+                                        .uppercase(false)
+                                        .mono(true)
+                                        .color(p.text_soft)
+                                        .render(),
                                     )
                                     .child(
                                         MoonSlider::new(&self.slider_state)
@@ -988,6 +1018,7 @@ impl Gallery {
     }
 
     fn render_menus(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let p = MoonPalette::active(cx);
         let view = cx.entity();
         section("Menus / Overlays", cx)
             .child(
@@ -1061,41 +1092,72 @@ impl Gallery {
                         .items_start()
                         .gap(px(14.0))
                         .child(
-                            MoonDropdown::new("gallery-dropdown")
-                                .label(format!("Scale {}", self.dropdown_value))
-                                .trigger_leading_icon(MoonButtonIconSlot::new(
-                                    moon_ui::MOON_ICON_CHECK,
+                            h_flex()
+                                .items_start()
+                                .gap(px(10.0))
+                                .child(labeled_example(
+                                    "Follows app density",
+                                    p,
+                                    MoonDropdown::new("gallery-dropdown")
+                                        .label(format!("Scale {}", self.dropdown_value))
+                                        .trigger_leading_icon(MoonButtonIconSlot::new(
+                                            moon_ui::MOON_ICON_CHECK,
+                                        ))
+                                        .trigger_caret(true)
+                                        .fit_trigger_width(100.0, 180.0)
+                                        .default_open(false)
+                                        .fit_menu_width(220.0, 560.0)
+                                        .items(gallery_dropdown_items(&self.dropdown_value))
+                                        .on_select(gallery_dropdown_on_select(view.clone())),
                                 ))
-                                .trigger_caret(true)
-                                .fit_trigger_width(100.0, 180.0)
-                                .default_open(false)
-                                .fit_menu_width(220.0, 560.0)
-                                .items([
-                                    MoonMenuItem::with_key("Auto", "Auto")
-                                        .selected(self.dropdown_value.as_ref() == "Auto"),
-                                    MoonMenuItem::with_key("50", "50%")
-                                        .selected(self.dropdown_value.as_ref() == "50"),
-                                    MoonMenuItem::with_key("20", "20%")
-                                        .checked(self.dropdown_value.as_ref() == "20"),
-                                    MoonMenuItem::separator(),
-                                    MoonMenuItem::new("Advanced").right_label(">").submenu([
-                                        MoonMenuItem::new("Bid view"),
-                                        MoonMenuItem::new("Ask view"),
-                                    ]),
-                                    MoonMenuItem::new(
-                                        "Only current market orders with a long translated label",
-                                    ),
-                                ])
-                                .on_select({
-                                    let view = view.clone();
-                                    move |key, _, app| {
-                                        let key = key.clone();
-                                        view.update(app, |this, cx| {
-                                            this.dropdown_value = key.clone();
-                                            this.push_event(format!("Dropdown: {key}"), cx);
-                                        });
-                                    }
-                                }),
+                                .child(labeled_example(
+                                    "Xs",
+                                    p,
+                                    MoonDropdown::new("gallery-dropdown-xs")
+                                        .label("Xs")
+                                        .trigger_leading_icon(MoonButtonIconSlot::new(
+                                            moon_ui::MOON_ICON_CHECK,
+                                        ))
+                                        .trigger_caret(true)
+                                        .fit_trigger_width(100.0, 180.0)
+                                        .default_open(false)
+                                        .fit_menu_width(220.0, 560.0)
+                                        .menu_size(MoonSize::Xs)
+                                        .items(gallery_dropdown_items(&self.dropdown_value))
+                                        .on_select(gallery_dropdown_on_select(view.clone())),
+                                ))
+                                .child(labeled_example(
+                                    "Sm",
+                                    p,
+                                    MoonDropdown::new("gallery-dropdown-sm")
+                                        .label("Sm")
+                                        .trigger_leading_icon(MoonButtonIconSlot::new(
+                                            moon_ui::MOON_ICON_CHECK,
+                                        ))
+                                        .trigger_caret(true)
+                                        .fit_trigger_width(100.0, 180.0)
+                                        .default_open(false)
+                                        .fit_menu_width(220.0, 560.0)
+                                        .menu_size(MoonSize::Sm)
+                                        .items(gallery_dropdown_items(&self.dropdown_value))
+                                        .on_select(gallery_dropdown_on_select(view.clone())),
+                                ))
+                                .child(labeled_example(
+                                    "Md",
+                                    p,
+                                    MoonDropdown::new("gallery-dropdown-md")
+                                        .label("Md")
+                                        .trigger_leading_icon(MoonButtonIconSlot::new(
+                                            moon_ui::MOON_ICON_CHECK,
+                                        ))
+                                        .trigger_caret(true)
+                                        .fit_trigger_width(100.0, 180.0)
+                                        .default_open(false)
+                                        .fit_menu_width(220.0, 560.0)
+                                        .menu_size(MoonSize::Md)
+                                        .items(gallery_dropdown_items(&self.dropdown_value))
+                                        .on_select(gallery_dropdown_on_select(view.clone())),
+                                )),
                         )
                         .child(
                             MoonPopover::new("gallery-popover")
@@ -1211,15 +1273,48 @@ impl Gallery {
                         ),
                 )
                 .child(
-                    MoonPopupMenu::new("gallery-popup-menu")
-                        .width(190.0)
-                        .max_height_ui(130.0)
-                        .items([
-                            MoonMenuItem::new("Popup menu"),
-                            MoonMenuItem::new("Checked").checked(true),
-                            MoonMenuItem::new("Danger").tone(MoonTone::Danger),
-                        ])
-                        .render(),
+                    h_flex()
+                        .items_start()
+                        .gap(px(10.0))
+                        .child(labeled_example(
+                            "Follows app density",
+                            p,
+                            MoonPopupMenu::new("gallery-popup-menu")
+                                .width(190.0)
+                                .max_height_ui(130.0)
+                                .items(gallery_popup_items())
+                                .render(),
+                        ))
+                        .child(labeled_example(
+                            "Xs",
+                            p,
+                            MoonPopupMenu::new("gallery-popup-menu-xs")
+                                .width(190.0)
+                                .max_height_ui(130.0)
+                                .size(MoonSize::Xs)
+                                .items(gallery_popup_items())
+                                .render(),
+                        ))
+                        .child(labeled_example(
+                            "Sm",
+                            p,
+                            MoonPopupMenu::new("gallery-popup-menu-sm")
+                                .width(190.0)
+                                .max_height_ui(130.0)
+                                .size(MoonSize::Sm)
+                                .items(gallery_popup_items())
+                                .render(),
+                        ))
+                        .child(labeled_example(
+                            "Md",
+                            p,
+                            MoonPopupMenu::new("gallery-popup-menu-md")
+                                .width(190.0)
+                                .max_height_ui(130.0)
+                                .size(MoonSize::Md)
+                                .items(gallery_popup_items())
+                                .render(),
+                        )),
                 ),
             )
     }
@@ -1495,6 +1590,7 @@ impl Gallery {
             )
     }
 
+    /// Render form primitives with explicit stepper tiers and an interactive density default.
     fn render_new_controls(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let view = cx.entity();
@@ -1664,11 +1760,36 @@ impl Gallery {
                                 MoonToggle::new("new-controls-toggle-compact")
                                     .checked(false)
                                     .label("compact")
-                                    .size(MoonToggleSize::Compact),
+                                    .size(MoonSize::Sm),
                             )
                             .child(MoonSpinner::new().tone(MoonTone::Info))
-                            .child(MoonKbd::new("Ctrl+K"))
+                            .child(MoonKbd::new("Xs").size(MoonSize::Xs.into()))
+                            .child(MoonKbd::new("Sm").size(MoonSize::Sm.into()))
+                            .child(MoonKbd::new("Md").size(MoonSize::Md.into()))
                             .child(MoonKbd::new("Esc").outline(true)),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(18.0))
+                            .items_start()
+                            .flex_wrap()
+                            .child(
+                                MoonToggle::new("new-controls-toggle-description-sm")
+                                    .label("Overlay hints")
+                                    .description("Show hints over the chart")
+                                    .size(MoonSize::Sm),
+                            )
+                            .child(
+                                MoonToggle::new("new-controls-toggle-description-md")
+                                    .label("Overlay hints")
+                                    .description("Show hints over the chart")
+                                    .default_checked(true)
+                                    .size(MoonSize::Md),
+                            )
+                            .child(
+                                MoonToggle::new("new-controls-toggle-density")
+                                    .label("density default"),
+                            ),
                     )
                     .child(
                         h_flex()
@@ -1740,7 +1861,9 @@ impl Gallery {
                             .flex_wrap()
                             .child(
                                 MoonRadio::new("new-controls-radio-fast")
-                                    .label("fast")
+                                    .label("fast (Sm)")
+                                    .size(MoonSize::Sm.into())
+                                    .description("Small radio with supporting text")
                                     .checked(self.new_radio_index == 0)
                                     .on_change({
                                         let view = view.clone();
@@ -1754,7 +1877,9 @@ impl Gallery {
                             )
                             .child(
                                 MoonRadio::new("new-controls-radio-balanced")
-                                    .label("balanced")
+                                    .label("balanced (Md)")
+                                    .size(MoonSize::Md.into())
+                                    .description("Medium radio with supporting text")
                                     .checked(self.new_radio_index == 1)
                                     .on_change({
                                         let view = view.clone();
@@ -1825,6 +1950,11 @@ impl Gallery {
                                                             .render(),
                                                         ),
                                                     )
+                                                    .children([moon_ui::MoonSize::Xs, moon_ui::MoonSize::Sm, moon_ui::MoonSize::Md].into_iter().map(|tier| {
+                                                        MoonStepper::new(format!("stepper-{tier:?}"))
+                                                            .size(tier.into())
+                                                            .value(42.0)
+                                                    }))
                                                     .child(
                                                         MoonFormRow::new(
                                                             "new-controls-form-row-stepper",
@@ -2494,7 +2624,7 @@ impl Gallery {
                                         } else {
                                             "strategy"
                                         })
-                                        .size(MoonBadgeSize::Tiny),
+                                        .size(MoonBadgeSize::Tier(MoonSize::Xs)),
                                     )
                             },
                         )),
@@ -3156,6 +3286,61 @@ impl Render for Gallery {
                     .child(self.render_event_log(cx)),
             )
     }
+}
+
+/// Caption plus control used by the menu-tier gallery row.
+///
+/// Args:
+///     label: Caption rendered above the control.
+///     p: Active palette for caption colour.
+///     child: The labelled control.
+///
+/// Returns:
+///     A column with the caption and the control.
+fn labeled_example(label: &str, p: MoonPalette, child: impl IntoElement) -> impl IntoElement {
+    v_flex()
+        .gap(px(4.0))
+        .child(
+            MoonText::new(label)
+                .uppercase(false)
+                .mono(true)
+                .color(p.text_soft)
+                .render(),
+        )
+        .child(child)
+}
+
+fn gallery_dropdown_items(selected: &SharedString) -> [MoonMenuItem; 6] {
+    [
+        MoonMenuItem::with_key("Auto", "Auto").selected(selected.as_ref() == "Auto"),
+        MoonMenuItem::with_key("50", "50%").selected(selected.as_ref() == "50"),
+        MoonMenuItem::with_key("20", "20%").checked(selected.as_ref() == "20"),
+        MoonMenuItem::separator(),
+        MoonMenuItem::new("Advanced")
+            .right_label(">")
+            .submenu([MoonMenuItem::new("Bid view"), MoonMenuItem::new("Ask view")]),
+        MoonMenuItem::new("Only current market orders with a long translated label"),
+    ]
+}
+
+fn gallery_dropdown_on_select(
+    view: Entity<Gallery>,
+) -> impl Fn(&SharedString, &mut Window, &mut App) + 'static {
+    move |key, _, app| {
+        let key = key.clone();
+        view.update(app, |this, cx| {
+            this.dropdown_value = key.clone();
+            this.push_event(format!("Dropdown: {key}"), cx);
+        });
+    }
+}
+
+fn gallery_popup_items() -> [MoonMenuItem; 3] {
+    [
+        MoonMenuItem::new("Popup menu"),
+        MoonMenuItem::new("Checked").checked(true),
+        MoonMenuItem::new("Danger").tone(MoonTone::Danger),
+    ]
 }
 
 fn section(title: &'static str, cx: &App) -> gpui::Div {

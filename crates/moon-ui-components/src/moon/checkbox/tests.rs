@@ -17,15 +17,6 @@ fn checkbox_tiers_resolve_to_nearest_supported_size() {
     assert_eq!(box_for(MoonSize::Xxl), crate::Size::Medium);
 }
 
-/// Catches the deprecated `Compact`/`Normal` aliases drifting from the tiers they replaced, which
-/// would silently resize checkboxes in apps that have not migrated yet.
-#[test]
-#[allow(deprecated)]
-fn deprecated_checkbox_sizes_keep_their_tiers() {
-    assert_eq!(MoonCheckboxSize::Compact, MoonSize::Sm.into());
-    assert_eq!(MoonCheckboxSize::Normal, MoonSize::Md.into());
-}
-
 /// Catches renaming `MoonSize` variants without a serde alias, which would fail to load sizes
 /// saved under the previous `XSmall`/`Small`/`Medium`/`Large` names.
 #[test]
@@ -37,5 +28,47 @@ fn moon_size_reads_previous_variant_names() {
         ("\"Large\"", MoonSize::Lg),
     ] {
         assert_eq!(serde_json::from_str::<MoonSize>(saved).unwrap(), tier);
+    }
+}
+
+/// Catches a fixed Md default, which renders compact and standard density rows too large.
+#[test]
+fn checkbox_default_follows_density_without_overriding_explicit_sizes() {
+    use super::MoonCheckbox;
+    use crate::moon::MoonThemeTokens;
+    let mut tokens = MoonThemeTokens::default();
+    for (tier, expected) in [
+        (MoonSize::Xs, crate::Size::Small),
+        (MoonSize::Sm, crate::Size::Small),
+        (MoonSize::Md, crate::Size::Medium),
+        (MoonSize::Lg, crate::Size::Medium),
+    ] {
+        tokens.scale.tier = tier;
+        assert_eq!(
+            size_for(MoonCheckbox::new("default").resolved_size(&tokens)),
+            expected
+        );
+        assert_eq!(
+            size_for(
+                MoonCheckbox::new("fixed")
+                    .size(MoonSize::Sm)
+                    .resolved_size(&tokens)
+            ),
+            crate::Size::Small
+        );
+        assert_eq!(
+            size_for(
+                MoonCheckbox::new("custom")
+                    .size(MoonCheckboxSize::Custom {
+                        box_size: 19.0,
+                        font_size: 12.0,
+                        line_height: 16.0,
+                        gap: 4.0,
+                        radius: 2.0,
+                    })
+                    .resolved_size(&tokens)
+            ),
+            crate::Size::Size(gpui::px(19.0))
+        );
     }
 }

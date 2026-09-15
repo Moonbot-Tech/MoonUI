@@ -7,7 +7,7 @@ use super::{
         MoonButton, MoonButtonIconSlot, MoonButtonSegment, MoonButtonSize, MoonButtonVariant,
         button_leading_icon_reservation, button_text_metrics,
     },
-    foundation::{MoonClickHandler, MoonSelectHandler, selected_background},
+    foundation::{MoonClickHandler, MoonSelectHandler, MoonSize, selected_background},
     icons::{MOON_ICON_CHECK, moon_icon},
     text::{MoonText, fit_text_with_suffix, measure_text_width},
     theme::{MoonTheme, MoonThemeTokens},
@@ -52,10 +52,10 @@ mod trigger;
 
 pub(crate) use layout::{MENU_CHECK_WIDTH, MenuMetrics, menu_row_metrics};
 use layout::{
-    MENU_GAP, MENU_PADDING, MENU_TRAILING_FONT_DELTA, MENU_TRAILING_WEIGHT, MoonMenuMaxHeight,
-    clamp_header_budget, fit_menu_item_label, menu_check_width, menu_content_max,
-    menu_level_is_virtualized, menu_outer_chrome, resolve_menu_outer_max, resolve_menu_width,
-    resolve_virtual_menu_width, unscaled_menu_metrics, virtual_menu_list_height,
+    MENU_GAP, MENU_PADDING, MENU_TRAILING_WEIGHT, MoonMenuMaxHeight, clamp_header_budget,
+    fit_menu_item_label, menu_check_width, menu_content_max, menu_level_is_virtualized,
+    menu_outer_chrome, resolve_menu_outer_max, resolve_menu_width, resolve_virtual_menu_width,
+    virtual_menu_list_height,
 };
 #[cfg(test)]
 use layout::{

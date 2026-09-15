@@ -5,7 +5,10 @@ use gpui::*;
 
 use super::{
     dropdown::{MoonMenuItem, MoonMenuLevel, MoonPopupMenu},
-    dropdown::{MoonMenuSize, MoonMenuWidth, menu_level_outer_height, resolve_menu_level_width},
+    dropdown::{
+        MoonMenuSize, MoonMenuWidth, menu_level_outer_height, menu_row_metrics,
+        resolve_menu_level_width,
+    },
     tokens::MoonRect,
 };
 
@@ -18,6 +21,7 @@ pub struct MoonContextMenu {
     items: MoonMenuLevel,
     open: bool,
     width: MoonMenuWidth,
+    size: Option<MoonMenuSize>,
     max_height: Option<f32>,
 }
 
@@ -32,6 +36,7 @@ pub struct MoonContextMenuOverlay {
     items: MoonMenuLevel,
     open: bool,
     width: MoonMenuWidth,
+    size: Option<MoonMenuSize>,
     max_height: Option<f32>,
     on_dismiss: Option<MoonContextDismissHandler>,
 }
@@ -140,6 +145,7 @@ impl MoonContextMenu {
             items: MoonMenuLevel::new([]),
             open: false,
             width: MoonMenuWidth::Rendered(180.0),
+            size: None,
             max_height: None,
         }
     }
@@ -237,6 +243,26 @@ impl MoonContextMenu {
         self
     }
 
+    /// Set the row-geometry size: a tier such as `MoonSize::Sm`, or a `MoonMenuSize::Custom`.
+    ///
+    /// An unset size follows the theme's density tier.
+    pub fn size(mut self, size: impl Into<MoonMenuSize>) -> Self {
+        self.size = Some(size.into());
+        self
+    }
+
+    /// Apply an already-selected size policy from the owning overlay.
+    ///
+    /// Args:
+    ///     size: Size policy retained by the overlay; `None` follows density.
+    ///
+    /// Returns:
+    ///     The updated positioned menu.
+    fn size_policy(mut self, size: Option<MoonMenuSize>) -> Self {
+        self.size = size;
+        self
+    }
+
     pub fn max_height(mut self, max_height: f32) -> Self {
         self.max_height = Some(max_height);
         self
@@ -259,6 +285,7 @@ impl MoonContextMenuOverlay {
             items: MoonMenuLevel::new([]),
             open: false,
             width: MoonMenuWidth::Rendered(180.0),
+            size: None,
             max_height: None,
             on_dismiss: None,
         }
@@ -342,6 +369,15 @@ impl MoonContextMenuOverlay {
             min: min_width,
             max: max_width,
         };
+        self
+    }
+
+    /// Set the row-geometry size: a tier such as `MoonSize::Sm`, or a `MoonMenuSize::Custom`.
+    ///
+    /// An unset size follows the theme's density tier. Overlays opened through
+    /// [`MoonContextMenuWindowExt`] leave this unset.
+    pub fn size(mut self, size: impl Into<MoonMenuSize>) -> Self {
+        self.size = Some(size.into());
         self
     }
 
@@ -503,17 +539,20 @@ impl RenderOnce for MoonContextMenu {
         let margin = 6.0;
         let rendered_max_width = (viewport_w - margin * 2.0).max(1.0);
         let tokens = super::MoonTheme::active_tokens(cx);
+        let size = self
+            .size
+            .unwrap_or_else(|| MoonMenuSize::from_theme(&tokens));
+        let metrics = menu_row_metrics(size, &tokens);
         let (width, _) = resolve_menu_level_width(
             self.width,
             &self.items,
-            MoonMenuSize::Normal,
+            metrics,
             &tokens,
             cx,
             true,
             Some(rendered_max_width),
         );
-        let menu_height =
-            menu_level_outer_height(&self.items, MoonMenuSize::Normal, &tokens, max_height);
+        let menu_height = menu_level_outer_height(&self.items, metrics, &tokens, max_height);
         let mut root = div()
             .id(ElementId::from(self.id.clone()))
             .absolute()
@@ -549,6 +588,7 @@ impl RenderOnce for MoonContextMenu {
                 MoonPopupMenu::new(format!("{}:popup", self.id))
                     .shared_level(self.items)
                     .width_policy(self.width)
+                    .size(size)
                     .rendered_max_width(rendered_max_width)
                     .max_height(max_height)
                     .render(),
@@ -666,7 +706,8 @@ impl RenderOnce for MoonContextMenuOverlay {
                 let menu = menu
                     .shared_items(self.items)
                     .open(true)
-                    .width_policy(self.width);
+                    .width_policy(self.width)
+                    .size_policy(self.size);
                 if let Some(max_height) = self.max_height {
                     menu.max_height(max_height)
                 } else {

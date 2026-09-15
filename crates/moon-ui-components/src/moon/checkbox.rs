@@ -1,3 +1,5 @@
+//! Checkbox facade with a density-selected default and explicit size overrides.
+
 use crate::checkbox::Checkbox;
 use crate::{Disableable, Sizable};
 use gpui::*;
@@ -22,14 +24,6 @@ pub enum MoonCheckboxSize {
     },
 }
 
-#[allow(non_upper_case_globals)]
-impl MoonCheckboxSize {
-    #[deprecated(note = "use `MoonSize::Sm`")]
-    pub const Compact: Self = Self::Tier(MoonSize::Sm);
-    #[deprecated(note = "use `MoonSize::Md`")]
-    pub const Normal: Self = Self::Tier(MoonSize::Md);
-}
-
 impl From<MoonSize> for MoonCheckboxSize {
     fn from(size: MoonSize) -> Self {
         Self::Tier(size)
@@ -41,6 +35,7 @@ struct MoonCheckboxState {
     checked: bool,
 }
 
+/// A controlled or retained checkbox with an optional density override.
 #[derive(IntoElement)]
 pub struct MoonCheckbox {
     id: SharedString,
@@ -51,13 +46,14 @@ pub struct MoonCheckbox {
     default_checked: bool,
     disabled: bool,
     indeterminate: bool,
-    size: MoonCheckboxSize,
+    size: Option<MoonCheckboxSize>,
     tone: MoonTone,
     mono: bool,
     on_change: Option<std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
 }
 
 impl MoonCheckbox {
+    /// Creates a checkbox whose omitted size follows the active density.
     pub fn new(id: impl Into<SharedString>) -> Self {
         Self {
             id: id.into(),
@@ -68,7 +64,7 @@ impl MoonCheckbox {
             default_checked: false,
             disabled: false,
             indeterminate: false,
-            size: MoonCheckboxSize::Tier(MoonSize::Md),
+            size: None,
             tone: MoonTone::Info,
             mono: false,
             on_change: None,
@@ -113,7 +109,7 @@ impl MoonCheckbox {
 
     /// Sets the size: a tier such as `MoonSize::Sm`, or a `MoonCheckboxSize::Custom`.
     pub fn size(mut self, size: impl Into<MoonCheckboxSize>) -> Self {
-        self.size = size.into();
+        self.size = Some(size.into());
         self
     }
 
@@ -131,10 +127,18 @@ impl MoonCheckbox {
         self.on_change = Some(std::rc::Rc::new(handler));
         self
     }
+    /// Resolves omitted size from density, preserving explicit Custom and tier overrides.
+    fn resolved_size(&self, tokens: &super::theme::MoonThemeTokens) -> MoonCheckboxSize {
+        self.size.unwrap_or_else(|| {
+            MoonCheckboxSize::Tier(tokens.tier().nearest(&[MoonSize::Sm, MoonSize::Md]))
+        })
+    }
 }
 
 impl RenderOnce for MoonCheckbox {
+    /// Renders the base checkbox using active density or explicit size.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let size = self.resolved_size(&MoonTheme::active_tokens(cx));
         let state_id = ElementId::from(self.id.clone());
         let state = window.use_keyed_state(state_id.clone(), cx, |_, _| MoonCheckboxState {
             checked: self.default_checked,
@@ -150,7 +154,7 @@ impl RenderOnce for MoonCheckbox {
             .disabled(self.disabled)
             .tone(self.tone)
             .mono(self.mono)
-            .with_size(size_for(self.size))
+            .with_size(size_for(size))
             .on_click(move |value, window, cx| {
                 if !controlled {
                     state_for_click.update(cx, |state, cx| {
@@ -181,7 +185,7 @@ impl RenderOnce for MoonCheckbox {
             font_size,
             line_height,
             ..
-        } = self.size
+        } = size
         {
             let tokens = MoonTheme::active_tokens(cx);
             checkbox = checkbox

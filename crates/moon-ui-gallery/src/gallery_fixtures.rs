@@ -99,7 +99,7 @@ pub(super) fn gallery_dock_panels() -> Vec<Rc<dyn PanelView>> {
             dock_panel("gallery-dock-log", "Log", MoonTone::Warning).tab_suffix(|_, _| {
                 MoonBadge::new("")
                     .count(7)
-                    .size(MoonBadgeSize::Tiny)
+                    .size(MoonBadgeSize::Tier(MoonSize::Xs))
                     .variant(MoonBadgeVariant::Solid)
                     .tone(MoonTone::Warning)
                     .render()

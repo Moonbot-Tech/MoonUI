@@ -3,14 +3,68 @@
 use super::{MoonKbd, MoonKbdSize};
 use gpui::Keystroke;
 
-/// Catches changing the compact or normal height in `kbd.rs:MoonKbd::metrics` away from the
-/// reviewed designer reference, which would make shortcut tags misalign with neighboring controls.
+/// Catches using pointer-target height or legacy font scaling, which enlarges shortcut chips.
 #[test]
 fn kbd_metrics_match_designer_reference() {
-    let compact = MoonKbd::new("Esc").size(MoonKbdSize::Compact);
-    assert_eq!(compact.metrics().height, 17.0);
-    let normal = MoonKbd::new("Ctrl+K");
-    assert_eq!(normal.metrics().height, 20.0);
+    use crate::moon::{MoonSize, MoonThemeTokens};
+    let mut tokens = MoonThemeTokens::default();
+    tokens.scale.ui = 1.5;
+    tokens.scale.font = 3.0;
+    tokens.scale.font_delta = 6.0;
+    for (tier, height, font, radius, pad) in [
+        (MoonSize::Xs, 24.0, 16.5, 4.0, 6.0),
+        (MoonSize::Sm, 30.0, 18.0, 4.0, 8.0),
+        (MoonSize::Md, 36.0, 21.0, 6.0, 12.0),
+        (MoonSize::Lg, 36.0, 21.0, 6.0, 12.0),
+        (MoonSize::Xl, 36.0, 21.0, 6.0, 12.0),
+        (MoonSize::Xxl, 36.0, 21.0, 6.0, 12.0),
+    ] {
+        let metrics = MoonKbd::new("Esc").size(tier.into()).metrics(&tokens);
+        assert_eq!(
+            (metrics.height, metrics.line_height, metrics.font_size),
+            (height, height, font)
+        );
+        assert_eq!((metrics.radius, metrics.pad_x), (radius, pad));
+        tokens.scale.tier = tier;
+        assert_eq!(MoonKbd::new("density").metrics(&tokens).height, height);
+    }
+}
+
+/// Catches ignoring explicit tiers or legacy Custom text scaling, resizing pinned shortcut chips.
+#[test]
+fn kbd_tiers_and_custom_scaling_survive() {
+    use crate::moon::{MoonSize, MoonThemeTokens};
+    let mut tokens = MoonThemeTokens::default();
+    tokens.scale.ui = 2.0;
+    tokens.scale.font = 3.0;
+    tokens.scale.font_delta = 6.0;
+    assert_eq!(
+        MoonKbd::new("Esc")
+            .size(MoonKbdSize::Tier(MoonSize::Xs))
+            .metrics(&tokens)
+            .height,
+        32.0
+    );
+    assert_eq!(
+        MoonKbd::new("Esc")
+            .size(MoonKbdSize::Tier(MoonSize::Sm))
+            .metrics(&tokens)
+            .height,
+        40.0
+    );
+    let metrics = MoonKbd::new("Esc")
+        .size(MoonKbdSize::Custom {
+            height: 20.0,
+            font_size: 10.0,
+            line_height: 12.0,
+            radius: 4.0,
+            pad_x: 6.0,
+        })
+        .metrics(&tokens);
+    assert_eq!(
+        (metrics.height, metrics.font_size, metrics.line_height),
+        (40.0, 36.0, 42.0)
+    );
 }
 
 /// Catches changing modifier ordering, separators, or special-key labels in
