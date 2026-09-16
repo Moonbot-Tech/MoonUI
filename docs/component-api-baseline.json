@@ -1927,6 +1927,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn moon_cubic_bezier(x1: f32, y1: f32, x2: f32, y2: f32) -> impl Fn(f32) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
+      "signature": "pub fn moon_shadow_sm(roles: MoonColors, tokens: &MoonThemeTokens) -> Vec<BoxShadow>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/foundation.rs",
       "signature": "pub fn nearest(self, supported: &[MoonSize]) -> MoonSize"
     },
     {
@@ -2579,7 +2587,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use foundation::{MoonSize, StyledExt, ThemeMode, h_flex, init, v_flex};"
+      "signature": "pub use foundation::{ MoonSize, StyledExt, ThemeMode, h_flex, init, moon_cubic_bezier, moon_shadow_sm, v_flex, };"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",

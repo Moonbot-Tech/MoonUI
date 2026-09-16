@@ -1,12 +1,15 @@
-//! Regression coverage for MoonToggle geometry, interaction, and light-theme colors.
+//! Regression coverage for MoonToggle geometry, interaction, and role-driven colours.
 
 use super::{
-    MoonToggle, MoonToggleLabelSide, MoonToggleSize, MoonToggleVariant, moon_toggle_click_plan,
-    toggle_colors,
+    MoonToggle, MoonToggleLabelSide, MoonToggleSize, MoonToggleVariant, THUMB_TRAVEL, ThumbTravel,
+    ToggleColors, moon_toggle_click_plan,
 };
-use crate::checkbox::MoonCheckboxMetrics;
+use crate::checkbox::{ChoiceColors, MoonCheckboxMetrics};
 use crate::moon::checkbox::tier_size;
-use crate::moon::{MoonPalette, MoonScale, MoonSize, MoonThemeConfig, MoonThemeTokens};
+use crate::moon::{
+    MoonColors, MoonPalette, MoonScale, MoonSize, MoonThemeConfig, MoonThemeTokens, MoonTone,
+    rgba_from,
+};
 use gpui::{px, size};
 
 /// Catches changing a tier's unscaled reference geometry in `MoonToggleSize::reference_metrics`
@@ -84,23 +87,80 @@ fn toggle_click_plan_respects_disabled_and_controlled_state() {
     assert!(!controlled.update_internal);
 }
 
-/// Catches replacing the light/off branch in `toggle.rs:toggle_colors` with generic text roles or
-/// dark-theme shadow strength, which would restore a harsh knob instead of the reviewed soft blue
-/// treatment.
+/// Catches a toggle drifting from the reviewed design, which reads its colours from the roles
+/// rather than the palette: an unchecked track is `bg_tertiary` behind a `border_secondary`
+/// outline; a checked one is `bg_brand_solid`, `bg_brand_solid_hover` under the pointer, and draws
+/// no outline at all; and the thumb is `fg_white` in both states. Restoring the old hard-coded
+/// light-theme blues, outlining a checked track, or painting the thumb from a text ink would each
+/// undo a reviewed decision. Every palette is paired with the other side's roles, so a colour read
+/// from the palette instead of the roles cannot pass by coinciding.
 #[test]
-fn light_toggle_uses_soft_knob_when_off() {
-    let p = MoonPalette::LIGHT;
-    let off = toggle_colors(p, p.accent, false);
-    assert_eq!(off.track, 0xEEF9FF);
-    assert_eq!(off.border, 0xC5DEEC);
-    assert_eq!(off.thumb, 0x6AA6C8);
-    assert_ne!(off.thumb, p.text);
-    assert_ne!(off.thumb, p.text_soft);
-    assert!(off.shadow_alpha < 0.20);
+fn toggle_colors_follow_the_colour_roles() {
+    for (p, roles) in [
+        (MoonPalette::TERMINAL, MoonColors::LIGHT),
+        (MoonPalette::LIGHT, MoonColors::DARK),
+    ] {
+        let off = ToggleColors::resolve(p, roles, None, false, false);
+        assert_eq!(off.track, roles.bg_tertiary.into());
+        assert_eq!(off.track_hover, off.track);
+        assert_eq!(off.border, roles.border_secondary.into());
+        assert_eq!(off.thumb, roles.fg_white.into());
 
-    let on = toggle_colors(p, p.accent, true);
-    assert_eq!(on.thumb, p.surface);
-    assert!(on.shadow_alpha < 0.20);
+        let on = ToggleColors::resolve(p, roles, None, true, false);
+        assert_eq!(on.track, roles.bg_brand_solid.into());
+        assert_eq!(on.track_hover, roles.bg_brand_solid_hover.into());
+        assert!(on.border.is_transparent());
+        assert_eq!(on.thumb, off.thumb);
+    }
+}
+
+/// Catches an explicit tone losing its hold on a checked track: `tone` must fill it with that tone
+/// instead of the brand colour, and keep that fill under the pointer, while an unchecked track and
+/// the thumb stay on the roles whatever the tone. A plausible future edit drops the tone when the
+/// brand fill lands, which silently repaints every toned toggle in the brand colour.
+#[test]
+fn an_explicit_tone_fills_a_checked_track_instead_of_the_brand() {
+    let p = MoonPalette::TERMINAL;
+    let roles = MoonColors::DARK;
+    let warning = rgba_from(MoonTone::Warning.color(p), 1.0);
+
+    let on = ToggleColors::resolve(p, roles, Some(MoonTone::Warning), true, false);
+    assert_eq!(on.track, warning);
+    assert_eq!(on.track_hover, warning);
+    assert!(on.border.is_transparent());
+    assert_eq!(on.thumb, roles.fg_white.into());
+
+    let off = ToggleColors::resolve(p, roles, Some(MoonTone::Warning), false, false);
+    assert_eq!(off.track, roles.bg_tertiary.into());
+    assert_eq!(off.border, roles.border_secondary.into());
+}
+
+/// Catches a disabled toggle fading colour by colour again: the track keeps the colours it paints
+/// when enabled and dims to 50% as one piece, outline and thumb with it, so the thumb never fades
+/// into the track at a different rate. Its label and supporting text are not part of that dimming
+/// — they carry the choice roles' own disabled colours, as a checkbox's do.
+#[test]
+fn a_disabled_toggle_dims_as_one_piece_while_its_text_dims_on_its_own() {
+    let p = MoonPalette::TERMINAL;
+    let roles = MoonColors::DARK;
+
+    for checked in [false, true] {
+        let enabled = ToggleColors::resolve(p, roles, None, checked, false);
+        let disabled = ToggleColors::resolve(p, roles, None, checked, true);
+
+        assert_eq!(enabled.track_opacity, 1.0);
+        assert_eq!(disabled.track_opacity, 0.5);
+        assert_eq!(disabled.track, enabled.track);
+        assert_eq!(disabled.border, enabled.border);
+        assert_eq!(disabled.thumb, enabled.thumb);
+
+        // The text comes from the shared choice colours, which dim it on their own.
+        let text = ChoiceColors::resolve(p, roles, None, checked, true);
+        assert_ne!(
+            text.label,
+            ChoiceColors::resolve(p, roles, None, checked, false).label
+        );
+    }
 }
 
 /// Breakage 1 (band B) -- `MoonToggleSize::resolve` / `MoonToggleMetrics::zoomed`: a Tier's font
@@ -451,4 +511,104 @@ fn slim_variant_draws_as_the_default_toggle_until_its_design_lands() {
             "{tier:?}"
         );
     }
+}
+
+/// Catches the thumb's travel state losing a case that only shows up in motion: a toggle rendered
+/// already checked must show its thumb at that end rather than sliding in from the other; a change
+/// must start a travel; the travel must survive the renders that happen while it runs, or the
+/// animation is cut off after one frame and the thumb jumps; and a change mid-flight must turn the
+/// thumb around from the end it was heading for instead of restarting from where it began.
+#[test]
+fn thumb_travel_starts_survives_and_turns_around() {
+    assert_eq!(ThumbTravel::initial(true), ThumbTravel::Resting(true));
+    assert_eq!(ThumbTravel::initial(false).from(), None);
+
+    let resting = ThumbTravel::Resting(false);
+    assert_eq!(resting.next(false), resting);
+
+    let travelling = resting.next(true);
+    assert_eq!(
+        travelling,
+        ThumbTravel::Travelling {
+            from: false,
+            to: true
+        }
+    );
+    assert_eq!(travelling.from(), Some(false));
+    // Re-rendering mid-travel must not restart or end it.
+    assert_eq!(travelling.next(true), travelling);
+
+    assert_eq!(
+        travelling.next(false),
+        ThumbTravel::Travelling {
+            from: true,
+            to: false
+        }
+    );
+}
+
+struct TravellingToggleHarness {
+    checked: bool,
+}
+
+impl gpui::Render for TravellingToggleHarness {
+    fn render(
+        &mut self,
+        _: &mut gpui::Window,
+        _: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::ParentElement as _;
+
+        gpui::div().child(
+            MoonToggle::new("travelling")
+                .size(MoonSize::Md)
+                .checked(self.checked),
+        )
+    }
+}
+
+/// Catches the thumb teleporting between ends: when a rendered toggle is switched on, the thumb
+/// must still be at the unchecked end on the first frame and arrive at the checked end only after
+/// the travel's 200ms, so the movement is the animation rather than a jump. A toggle that is
+/// switched off again must travel back the same way.
+#[gpui::test]
+fn the_thumb_slides_between_ends_over_the_travel_duration(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let window = cx.add_window(|_, _| TravellingToggleHarness { checked: false });
+    let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+    cx.run_until_parked();
+
+    let track = cx.debug_bounds("travelling:track").expect("track renders");
+    let resting_off = cx.debug_bounds("travelling:thumb").expect("thumb renders");
+    assert_eq!(resting_off.left() - track.left(), px(2.));
+
+    window
+        .update(&mut cx, |view, _, cx| {
+            view.checked = true;
+            cx.notify();
+        })
+        .expect("window stays open");
+    cx.run_until_parked();
+
+    let started = cx.debug_bounds("travelling:thumb").expect("thumb renders");
+    assert_eq!(
+        started.left(),
+        resting_off.left(),
+        "the thumb must start its travel at the end it is leaving"
+    );
+
+    // GPUI animations read the wall clock rather than the test clock, so the travel is waited out
+    // and then a repaint is forced to draw the frame that lands the thumb.
+    std::thread::sleep(THUMB_TRAVEL + std::time::Duration::from_millis(50));
+    window
+        .update(&mut cx, |_, _, cx| cx.notify())
+        .expect("window stays open");
+    cx.run_until_parked();
+
+    let arrived = cx.debug_bounds("travelling:thumb").expect("thumb renders");
+    assert_eq!(
+        track.right() - arrived.right(),
+        px(2.),
+        "the thumb must reach the checked end once the travel is over"
+    );
 }

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
@@ -5,7 +7,7 @@ use crate::checkbox::{ChoiceColors, MoonCheckboxMetrics, choice_text_column};
 
 use super::{
     colors::MoonColors,
-    foundation::{MoonSize, box_shadow},
+    foundation::{MoonSize, moon_cubic_bezier, moon_shadow_sm},
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
@@ -204,9 +206,60 @@ impl MoonToggleMetrics {
     }
 }
 
+/// How long the thumb takes to travel from one end of the track to the other.
+const THUMB_TRAVEL: Duration = Duration::from_millis(150);
+
+/// The curve the thumb travels on: out of the old end quickly, easing into the new one.
+const THUMB_TRAVEL_CURVE: [f32; 4] = [0.4, 0.0, 0.2, 1.0];
+
 #[derive(Default)]
 struct MoonToggleState {
     checked: bool,
+}
+
+/// Where a toggle's thumb is drawn, and whether it is on its way there.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ThumbTravel {
+    /// Resting at one end, drawn there with no animation. A toggle first rendered checked shows
+    /// its thumb at the checked end at once, rather than sliding in from the other.
+    Resting(bool),
+    /// Travelling to `to` after the toggle changed, having started from `from`.
+    Travelling { from: bool, to: bool },
+}
+
+impl ThumbTravel {
+    /// Returns the state of a toggle first rendered at `checked`.
+    fn initial(checked: bool) -> Self {
+        Self::Resting(checked)
+    }
+
+    /// Returns the state after a render at `checked`.
+    ///
+    /// A toggle that changes starts travelling; one that changes again mid-flight turns around
+    /// from the end it was heading for. A travelling thumb keeps that state once it arrives, so
+    /// the animation runs to the end instead of being cut off by the next render.
+    fn next(self, checked: bool) -> Self {
+        match self {
+            Self::Resting(at) if at == checked => self,
+            Self::Resting(at) => Self::Travelling {
+                from: at,
+                to: checked,
+            },
+            Self::Travelling { to, .. } if to == checked => self,
+            Self::Travelling { to, .. } => Self::Travelling {
+                from: to,
+                to: checked,
+            },
+        }
+    }
+
+    /// The end the thumb is travelling from, or `None` when it is at rest.
+    fn from(self) -> Option<bool> {
+        match self {
+            Self::Resting(_) => None,
+            Self::Travelling { from, .. } => Some(from),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -242,7 +295,7 @@ pub struct MoonToggle {
     default_checked: bool,
     disabled: bool,
     size: Option<MoonToggleSize>,
-    tone: MoonTone,
+    tone: Option<MoonTone>,
     mono: bool,
     label_color: Option<u32>,
     on_change: Option<std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
@@ -261,7 +314,7 @@ impl MoonToggle {
             default_checked: false,
             disabled: false,
             size: None,
-            tone: MoonTone::Info,
+            tone: None,
             mono: false,
             label_color: None,
             on_change: None,
@@ -322,8 +375,10 @@ impl MoonToggle {
         self
     }
 
+    /// Fills a checked track with `tone` instead of the brand colour. The tone has no hover
+    /// colour of its own, so a toned track keeps its fill under the pointer.
     pub fn tone(mut self, tone: MoonTone) -> Self {
-        self.tone = tone;
+        self.tone = Some(tone);
         self
     }
 
@@ -351,13 +406,15 @@ impl RenderOnce for MoonToggle {
             .unwrap_or_else(|| MoonToggleSize::density_default(&tokens));
         let m = self.variant.metrics(size.resolve(&tokens));
         let choice = m.choice();
-        let border = tokens.ui(1.0);
+        // The outline is a hairline drawn inside the track, so it never adds to the track's size.
+        let border = tokens.ui(0.5);
         let inset = -(m.focus_ring_distance + border);
         let p = tokens.palette;
         let checked = self.checked.unwrap_or_else(|| state.read(cx).checked);
         let disabled = self.disabled;
-        let accent = self.tone.color(p);
-        let control_alpha = if disabled { 0.45 } else { 1.0 };
+        // The focus ring keeps the tone accent it has always drawn, Info where no tone is set,
+        // until the ring has a colour of its own in the design.
+        let ring_accent = self.tone.unwrap_or(MoonTone::Info).color(p);
         let parent_view = window.current_view();
         let track_width = m.track_width;
         let track_height = m.track_height;
@@ -365,14 +422,18 @@ impl RenderOnce for MoonToggle {
         // Insets start inside the track's border, so taking it back off leaves the thumb the same
         // distance from the track's outer edge on every side.
         let thumb_inset = (track_height - thumb_size) * 0.5 - border;
-        let thumb_left = if checked {
-            track_width - thumb_size - thumb_inset - 2.0 * border
-        } else {
-            thumb_inset
+        let thumb_left_at = |checked: bool| {
+            if checked {
+                track_width - thumb_size - thumb_inset - 2.0 * border
+            } else {
+                thumb_inset
+            }
         };
-        let colors = toggle_colors(p, accent, checked);
+        let thumb_left = thumb_left_at(checked);
+        let roles = MoonColors::active(cx);
+        let colors = ToggleColors::resolve(p, roles, self.tone, checked, disabled);
         // The label and supporting text take the checkbox's and radio's text colours.
-        let text_colors = ChoiceColors::resolve(p, MoonColors::active(cx), None, checked, disabled);
+        let text_colors = ChoiceColors::resolve(p, roles, None, checked, disabled);
         let focus_handle = window
             .use_keyed_state(
                 ElementId::from(SharedString::from(format!("{}:focus", self.id))),
@@ -389,12 +450,59 @@ impl RenderOnce for MoonToggle {
         let track_selector = format!("{}:track", self.id);
         let thumb_selector = format!("{}:thumb", self.id);
         let focus_ring_selector = format!("{}:focus-ring", self.id);
+        // The whole row is the hit area, so the track takes its hover fill from a pointer anywhere
+        // on the row, its label included, rather than only over the track itself.
+        let hover_group = SharedString::from(format!("{}:row", self.id));
+        let track_hover = colors.track_hover;
         // Empty text counts as no text, so a bare toggle never gains the text column and its gap.
         let label = self.label.filter(|label| !label.is_empty());
         let description = self
             .description
             .filter(|description| !description.is_empty());
         let has_text = label.is_some() || description.is_some();
+
+        // A thumb that has just changed ends slides between them; one that has not is drawn where
+        // it belongs. The travel state keeps the animation alive until the thumb arrives, and the
+        // element id carries the end it is heading for, so changing again turns it around instead
+        // of continuing the old slide.
+        let travel = window.use_keyed_state(
+            ElementId::from(SharedString::from(format!("{}:travel", self.id))),
+            cx,
+            |_, _| ThumbTravel::initial(checked),
+        );
+        let previous = *travel.read(cx);
+        let current = previous.next(checked);
+        if current != previous {
+            travel.update(cx, |travel, _| *travel = current);
+        }
+        let thumb = div()
+            .debug_selector(|| thumb_selector)
+            .absolute()
+            .left(px(thumb_left))
+            .top(px(thumb_inset))
+            .w(px(thumb_size))
+            .h(px(thumb_size))
+            .rounded(px(thumb_size * 0.5))
+            .bg(colors.thumb)
+            .shadow(moon_shadow_sm(roles, &tokens));
+        let thumb = match current.from() {
+            None => thumb.into_any_element(),
+            Some(from) => {
+                let from_left = thumb_left_at(from);
+                let travelled = thumb_left - from_left;
+                let [x1, y1, x2, y2] = THUMB_TRAVEL_CURVE;
+                thumb
+                    .with_animation(
+                        ElementId::from(SharedString::from(format!(
+                            "{}:travel:{checked}",
+                            self.id
+                        ))),
+                        Animation::new(THUMB_TRAVEL).with_easing(moon_cubic_bezier(x1, y1, x2, y2)),
+                        move |thumb, delta| thumb.left(px(from_left + travelled * delta)),
+                    )
+                    .into_any_element()
+            }
+        };
 
         let switch = div()
             .relative()
@@ -405,25 +513,27 @@ impl RenderOnce for MoonToggle {
             .h(px(track_height))
             .rounded(px(track_height * 0.5))
             .border(px(border))
-            .border_color(rgba_from(colors.border, 0.72 * control_alpha))
-            .bg(rgba_from(colors.track, colors.track_alpha * control_alpha))
+            .border_color(colors.border)
+            .bg(colors.track)
+            // A disabled toggle dims as one piece, its outline and thumb with it; the label and
+            // supporting text dim through their own colours instead.
+            .opacity(colors.track_opacity)
+            .when(!disabled, |this| {
+                this.group_hover(hover_group.clone(), move |this| this.bg(track_hover))
+            })
+            // The thumb rides in a well the size of the track's inside, which clips it and its
+            // shadow to the track. The well is its own layer rather than a clip on the track,
+            // because the focus ring hangs outside the track and must not be clipped with it.
             .child(
                 div()
-                    .debug_selector(|| thumb_selector)
                     .absolute()
-                    .left(px(thumb_left))
-                    .top(px(thumb_inset))
-                    .w(px(thumb_size))
-                    .h(px(thumb_size))
-                    .rounded(px(thumb_size * 0.5))
-                    .bg(rgba_from(colors.thumb, control_alpha))
-                    .shadow(vec![box_shadow(
-                        px(0.0),
-                        px(tokens.ui(1.0)),
-                        px(tokens.ui(4.0)),
-                        px(0.0),
-                        rgba_from(p.shadow, colors.shadow_alpha * control_alpha),
-                    )]),
+                    .top_0()
+                    .left_0()
+                    .right_0()
+                    .bottom_0()
+                    .rounded(px(track_height * 0.5 - border))
+                    .overflow_hidden()
+                    .child(thumb),
             )
             .when(is_focused, |this| {
                 this.child(
@@ -435,7 +545,7 @@ impl RenderOnce for MoonToggle {
                         .right(px(inset))
                         .bottom(px(inset))
                         .border(px(m.focus_ring_width))
-                        .border_color(rgba_from(accent, 1.0))
+                        .border_color(rgba_from(ring_accent, 1.0))
                         .rounded(px(m.track_height * 0.5 + m.focus_ring_distance + border)),
                 )
             });
@@ -459,6 +569,7 @@ impl RenderOnce for MoonToggle {
                 "{}:root",
                 self.id
             ))))
+            .group(hover_group.clone())
             .relative()
             .flex()
             .items_center()
@@ -522,41 +633,83 @@ impl RenderOnce for MoonToggle {
     }
 }
 
+/// The colours a toggle's track and thumb paint with.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct ToggleColors {
-    track: u32,
-    track_alpha: f32,
-    border: u32,
-    thumb: u32,
-    shadow_alpha: f32,
+    track: Hsla,
+    /// The track under the pointer. Equal to `track` where the state has no hover colour of its
+    /// own, which leaves the track unchanged on hover.
+    track_hover: Hsla,
+    border: Hsla,
+    thumb: Hsla,
+    /// Opacity of the track together with its outline, thumb and shadow. The label and supporting
+    /// text dim through their own colours instead.
+    track_opacity: f32,
 }
 
-fn toggle_colors(p: MoonPalette, accent: u32, checked: bool) -> ToggleColors {
-    if p.is_light() {
-        if checked {
-            ToggleColors {
-                track: accent,
-                track_alpha: 0.58,
-                border: accent,
-                thumb: p.surface,
-                shadow_alpha: 0.14,
+impl ToggleColors {
+    /// Opacity of a disabled toggle's track, applied to the track as a whole rather than to each
+    /// colour, which is what a disabled checkbox does to its box.
+    const DISABLED_TRACK_OPACITY: f32 = 0.5;
+
+    /// Resolves a toggle's colours from the theme's colour roles.
+    ///
+    /// An unchecked toggle is a `bg_tertiary` track behind a `border_secondary` outline. A checked
+    /// one is filled with `bg_brand_solid`, `bg_brand_solid_hover` under the pointer, and draws no
+    /// outline at all. An explicit tone replaces the brand fill with that tone, which has no hover
+    /// colour of its own.
+    ///
+    /// The thumb is `fg_white` in both states, which is white on every bundled theme. A disabled
+    /// toggle paints the same colours and dims the track, its outline and its thumb as one piece,
+    /// exactly as a disabled checkbox dims its box.
+    ///
+    /// Args:
+    ///     p: The active palette, for a tone's fill and the thumb's shadow.
+    ///     roles: The active colour roles, normally `MoonColors::active`.
+    ///     tone: The tone set on the toggle, or `None` for the brand fill.
+    ///     checked: Whether the toggle is on.
+    ///     disabled: Whether the toggle is disabled.
+    ///
+    /// Returns:
+    ///     The colours to paint the track, its outline and the thumb with, and the opacity to
+    ///     paint them at.
+    fn resolve(
+        p: MoonPalette,
+        roles: MoonColors,
+        tone: Option<MoonTone>,
+        checked: bool,
+        disabled: bool,
+    ) -> Self {
+        let (checked_track, checked_track_hover) = match tone {
+            Some(tone) => {
+                let tone = rgba_from(tone.color(p), 1.0);
+                (tone, tone)
             }
-        } else {
-            ToggleColors {
-                track: 0xEEF9FF,
-                track_alpha: 1.0,
-                border: 0xC5DEEC,
-                thumb: 0x6AA6C8,
-                shadow_alpha: 0.12,
-            }
-        }
-    } else {
-        ToggleColors {
-            track: if checked { accent } else { p.panel },
-            track_alpha: if checked { 0.55 } else { 1.0 },
-            border: if checked { accent } else { p.border },
-            thumb: if checked { p.text } else { p.text_soft },
-            shadow_alpha: 0.38,
+            None => (
+                roles.bg_brand_solid.into(),
+                roles.bg_brand_solid_hover.into(),
+            ),
+        };
+        let unchecked = roles.bg_tertiary.into();
+        Self {
+            track: if checked { checked_track } else { unchecked },
+            track_hover: if checked {
+                checked_track_hover
+            } else {
+                unchecked
+            },
+            // A checked track is the brand fill alone; only an unchecked one is outlined.
+            border: if checked {
+                transparent_black()
+            } else {
+                roles.border_secondary.into()
+            },
+            thumb: roles.fg_white.into(),
+            track_opacity: if disabled {
+                Self::DISABLED_TRACK_OPACITY
+            } else {
+                1.0
+            },
         }
     }
 }

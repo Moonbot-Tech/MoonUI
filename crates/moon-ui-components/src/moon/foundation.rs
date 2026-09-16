@@ -8,6 +8,7 @@ use gpui::{
 use serde::{Deserialize, Serialize};
 
 use super::{
+    colors::MoonColors,
     theme::MoonThemeTokens,
     tokens::{MoonPalette, rgba_from},
 };
@@ -36,6 +37,101 @@ pub fn box_shadow(
         spread_radius: spread.into(),
         inset: false,
         color,
+    }
+}
+
+/// The design's `sm` shadow: the two layers that together read as one soft drop shadow under a
+/// small control, such as a toggle's thumb.
+///
+/// The first layer is `shadow_sm_01`, 1px down with a 3px blur; the second is `shadow_sm_02`, 1px
+/// down with a 2px blur pulled in by 1px, so it sits tighter under the element than the first.
+/// Every length follows the UI zoom, so the shadow grows with the control it sits under. A legacy
+/// palette leaves the second layer transparent, which keeps its single-layer look.
+///
+/// Args:
+///     roles: The active colour roles, normally [`MoonColors::active`].
+///     tokens: The active theme tokens, for the UI zoom.
+///
+/// Returns:
+///     Both layers in the order the design lists them, ready for `Styled::shadow`.
+pub fn moon_shadow_sm(roles: MoonColors, tokens: &MoonThemeTokens) -> Vec<BoxShadow> {
+    let ui = |value: f32| px(tokens.ui(value));
+    vec![
+        box_shadow(
+            px(0.0),
+            ui(1.0),
+            ui(3.0),
+            px(0.0),
+            roles.shadow_sm_01.into(),
+        ),
+        box_shadow(
+            px(0.0),
+            ui(1.0),
+            ui(2.0),
+            ui(-1.0),
+            roles.shadow_sm_02.into(),
+        ),
+    ]
+}
+
+/// A CSS `cubic-bezier(x1, y1, x2, y2)` timing function, as an easing for an `Animation`.
+///
+/// The curve runs from `(0, 0)` to `(1, 1)` through the two control points, so the same numbers a
+/// design tool shows describe the same motion here. The returned easing maps elapsed time to
+/// progress: it solves the curve's x for the time it is given, then reads that point's y.
+///
+/// Args:
+///     x1: The first control point's time.
+///     y1: The first control point's progress.
+///     x2: The second control point's time.
+///     y2: The second control point's progress.
+///
+/// Returns:
+///     The easing, which maps a `0.0..=1.0` time to a progress that starts at 0 and ends at 1.
+pub fn moon_cubic_bezier(x1: f32, y1: f32, x2: f32, y2: f32) -> impl Fn(f32) -> f32 {
+    // Polynomial coefficients of the curve with its ends pinned to (0, 0) and (1, 1).
+    let cx = 3.0 * x1;
+    let bx = 3.0 * (x2 - x1) - cx;
+    let ax = 1.0 - cx - bx;
+    let cy = 3.0 * y1;
+    let by = 3.0 * (y2 - y1) - cy;
+    let ay = 1.0 - cy - by;
+
+    let sample_x = move |s: f32| ((ax * s + bx) * s + cx) * s;
+    let sample_y = move |s: f32| ((ay * s + by) * s + cy) * s;
+    let slope_x = move |s: f32| (3.0 * ax * s + 2.0 * bx) * s + cx;
+
+    move |delta: f32| {
+        let time = delta.clamp(0.0, 1.0);
+        // Newton-Raphson converges in a few steps for the curves a timing function allows.
+        let mut s = time;
+        for _ in 0..8 {
+            let error = sample_x(s) - time;
+            if error.abs() < 1e-6 {
+                return sample_y(s).clamp(0.0, 1.0);
+            }
+            let slope = slope_x(s);
+            if slope.abs() < 1e-6 {
+                break;
+            }
+            s -= error / slope;
+        }
+        // A curve too flat for Newton-Raphson falls back to bisection, which always converges.
+        let (mut low, mut high) = (0.0_f32, 1.0_f32);
+        let mut s = time.clamp(low, high);
+        for _ in 0..32 {
+            let x = sample_x(s);
+            if (x - time).abs() < 1e-6 {
+                break;
+            }
+            if x < time {
+                low = s;
+            } else {
+                high = s;
+            }
+            s = (low + high) * 0.5;
+        }
+        sample_y(s).clamp(0.0, 1.0)
     }
 }
 
