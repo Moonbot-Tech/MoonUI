@@ -1,5 +1,7 @@
 //! Dropdown trigger fitting, builder state, and anchored-popup composition.
 
+use gpui::prelude::FluentBuilder as _;
+
 use super::*;
 
 /// Resolve and, when necessary, truncate one plain dropdown trigger label.
@@ -84,6 +86,7 @@ pub struct MoonDropdown {
     trigger_leading_icon: Option<MoonButtonIconSlot>,
     trigger_width: MoonDropdownTriggerWidth,
     trigger_caret: bool,
+    trigger_tooltip: Option<SharedString>,
     selected: bool,
     disabled: bool,
     default_open: bool,
@@ -121,6 +124,7 @@ impl MoonDropdown {
             trigger_leading_icon: None,
             trigger_width: MoonDropdownTriggerWidth::Intrinsic,
             trigger_caret: false,
+            trigger_tooltip: None,
             selected: false,
             disabled: false,
             default_open: false,
@@ -271,6 +275,12 @@ impl MoonDropdown {
     ///     The updated dropdown.
     pub fn trigger_caret(mut self, visible: bool) -> Self {
         self.trigger_caret = visible;
+        self
+    }
+
+    /// Tooltip for the dropdown's trigger button.
+    pub fn trigger_tooltip(mut self, tooltip: impl Into<SharedString>) -> Self {
+        self.trigger_tooltip = Some(tooltip.into());
         self
     }
 
@@ -558,6 +568,7 @@ impl MoonDropdown {
             }
         }
 
+        trigger = trigger.when_some(self.trigger_tooltip.clone(), |b, t| b.tooltip(t));
         trigger.render()
     }
 }

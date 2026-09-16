@@ -7,7 +7,10 @@ use gpui::{
     StatefulInteractiveElement as _, Styled as _, WeakEntity, Window, div, px,
 };
 
-use super::{DockEvent, DockTabDrag, MoonTabPanelRuntimeState, TabPanel, tab_interaction_policy};
+use super::{
+    DockEvent, DockPanelControlTooltips, DockTabDrag, MoonTabPanelRuntimeState, TabPanel,
+    close_control_shown, tab_interaction_policy,
+};
 use crate::{
     event::InteractiveElementExt as _,
     moon::{
@@ -16,10 +19,43 @@ use crate::{
         button::{MoonButton, MoonButtonSize, MoonButtonVariant},
         h_flex,
         text::MoonText,
-        theme::MoonTheme,
+        theme::{MoonTheme, MoonThemeTokens},
         tokens::{MoonPalette, rgba_from},
     },
 };
+
+/// Height of a dock tab header at the active token scale.
+///
+/// Args:
+///     tokens: Active theme tokens.
+///
+/// Returns:
+///     The fitted header height used by both the tab strip and the split-drop inset.
+pub(super) fn tab_header_height(tokens: &MoonThemeTokens) -> f32 {
+    tokens.fit_height(29.0, 13.0, 8.0)
+}
+
+/// Glyph and matching host tooltip for the dock zoom control.
+///
+/// One function owns both so a restore label cannot sit on the maximize glyph.
+///
+/// Args:
+///     zoomed: Whether this panel currently fills the dock.
+///     tooltips: Host-supplied control labels; fields stay `None` when unset.
+///
+/// Returns:
+///     The restore glyph (`U+25A1`) with `zoom_out` while zoomed, otherwise the maximize glyph
+///     (`U+25A3`) with `zoom_in`.
+pub(super) fn zoom_control(
+    zoomed: bool,
+    tooltips: &DockPanelControlTooltips,
+) -> (&'static str, Option<SharedString>) {
+    if zoomed {
+        ("\u{25A1}", tooltips.zoom_out.clone())
+    } else {
+        ("\u{25A3}", tooltips.zoom_in.clone())
+    }
+}
 
 impl RenderOnce for TabPanel {
     /// Render the tab group and synchronize edge-triggered panel activation notifications.
@@ -99,7 +135,7 @@ impl RenderOnce for TabPanel {
                     "{}:header",
                     self.id
                 ))))
-                .h(px(tokens.fit_height(29.0, 13.0, 8.0)))
+                .h(px(tab_header_height(&tokens)))
                 .flex()
                 .flex_none()
                 .items_center()
@@ -370,6 +406,10 @@ impl RenderOnce for TabPanel {
                         .trigger_caret(false)
                         .trigger_variant(MoonButtonVariant::Ghost)
                         .trigger_size(MoonButtonSize::Tier(MoonSize::Xs))
+                        .when_some(
+                            self.panel_control_tooltips.overflow.clone(),
+                            |this, tooltip| this.trigger_tooltip(tooltip),
+                        )
                         .items(overflow_items),
                 ),
             );
@@ -385,6 +425,12 @@ impl RenderOnce for TabPanel {
                 }
                 if self.show_panel_controls {
                     let panel_name = panel.panel_name(cx);
+                    // Same membership the tab loop feeds `tab_interaction_policy`, so a pinned
+                    // tab cannot be undraggable and still show a dead close control.
+                    let pinned = self
+                        .pinned_leading_panels
+                        .iter()
+                        .any(|name| name.as_ref() == panel_name.as_ref());
                     if self.layout_editable && self.detach_allowed && panel.detachable(cx) {
                         let dock_area = self.dock_area.clone();
                         tools = tools.child(
@@ -392,6 +438,9 @@ impl RenderOnce for TabPanel {
                                 .label("⧉")
                                 .size(MoonButtonSize::Tier(MoonSize::Xs))
                                 .variant(MoonButtonVariant::Ghost)
+                                .when_some(self.panel_control_tooltips.detach.clone(), |b, t| {
+                                    b.tooltip(t)
+                                })
                                 .on_click({
                                     let panel_name = panel_name.clone();
                                     move |_, _, cx| {
@@ -412,23 +461,21 @@ impl RenderOnce for TabPanel {
                     }
                     if panel.zoomable(cx) {
                         let dock_area = self.dock_area.clone();
-                        let zoom_label = if self
+                        let zoomed = self
                             .dock_area
                             .as_ref()
                             .and_then(|dock_area| dock_area.upgrade())
                             .and_then(|dock_area| dock_area.read(cx).zoomed_panel.as_ref().cloned())
                             .as_ref()
-                            == Some(&panel_name)
-                        {
-                            "□"
-                        } else {
-                            "▣"
-                        };
+                            == Some(&panel_name);
+                        let (zoom_label, zoom_tooltip) =
+                            zoom_control(zoomed, &self.panel_control_tooltips);
                         tools = tools.child(
                             MoonButton::new(format!("{}:zoom", self.id))
                                 .label(zoom_label)
                                 .size(MoonButtonSize::Tier(MoonSize::Xs))
                                 .variant(MoonButtonVariant::Ghost)
+                                .when_some(zoom_tooltip, |b, t| b.tooltip(t))
                                 .on_click({
                                     let panel_name = panel_name.clone();
                                     move |_, window, cx| {
@@ -448,13 +495,21 @@ impl RenderOnce for TabPanel {
                                 .render(),
                         );
                     }
-                    if self.layout_editable && self.close_allowed && panel.closable(cx) {
+                    if close_control_shown(
+                        self.layout_editable,
+                        self.close_allowed,
+                        panel.closable(cx),
+                        pinned,
+                    ) {
                         let dock_area = self.dock_area.clone();
                         tools = tools.child(
                             MoonButton::new(format!("{}:close", self.id))
                                 .label("×")
                                 .size(MoonButtonSize::Tier(MoonSize::Xs))
                                 .variant(MoonButtonVariant::Ghost)
+                                .when_some(self.panel_control_tooltips.close.clone(), |b, t| {
+                                    b.tooltip(t)
+                                })
                                 .on_click({
                                     let panel_name = panel_name.clone();
                                     move |_, _window, cx| {

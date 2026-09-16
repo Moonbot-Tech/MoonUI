@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     background::MoonBackgroundPolicy,
     text::MoonText,
-    theme::MoonTheme,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, rgba_from},
 };
 
@@ -28,7 +28,7 @@ mod tree;
 
 use drag::{
     DockResizeTarget, DockTabDrag, DockTileDrag, DockTileDragKind, DockTileDragStart,
-    tab_interaction_policy,
+    close_control_shown, tab_interaction_policy,
 };
 use panel::MoonPanelRegistry;
 pub use panel::{DockItem, MoonDockPanel, Panel, PanelView, register_panel};
@@ -37,6 +37,7 @@ pub use state::{
     DockAreaState, DockNamedLayout, DockState, DockTopologyByName, DockTopologyNode,
     DockTopologySide, PanelInfo, PanelState, TileMeta,
 };
+use tab_panel::tab_header_height;
 
 const DOCK_RESIZE_HIT_SIZE: f32 = 6.0;
 
@@ -144,6 +145,25 @@ struct MoonTabPanelRuntimeState {
     notified_active: Option<(Option<SharedString>, usize)>,
 }
 
+/// Host-supplied tooltips for the dock header's built-in controls.
+///
+/// The dock owns the buttons; the host owns their words. Every field defaults to `None`, which
+/// renders exactly as today, so an existing consumer is unaffected. MoonUI's own i18n carries no
+/// ru/es, which is why these arrive from the host already translated rather than through `t!()`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DockPanelControlTooltips {
+    /// The detach control (glyph U+29C9).
+    pub detach: Option<SharedString>,
+    /// The zoom control while the panel is NOT zoomed (glyph U+25A3).
+    pub zoom_in: Option<SharedString>,
+    /// The zoom control while the panel IS zoomed (glyph U+25A1) — the restore action.
+    pub zoom_out: Option<SharedString>,
+    /// The close control (glyph U+00D7).
+    pub close: Option<SharedString>,
+    /// The tab-overflow chevron that precedes the three controls.
+    pub overflow: Option<SharedString>,
+}
+
 #[derive(IntoElement)]
 /// Renders one dock tab group and its active panel surface.
 pub struct TabPanel {
@@ -162,6 +182,7 @@ pub struct TabPanel {
     detach_allowed: bool,
     close_allowed: bool,
     pinned_leading_panels: Vec<SharedString>,
+    panel_control_tooltips: DockPanelControlTooltips,
 }
 
 impl TabPanel {
@@ -183,6 +204,7 @@ impl TabPanel {
             detach_allowed: true,
             close_allowed: true,
             pinned_leading_panels: Vec::new(),
+            panel_control_tooltips: DockPanelControlTooltips::default(),
         }
     }
 
@@ -237,6 +259,12 @@ impl TabPanel {
     /// Mark stable panel names as emphasized non-draggable leading tabs.
     fn pinned_leading_panels(mut self, panel_names: Vec<SharedString>) -> Self {
         self.pinned_leading_panels = panel_names;
+        self
+    }
+
+    /// Set the host-supplied tooltips for this tab group's built-in header controls.
+    pub fn panel_control_tooltips(mut self, tooltips: DockPanelControlTooltips) -> Self {
+        self.panel_control_tooltips = tooltips;
         self
     }
 
@@ -740,6 +768,8 @@ pub struct DockArea {
     close_allowed: bool,
     /// Stable panel names that remain leading, emphasized, and non-draggable in tab groups.
     pinned_leading_panels: Vec<SharedString>,
+    /// Host-supplied tooltips for every TabPanel's built-in header controls.
+    panel_control_tooltips: DockPanelControlTooltips,
 }
 
 impl EventEmitter<DockEvent> for DockArea {}
@@ -776,6 +806,7 @@ impl DockArea {
             detach_allowed: true,
             close_allowed: true,
             pinned_leading_panels: Vec::new(),
+            panel_control_tooltips: DockPanelControlTooltips::default(),
         }
     }
 
@@ -806,6 +837,7 @@ impl DockArea {
             detach_allowed: true,
             close_allowed: true,
             pinned_leading_panels: Vec::new(),
+            panel_control_tooltips: DockPanelControlTooltips::default(),
         }
     }
 
@@ -851,6 +883,7 @@ impl DockArea {
             detach_allowed: true,
             close_allowed: true,
             pinned_leading_panels: Vec::new(),
+            panel_control_tooltips: DockPanelControlTooltips::default(),
         }
     }
 
@@ -1100,6 +1133,16 @@ impl DockArea {
         }
         cx.notify();
         changed
+    }
+
+    /// Set the tooltips the dock hands to every TabPanel's built-in controls.
+    pub fn set_panel_control_tooltips(
+        &mut self,
+        tooltips: DockPanelControlTooltips,
+        cx: &mut Context<Self>,
+    ) {
+        self.panel_control_tooltips = tooltips;
+        cx.notify();
     }
 
     /// Emit a detach request only if both layout editing and detachment remain enabled.
@@ -2555,6 +2598,16 @@ impl DockArea {
         }
     }
 
+    /// Vertical offset that keeps split drop zones below a tab header, or `0.0` when the slot
+    /// has no header so the zones still cover the full item.
+    fn split_drop_header_inset(show_header: bool, tokens: &MoonThemeTokens) -> f32 {
+        if show_header {
+            tab_header_height(tokens)
+        } else {
+            0.0
+        }
+    }
+
     /// Render one directional drop zone with a stale-event editability guard.
     fn split_drop_zone(
         &self,
@@ -2562,6 +2615,7 @@ impl DockArea {
         root: DockRoot,
         path: Vec<usize>,
         placement: DockSplitPlacement,
+        header_inset: f32,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let dock = cx.entity();
@@ -2572,20 +2626,20 @@ impl DockArea {
             .absolute()
             .when(matches!(placement, DockSplitPlacement::Left), |this| {
                 this.left(px(0.0))
-                    .top(px(0.0))
+                    .top(px(header_inset))
                     .bottom(px(0.0))
                     .w(px(tokens.ui(42.0)))
                     .border_l(px(tokens.ui(2.0)))
             })
             .when(matches!(placement, DockSplitPlacement::Right), |this| {
                 this.right(px(0.0))
-                    .top(px(0.0))
+                    .top(px(header_inset))
                     .bottom(px(0.0))
                     .w(px(tokens.ui(42.0)))
                     .border_r(px(tokens.ui(2.0)))
             })
             .when(matches!(placement, DockSplitPlacement::Top), |this| {
-                this.top(px(0.0))
+                this.top(px(header_inset))
                     .left(px(tokens.ui(42.0)))
                     .right(px(tokens.ui(42.0)))
                     .h(px(tokens.ui(34.0)))
@@ -2635,6 +2689,7 @@ impl DockArea {
         root: DockRoot,
         path: Vec<usize>,
         target_splittable: bool,
+        header_inset: f32,
         cx: &mut Context<Self>,
     ) -> Div {
         // Slot accepts split drops only if it is itself splittable (a bottom dock panel),
@@ -2648,6 +2703,7 @@ impl DockArea {
                 root,
                 path.clone(),
                 DockSplitPlacement::Left,
+                header_inset,
                 cx,
             ))
             .child(self.split_drop_zone(
@@ -2655,6 +2711,7 @@ impl DockArea {
                 root,
                 path.clone(),
                 DockSplitPlacement::Right,
+                header_inset,
                 cx,
             ))
             .child(self.split_drop_zone(
@@ -2662,6 +2719,7 @@ impl DockArea {
                 root,
                 path.clone(),
                 DockSplitPlacement::Top,
+                header_inset,
                 cx,
             ))
             .child(self.split_drop_zone(
@@ -2669,6 +2727,7 @@ impl DockArea {
                 root,
                 path,
                 DockSplitPlacement::Bottom,
+                header_inset,
                 cx,
             ));
         host
@@ -2940,6 +2999,8 @@ impl DockArea {
             DockItem::Panel(panel) => {
                 let id_text = id.to_string();
                 let want_header = panel.show_dock_header(cx);
+                let tokens = MoonTheme::active_tokens(cx);
+                let header_inset = Self::split_drop_header_inset(want_header, &tokens);
                 let host = div().relative().size_full().child(
                     TabPanel::new(id, vec![panel.clone()])
                         .dock_context(cx.entity().downgrade(), root, path.clone())
@@ -2949,18 +3010,21 @@ impl DockArea {
                         .detach_allowed(self.detach_allowed)
                         .close_allowed(self.close_allowed)
                         .pinned_leading_panels(self.pinned_leading_panels.clone())
+                        .panel_control_tooltips(self.panel_control_tooltips.clone())
                         .background_policy(self.tab_background_policy)
                         .content_background_policy(
                             self.content_background_policy
                                 .unwrap_or_else(|| panel.background_policy(cx)),
                         ),
                 );
-                self.add_split_drop_zones(host, &id_text, root, path, want_header, cx)
+                self.add_split_drop_zones(host, &id_text, root, path, want_header, header_inset, cx)
                     .into_any_element()
             }
             DockItem::Tabs { items, active_ix } => {
                 let target_splittable = items.iter().any(|p| p.show_dock_header(cx));
                 let id_text = id.to_string();
+                let tokens = MoonTheme::active_tokens(cx);
+                let header_inset = Self::split_drop_header_inset(true, &tokens);
                 let host = div().relative().size_full().child(
                     TabPanel::new(id, items.clone())
                         .dock_context(cx.entity().downgrade(), root, path.clone())
@@ -2969,13 +3033,22 @@ impl DockArea {
                         .detach_allowed(self.detach_allowed)
                         .close_allowed(self.close_allowed)
                         .pinned_leading_panels(self.pinned_leading_panels.clone())
+                        .panel_control_tooltips(self.panel_control_tooltips.clone())
                         .background_policy(self.tab_background_policy)
                         .when_some(self.content_background_policy, |this, policy| {
                             this.content_background_policy(policy)
                         }),
                 );
-                self.add_split_drop_zones(host, &id_text, root, path, target_splittable, cx)
-                    .into_any_element()
+                self.add_split_drop_zones(
+                    host,
+                    &id_text,
+                    root,
+                    path,
+                    target_splittable,
+                    header_inset,
+                    cx,
+                )
+                .into_any_element()
             }
             DockItem::Tiles { items, metas } => {
                 let p = MoonPalette::active(cx);
@@ -3087,6 +3160,7 @@ impl DockArea {
                             .detach_allowed(self.detach_allowed)
                             .close_allowed(self.close_allowed)
                             .pinned_leading_panels(self.pinned_leading_panels.clone())
+                            .panel_control_tooltips(self.panel_control_tooltips.clone())
                             .background_policy(MoonBackgroundPolicy::NoFill)
                             .content_background_policy(panel.background_policy(cx)),
                         )
@@ -3376,6 +3450,7 @@ impl Render for DockArea {
                     .detach_allowed(self.detach_allowed)
                     .close_allowed(self.close_allowed)
                     .pinned_leading_panels(self.pinned_leading_panels.clone())
+                    .panel_control_tooltips(self.panel_control_tooltips.clone())
                     .background_policy(self.tab_background_policy)
                     .content_background_policy(
                         self.content_background_policy
