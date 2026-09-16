@@ -436,7 +436,9 @@ impl ChoiceColors {
     ///
     /// An unchecked box is a `border_primary` outline with no fill, and the outline stays
     /// `border_primary` when hovered; once disabled it gains a `bg_tertiary` fill. A checked box is
-    /// filled with `bg_brand_solid` and draws no border, with its mark in `fg_white`. An explicit
+    /// filled with `bg_brand_solid` and draws no border, with its mark in `text_primary_on_brand`
+    /// — white in the colour modes, and on a legacy palette the ink that reads on its accent, so a
+    /// theme with a light (amber) accent keeps a dark, readable mark. An explicit
     /// `tone` replaces the brand fill, and the mark then takes the palette ink that reads best on
     /// that tone. A disabled box, checked or not, renders at half opacity as a whole. The focus
     /// ring is always `focus_ring`, whatever the tone.
@@ -465,7 +467,10 @@ impl ChoiceColors {
                 let tone = tone.color(p);
                 (rgba_from(tone, 1.0), rgba_from(p.ink_on(tone), 1.0))
             }
-            None => (roles.bg_brand_solid.into(), roles.fg_white.into()),
+            None => (
+                roles.bg_brand_solid.into(),
+                roles.text_primary_on_brand.into(),
+            ),
         };
         let (border, fill) = if checked {
             (transparent_black(), checked_fill)
@@ -806,7 +811,8 @@ mod tests {
 
     /// Catches the shared checkbox and radio colours drifting from the reviewed design: an unchecked
     /// box is a `border_primary` outline with no fill, filled with `bg_tertiary` only when disabled;
-    /// a checked box is `bg_brand_solid` with no border and an `fg_white` mark, unless an explicit
+    /// a checked box is `bg_brand_solid` with no border and a `text_primary_on_brand` mark (the
+    /// palette's `ink_on(accent)` on a legacy theme, so an amber accent gets a dark mark), unless an explicit
     /// tone fills it with that tone and the ink that reads best on it; a disabled box dims to half
     /// as a whole rather than fading its colours; the focus ring is `focus_ring`, never the tone;
     /// and the label and supporting text are `text_secondary` and `text_tertiary`, dimmed to 45%
@@ -836,7 +842,7 @@ mod tests {
                 let checked = ChoiceColors::resolve(p, roles, None, true, disabled);
                 assert!(checked.border.is_transparent());
                 assert_eq!(checked.fill, roles.bg_brand_solid.into());
-                assert_eq!(checked.mark, roles.fg_white.into());
+                assert_eq!(checked.mark, roles.text_primary_on_brand.into());
                 assert_eq!(checked.box_opacity, box_opacity);
                 assert_eq!(checked.focus_ring, roles.focus_ring.into());
 
