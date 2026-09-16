@@ -253,6 +253,10 @@ fn parse_theme_mode(mode: &str) -> Option<ThemeMode> {
     }
 }
 
+/// Returns the display name of a theme mode, which the handoff snapshot run also uses for its
+/// per-theme directory. Only that snapshot build reads it outside tests since the gallery header
+/// switched to named styles.
+#[cfg_attr(not(feature = "snapshot"), allow(dead_code))]
 fn theme_mode_name(mode: ThemeMode) -> &'static str {
     match mode {
         ThemeMode::Light => "Light",

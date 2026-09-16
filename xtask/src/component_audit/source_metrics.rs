@@ -116,7 +116,11 @@ fn scan_facade_raw_gpui_exports(path: &Path) -> Result<Vec<SourceHit>> {
 
 /// Find unapproved raw color literals in Moon-owned component sources.
 fn scan_raw_hex_in_moon(root: &Path) -> Result<Vec<SourceHit>> {
-    scan_files(root, |line| {
+    let token_sources: Vec<String> = RAW_HEX_TOKEN_SOURCES
+        .iter()
+        .map(|file| normalize_path(&root.join(file)))
+        .collect();
+    let mut hits = scan_files(root, |line| {
         let trimmed = line.trim();
         if trimmed.starts_with("//") {
             return false;
@@ -128,8 +132,22 @@ fn scan_raw_hex_in_moon(root: &Path) -> Result<Vec<SourceHit>> {
                 || trimmed.contains("rgba_from(0x")
                 || trimmed.contains("hsla(0x"))
             && !trimmed.contains("MOON-ONEOFF")
-    })
+    })?;
+    hits.retain(|hit| !token_sources.contains(&hit.file));
+    Ok(hits)
 }
+
+/// Moon source files that define colour tokens, where hex literals are the content rather than a
+/// component painting a raw colour.
+///
+/// Paths are relative to `crates/moon-ui-components/src/moon` and matched exactly, so a component
+/// module that happens to share a file name elsewhere in the tree is still audited. `tokens.rs`
+/// needs no entry: its palette constants are bare integers (`shell: 0x131416`) the scan never
+/// matches. The primitive colour scales are built with `MoonColor::rgb(0x..)` because they carry
+/// alpha, and would otherwise count as hundreds of component-level raw colours; the colour modes
+/// write the few roles with no scale step behind them, such as shadows at a set opacity, the same
+/// way.
+const RAW_HEX_TOKEN_SOURCES: &[&str] = &["primitives.rs", "colors/modes.rs"];
 
 /// Find unapproved raw color literals in the audited inherited base components.
 fn scan_raw_hex_in_moon_base(src: &Path) -> Result<Vec<SourceHit>> {

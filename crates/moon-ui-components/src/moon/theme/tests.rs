@@ -1,7 +1,10 @@
 //! Guards scale validity and density propagation through theme loading and mode selection.
 
 use super::{MoonScale, MoonThemeConfig, MoonThemeTokens};
-use crate::moon::tokens::{MoonPalette, contrast_ratio};
+use crate::moon::{
+    colors::MoonColors,
+    tokens::{MoonPalette, contrast_ratio},
+};
 
 /// WCAG floor for normal-size text.
 const INK_CONTRAST_FLOOR: f32 = 4.5;
@@ -26,6 +29,8 @@ fn selection_inks_are_readable_on_the_surface_each_one_lands_on() {
         ("dark", MoonPalette::TERMINAL),
         ("graphite", MoonPalette::GRAPHITE),
         ("light", MoonPalette::LIGHT),
+        ("dark colour mode", MoonColors::DARK.to_palette()),
+        ("light colour mode", MoonColors::LIGHT.to_palette()),
     ] {
         let tokens = MoonThemeTokens {
             palette,
