@@ -13,12 +13,13 @@ use gpui::{
 };
 
 use super::{
-    DOCK_TILE_MIN_H, DockArea, DockEvent, DockItem, DockNamedLayout, DockRoot, DockSplitPlacement,
-    DockTopologyByName, DockTopologyNode, DockTopologySide, MoonDockPanel,
-    MoonTabPanelRuntimeState, Panel, PanelEvent, PanelView, TabPanel, TileMeta,
+    DOCK_TILE_MIN_H, DockArea, DockEvent, DockItem, DockNamedLayout, DockPanelControlTooltips,
+    DockRoot, DockSplitPlacement, DockTopologyByName, DockTopologyNode, DockTopologySide,
+    MoonDockPanel, MoonTabPanelRuntimeState, Panel, PanelEvent, PanelView, TabPanel, TileMeta,
     tab_interaction_policy,
+    tab_panel::{tab_header_height, zoom_control},
 };
-use crate::moon::MoonBackgroundPolicy;
+use crate::moon::{MoonBackgroundPolicy, MoonThemeTokens};
 
 /// Build a minimal panel for dock-structure tests.
 fn panel(name: &'static str) -> Rc<dyn PanelView> {
@@ -1425,4 +1426,51 @@ fn pinned_leading_tab_is_fixed_but_remains_a_drop_target() {
         !policy.detachable,
         "the pinned Charts tab must stay attached"
     );
+}
+
+/// Catches splitting the zoom glyph and tooltip onto separate conditions, which would label
+/// a maximize button "restore" after the panel has already filled the dock.
+#[test]
+fn zoom_control_pairs_the_glyph_with_its_tooltip() {
+    let tooltips = DockPanelControlTooltips {
+        zoom_in: Some("Zoom the panel to fill the dock".into()),
+        zoom_out: Some("Restore the normal layout".into()),
+        ..Default::default()
+    };
+    let (glyph, tip) = zoom_control(true, &tooltips);
+    assert_eq!(
+        glyph, "\u{25A1}",
+        "zoomed panel must show the restore square"
+    );
+    assert_eq!(
+        tip.as_deref(),
+        Some("Restore the normal layout"),
+        "zoomed panel must use zoom_out, not zoom_in"
+    );
+    let (glyph, tip) = zoom_control(false, &tooltips);
+    assert_eq!(
+        glyph, "\u{25A3}",
+        "unzoomed panel must show the maximize square"
+    );
+    assert_eq!(
+        tip.as_deref(),
+        Some("Zoom the panel to fill the dock"),
+        "unzoomed panel must use zoom_in, not zoom_out"
+    );
+}
+
+/// Catches leaving split drop zones at the top of a headed slot, which would steal tab drops
+/// from the header so a dragged panel cannot land back on the strip.
+#[test]
+fn split_drop_header_inset_clears_the_tab_header() {
+    let tokens = MoonThemeTokens::default();
+    assert_eq!(
+        tab_header_height(&tokens),
+        tokens.fit_height(29.0, 13.0, 8.0)
+    );
+    assert_eq!(
+        DockArea::split_drop_header_inset(true, &tokens),
+        tab_header_height(&tokens)
+    );
+    assert_eq!(DockArea::split_drop_header_inset(false, &tokens), 0.0);
 }

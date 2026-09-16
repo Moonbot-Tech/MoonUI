@@ -114,8 +114,9 @@ pub use description_list::MoonDescriptionList;
 pub use dialog::{MoonDialog, MoonDialogContent};
 pub use disclosure::{MoonDisclosure, MoonDisclosureDirection};
 pub use dock::{
-    DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, DockSplitPlacement, MoonDockPanel,
-    Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel,
+    DockArea, DockAreaState, DockEvent, DockItem, DockPanelControlTooltips, DockPlacement,
+    DockSplitPlacement, MoonDockPanel, Panel, PanelEvent, PanelInfo, PanelState, PanelView,
+    TabPanel, register_panel,
 };
 pub use dock::{DockNamedLayout, DockTopologyByName, DockTopologyNode, DockTopologySide};
 pub(crate) use dropdown::{MENU_CHECK_WIDTH, menu_row_metrics};

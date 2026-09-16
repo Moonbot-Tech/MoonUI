@@ -1447,6 +1447,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn panel_control_tooltips(mut self, tooltips: DockPanelControlTooltips) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn panel_names(&self) -> Vec<String>"
     },
     {
@@ -1476,6 +1480,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub fn set_layout_editable(&mut self, editable: bool, cx: &mut Context<Self>)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub fn set_panel_control_tooltips( &mut self, tooltips: DockPanelControlTooltips, cx: &mut Context<Self>, )"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1576,6 +1584,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
       "signature": "pub struct DockNamedLayout"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dock.rs",
+      "signature": "pub struct DockPanelControlTooltips"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1812,6 +1824,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn trigger_size(mut self, size: MoonButtonSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_tooltip(mut self, tooltip: impl Into<SharedString>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
@@ -2543,7 +2559,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use dock::{ DockArea, DockAreaState, DockEvent, DockItem, DockPlacement, DockSplitPlacement, MoonDockPanel, Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel, };"
+      "signature": "pub use dock::{ DockArea, DockAreaState, DockEvent, DockItem, DockPanelControlTooltips, DockPlacement, DockSplitPlacement, MoonDockPanel, Panel, PanelEvent, PanelInfo, PanelState, PanelView, TabPanel, register_panel, };"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
