@@ -28,7 +28,7 @@ mod tree;
 
 use drag::{
     DockResizeTarget, DockTabDrag, DockTileDrag, DockTileDragKind, DockTileDragStart,
-    tab_interaction_policy,
+    close_control_shown, tab_interaction_policy,
 };
 use panel::MoonPanelRegistry;
 pub use panel::{DockItem, MoonDockPanel, Panel, PanelView, register_panel};

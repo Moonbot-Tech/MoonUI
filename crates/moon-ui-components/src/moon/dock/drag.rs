@@ -60,6 +60,29 @@ pub(super) fn tab_interaction_policy(
     }
 }
 
+/// Whether the header close control is shown for the active panel.
+///
+/// Pinned already suppresses drag and detach; close is the same structural-immovability
+/// rule. `panel_closable` is the panel's own statement and stays a call-site input so a
+/// panel pinned in one dock and loose in another does not have to lie about itself.
+///
+/// Args:
+///     layout_editable: Whether structural dock edits are enabled.
+///     close_allowed: Whether the host permits close requests.
+///     panel_closable: Whether the panel itself reports as closable.
+///     pinned: Whether the active panel belongs to the leading pinned prefix.
+///
+/// Returns:
+///     True when the header close control should render.
+pub(super) fn close_control_shown(
+    layout_editable: bool,
+    close_allowed: bool,
+    panel_closable: bool,
+    pinned: bool,
+) -> bool {
+    layout_editable && close_allowed && panel_closable && !pinned
+}
+
 impl Render for DockTabDrag {
     /// Render no visual content because the value is only a drag payload.
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {

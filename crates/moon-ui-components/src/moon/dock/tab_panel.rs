@@ -9,7 +9,7 @@ use gpui::{
 
 use super::{
     DockEvent, DockPanelControlTooltips, DockTabDrag, MoonTabPanelRuntimeState, TabPanel,
-    tab_interaction_policy,
+    close_control_shown, tab_interaction_policy,
 };
 use crate::{
     event::InteractiveElementExt as _,
@@ -425,6 +425,12 @@ impl RenderOnce for TabPanel {
                 }
                 if self.show_panel_controls {
                     let panel_name = panel.panel_name(cx);
+                    // Same membership the tab loop feeds `tab_interaction_policy`, so a pinned
+                    // tab cannot be undraggable and still show a dead close control.
+                    let pinned = self
+                        .pinned_leading_panels
+                        .iter()
+                        .any(|name| name.as_ref() == panel_name.as_ref());
                     if self.layout_editable && self.detach_allowed && panel.detachable(cx) {
                         let dock_area = self.dock_area.clone();
                         tools = tools.child(
@@ -489,7 +495,12 @@ impl RenderOnce for TabPanel {
                                 .render(),
                         );
                     }
-                    if self.layout_editable && self.close_allowed && panel.closable(cx) {
+                    if close_control_shown(
+                        self.layout_editable,
+                        self.close_allowed,
+                        panel.closable(cx),
+                        pinned,
+                    ) {
                         let dock_area = self.dock_area.clone();
                         tools = tools.child(
                             MoonButton::new(format!("{}:close", self.id))

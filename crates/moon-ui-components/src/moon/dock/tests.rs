@@ -16,7 +16,7 @@ use super::{
     DOCK_TILE_MIN_H, DockArea, DockEvent, DockItem, DockNamedLayout, DockPanelControlTooltips,
     DockRoot, DockSplitPlacement, DockTopologyByName, DockTopologyNode, DockTopologySide,
     MoonDockPanel, MoonTabPanelRuntimeState, Panel, PanelEvent, PanelView, TabPanel, TileMeta,
-    tab_interaction_policy,
+    close_control_shown, tab_interaction_policy,
     tab_panel::{tab_header_height, zoom_control},
 };
 use crate::moon::{MoonBackgroundPolicy, MoonThemeTokens};
@@ -1425,6 +1425,20 @@ fn pinned_leading_tab_is_fixed_but_remains_a_drop_target() {
     assert!(
         !policy.detachable,
         "the pinned Charts tab must stay attached"
+    );
+}
+
+/// Catches omitting the pinned guard from the header close control, which would leave a
+/// visibly dead × on the pinned leading tab — close is already a no-op for that panel.
+#[test]
+fn pinned_active_panel_hides_the_close_control() {
+    assert!(
+        close_control_shown(true, true, true, false),
+        "an unpinned closable panel must still show the close control"
+    );
+    assert!(
+        !close_control_shown(true, true, true, true),
+        "a pinned closable panel must not show a dead close control"
     );
 }
 
