@@ -56,6 +56,7 @@ fn gallery_page_cli_names_match_tabs() {
     assert_eq!(page_index("Composites"), Some(6));
     assert_eq!(page_index("Stateful"), Some(7));
     assert_eq!(page_index("checkboxes"), Some(8));
+    assert_eq!(page_index("Toggles"), Some(9));
     assert_eq!(page_index("missing"), None);
 }
 

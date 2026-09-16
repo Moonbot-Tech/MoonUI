@@ -1,5 +1,5 @@
 param(
-    [string[]]$Pages = @("Controls", "Inputs", "Data", "Overlays", "Layout", "NewControls", "Composites", "Stateful", "Checkboxes"),
+    [string[]]$Pages = @("Controls", "Inputs", "Data", "Overlays", "Layout", "NewControls", "Composites", "Stateful", "Checkboxes", "Toggles"),
     [string[]]$Themes = @("Dark", "Light"),
     [switch]$Compare,
     [switch]$FailOnDiff,

@@ -37,7 +37,7 @@ use moon_ui::{
     MoonStatusIndicator, MoonStatusItem, MoonStepper, MoonSurface, MoonSurfaceVariant, MoonSwitch,
     MoonTabItem, MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle,
     MoonTag, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonTimePicker,
-    MoonTimePickerState, MoonToggle, MoonToggleVariant, MoonTone, MoonTooltip,
+    MoonTimePickerState, MoonToggle, MoonToggleLabelSide, MoonToggleVariant, MoonTone, MoonTooltip,
     MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem,
     MoonTreeSelectionMode, MoonTreeState, MoonVirtualList, MoonVirtualListScrollHandle,
     MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, PanelView,
@@ -150,6 +150,7 @@ const GALLERY_PAGES: &[&str] = &[
     "Composites",
     "Stateful",
     "Checkboxes",
+    "Toggles",
 ];
 
 #[cfg(feature = "snapshot")]

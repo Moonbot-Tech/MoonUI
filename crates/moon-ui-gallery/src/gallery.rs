@@ -17,6 +17,9 @@ pub(super) struct Gallery {
     /// Selected option of the live radio groups on the Checkboxes page.
     radio_sm_index: usize,
     radio_md_index: usize,
+    /// Checked values of the controlled toggles on the Toggles page.
+    toggle_sm_checked: bool,
+    toggle_md_checked: bool,
     new_toggle_checked: bool,
     new_stepper_value: f32,
     new_switch_checked: bool,
@@ -331,6 +334,8 @@ impl Gallery {
             checkbox_md_checked: true,
             radio_sm_index: 0,
             radio_md_index: 1,
+            toggle_sm_checked: true,
+            toggle_md_checked: false,
             new_toggle_checked: true,
             new_stepper_value: 3.0,
             new_switch_checked: true,
@@ -3254,7 +3259,8 @@ impl Render for Gallery {
             5 => self.render_new_controls(cx).into_any_element(),
             6 => self.render_composites(cx).into_any_element(),
             7 => self.render_stateful(cx).into_any_element(),
-            _ => self.render_checkboxes(cx).into_any_element(),
+            8 => self.render_checkboxes(cx).into_any_element(),
+            _ => self.render_toggles(cx).into_any_element(),
         };
 
         v_flex()
@@ -3462,5 +3468,7 @@ fn open_detached_gallery_panel(panel_name: SharedString, cx: &mut App) {
 }
 
 mod checkboxes;
+mod choice;
 #[cfg(test)]
 mod tests;
+mod toggles;
