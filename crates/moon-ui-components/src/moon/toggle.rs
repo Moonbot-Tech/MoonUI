@@ -1,8 +1,11 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
+use crate::checkbox::{ChoiceColors, MoonCheckboxMetrics, choice_text_column};
+
 use super::{
-    foundation::{MoonSize, box_shadow, v_flex},
+    colors::MoonColors,
+    foundation::{MoonSize, box_shadow},
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
@@ -13,10 +16,33 @@ pub enum MoonToggleLabelSide {
     Right,
 }
 
+/// A toggle's visual type. The look of each is the component's own; a variant never changes
+/// what a toggle does or how it reports a change.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MoonToggleVariant {
+    /// The reviewed toggle: a track one text line tall with the thumb inside it.
+    #[default]
+    Default,
+    /// A slimmer toggle. It draws exactly as [`MoonToggleVariant::Default`] until its own design
+    /// is specified, so a caller can already ask for the one it means.
+    Slim,
+}
+
+impl MoonToggleVariant {
+    /// Returns `metrics` as this variant draws them, which is where a variant's own geometry
+    /// belongs: `Slim` keeps the default track and thumb until its design lands.
+    fn metrics(self, metrics: MoonToggleMetrics) -> MoonToggleMetrics {
+        match self {
+            Self::Default | Self::Slim => metrics,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonToggleSize {
-    /// A tier of the shared size scale. Toggles come in `Xs` (20x12 track), `Sm` (28x16 track) or
-    /// `Md` (36x20); `Lg` and above render as `Md`.
+    /// A tier of the shared size scale. Toggles come in the checkbox's tiers with the same text and
+    /// spacing: `Sm` (36x20 track) and `Md` (44x24 track); `Xs` renders as `Sm`, and `Lg` and
+    /// above render as `Md`.
     Tier(MoonSize),
     Custom {
         track_width: f32,
@@ -54,7 +80,7 @@ pub struct MoonToggleMetrics {
 }
 
 impl MoonToggleSize {
-    pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];
+    pub const SUPPORTED_TIERS: [MoonSize; 2] = [MoonSize::Sm, MoonSize::Md];
 
     /// The app's density tier, snapped to a tier this component supports.
     pub fn density_default(tokens: &MoonThemeTokens) -> Self {
@@ -67,10 +93,10 @@ impl MoonToggleSize {
             Self::Tier(t) => {
                 let t = t.nearest(&Self::SUPPORTED_TIERS);
                 let c = t.control_metrics();
+                // Each track is exactly one text line tall, with its thumb 2px in from the edge.
                 let (track_width, track_height, thumb_size, description_gap) = match t {
-                    MoonSize::Xs => (20.0, 12.0, 8.0, 0.0),
-                    MoonSize::Sm => (28.0, 16.0, 12.0, 0.0),
-                    _ => (36.0, 20.0, 16.0, 2.0),
+                    MoonSize::Sm => (36.0, 20.0, 16.0, 0.0),
+                    _ => (44.0, 24.0, 20.0, 2.0),
                 };
                 MoonToggleMetrics {
                     track_width,
@@ -156,6 +182,26 @@ impl MoonToggleMetrics {
             focus_ring_width: tokens.ui(self.focus_ring_width),
         }
     }
+
+    /// Returns these metrics as checkbox metrics with the track as the box, so the toggle's text
+    /// lays out exactly as a checkbox's or radio's does. Only the box's height takes part in that
+    /// layout; the mark fields are the thumb's size and stay unused.
+    fn choice(self) -> MoonCheckboxMetrics {
+        MoonCheckboxMetrics {
+            box_size: px(self.track_height),
+            font_size: px(self.font_size),
+            line_height: px(self.line_height),
+            label_weight: FontWeight(self.label_weight),
+            description_weight: FontWeight(self.description_weight),
+            gap: px(self.gap),
+            description_gap: px(self.description_gap),
+            radius: px(self.track_height * 0.5),
+            focus_ring_distance: px(self.focus_ring_distance),
+            focus_ring_width: px(self.focus_ring_width),
+            mark_size: px(self.thumb_size),
+            mark_stroke: None,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -191,6 +237,7 @@ pub struct MoonToggle {
     label: Option<SharedString>,
     description: Option<SharedString>,
     label_side: MoonToggleLabelSide,
+    variant: MoonToggleVariant,
     checked: Option<bool>,
     default_checked: bool,
     disabled: bool,
@@ -209,12 +256,13 @@ impl MoonToggle {
             label: None,
             description: None,
             label_side: MoonToggleLabelSide::Right,
+            variant: MoonToggleVariant::Default,
             checked: None,
             default_checked: false,
             disabled: false,
             size: None,
             tone: MoonTone::Info,
-            mono: true,
+            mono: false,
             label_color: None,
             on_change: None,
         }
@@ -241,6 +289,12 @@ impl MoonToggle {
         self
     }
 
+    /// Sets the visual type: the default toggle, or `Slim`.
+    pub fn variant(mut self, variant: MoonToggleVariant) -> Self {
+        self.variant = variant;
+        self
+    }
+
     pub fn checked(mut self, checked: bool) -> Self {
         self.checked = Some(checked);
         self
@@ -262,7 +316,7 @@ impl MoonToggle {
         self
     }
 
-    /// Overrides the label's ink. The description keeps the muted colour; disabled alpha still applies.
+    /// Overrides the label's ink. The description keeps its colour; disabled alpha still applies.
     pub fn label_color(mut self, color: u32) -> Self {
         self.label_color = Some(color);
         self
@@ -295,11 +349,10 @@ impl RenderOnce for MoonToggle {
         let size = self
             .size
             .unwrap_or_else(|| MoonToggleSize::density_default(&tokens));
-        let m = size.resolve(&tokens);
-        let has_description = self.description.is_some();
-        let track_offset = ((m.line_height - m.track_height) * 0.5).max(0.0);
-        let text_offset = ((m.track_height - m.line_height) * 0.5).max(0.0);
-        let inset = -(m.focus_ring_distance + tokens.ui(1.0));
+        let m = self.variant.metrics(size.resolve(&tokens));
+        let choice = m.choice();
+        let border = tokens.ui(1.0);
+        let inset = -(m.focus_ring_distance + border);
         let p = tokens.palette;
         let checked = self.checked.unwrap_or_else(|| state.read(cx).checked);
         let disabled = self.disabled;
@@ -309,12 +362,17 @@ impl RenderOnce for MoonToggle {
         let track_width = m.track_width;
         let track_height = m.track_height;
         let thumb_size = m.thumb_size;
+        // Insets start inside the track's border, so taking it back off leaves the thumb the same
+        // distance from the track's outer edge on every side.
+        let thumb_inset = (track_height - thumb_size) * 0.5 - border;
         let thumb_left = if checked {
-            track_width - thumb_size - tokens.ui(2.0)
+            track_width - thumb_size - thumb_inset - 2.0 * border
         } else {
-            tokens.ui(2.0)
+            thumb_inset
         };
         let colors = toggle_colors(p, accent, checked);
+        // The label and supporting text take the checkbox's and radio's text colours.
+        let text_colors = ChoiceColors::resolve(p, MoonColors::active(cx), None, checked, disabled);
         let focus_handle = window
             .use_keyed_state(
                 ElementId::from(SharedString::from(format!("{}:focus", self.id))),
@@ -324,32 +382,37 @@ impl RenderOnce for MoonToggle {
             .read(cx)
             .clone();
         let is_focused = focus_handle.is_focused(window);
-        let label_ink =
-            self.label_color
-                .unwrap_or(if disabled { p.text_muted } else { p.text_soft });
-        let text_alpha = if disabled { 0.45 } else { 1.0 };
-        let label_selector = format!("{}:label", self.id);
-        let description_selector = format!("{}:description", self.id);
+        let label_color = match self.label_color {
+            Some(color) => rgba_from(color, if disabled { 0.45 } else { 1.0 }),
+            None => text_colors.label,
+        };
         let track_selector = format!("{}:track", self.id);
+        let thumb_selector = format!("{}:thumb", self.id);
         let focus_ring_selector = format!("{}:focus-ring", self.id);
-        let has_text = self.label.is_some() || has_description;
+        // Empty text counts as no text, so a bare toggle never gains the text column and its gap.
+        let label = self.label.filter(|label| !label.is_empty());
+        let description = self
+            .description
+            .filter(|description| !description.is_empty());
+        let has_text = label.is_some() || description.is_some();
 
         let switch = div()
             .relative()
             .debug_selector(|| track_selector)
             .flex_shrink_0()
-            .when(has_description, |this| this.mt(px(track_offset)))
+            .when(has_text, |this| this.mt(choice.box_offset()))
             .w(px(track_width))
             .h(px(track_height))
             .rounded(px(track_height * 0.5))
-            .border(px(tokens.ui(1.0)))
+            .border(px(border))
             .border_color(rgba_from(colors.border, 0.72 * control_alpha))
             .bg(rgba_from(colors.track, colors.track_alpha * control_alpha))
             .child(
                 div()
+                    .debug_selector(|| thumb_selector)
                     .absolute()
                     .left(px(thumb_left))
-                    .top(px((track_height - thumb_size) * 0.5))
+                    .top(px(thumb_inset))
                     .w(px(thumb_size))
                     .h(px(thumb_size))
                     .rounded(px(thumb_size * 0.5))
@@ -373,39 +436,23 @@ impl RenderOnce for MoonToggle {
                         .bottom(px(inset))
                         .border(px(m.focus_ring_width))
                         .border_color(rgba_from(accent, 1.0))
-                        .rounded(px(m.track_height * 0.5
-                            + m.focus_ring_distance
-                            + tokens.ui(1.0))),
+                        .rounded(px(m.track_height * 0.5 + m.focus_ring_distance + border)),
                 )
             });
 
-        let column = v_flex()
-            .gap(px(m.description_gap))
-            .when(has_description, |this| this.mt(px(text_offset)))
-            .when_some(self.label, |this, label| {
-                this.child(
-                    div()
-                        .font_family(tokens.font_family(self.mono))
-                        .text_size(px(m.font_size))
-                        .line_height(px(m.line_height))
-                        .font_weight(FontWeight(m.label_weight))
-                        .text_color(rgba_from(label_ink, text_alpha))
-                        .debug_selector(|| label_selector)
-                        .child(label),
-                )
-            })
-            .when_some(self.description, |this, description| {
-                this.child(
-                    div()
-                        .font_family(tokens.font_family(self.mono))
-                        .text_size(px(m.font_size))
-                        .line_height(px(m.line_height))
-                        .font_weight(FontWeight(m.description_weight))
-                        .text_color(rgba_from(p.text_muted, text_alpha))
-                        .debug_selector(|| description_selector)
-                        .child(description),
-                )
-            });
+        // The column starts at its content width and only shrinks, wrapping its text, instead of
+        // filling the row, so a label on the left stays beside the track.
+        let column = has_text.then(|| {
+            choice_text_column(
+                &self.id,
+                choice,
+                label,
+                description,
+                text_colors.description,
+                Vec::new(),
+            )
+            .flex_initial()
+        });
 
         let mut root = div()
             .id(ElementId::from(SharedString::from(format!(
@@ -414,9 +461,13 @@ impl RenderOnce for MoonToggle {
             ))))
             .relative()
             .flex()
-            .when(has_description, |this| this.items_start())
-            .when(!has_description, |this| this.items_center())
-            .gap(px(m.gap))
+            .items_center()
+            // Rows with text are top-aligned so the track stays on the first line.
+            .when(has_text, |this| this.items_start())
+            .gap(choice.gap)
+            .text_size(choice.font_size)
+            .text_color(label_color)
+            .when(self.mono, |this| this.font_family(tokens.font_family(true)))
             .rounded(px(track_height * 0.5))
             .when(disabled, |this| this.cursor_default())
             .when(!disabled, |this| {
@@ -426,17 +477,10 @@ impl RenderOnce for MoonToggle {
                     .active(|this| this.bg(rgba_from(p.overlay, 0.015)))
             });
 
-        if self.label_side == MoonToggleLabelSide::Left {
-            if has_text {
-                root = root.child(column);
-            }
-            root = root.child(switch);
-        } else {
-            root = root.child(switch);
-            if has_text {
-                root = root.child(column);
-            }
-        }
+        root = match self.label_side {
+            MoonToggleLabelSide::Left => root.children(column).child(switch),
+            MoonToggleLabelSide::Right => root.child(switch).children(column),
+        };
 
         if let Some(bounds) = self.bounds {
             root = root

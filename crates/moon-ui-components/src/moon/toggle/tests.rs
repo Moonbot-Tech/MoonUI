@@ -1,44 +1,70 @@
 //! Regression coverage for MoonToggle geometry, interaction, and light-theme colors.
 
-use super::{MoonToggle, MoonToggleSize, moon_toggle_click_plan, toggle_colors};
+use super::{
+    MoonToggle, MoonToggleLabelSide, MoonToggleSize, MoonToggleVariant, moon_toggle_click_plan,
+    toggle_colors,
+};
+use crate::checkbox::MoonCheckboxMetrics;
+use crate::moon::checkbox::tier_size;
 use crate::moon::{MoonPalette, MoonScale, MoonSize, MoonThemeConfig, MoonThemeTokens};
+use gpui::{px, size};
 
 /// Catches changing a tier's unscaled reference geometry in `MoonToggleSize::reference_metrics`
-/// away from the reviewed designer reference (Sm 28x16 track/12 thumb/14px-20 text/8 gap, Md
-/// 36x20/16/16-24/12), which would resize the rendered switch and its label unexpectedly.
+/// away from the reviewed designer reference (Sm 36x20 track/16 thumb/14px-20 text/8 gap, Md
+/// 44x24/20/16-24/12), which would resize the rendered switch and its label unexpectedly.
 #[test]
 fn toggle_metrics_match_designer_reference() {
-    let xs = MoonToggleSize::Tier(MoonSize::Xs).reference_metrics();
-    assert_eq!(
-        (xs.track_width, xs.track_height, xs.thumb_size),
-        (20.0, 12.0, 8.0)
-    );
-
     let sm = MoonToggleSize::Tier(MoonSize::Sm).reference_metrics();
-    assert_eq!(sm.track_width, 28.0);
-    assert_eq!(sm.track_height, 16.0);
-    assert_eq!(sm.thumb_size, 12.0);
+    assert_eq!(sm.track_width, 36.0);
+    assert_eq!(sm.track_height, 20.0);
+    assert_eq!(sm.thumb_size, 16.0);
     assert_eq!(sm.font_size, 14.0);
     assert_eq!(sm.line_height, 20.0);
     assert_eq!(sm.gap, 8.0);
 
     let md = MoonToggleSize::Tier(MoonSize::Md).reference_metrics();
-    assert_eq!(md.track_width, 36.0);
-    assert_eq!(md.track_height, 20.0);
-    assert_eq!(md.thumb_size, 16.0);
+    assert_eq!(md.track_width, 44.0);
+    assert_eq!(md.track_height, 24.0);
+    assert_eq!(md.thumb_size, 20.0);
     assert_eq!(md.font_size, 16.0);
     assert_eq!(md.line_height, 24.0);
     assert_eq!(md.gap, 12.0);
 }
 
-/// Catches `moon/toggle.rs:MoonToggleSize::reference_metrics` breaking its fixed inset rule,
-/// which mis-centres Compact, Standard, or Large toggle thumbs within their tracks.
+/// Catches `moon/toggle.rs:MoonToggleSize::reference_metrics` breaking the rule its tiers are
+/// drawn to, which mis-centres a toggle's thumb or lifts its track off the line of text beside it:
+/// a default track is exactly one text line tall, and its thumb sits 2px in from each edge.
 #[test]
 fn toggle_tiers_keep_the_two_pixel_inset_on_each_side() {
-    for tier in [MoonSize::Xs, MoonSize::Sm, MoonSize::Md] {
+    for tier in MoonToggleSize::SUPPORTED_TIERS {
         let metrics = MoonToggleSize::Tier(tier).reference_metrics();
-        assert_eq!(metrics.track_height, metrics.line_height - 4.0);
-        assert_eq!(metrics.thumb_size, metrics.track_height - 4.0);
+        assert_eq!(metrics.track_height, metrics.line_height, "{tier:?}");
+        assert_eq!(metrics.thumb_size, metrics.track_height - 4.0, "{tier:?}");
+    }
+}
+
+/// Catches a toggle tier's text drifting from the checkbox and radio of the same tier: the label
+/// and supporting text must share the checkbox's font size, line height, weights, track-to-text
+/// gap and label-to-description gap, at any UI zoom, so a toggle's label lines up with a
+/// checkbox's in the same form.
+#[test]
+fn tier_text_matches_the_checkbox_of_the_same_tier() {
+    let tokens = MoonThemeConfig::moon_terminal()
+        .with_font_delta(3.0)
+        .with_ui_scale(1.5)
+        .dark;
+    for tier in MoonToggleSize::SUPPORTED_TIERS {
+        let toggle = MoonToggleSize::Tier(tier).resolve(&tokens).choice();
+        let checkbox = MoonCheckboxMetrics::resolve(tier_size(tier), &tokens);
+        assert_eq!(toggle.font_size, checkbox.font_size, "{tier:?}");
+        assert_eq!(toggle.line_height, checkbox.line_height, "{tier:?}");
+        assert_eq!(toggle.label_weight, checkbox.label_weight, "{tier:?}");
+        assert_eq!(
+            toggle.description_weight, checkbox.description_weight,
+            "{tier:?}"
+        );
+        assert_eq!(toggle.gap, checkbox.gap, "{tier:?}");
+        assert_eq!(toggle.description_gap, checkbox.description_gap, "{tier:?}");
     }
 }
 
@@ -107,7 +133,7 @@ fn tier_font_follows_ui_zoom_not_font_scale() {
 #[test]
 fn density_default_snaps_every_tier_to_a_supported_one() {
     for (tier, want) in [
-        (MoonSize::Xs, MoonSize::Xs),
+        (MoonSize::Xs, MoonSize::Sm),
         (MoonSize::Sm, MoonSize::Sm),
         (MoonSize::Md, MoonSize::Md),
         (MoonSize::Lg, MoonSize::Md),
@@ -163,10 +189,199 @@ fn focus_ring_geometry_tracks_the_switch_radius() {
     let sm = MoonToggleSize::Tier(MoonSize::Sm).reference_metrics();
     assert_eq!(sm.focus_ring_distance, 4.0);
     assert_eq!(sm.focus_ring_width, 2.0);
-    assert_eq!(sm.track_height * 0.5 + sm.focus_ring_distance, 12.0); // 16 / 2 + 4
+    assert_eq!(sm.track_height * 0.5 + sm.focus_ring_distance, 14.0); // 20 / 2 + 4
 
     let md = MoonToggleSize::Tier(MoonSize::Md).reference_metrics();
-    assert_eq!(md.track_height * 0.5 + md.focus_ring_distance, 14.0); // 20 / 2 + 4
+    assert_eq!(md.track_height * 0.5 + md.focus_ring_distance, 16.0); // 24 / 2 + 4
+}
+
+/// Width of the column a stretched `SizedToggleHarness` spans, wider than any of its toggles.
+const STRETCHED_WIDTH: f32 = 320.;
+
+struct SizedToggleHarness {
+    size: MoonSize,
+    checked: bool,
+    label: Option<&'static str>,
+    description: Option<&'static str>,
+    label_side: MoonToggleLabelSide,
+    /// Stretches the toggle across a `STRETCHED_WIDTH` column instead of shrinking it to its
+    /// content.
+    stretched: bool,
+}
+
+impl SizedToggleHarness {
+    fn bare(size: MoonSize, checked: bool) -> Self {
+        Self {
+            size,
+            checked,
+            label: None,
+            description: None,
+            label_side: MoonToggleLabelSide::Right,
+            stretched: false,
+        }
+    }
+}
+
+impl gpui::Render for SizedToggleHarness {
+    fn render(
+        &mut self,
+        _: &mut gpui::Window,
+        _: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{InteractiveElement as _, IntoElement as _, ParentElement as _, Styled as _};
+
+        let mut toggle = MoonToggle::new("sized")
+            .size(self.size)
+            .checked(self.checked)
+            .label_side(self.label_side);
+        if let Some(label) = self.label {
+            toggle = toggle.label(label);
+        }
+        if let Some(description) = self.description {
+            toggle = toggle.description(description);
+        }
+        if self.stretched {
+            crate::v_flex()
+                .w(px(STRETCHED_WIDTH))
+                .child(toggle)
+                .into_any_element()
+        } else {
+            // A flex row shrinks the probe to its content, so the probe measures the toggle.
+            crate::h_flex()
+                .child(
+                    gpui::div()
+                        .debug_selector(|| "sized-control".into())
+                        .child(toggle),
+                )
+                .into_any_element()
+        }
+    }
+}
+
+fn render_toggle(
+    cx: &mut gpui::TestAppContext,
+    harness: SizedToggleHarness,
+) -> gpui::VisualTestContext {
+    let window = cx.add_window(move |_, _| harness);
+    let cx = gpui::VisualTestContext::from_window(window.into(), cx);
+    cx.run_until_parked();
+    cx
+}
+
+/// Catches the rendered track or thumb drifting from the reviewed geometry: a Sm toggle is a 36x20
+/// track with a 16px thumb and a Md toggle a 44x24 track with a 20px thumb, and the thumb sits 2px
+/// in from the track's outer edge on the top, the bottom and the side it rests against. Measuring
+/// the thumb's insets from inside the track's 1px border would push it 1px down and towards the
+/// right, off centre in both states.
+#[gpui::test]
+fn track_and_thumb_render_at_the_reviewed_size(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for (tier, track, thumb) in [
+        (MoonSize::Sm, (36., 20.), 16.),
+        (MoonSize::Md, (44., 24.), 20.),
+    ] {
+        for checked in [false, true] {
+            let mut cx = render_toggle(cx, SizedToggleHarness::bare(tier, checked));
+            let control = cx.debug_bounds("sized-control").expect("probe must render");
+            let track_bounds = cx.debug_bounds("sized:track").expect("track must render");
+            let thumb_bounds = cx.debug_bounds("sized:thumb").expect("thumb must render");
+
+            assert_eq!(control.size, size(px(track.0), px(track.1)), "{tier:?}");
+            assert_eq!(
+                track_bounds.size,
+                size(px(track.0), px(track.1)),
+                "{tier:?}"
+            );
+            assert_eq!(thumb_bounds.size, size(px(thumb), px(thumb)), "{tier:?}");
+            assert_eq!(thumb_bounds.top() - track_bounds.top(), px(2.), "{tier:?}");
+            assert_eq!(
+                track_bounds.bottom() - thumb_bounds.bottom(),
+                px(2.),
+                "{tier:?}"
+            );
+            if checked {
+                assert_eq!(
+                    track_bounds.right() - thumb_bounds.right(),
+                    px(2.),
+                    "{tier:?}"
+                );
+            } else {
+                assert_eq!(
+                    thumb_bounds.left() - track_bounds.left(),
+                    px(2.),
+                    "{tier:?}"
+                );
+            }
+        }
+    }
+}
+
+/// Catches a toggle's text leaving the checkbox's layout: the label must sit on one text line
+/// (20px Sm, 24px Md) centred on the track, the track-to-text gap must be 8px or 12px, and the
+/// supporting text must stack under the label at 0px or 2px, on either side of the track. The
+/// toggle is stretched across a wider column, where a text column that fills the row would push the
+/// track away from a label on its left.
+#[gpui::test]
+fn label_and_description_lay_out_like_a_checkbox(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for (tier, line, gap, description_gap) in
+        [(MoonSize::Sm, 20., 8., 0.), (MoonSize::Md, 24., 12., 2.)]
+    {
+        for label_side in [MoonToggleLabelSide::Right, MoonToggleLabelSide::Left] {
+            let mut cx = render_toggle(
+                cx,
+                SizedToggleHarness {
+                    label: Some("Overlay hints"),
+                    description: Some("Show hints over the chart"),
+                    label_side,
+                    stretched: true,
+                    ..SizedToggleHarness::bare(tier, false)
+                },
+            );
+            let track = cx.debug_bounds("sized:track").expect("track must render");
+            let label = cx.debug_bounds("sized:label").expect("label must render");
+            let description = cx
+                .debug_bounds("sized:description")
+                .expect("description must render");
+
+            assert_eq!(label.size.height, px(line), "{tier:?}");
+            assert_eq!(label.center().y, track.center().y, "{tier:?}");
+            assert_eq!(
+                description.top() - label.bottom(),
+                px(description_gap),
+                "{tier:?}"
+            );
+            assert_eq!(description.left(), label.left(), "{tier:?}");
+            if label_side == MoonToggleLabelSide::Left {
+                assert!(
+                    track.right() < px(STRETCHED_WIDTH),
+                    "{tier:?} track must follow its label, not the end of the row"
+                );
+            }
+            let text_gap = match label_side {
+                MoonToggleLabelSide::Right => label.left() - track.right(),
+                MoonToggleLabelSide::Left => track.left() - label.right().max(description.right()),
+            };
+            assert_eq!(text_gap, px(gap), "{tier:?} {label_side:?}");
+        }
+    }
+}
+
+/// Catches a toggle reserving text space for text it does not show: an empty label must render
+/// no text column and no gap, so the toggle stays exactly its track.
+#[gpui::test]
+fn toggle_with_empty_label_renders_only_its_track(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let mut cx = render_toggle(
+        cx,
+        SizedToggleHarness {
+            label: Some(""),
+            ..SizedToggleHarness::bare(MoonSize::Sm, false)
+        },
+    );
+    let control = cx.debug_bounds("sized-control").expect("probe must render");
+    assert_eq!(control.size, size(px(36.), px(20.)));
+    assert!(cx.debug_bounds("sized:label").is_none());
 }
 
 struct ToggleHarness;
@@ -211,4 +426,29 @@ fn click_focuses_toggle_so_the_ring_appears(cx: &mut gpui::TestAppContext) {
         cx.debug_bounds("probe:focus-ring").is_some(),
         "click must explicitly focus the toggle so the ring renders"
     );
+}
+
+/// Catches `MoonToggleVariant::Slim` drifting away from the default toggle before its own design is
+/// specified, and catches a new toggle defaulting to anything but `Default`: until the slim design
+/// lands both variants draw the same track and thumb, so a caller that already asks for `Slim` gets
+/// today's toggle rather than a half-finished one. Changing this test is how the slim design says
+/// it has arrived.
+#[test]
+fn slim_variant_draws_as_the_default_toggle_until_its_design_lands() {
+    assert_eq!(MoonToggleVariant::default(), MoonToggleVariant::Default);
+    assert_eq!(MoonToggle::new("probe").variant, MoonToggleVariant::Default);
+
+    for tier in MoonToggleSize::SUPPORTED_TIERS {
+        let metrics = MoonToggleSize::Tier(tier).reference_metrics();
+        assert_eq!(
+            MoonToggleVariant::Default.metrics(metrics),
+            metrics,
+            "{tier:?}"
+        );
+        assert_eq!(
+            MoonToggleVariant::Slim.metrics(metrics),
+            MoonToggleVariant::Default.metrics(metrics),
+            "{tier:?}"
+        );
+    }
 }

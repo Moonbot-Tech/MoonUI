@@ -2779,7 +2779,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleMetrics, MoonToggleSize};"
+      "signature": "pub use toggle::{ MoonToggle, MoonToggleLabelSide, MoonToggleMetrics, MoonToggleSize, MoonToggleVariant, };"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -4739,6 +4739,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub enum MoonToggleVariant"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
     },
     {
@@ -4796,6 +4800,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub fn variant(mut self, variant: MoonToggleVariant) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",

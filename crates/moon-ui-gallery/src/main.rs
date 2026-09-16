@@ -37,11 +37,11 @@ use moon_ui::{
     MoonStatusIndicator, MoonStatusItem, MoonStepper, MoonSurface, MoonSurfaceVariant, MoonSwitch,
     MoonTabItem, MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle,
     MoonTag, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonTimePicker,
-    MoonTimePickerState, MoonToggle, MoonTone, MoonTooltip, MoonTooltipPlacement, MoonTooltipSize,
-    MoonTooltipView, MoonTree, MoonTreeItem, MoonTreeSelectionMode, MoonTreeState, MoonVirtualList,
-    MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand,
-    MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex, moon_h_resizable,
-    moon_resizable_panel, rgba_from, v_flex,
+    MoonTimePickerState, MoonToggle, MoonToggleVariant, MoonTone, MoonTooltip,
+    MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem,
+    MoonTreeSelectionMode, MoonTreeState, MoonVirtualList, MoonVirtualListScrollHandle,
+    MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, PanelView,
+    Root, TabPanel, ThemeMode, h_flex, moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
 };
 
 mod gallery;

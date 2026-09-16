@@ -1,5 +1,5 @@
-//! The Checkboxes gallery page: checkboxes and radios in every combination of size, text and
-//! state, plus tones, text edge cases and live controlled examples.
+//! The Checkboxes gallery page: checkboxes, radios and toggles in every combination of size, text
+//! and state, plus tones, text edge cases and live controlled examples.
 
 use super::*;
 use gpui::AnyElement;
@@ -12,6 +12,10 @@ const MATRIX_SUPPORT_TEXT: &str = "Keep me signed in";
 const RADIO_LABEL: &str = "Limit order";
 /// Support text of the radio matrix cells that carry it.
 const RADIO_SUPPORT_TEXT: &str = "Fill at my price";
+/// Label of the toggle matrix cells that carry one.
+const TOGGLE_LABEL: &str = "Live prices";
+/// Support text of the toggle matrix cells that carry it.
+const TOGGLE_SUPPORT_TEXT: &str = "Stream every tick";
 /// Width of the state names that start each matrix row.
 const STATE_COLUMN_WIDTH: f32 = 116.0;
 
@@ -65,6 +69,12 @@ impl ChoiceText {
             Self::LabelAndSupport | Self::Support => 172.0,
         }
     }
+
+    /// Returns the column width for a toggle of `size`: a checkbox's column widened by how much
+    /// wider the track (36 or 44px) is than a checkbox's box (16 or 20px).
+    fn toggle_width(self, size: MoonSize) -> f32 {
+        self.width(size) + if size >= MoonSize::Md { 24.0 } else { 20.0 }
+    }
 }
 
 /// The state a showcased control is drawn in: one matrix row each.
@@ -95,6 +105,8 @@ impl ChoiceState {
         Self::Disabled,
         Self::DisabledChecked,
     ];
+    /// Every state a toggle can show, the same as a radio's.
+    const TOGGLE: [Self; 4] = Self::RADIO;
 
     /// Returns the row heading.
     fn title(self) -> &'static str {
@@ -196,11 +208,33 @@ fn matrix_radio(size: MoonSize, text: ChoiceText, state: ChoiceState) -> MoonRad
     }
 }
 
-/// Renders a matrix card: a heading row of `texts`, then a row per state whose cells come from
-/// `cell`.
+/// Returns the toggle for one matrix cell of `size`, drawn in `state`.
+///
+/// Every cell keeps its own checked state, so an enabled one can be clicked through.
+fn matrix_toggle(size: MoonSize, text: ChoiceText, state: ChoiceState) -> MoonToggle {
+    let id = format!(
+        "checkboxes-toggle-{}-{}-{}",
+        size_key(size),
+        text.key(),
+        state.key()
+    );
+    let toggle = MoonToggle::new(SharedString::from(id))
+        .size(size)
+        .default_checked(state.checked())
+        .disabled(state.disabled());
+    match text {
+        ChoiceText::None => toggle,
+        ChoiceText::Label => toggle.label(TOGGLE_LABEL),
+        ChoiceText::LabelAndSupport => toggle.label(TOGGLE_LABEL).description(TOGGLE_SUPPORT_TEXT),
+        ChoiceText::Support => toggle.description(TOGGLE_SUPPORT_TEXT),
+    }
+}
+
+/// Renders a matrix card: a heading row of `texts` with each column `width` wide, then a row per
+/// state whose cells come from `cell`.
 fn choice_matrix<E: IntoElement>(
     title: &'static str,
-    size: MoonSize,
+    width: impl Fn(ChoiceText) -> f32,
     texts: &[ChoiceText],
     states: &[ChoiceState],
     cell: impl Fn(ChoiceText, ChoiceState) -> E,
@@ -209,9 +243,9 @@ fn choice_matrix<E: IntoElement>(
     let heading = h_flex()
         .gap(px(12.0))
         .child(div().w(px(STATE_COLUMN_WIDTH)))
-        .children(texts.iter().map(|text| {
+        .children(texts.iter().map(|&text| {
             div()
-                .w(px(text.width(size)))
+                .w(px(width(text)))
                 .child(caption(text.title(), cx).render())
         }));
     // Rows sit closer than the card's own spacing so both checkbox matrices fit one snapshot.
@@ -229,7 +263,7 @@ fn choice_matrix<E: IntoElement>(
                 .children(
                     texts
                         .iter()
-                        .map(|&text| div().w(px(text.width(size))).child(cell(text, state))),
+                        .map(|&text| div().w(px(width(text))).child(cell(text, state))),
                 )
         }));
     card(title, cx).child(rows)
@@ -269,6 +303,9 @@ impl Gallery {
                     .child(self.render_live_checkboxes(cx)),
             )
             .child(radio_matrix(MoonSize::Md, "Radio / Md", cx))
+            .child(toggle_matrix(MoonSize::Sm, "Toggle / Sm", cx))
+            .child(toggle_matrix(MoonSize::Md, "Toggle / Md", cx))
+            .child(toggle_variants_card(cx))
             .child(text_edge_cases_card(cx))
             .child(self.render_density_radios(cx))
     }
@@ -403,7 +440,7 @@ impl Gallery {
 fn checkbox_matrix(size: MoonSize, title: &'static str, cx: &App) -> gpui::Div {
     choice_matrix(
         title,
-        size,
+        |text| text.width(size),
         &ChoiceText::ALL,
         &ChoiceState::CHECKBOX,
         |text, state| matrix_checkbox(size, text, state),
@@ -415,12 +452,54 @@ fn checkbox_matrix(size: MoonSize, title: &'static str, cx: &App) -> gpui::Div {
 fn radio_matrix(size: MoonSize, title: &'static str, cx: &App) -> gpui::Div {
     choice_matrix(
         title,
-        size,
+        |text| text.width(size),
         &ChoiceText::ALL,
         &ChoiceState::RADIO,
         |text, state| matrix_radio(size, text, state),
         cx,
     )
+}
+
+/// Renders the toggle matrix for `size`: every toggle state against every text combination.
+fn toggle_matrix(size: MoonSize, title: &'static str, cx: &App) -> gpui::Div {
+    choice_matrix(
+        title,
+        |text| text.toggle_width(size),
+        &ChoiceText::ALL,
+        &ChoiceState::TOGGLE,
+        |text, state| matrix_toggle(size, text, state),
+        cx,
+    )
+}
+
+/// Renders every toggle variant at both sizes, off and on, so a variant's own look sits beside
+/// the default toggle's. `Slim` draws as the default until its design is specified.
+fn toggle_variants_card(cx: &App) -> gpui::Div {
+    const VARIANTS: [(MoonToggleVariant, &str); 2] = [
+        (MoonToggleVariant::Default, "Default"),
+        (MoonToggleVariant::Slim, "Slim"),
+    ];
+    card("Toggle variants", cx).children(VARIANTS.into_iter().map(|(variant, name)| {
+        h_flex()
+            .gap(px(12.0))
+            .child(div().w(px(64.0)).child(caption(name, cx).render()))
+            .children(
+                [MoonSize::Sm, MoonSize::Md]
+                    .into_iter()
+                    .flat_map(move |size| {
+                        [false, true].into_iter().map(move |checked| {
+                            MoonToggle::new(SharedString::from(format!(
+                                "checkboxes-toggle-variant-{}-{}-{checked}",
+                                name.to_ascii_lowercase(),
+                                size_key(size),
+                            )))
+                            .size(size)
+                            .variant(variant)
+                            .default_checked(checked)
+                        })
+                    }),
+            )
+    }))
 }
 
 /// Renders a checked checkbox and radio in every tone, since the tone colours the checked fill.
@@ -506,6 +585,16 @@ fn text_edge_cases_card(cx: &App) -> gpui::Div {
                     .label(LONG_LABEL)
                     .description(LONG_SUPPORT)
                     .checked(true)
+                    .into_any_element(),
+            ))
+            .child(case(
+                "Wrapping toggle + support",
+                size,
+                MoonToggle::new(SharedString::from(format!("checkboxes-wrap-toggle-{key}")))
+                    .size(size)
+                    .label(LONG_LABEL)
+                    .description(LONG_SUPPORT)
+                    .default_checked(true)
                     .into_any_element(),
             ))
             .child(case(
