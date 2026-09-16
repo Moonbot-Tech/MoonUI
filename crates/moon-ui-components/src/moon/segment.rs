@@ -3,7 +3,7 @@ use gpui::*;
 use std::rc::Rc;
 
 use super::{
-    foundation::{MoonIndexedClickHandler, accent_underline_colored},
+    foundation::{MoonIndexedClickHandler, MoonSize, accent_underline_colored},
     text::{MoonText, fit_text_to_width, measure_text_width},
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, contrast_ratio, rgba_from},
@@ -29,6 +29,18 @@ const SEGMENT_HOTKEY_SIZE: f32 = 8.5;
 const SEGMENT_HOTKEY_WEIGHT: f32 = 400.0;
 const SEGMENT_LABEL_SIZE: f32 = 11.0;
 const SEGMENT_LABEL_FIT_WEIGHT: f32 = 500.0;
+
+/// Label and hotkey text metrics for the active tier: `(label_size, label_line, hotkey_size, hotkey_line)`.
+///
+/// Measurement and render MUST read the same values, or fitted cells are narrower than the
+/// text drawn in them.
+fn segment_text_metrics(tokens: &MoonThemeTokens) -> (f32, f32, f32, f32) {
+    if tokens.tier() == MoonSize::Xs {
+        (12.0, 16.0, 9.5, 12.0)
+    } else {
+        (SEGMENT_LABEL_SIZE, 14.0, SEGMENT_HOTKEY_SIZE, 12.0)
+    }
+}
 
 type MoonIndexedScrollHandler = Rc<dyn Fn(usize, &ScrollWheelEvent, &mut Window, &mut App)>;
 
@@ -245,6 +257,7 @@ impl MoonSegmentItem {
     ///     The updated fitted item.
     pub fn fit_width(mut self, cx: &App, min_width: f32, max_width: f32) -> Self {
         let tokens = MoonTheme::active_tokens(cx);
+        let (label_size, _, hotkey_size, _) = segment_text_metrics(&tokens);
         let min_width = tokens.font_width(min_width);
         let max_width = tokens.font_width(max_width).max(min_width);
         let chrome_width = tokens.ui(SEGMENT_PAD_X) * 2.0 + tokens.ui(SEGMENT_GAP);
@@ -256,22 +269,13 @@ impl MoonSegmentItem {
             min_width,
             max_width,
             chrome_width,
+            |text| measure_text_width(cx, &tokens, text, hotkey_size, SEGMENT_HOTKEY_WEIGHT, true),
             |text| {
                 measure_text_width(
                     cx,
                     &tokens,
                     text,
-                    SEGMENT_HOTKEY_SIZE,
-                    SEGMENT_HOTKEY_WEIGHT,
-                    true,
-                )
-            },
-            |text| {
-                measure_text_width(
-                    cx,
-                    &tokens,
-                    text,
-                    SEGMENT_LABEL_SIZE,
+                    label_size,
                     SEGMENT_LABEL_FIT_WEIGHT,
                     true,
                 )
@@ -434,13 +438,17 @@ impl MoonSegmentedControl {
         let on_click = self.on_click.clone();
         let on_scroll = self.on_scroll.clone();
         let mut replacements = self.replacements;
+        let (label_size, label_line, hotkey_size, hotkey_line) = segment_text_metrics(&tokens);
 
         let mut root = div()
             .id(self.id)
             .relative()
             .flex()
             .items_center()
-            .h(px(tokens.fit_height(26.0, 14.0, 6.0)))
+            .h(px(tokens.fit_band(
+                tokens.tier_band_base(26.0, |m| m.line_height),
+                14.0,
+            )))
             .gap(px(tokens.ui(self.item_gap)))
             .whitespace_nowrap();
 
@@ -505,8 +513,8 @@ impl MoonSegmentedControl {
                         MoonText::new(item.hotkey)
                             .color(key_color)
                             .alpha(if disabled { 0.40 } else { key_alpha })
-                            .font_size(SEGMENT_HOTKEY_SIZE)
-                            .line_height(12.0)
+                            .font_size(hotkey_size)
+                            .line_height(hotkey_line)
                             .weight(SEGMENT_HOTKEY_WEIGHT)
                             .mono(true)
                             .uppercase(false)
@@ -516,8 +524,8 @@ impl MoonSegmentedControl {
                         MoonText::new(item.label)
                             .color(label_color)
                             .alpha(if disabled { 0.40 } else { 1.0 })
-                            .font_size(SEGMENT_LABEL_SIZE)
-                            .line_height(14.0)
+                            .font_size(label_size)
+                            .line_height(label_line)
                             .weight(if selected {
                                 SEGMENT_LABEL_FIT_WEIGHT
                             } else {

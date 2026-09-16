@@ -247,9 +247,9 @@ impl MoonCheckboxMetrics {
 
     /// Resolves `size` against the theme's scale.
     ///
-    /// The `Sm` and `Md` tiers are reviewed designs with fixed geometry, so they follow only the UI
-    /// zoom (`scale.ui`): the theme's text scaling (`scale.font`, `scale.font_delta`) does not
-    /// grow their box or their text. A `Size::Size` box keeps following text scaling.
+    /// The `Xs`, `Sm` and `Md` tiers are reviewed designs with fixed geometry, so they follow only
+    /// the UI zoom (`scale.ui`): the theme's text scaling (`scale.font`, `scale.font_delta`) does
+    /// not grow their box or their text. A `Size::Size` box keeps following text scaling.
     pub(crate) fn resolve(size: Size, tokens: &MoonThemeTokens) -> Self {
         let base = Self::base_for_size(size);
         match size {

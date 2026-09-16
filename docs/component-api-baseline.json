@@ -4179,6 +4179,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn strip_height(tokens: &MoonThemeTokens) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
       "signature": "pub fn width(mut self, width: f32) -> Self"
     },
     {
@@ -4503,6 +4507,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn fit_band(&self, base_height: f32, base_line_height: f32) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn fit_height(&self, base_height: f32, base_line_height: f32, base_pad_y: f32) -> f32"
     },
     {
@@ -4587,11 +4595,31 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn table_header_base(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn table_header_height(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn table_row_base(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn table_row_height(&self) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn text(&self, font_size: f32, line_height: f32) -> MoonTextMetrics"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn tier(&self) -> MoonSize"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn tier_band_base(&self, standard_base: f32, metric: fn(MoonControlMetrics) -> f32) -> f32"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",

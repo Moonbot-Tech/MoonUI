@@ -7,6 +7,7 @@ use gpui::*;
 use regex::Regex;
 
 use super::{
+    foundation::MoonSize,
     theme::MoonTheme,
     tokens::{MoonRect, MoonTone},
 };
@@ -40,7 +41,7 @@ pub struct MoonInput {
     state: Option<Entity<MoonInputState>>,
     placeholder: SharedString,
     default_value: SharedString,
-    size: MoonInputSize,
+    size: Option<MoonInputSize>,
     disabled: bool,
     cleanable: bool,
     clean_on_escape: Option<bool>,
@@ -64,7 +65,7 @@ impl MoonInput {
             state: None,
             placeholder: SharedString::from(""),
             default_value: SharedString::from(""),
-            size: MoonInputSize::Normal,
+            size: None,
             disabled: false,
             cleanable: false,
             clean_on_escape: None,
@@ -102,7 +103,7 @@ impl MoonInput {
     }
 
     pub fn size(mut self, size: MoonInputSize) -> Self {
-        self.size = size;
+        self.size = Some(size);
         self
     }
 
@@ -232,8 +233,15 @@ impl RenderOnce for MoonInput {
             });
         }
 
+        let size = self.size.unwrap_or_else(|| {
+            if tokens.tier() == MoonSize::Xs {
+                MoonInputSize::Compact
+            } else {
+                MoonInputSize::Normal
+            }
+        });
         let mut input = Input::new(&state)
-            .with_size(size_for(self.size))
+            .with_size(size_for(size))
             .disabled(self.disabled)
             .cleanable(self.cleanable)
             .selected(self.selected)
@@ -261,7 +269,7 @@ impl RenderOnce for MoonInput {
             pad_x,
             pad_y,
             gap,
-        } = self.size
+        } = size
         {
             let line_height = tokens.line_height(line_height);
             let height = tokens.ui(height).max(line_height + tokens.ui(pad_y) * 2.0);

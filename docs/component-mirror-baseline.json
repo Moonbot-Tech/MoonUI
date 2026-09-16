@@ -173,12 +173,12 @@
       "local_paths": [
         "checkbox.rs"
       ],
-      "local_hash": "9f8dd5ce3e68b95d",
+      "local_hash": "fb5ab3bfde122273",
       "local_files": [
         {
           "path": "checkbox.rs",
-          "hash": "9628a7b9970defa2",
-          "bytes": 51708
+          "hash": "b9c61d1a2c21eec4",
+          "bytes": 52233
         }
       ],
       "donor_hash": "c665cd46d9f5aa2a",
@@ -227,12 +227,12 @@
       "local_paths": [
         "combobox.rs"
       ],
-      "local_hash": "302153879bd1e2b7",
+      "local_hash": "e645b6303a418133",
       "local_files": [
         {
           "path": "combobox.rs",
-          "hash": "9b7a63399a7fc4bc",
-          "bytes": 51060
+          "hash": "709e82aad68cabcb",
+          "bytes": 52680
         }
       ],
       "donor_hash": "2324438aee108e17",
@@ -437,7 +437,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "65d74102a3afe7ff",
+      "local_hash": "66b8196a2c8bdc79",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -506,8 +506,8 @@
         },
         {
           "path": "input/input.rs",
-          "hash": "3d13606af19dd4fe",
-          "bytes": 21567
+          "hash": "4ebe2e7550fade39",
+          "bytes": 21801
         },
         {
           "path": "input/lsp/code_actions.rs",
@@ -1521,7 +1521,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "65d74102a3afe7ff",
+      "local_hash": "66b8196a2c8bdc79",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -1590,8 +1590,8 @@
         },
         {
           "path": "input/input.rs",
-          "hash": "3d13606af19dd4fe",
-          "bytes": 21567
+          "hash": "4ebe2e7550fade39",
+          "bytes": 21801
         },
         {
           "path": "input/lsp/code_actions.rs",

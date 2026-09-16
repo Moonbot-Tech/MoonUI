@@ -14,7 +14,7 @@ use super::{
 use crate::{
     event::InteractiveElementExt as _,
     moon::{
-        MOON_ICON_CARET_DOWN, MoonDropdown, MoonMenuItem, MoonSize,
+        MOON_ICON_CARET_DOWN, MoonDropdown, MoonMenuItem, MoonSize, MoonTabStrip,
         background::MoonBackgroundPolicy,
         button::{MoonButton, MoonButtonSize, MoonButtonVariant},
         h_flex,
@@ -32,7 +32,7 @@ use crate::{
 /// Returns:
 ///     The fitted header height used by both the tab strip and the split-drop inset.
 pub(super) fn tab_header_height(tokens: &MoonThemeTokens) -> f32 {
-    tokens.fit_height(29.0, 13.0, 8.0)
+    tokens.fit_band(tokens.tier_band_base(29.0, |m| m.line_height), 13.0)
 }
 
 /// Glyph and matching host tooltip for the dock zoom control.
@@ -227,9 +227,11 @@ impl RenderOnce for TabPanel {
                 let tab_suffix = (!selected)
                     .then(|| panel.title_suffix(window, cx))
                     .flatten();
-                // Match the top MoonTabStrip: a 28-unit mono tab with an amber bottom underline
-                // instead of a panel-colored active background. Drag, drop, and double-click all
-                // share this host so docking behavior stays independent of its presentation.
+                // Match the top MoonTabStrip: a mono tab with an amber bottom underline instead of
+                // a panel-colored active background, its height enforced by construction through
+                // MoonTabStrip::strip_height rather than a hand-copied expression. Drag, drop, and
+                // double-click all share this host so docking behavior stays independent of its
+                // presentation.
                 let mut tab_host = div()
                     .id(ElementId::from(SharedString::from(format!(
                         "{}:tab-host:{ix}",
@@ -237,7 +239,7 @@ impl RenderOnce for TabPanel {
                     ))))
                     .debug_selector(move || tab_debug_selector)
                     .relative()
-                    .h(px(tokens.fit_height(28.0, 13.0, 7.5)))
+                    .h(px(MoonTabStrip::strip_height(&tokens)))
                     .flex()
                     .flex_none()
                     .items_center()

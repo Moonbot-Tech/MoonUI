@@ -147,6 +147,11 @@ impl MoonTabStrip {
         self
     }
 
+    /// The strip's band height at the active density tier.
+    pub fn strip_height(tokens: &MoonThemeTokens) -> f32 {
+        tokens.fit_band(tokens.tier_band_base(28.0, |m| m.line_height), 13.0)
+    }
+
     pub fn render_with_palette(
         self,
         window: &mut Window,
@@ -178,7 +183,7 @@ impl MoonTabStrip {
         tokens: MoonThemeTokens,
     ) -> impl IntoElement {
         let strip_id = self.id.clone();
-        let tab_h = tokens.fit_height(28.0, 13.0, 7.5);
+        let tab_h = Self::strip_height(&tokens);
         let selected_ix = self.items.iter().position(|item| item.selected);
         let item_metas: Vec<(SharedString, bool, bool)> = self
             .items
@@ -316,12 +321,17 @@ fn render_moon_tab(
     let fixed_width = item.width;
     let fg = if active { p.text } else { p.text_muted };
     let fg_alpha = if disabled { 0.45 } else { 1.0 };
+    let (label_size, label_line) = if tokens.tier() == MoonSize::Xs {
+        (12.0, 16.0)
+    } else {
+        (10.0, 13.0)
+    };
 
     let label = MoonText::new(item.label)
         .color(fg)
         .alpha(fg_alpha)
-        .font_size(10.0)
-        .line_height(13.0)
+        .font_size(label_size)
+        .line_height(label_line)
         .weight(if active { 600.0 } else { 400.0 })
         .mono(true)
         .uppercase(false)
@@ -330,7 +340,7 @@ fn render_moon_tab(
     let mut tab = div()
         .id(("moon-tab", ix))
         .relative()
-        .h(px(tokens.fit_height(28.0, 13.0, 7.5)))
+        .h(px(MoonTabStrip::strip_height(&tokens)))
         .flex()
         .flex_none()
         .items_center()

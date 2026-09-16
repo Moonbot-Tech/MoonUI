@@ -546,8 +546,8 @@ pub struct MoonDataTable {
     bounds: Option<MoonRect>,
     columns: Vec<MoonDataTableColumn>,
     row_count: usize,
-    row_height: f32,
-    header_height: f32,
+    row_height: Option<f32>,
+    header_height: Option<f32>,
     state: Option<Entity<MoonDataTableState>>,
     render_row: Rc<dyn Fn(usize, &mut Window, &mut App) -> MoonDataRow>,
     scroll_handle: Option<MoonVirtualListScrollHandle>,
@@ -595,8 +595,8 @@ impl MoonDataTable {
             bounds: None,
             columns: Vec::new(),
             row_count,
-            row_height: 25.0,
-            header_height: 26.0,
+            row_height: None,
+            header_height: None,
             state: None,
             render_row: Rc::new(render_row),
             scroll_handle: None,
@@ -638,13 +638,18 @@ impl MoonDataTable {
         self
     }
 
+    /// Sets an explicit row height, in unscaled design-reference pixels, overriding the density
+    /// tier's own at every tier. Omitted, the row height follows the active density tier instead.
     pub fn row_height(mut self, row_height: f32) -> Self {
-        self.row_height = row_height;
+        self.row_height = Some(row_height);
         self
     }
 
+    /// Sets an explicit header height, in unscaled design-reference pixels, overriding the
+    /// density tier's own at every tier. Omitted, the header height follows the active density
+    /// tier instead.
     pub fn header_height(mut self, header_height: f32) -> Self {
-        self.header_height = header_height;
+        self.header_height = Some(header_height);
         self
     }
 
@@ -951,8 +956,14 @@ impl RenderOnce for MoonDataTable {
             )
         });
         let render_row = self.render_row.clone();
-        let row_height = tokens.fit_height(self.row_height, 14.0, 5.5);
-        let header_height = tokens.fit_height(self.header_height, 11.0, 7.5);
+        let row_height = self.row_height.map_or_else(
+            || tokens.table_row_height(),
+            |h| tokens.fit_height(h, 14.0, 5.5),
+        );
+        let header_height = self.header_height.map_or_else(
+            || tokens.table_header_height(),
+            |h| tokens.fit_height(h, 11.0, 7.5),
+        );
         let id = self.id.clone();
         let state_for_rows = state.clone();
         let background_policy = self.background_policy;

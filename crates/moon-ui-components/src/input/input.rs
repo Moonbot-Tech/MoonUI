@@ -46,7 +46,15 @@ impl MoonInputMetrics {
 
     fn base_for_size(size: Size) -> Self {
         match size {
-            Size::XSmall | Size::Small => Self {
+            Size::XSmall => Self {
+                height: px(20.),
+                font_size: px(12.),
+                line_height: px(16.),
+                pad_x: px(6.),
+                radius: px(4.),
+                gap: px(4.),
+            },
+            Size::Small => Self {
                 height: px(22.),
                 font_size: px(10.),
                 line_height: px(13.),

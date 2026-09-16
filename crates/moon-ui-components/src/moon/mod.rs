@@ -91,6 +91,7 @@ pub use breadcrumb::{MoonBreadcrumb, MoonBreadcrumbItem};
 pub use button::{
     MoonButton, MoonButtonIconSlot, MoonButtonSegment, MoonButtonSize, MoonButtonVariant,
 };
+pub(crate) use button::{resolve_button_size, tier_button_metrics};
 pub use checkbox::{MoonCheckbox, MoonCheckboxSize};
 pub use collapsible::MoonCollapsible;
 pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};
