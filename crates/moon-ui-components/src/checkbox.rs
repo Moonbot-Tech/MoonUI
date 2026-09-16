@@ -260,7 +260,21 @@ impl MoonCheckboxMetrics {
 
     fn base_for_size(size: Size) -> Self {
         match size {
-            Size::XSmall | Size::Small => Self {
+            Size::XSmall => Self {
+                box_size: px(12.),
+                font_size: px(12.),
+                line_height: px(16.),
+                label_weight: FontWeight::MEDIUM,
+                description_weight: FontWeight::NORMAL,
+                gap: px(4.),
+                description_gap: px(0.),
+                radius: px(4.),
+                focus_ring_distance: px(4.),
+                focus_ring_width: px(2.),
+                mark_size: px(9.),
+                mark_stroke: Some(px(1.25)),
+            },
+            Size::Small => Self {
                 box_size: px(16.),
                 font_size: px(14.),
                 line_height: px(20.),
