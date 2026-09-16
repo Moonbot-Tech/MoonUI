@@ -468,13 +468,11 @@ impl RenderOnce for MoonToggle {
             .text_size(choice.font_size)
             .text_color(label_color)
             .when(self.mono, |this| this.font_family(tokens.font_family(true)))
-            .rounded(px(track_height * 0.5))
             .when(disabled, |this| this.cursor_default())
+            // The row itself paints nothing: hovering or pressing a toggle leaves the surface
+            // behind the track and its text alone, as it does on a checkbox or radio.
             .when(!disabled, |this| {
-                this.track_focus(&focus_handle)
-                    .cursor_pointer()
-                    .hover(|this| this.bg(rgba_from(p.overlay, 0.025)))
-                    .active(|this| this.bg(rgba_from(p.overlay, 0.015)))
+                this.track_focus(&focus_handle).cursor_pointer()
             });
 
         root = match self.label_side {
