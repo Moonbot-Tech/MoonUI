@@ -2607,7 +2607,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use input::{MoonInput, MoonInputEvent, MoonInputState, MoonInputValidator};"
+      "signature": "pub use input::{MoonInput, MoonInputEvent, MoonInputSize, MoonInputState, MoonInputValidator};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",

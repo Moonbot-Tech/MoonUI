@@ -135,7 +135,7 @@ pub use hotkey_input::MoonHotkeyModifierWatch;
 pub use hover_card::{MoonHoverCard, MoonHoverCardState};
 pub use icons::{MOON_ICON_CARET_DOWN, MOON_ICON_CHECK};
 pub use index_path::IndexPath;
-pub use input::{MoonInput, MoonInputEvent, MoonInputState, MoonInputValidator};
+pub use input::{MoonInput, MoonInputEvent, MoonInputSize, MoonInputState, MoonInputValidator};
 pub use input_mask::{MoonInputMaskPattern, MoonInputMaskToken};
 pub use kbd::{MoonKbd, MoonKbdSize};
 pub use label::MoonLabel;
