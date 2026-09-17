@@ -310,6 +310,11 @@
       "reason": "The mirrored Longbridge switch module was deleted. Its one remaining caller, the settings bool field, renders a MoonToggle, so the crate no longer carries a second switch implementation.",
       "file": "crates/moon-ui-components/src/lib.rs",
       "signature": "pub mod switch"
+    },
+    {
+      "reason": "Toggles dropped the Xs tier added in #73: its 20x12 track with an 8px thumb was drawn against the 28x16/36x20 scale that the reviewed toggle design replaced, and no Xs was drawn for the new sizes or for the slim variant. SUPPORTED_TIERS is [Sm, Md] again and an Xs request snaps up to Sm, as it did before #73.",
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];"
     }
   ]
 }

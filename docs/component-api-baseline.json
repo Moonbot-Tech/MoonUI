@@ -4727,7 +4727,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
-      "signature": "pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];"
+      "signature": "pub const SUPPORTED_TIERS: [MoonSize; 2] = [MoonSize::Sm, MoonSize::Md];"
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
