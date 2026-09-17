@@ -57,7 +57,9 @@ fn tier_text_matches_the_checkbox_of_the_same_tier() {
         .with_ui_scale(1.5)
         .dark;
     for tier in MoonToggleSize::SUPPORTED_TIERS {
-        let toggle = MoonToggleSize::Tier(tier).resolve(&tokens).choice();
+        let toggle = MoonToggleSize::Tier(tier)
+            .resolve(MoonToggleVariant::Default, &tokens)
+            .choice();
         let checkbox = MoonCheckboxMetrics::resolve(tier_size(tier), &tokens);
         assert_eq!(toggle.font_size, checkbox.font_size, "{tier:?}");
         assert_eq!(toggle.line_height, checkbox.line_height, "{tier:?}");
@@ -100,13 +102,13 @@ fn toggle_colors_follow_the_colour_roles() {
         (MoonPalette::TERMINAL, MoonColors::LIGHT),
         (MoonPalette::LIGHT, MoonColors::DARK),
     ] {
-        let off = ToggleColors::resolve(p, roles, None, false, false);
+        let off = ToggleColors::resolve(p, roles, MoonToggleVariant::Default, None, false, false);
         assert_eq!(off.track, roles.bg_tertiary.into());
         assert_eq!(off.track_hover, off.track);
         assert_eq!(off.border, roles.border_secondary.into());
         assert_eq!(off.thumb, roles.fg_white.into());
 
-        let on = ToggleColors::resolve(p, roles, None, true, false);
+        let on = ToggleColors::resolve(p, roles, MoonToggleVariant::Default, None, true, false);
         assert_eq!(on.track, roles.bg_brand_solid.into());
         assert_eq!(on.track_hover, roles.bg_brand_solid_hover.into());
         assert!(on.border.is_transparent());
@@ -124,41 +126,81 @@ fn an_explicit_tone_fills_a_checked_track_instead_of_the_brand() {
     let roles = MoonColors::DARK;
     let warning = rgba_from(MoonTone::Warning.color(p), 1.0);
 
-    let on = ToggleColors::resolve(p, roles, Some(MoonTone::Warning), true, false);
+    let on = ToggleColors::resolve(
+        p,
+        roles,
+        MoonToggleVariant::Default,
+        Some(MoonTone::Warning),
+        true,
+        false,
+    );
     assert_eq!(on.track, warning);
     assert_eq!(on.track_hover, warning);
     assert!(on.border.is_transparent());
     assert_eq!(on.thumb, roles.fg_white.into());
 
-    let off = ToggleColors::resolve(p, roles, Some(MoonTone::Warning), false, false);
+    let off = ToggleColors::resolve(
+        p,
+        roles,
+        MoonToggleVariant::Default,
+        Some(MoonTone::Warning),
+        false,
+        false,
+    );
     assert_eq!(off.track, roles.bg_tertiary.into());
     assert_eq!(off.border, roles.border_secondary.into());
 }
 
-/// Catches a disabled toggle fading colour by colour again: the track keeps the colours it paints
-/// when enabled and dims to 50% as one piece, outline and thumb with it, so the thumb never fades
-/// into the track at a different rate. Its label and supporting text are not part of that dimming
-/// — they carry the choice roles' own disabled colours, as a checkbox's do.
+/// Catches a disabled toggle going back to painting its colours translucent. GPUI fades each
+/// element on its own rather than the control as a whole, so a translucent thumb shows the track
+/// through it and reads as a tint of the track instead of a faded white. Every colour is mixed
+/// halfway into `bg_primary` and stays opaque instead, which is what a control at half opacity
+/// looks like. A colour that paints nothing must stay transparent, or an outline the variant leaves
+/// off would come back as a surface-coloured ring. The label and supporting text are not part of
+/// this: they carry the choice roles' own disabled colours, as a checkbox's do.
 #[test]
-fn a_disabled_toggle_dims_as_one_piece_while_its_text_dims_on_its_own() {
+fn a_disabled_toggle_mixes_its_colours_into_the_surface_rather_than_fading_them() {
     let p = MoonPalette::TERMINAL;
     let roles = MoonColors::DARK;
+    let surface: gpui::Hsla = roles.bg_primary.into();
+    let halfway = |color: gpui::Hsla| {
+        let faded = gpui::Rgba::from(color).alpha(color.a * 0.5);
+        gpui::Hsla::from(gpui::Rgba::from(surface).blend(faded))
+    };
 
-    for checked in [false, true] {
-        let enabled = ToggleColors::resolve(p, roles, None, checked, false);
-        let disabled = ToggleColors::resolve(p, roles, None, checked, true);
+    for variant in [MoonToggleVariant::Default, MoonToggleVariant::Slim] {
+        for checked in [false, true] {
+            let enabled = ToggleColors::resolve(p, roles, variant, None, checked, false);
+            let disabled = ToggleColors::resolve(p, roles, variant, None, checked, true);
 
-        assert_eq!(enabled.track_opacity, 1.0);
-        assert_eq!(disabled.track_opacity, 0.5);
-        assert_eq!(disabled.track, enabled.track);
-        assert_eq!(disabled.border, enabled.border);
-        assert_eq!(disabled.thumb, enabled.thumb);
+            for (enabled, disabled) in [
+                (enabled.track, disabled.track),
+                (enabled.track_hover, disabled.track_hover),
+                (enabled.border, disabled.border),
+                (enabled.thumb, disabled.thumb),
+                (enabled.thumb_border, disabled.thumb_border),
+            ] {
+                if enabled.a == 0.0 {
+                    assert!(
+                        disabled.is_transparent(),
+                        "{variant:?} checked {checked}: a colour that paints nothing must stay so"
+                    );
+                } else {
+                    assert_eq!(
+                        disabled,
+                        halfway(enabled),
+                        "{variant:?} checked {checked}: every colour is mixed halfway into the surface"
+                    );
+                    assert_eq!(disabled.a, 1.0, "{variant:?} and stays opaque");
+                }
+            }
+        }
 
         // The text comes from the shared choice colours, which dim it on their own.
-        let text = ChoiceColors::resolve(p, roles, None, checked, true);
+        let text = ChoiceColors::resolve(p, roles, None, true, true);
         assert_ne!(
             text.label,
-            ChoiceColors::resolve(p, roles, None, checked, false).label
+            ChoiceColors::resolve(p, roles, None, true, false).label
         );
     }
 }
@@ -172,11 +214,11 @@ fn a_disabled_toggle_dims_as_one_piece_while_its_text_dims_on_its_own() {
 fn tier_font_follows_ui_zoom_not_font_scale() {
     let tokens = MoonThemeConfig::moon_terminal().with_font_delta(3.0).dark;
 
-    let sm = MoonToggleSize::Tier(MoonSize::Sm).resolve(&tokens);
+    let sm = MoonToggleSize::Tier(MoonSize::Sm).resolve(MoonToggleVariant::Default, &tokens);
     assert_eq!(sm.font_size, tokens.ui(14.0));
     assert_ne!(sm.font_size, tokens.font(14.0));
 
-    let md = MoonToggleSize::Tier(MoonSize::Md).resolve(&tokens);
+    let md = MoonToggleSize::Tier(MoonSize::Md).resolve(MoonToggleVariant::Default, &tokens);
     assert_eq!(md.font_size, tokens.ui(16.0));
     assert_ne!(md.font_size, tokens.font(16.0));
 }
@@ -230,12 +272,12 @@ fn custom_keeps_text_scaling_while_tier_does_not() {
         gap: 8.0,
     };
 
-    let resolved = custom.resolve(&tokens);
+    let resolved = custom.resolve(MoonToggleVariant::Default, &tokens);
     assert_eq!(resolved.font_size, tokens.font(14.0));
     assert_eq!(resolved.line_height, tokens.line_height(20.0));
     assert_ne!(resolved.font_size, tokens.ui(14.0));
 
-    let tier = MoonToggleSize::Tier(MoonSize::Sm).resolve(&tokens);
+    let tier = MoonToggleSize::Tier(MoonSize::Sm).resolve(MoonToggleVariant::Default, &tokens);
     assert_eq!(tier.line_height, tokens.ui(20.0));
     assert_ne!(tier.line_height, tokens.line_height(20.0));
 }
@@ -260,6 +302,7 @@ const STRETCHED_WIDTH: f32 = 320.;
 
 struct SizedToggleHarness {
     size: MoonSize,
+    variant: MoonToggleVariant,
     checked: bool,
     label: Option<&'static str>,
     description: Option<&'static str>,
@@ -273,6 +316,7 @@ impl SizedToggleHarness {
     fn bare(size: MoonSize, checked: bool) -> Self {
         Self {
             size,
+            variant: MoonToggleVariant::Default,
             checked,
             label: None,
             description: None,
@@ -292,6 +336,7 @@ impl gpui::Render for SizedToggleHarness {
 
         let mut toggle = MoonToggle::new("sized")
             .size(self.size)
+            .variant(self.variant)
             .checked(self.checked)
             .label_side(self.label_side);
         if let Some(label) = self.label {
@@ -336,40 +381,74 @@ fn render_toggle(
 #[gpui::test]
 fn track_and_thumb_render_at_the_reviewed_size(cx: &mut gpui::TestAppContext) {
     cx.update(crate::init);
-    for (tier, track, thumb) in [
-        (MoonSize::Sm, (36., 20.), 16.),
-        (MoonSize::Md, (44., 24.), 20.),
+    // A default toggle keeps its thumb 2px inside the track; a slim one's thumb is the track's
+    // own height, so it sits flush against every edge.
+    for (variant, tier, track, thumb, gap) in [
+        (
+            MoonToggleVariant::Default,
+            MoonSize::Sm,
+            (36., 20.),
+            16.,
+            2.,
+        ),
+        (
+            MoonToggleVariant::Default,
+            MoonSize::Md,
+            (44., 24.),
+            20.,
+            2.,
+        ),
+        (MoonToggleVariant::Slim, MoonSize::Sm, (32., 16.), 16., 0.),
+        (MoonToggleVariant::Slim, MoonSize::Md, (40., 20.), 20., 0.),
     ] {
         for checked in [false, true] {
-            let mut cx = render_toggle(cx, SizedToggleHarness::bare(tier, checked));
+            let mut cx = render_toggle(
+                cx,
+                SizedToggleHarness {
+                    variant,
+                    ..SizedToggleHarness::bare(tier, checked)
+                },
+            );
             let control = cx.debug_bounds("sized-control").expect("probe must render");
             let track_bounds = cx.debug_bounds("sized:track").expect("track must render");
             let thumb_bounds = cx.debug_bounds("sized:thumb").expect("thumb must render");
 
-            assert_eq!(control.size, size(px(track.0), px(track.1)), "{tier:?}");
+            assert_eq!(
+                control.size,
+                size(px(track.0), px(track.1)),
+                "{variant:?} {tier:?}"
+            );
             assert_eq!(
                 track_bounds.size,
                 size(px(track.0), px(track.1)),
-                "{tier:?}"
+                "{variant:?} {tier:?}"
             );
-            assert_eq!(thumb_bounds.size, size(px(thumb), px(thumb)), "{tier:?}");
-            assert_eq!(thumb_bounds.top() - track_bounds.top(), px(2.), "{tier:?}");
+            assert_eq!(
+                thumb_bounds.size,
+                size(px(thumb), px(thumb)),
+                "{variant:?} {tier:?}"
+            );
+            assert_eq!(
+                thumb_bounds.top() - track_bounds.top(),
+                px(gap),
+                "{variant:?} {tier:?}"
+            );
             assert_eq!(
                 track_bounds.bottom() - thumb_bounds.bottom(),
-                px(2.),
-                "{tier:?}"
+                px(gap),
+                "{variant:?} {tier:?}"
             );
             if checked {
                 assert_eq!(
                     track_bounds.right() - thumb_bounds.right(),
-                    px(2.),
-                    "{tier:?}"
+                    px(gap),
+                    "{variant:?} {tier:?}"
                 );
             } else {
                 assert_eq!(
                     thumb_bounds.left() - track_bounds.left(),
-                    px(2.),
-                    "{tier:?}"
+                    px(gap),
+                    "{variant:?} {tier:?}"
                 );
             }
         }
@@ -488,28 +567,124 @@ fn click_focuses_toggle_so_the_ring_appears(cx: &mut gpui::TestAppContext) {
     );
 }
 
-/// Catches `MoonToggleVariant::Slim` drifting away from the default toggle before its own design is
-/// specified, and catches a new toggle defaulting to anything but `Default`: until the slim design
-/// lands both variants draw the same track and thumb, so a caller that already asks for `Slim` gets
-/// today's toggle rather than a half-finished one. Changing this test is how the slim design says
-/// it has arrived.
+/// Catches the slim variant drifting from its reviewed reference (Sm 32x16 track under a 16px
+/// thumb, Md 40x20 under 20px, both outlined a full pixel against the default's hairline), and
+/// catches a new toggle defaulting to anything but `Default`. A slim thumb is exactly its track's
+/// height, so it rides the track instead of sitting inside it; the two then share one silhouette at
+/// the resting end, which the design accepts. A thumb any smaller would read as a shrunken default
+/// toggle.
 #[test]
-fn slim_variant_draws_as_the_default_toggle_until_its_design_lands() {
+fn slim_variant_matches_its_designer_reference() {
     assert_eq!(MoonToggleVariant::default(), MoonToggleVariant::Default);
     assert_eq!(MoonToggle::new("probe").variant, MoonToggleVariant::Default);
 
+    for (tier, track_width, track_height, thumb_size) in [
+        (MoonSize::Sm, 32.0, 16.0, 16.0),
+        (MoonSize::Md, 40.0, 20.0, 20.0),
+    ] {
+        let slim = MoonToggleSize::Tier(tier).reference_metrics_for(MoonToggleVariant::Slim);
+        assert_eq!(slim.track_width, track_width, "{tier:?}");
+        assert_eq!(slim.track_height, track_height, "{tier:?}");
+        assert_eq!(slim.thumb_size, thumb_size, "{tier:?}");
+        assert_eq!(slim.border, 1.0, "{tier:?}");
+        assert_eq!(
+            slim.thumb_size, slim.track_height,
+            "{tier:?} a slim thumb is the height of its track"
+        );
+
+        let default = MoonToggleSize::Tier(tier).reference_metrics();
+        assert_eq!(default.border, 0.5, "{tier:?}");
+        assert_eq!(
+            (default.track_height - default.thumb_size) * 0.5,
+            2.0,
+            "{tier:?} a default thumb keeps its 2px gap"
+        );
+        assert!(slim.track_height < default.track_height, "{tier:?}");
+        assert!(slim.track_width < default.track_width, "{tier:?}");
+    }
+}
+
+/// Catches a slim toggle's two outlines drifting apart: its track and its thumb carry one colour
+/// per state, so the thumb reads as part of the track rather than a disc laid over it. That colour
+/// is `border_secondary` while off, unchanged under the pointer, `toggle_slim_border_pressed` once
+/// on, and `toggle_slim_border_pressed_hover` when a checked one is hovered. A default toggle keeps
+/// its own rule — an unchecked track outlined in `border_secondary`, a checked one left to its
+/// fill, and a thumb that is never outlined. The fills are shared, so they must not differ between
+/// the variants.
+#[test]
+fn a_slim_toggle_outlines_its_track_and_thumb_alike() {
+    for (p, roles) in [
+        (MoonPalette::TERMINAL, MoonColors::LIGHT),
+        (MoonPalette::LIGHT, MoonColors::DARK),
+    ] {
+        let slim = |checked| {
+            ToggleColors::resolve(p, roles, MoonToggleVariant::Slim, None, checked, false)
+        };
+        let default = |checked| {
+            ToggleColors::resolve(p, roles, MoonToggleVariant::Default, None, checked, false)
+        };
+
+        for checked in [false, true] {
+            let slim = slim(checked);
+            assert_eq!(
+                slim.thumb_border, slim.border,
+                "the thumb must match the track it rides, checked {checked}"
+            );
+            assert_eq!(
+                slim.thumb_border_hover, slim.border_hover,
+                "and must keep matching it under the pointer, checked {checked}"
+            );
+        }
+
+        let off = slim(false);
+        assert_eq!(off.border, roles.border_secondary.into());
+        assert_eq!(off.border_hover, off.border);
+
+        let on = slim(true);
+        assert_eq!(on.border, roles.toggle_slim_border_pressed.into());
+        assert_eq!(
+            on.border_hover,
+            roles.toggle_slim_border_pressed_hover.into()
+        );
+
+        assert!(default(true).border.is_transparent());
+        assert_eq!(default(false).border, roles.border_secondary.into());
+        assert_eq!(default(false).border_hover, default(false).border);
+        for checked in [false, true] {
+            assert!(default(checked).thumb_border.is_transparent());
+            assert!(default(checked).thumb_border_hover.is_transparent());
+            assert_eq!(slim(checked).track, default(checked).track);
+            assert_eq!(slim(checked).track_hover, default(checked).track_hover);
+            assert_eq!(slim(checked).thumb, default(checked).thumb);
+        }
+    }
+}
+
+/// Catches a slim toggle's text drifting from the default variant's: the two differ in the track,
+/// the thumb and the outline only, so the label, the supporting text and the gap between text and
+/// track must stay identical at both tiers and at any zoom. A slim toggle beside a default one, or
+/// beside a checkbox, must line its text up with them.
+#[test]
+fn slim_keeps_the_text_of_the_default_variant() {
+    let tokens = MoonThemeConfig::moon_terminal()
+        .with_font_delta(3.0)
+        .with_ui_scale(1.5)
+        .dark;
+
     for tier in MoonToggleSize::SUPPORTED_TIERS {
-        let metrics = MoonToggleSize::Tier(tier).reference_metrics();
+        let size = MoonToggleSize::Tier(tier);
+        let slim = size.resolve(MoonToggleVariant::Slim, &tokens).choice();
+        let default = size.resolve(MoonToggleVariant::Default, &tokens).choice();
+
+        assert_eq!(slim.font_size, default.font_size, "{tier:?}");
+        assert_eq!(slim.line_height, default.line_height, "{tier:?}");
+        assert_eq!(slim.label_weight, default.label_weight, "{tier:?}");
         assert_eq!(
-            MoonToggleVariant::Default.metrics(metrics),
-            metrics,
+            slim.description_weight, default.description_weight,
             "{tier:?}"
         );
-        assert_eq!(
-            MoonToggleVariant::Slim.metrics(metrics),
-            MoonToggleVariant::Default.metrics(metrics),
-            "{tier:?}"
-        );
+        assert_eq!(slim.gap, default.gap, "{tier:?}");
+        assert_eq!(slim.description_gap, default.description_gap, "{tier:?}");
     }
 }
 
@@ -517,34 +692,56 @@ fn slim_variant_draws_as_the_default_toggle_until_its_design_lands() {
 /// already checked must show its thumb at that end rather than sliding in from the other; a change
 /// must start a travel; the travel must survive the renders that happen while it runs, or the
 /// animation is cut off after one frame and the thumb jumps; and a change mid-flight must turn the
-/// thumb around from the end it was heading for instead of restarting from where it began.
+/// thumb around from the end it was heading for instead of restarting from where it began. A
+/// travel counts as settled only once its duration has passed, which is what lets the track hand
+/// its cap to a thumb that has come to a stop on it.
 #[test]
 fn thumb_travel_starts_survives_and_turns_around() {
     assert_eq!(ThumbTravel::initial(true), ThumbTravel::Resting(true));
     assert_eq!(ThumbTravel::initial(false).from(), None);
+    assert!(ThumbTravel::initial(false).settled());
 
     let resting = ThumbTravel::Resting(false);
     assert_eq!(resting.next(false), resting);
 
     let travelling = resting.next(true);
-    assert_eq!(
-        travelling,
-        ThumbTravel::Travelling {
-            from: false,
-            to: true
-        }
+    assert!(
+        matches!(
+            travelling,
+            ThumbTravel::Travelling {
+                from: false,
+                to: true,
+                ..
+            }
+        ),
+        "a change must start a travel from the end it is leaving"
     );
     assert_eq!(travelling.from(), Some(false));
+    assert!(!travelling.settled(), "a travel starts unsettled");
     // Re-rendering mid-travel must not restart or end it.
     assert_eq!(travelling.next(true), travelling);
 
-    assert_eq!(
-        travelling.next(false),
-        ThumbTravel::Travelling {
-            from: true,
-            to: false
-        }
+    let turned = travelling.next(false);
+    assert!(
+        matches!(
+            turned,
+            ThumbTravel::Travelling {
+                from: true,
+                to: false,
+                ..
+            }
+        ),
+        "a change mid-flight must turn around from the end it was heading for"
     );
+
+    // The clock is the only thing that settles a travel.
+    let arrived = ThumbTravel::Travelling {
+        from: false,
+        to: true,
+        since: std::time::Instant::now() - THUMB_TRAVEL,
+    };
+    assert!(arrived.settled());
+    assert_eq!(arrived.from(), Some(false));
 }
 
 struct TravellingToggleHarness {
@@ -611,4 +808,41 @@ fn the_thumb_slides_between_ends_over_the_travel_duration(cx: &mut gpui::TestApp
         px(2.),
         "the thumb must reach the checked end once the travel is over"
     );
+}
+
+/// Catches a slim thumb's ring going back to being a border over the thumb's own colour. Drawn that
+/// way, a pixel the ring only partly covers mixes the thumb's white into the ring instead of the
+/// track behind it, and the thumb picks up a pale halo on the circle's diagonals where the ring
+/// runs between two pixel centres. The ring is two discs instead: the thumb is the ring's colour
+/// and a face inset by the ring's width carries the thumb's own. A default toggle draws no ring, so
+/// it has no face either.
+#[gpui::test]
+fn a_slim_thumb_is_a_ring_around_a_face_rather_than_a_bordered_disc(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for (tier, ring) in [(MoonSize::Sm, 1.), (MoonSize::Md, 1.)] {
+        for checked in [false, true] {
+            let mut cx = render_toggle(
+                cx,
+                SizedToggleHarness {
+                    variant: MoonToggleVariant::Slim,
+                    ..SizedToggleHarness::bare(tier, checked)
+                },
+            );
+            let thumb = cx.debug_bounds("sized:thumb").expect("thumb must render");
+            let face = cx
+                .debug_bounds("sized:thumb-face")
+                .expect("a slim thumb must draw its face inside the ring");
+
+            assert_eq!(face.left() - thumb.left(), px(ring), "{tier:?}");
+            assert_eq!(thumb.right() - face.right(), px(ring), "{tier:?}");
+            assert_eq!(face.top() - thumb.top(), px(ring), "{tier:?}");
+            assert_eq!(thumb.bottom() - face.bottom(), px(ring), "{tier:?}");
+        }
+
+        let mut cx = render_toggle(cx, SizedToggleHarness::bare(tier, true));
+        assert!(
+            cx.debug_bounds("sized:thumb-face").is_none(),
+            "{tier:?} a default thumb draws no ring, so it needs no face"
+        );
+    }
 }

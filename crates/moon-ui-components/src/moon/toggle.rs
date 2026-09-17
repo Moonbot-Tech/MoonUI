@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gpui::prelude::FluentBuilder;
 use gpui::*;
@@ -25,17 +25,55 @@ pub enum MoonToggleVariant {
     /// The reviewed toggle: a track one text line tall with the thumb inside it.
     #[default]
     Default,
-    /// A slimmer toggle. It draws exactly as [`MoonToggleVariant::Default`] until its own design
-    /// is specified, so a caller can already ask for the one it means.
+    /// A slimmer toggle: a shorter track behind the same text, with a thumb as tall as the track
+    /// itself that carries a 1px outline of its own. `Sm` is a 32x16 track under a 16px thumb and
+    /// `Md` a 40x20 track under a 20px thumb, so the thumb rides the track rather than sitting
+    /// inside it.
     Slim,
 }
 
 impl MoonToggleVariant {
-    /// Returns `metrics` as this variant draws them, which is where a variant's own geometry
-    /// belongs: `Slim` keeps the default track and thumb until its design lands.
-    fn metrics(self, metrics: MoonToggleMetrics) -> MoonToggleMetrics {
+    /// This variant's track, thumb and outline at `tier`, in unscaled design-reference pixels.
+    ///
+    /// The gap from the thumb to the track's outer edge is whatever the two sizes leave: 2px on
+    /// the default toggle, none at all on a slim one, whose thumb is the height of its track.
+    ///
+    /// Returns:
+    ///     The track's width and height, the thumb's size, and the outline's width.
+    fn track(self, tier: MoonSize) -> (f32, f32, f32, f32) {
+        match (self, tier) {
+            (Self::Default, MoonSize::Sm) => (36.0, 20.0, 16.0, 0.5),
+            (Self::Default, _) => (44.0, 24.0, 20.0, 0.5),
+            // A slim thumb is exactly its track's height, as the design has it. The two then share
+            // one silhouette at the end the thumb rests on, where their antialiased edges compound
+            // into a harder, stepped curve; that is the design's trade for a thumb that fills the
+            // track.
+            (Self::Slim, MoonSize::Sm) => (32.0, 16.0, 16.0, 1.0),
+            (Self::Slim, _) => (40.0, 20.0, 20.0, 1.0),
+        }
+    }
+
+    /// Whether the thumb carries an outline of its own.
+    ///
+    /// A slim toggle's thumb rides over the track, so it is ringed to stay legible against it; the
+    /// default toggle's thumb sits inside its track and stays a plain disc.
+    fn rings_thumb(self) -> bool {
         match self {
-            Self::Default | Self::Slim => metrics,
+            Self::Default => false,
+            Self::Slim => true,
+        }
+    }
+
+    /// Whether the track clips the thumb and its shadow.
+    ///
+    /// The default toggle's thumb sits inside its track, so clipping keeps the shadow off the
+    /// surface around it. A slim toggle's thumb is as tall as its track and rides over its
+    /// outline, so clipping there would flatten the thumb's own shadow against the track it sits
+    /// on; it draws unclipped instead.
+    fn clips_thumb(self) -> bool {
+        match self {
+            Self::Default => true,
+            Self::Slim => false,
         }
     }
 }
@@ -43,8 +81,8 @@ impl MoonToggleVariant {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonToggleSize {
     /// A tier of the shared size scale. Toggles come in the checkbox's tiers with the same text and
-    /// spacing: `Sm` (36x20 track) and `Md` (44x24 track); `Xs` renders as `Sm`, and `Lg` and
-    /// above render as `Md`.
+    /// spacing; `Xs` renders as `Sm`, and `Lg` and above render as `Md`. The track is the variant's
+    /// own: `Sm` is 36x20 by default and 32x16 slim, `Md` 44x24 and 40x20.
     Tier(MoonSize),
     Custom {
         track_width: f32,
@@ -76,6 +114,9 @@ pub struct MoonToggleMetrics {
     pub gap: f32,
     /// Space between the label and the description under it.
     pub description_gap: f32,
+    /// Width of the variant's outline, drawn inside whichever of the track or the thumb carries
+    /// it, so it never adds to that element's size.
+    pub border: f32,
     /// Gap from the track edge to the focus ring's outer edge; the ring's stroke lies inside it.
     pub focus_ring_distance: f32,
     pub focus_ring_width: f32,
@@ -89,17 +130,21 @@ impl MoonToggleSize {
         Self::Tier(tokens.tier().nearest(&Self::SUPPORTED_TIERS))
     }
 
-    /// This size's metrics in unscaled design-reference pixels.
+    /// This size's metrics for the default variant, in unscaled design-reference pixels.
     pub fn reference_metrics(self) -> MoonToggleMetrics {
+        self.reference_metrics_for(MoonToggleVariant::Default)
+    }
+
+    /// This size's metrics as `variant` draws them, in unscaled design-reference pixels.
+    ///
+    /// A variant owns the track, the thumb and the outline; the text is the tier's own, so a slim
+    /// toggle carries the same label, supporting text and spacing as the toggle beside it.
+    pub fn reference_metrics_for(self, variant: MoonToggleVariant) -> MoonToggleMetrics {
         match self {
             Self::Tier(t) => {
                 let t = t.nearest(&Self::SUPPORTED_TIERS);
                 let c = t.control_metrics();
-                // Each track is exactly one text line tall, with its thumb 2px in from the edge.
-                let (track_width, track_height, thumb_size, description_gap) = match t {
-                    MoonSize::Sm => (36.0, 20.0, 16.0, 0.0),
-                    _ => (44.0, 24.0, 20.0, 2.0),
-                };
+                let (track_width, track_height, thumb_size, border) = variant.track(t);
                 MoonToggleMetrics {
                     track_width,
                     track_height,
@@ -109,7 +154,8 @@ impl MoonToggleSize {
                     label_weight: 500.0,
                     description_weight: 400.0,
                     gap: c.gap,
-                    description_gap,
+                    description_gap: if t == MoonSize::Sm { 0.0 } else { 2.0 },
+                    border,
                     focus_ring_distance: 4.0,
                     focus_ring_width: 2.0,
                 }
@@ -131,6 +177,8 @@ impl MoonToggleSize {
                 description_weight: 400.0,
                 gap,
                 description_gap: 0.0,
+                // A custom size sets its own track, so only the outline follows the variant.
+                border: variant.track(MoonSize::Md).3,
                 focus_ring_distance: 4.0,
                 focus_ring_width: 2.0,
             },
@@ -138,10 +186,11 @@ impl MoonToggleSize {
     }
 
     /// Metrics as rendered: a tier follows the UI zoom only, `Custom` also follows text scaling.
-    fn resolve(self, tokens: &MoonThemeTokens) -> MoonToggleMetrics {
+    fn resolve(self, variant: MoonToggleVariant, tokens: &MoonThemeTokens) -> MoonToggleMetrics {
+        let reference = self.reference_metrics_for(variant);
         match self {
-            Self::Tier(_) => self.reference_metrics().zoomed(tokens),
-            Self::Custom { .. } => self.reference_metrics().scaled(tokens),
+            Self::Tier(_) => reference.zoomed(tokens),
+            Self::Custom { .. } => reference.scaled(tokens),
         }
     }
 }
@@ -160,6 +209,7 @@ impl MoonToggleMetrics {
             description_weight: self.description_weight,
             gap: ui(self.gap),
             description_gap: ui(self.description_gap),
+            border: ui(self.border),
             focus_ring_distance: ui(self.focus_ring_distance),
             focus_ring_width: ui(self.focus_ring_width),
         }
@@ -180,6 +230,7 @@ impl MoonToggleMetrics {
             description_weight: self.description_weight,
             gap: tokens.ui(self.gap),
             description_gap: tokens.ui(self.description_gap),
+            border: tokens.ui(self.border),
             focus_ring_distance: tokens.ui(self.focus_ring_distance),
             focus_ring_width: tokens.ui(self.focus_ring_width),
         }
@@ -223,8 +274,15 @@ enum ThumbTravel {
     /// Resting at one end, drawn there with no animation. A toggle first rendered checked shows
     /// its thumb at the checked end at once, rather than sliding in from the other.
     Resting(bool),
-    /// Travelling to `to` after the toggle changed, having started from `from`.
-    Travelling { from: bool, to: bool },
+    /// Travelling to `to` after the toggle changed, having started from `from` at `since`.
+    ///
+    /// The state stays here once the thumb arrives, so the animation runs to its end instead of
+    /// being cut off by the next render; `since` is what tells the two apart.
+    Travelling {
+        from: bool,
+        to: bool,
+        since: Instant,
+    },
 }
 
 impl ThumbTravel {
@@ -244,12 +302,23 @@ impl ThumbTravel {
             Self::Resting(at) => Self::Travelling {
                 from: at,
                 to: checked,
+                since: Instant::now(),
             },
             Self::Travelling { to, .. } if to == checked => self,
             Self::Travelling { to, .. } => Self::Travelling {
                 from: to,
                 to: checked,
+                since: Instant::now(),
             },
+        }
+    }
+
+    /// Whether the thumb has arrived, which is what lets the track give its cap up to a thumb that
+    /// has come to a stop on it.
+    fn settled(self) -> bool {
+        match self {
+            Self::Resting(_) => true,
+            Self::Travelling { since, .. } => since.elapsed() >= THUMB_TRAVEL,
         }
     }
 
@@ -404,11 +473,13 @@ impl RenderOnce for MoonToggle {
         let size = self
             .size
             .unwrap_or_else(|| MoonToggleSize::density_default(&tokens));
-        let m = self.variant.metrics(size.resolve(&tokens));
+        let m = size.resolve(self.variant, &tokens);
         let choice = m.choice();
-        // The outline is a hairline drawn inside the track, so it never adds to the track's size.
-        let border = tokens.ui(0.5);
-        let inset = -(m.focus_ring_distance + border);
+        // The outline is drawn inside the track, so it never adds to the track's size.
+        let border = m.border;
+        // The track carries no border of its own now, so the ring sits its own distance outside the
+        // track's box.
+        let inset = -m.focus_ring_distance;
         let p = tokens.palette;
         let checked = self.checked.unwrap_or_else(|| state.read(cx).checked);
         let disabled = self.disabled;
@@ -419,19 +490,20 @@ impl RenderOnce for MoonToggle {
         let track_width = m.track_width;
         let track_height = m.track_height;
         let thumb_size = m.thumb_size;
-        // Insets start inside the track's border, so taking it back off leaves the thumb the same
-        // distance from the track's outer edge on every side.
-        let thumb_inset = (track_height - thumb_size) * 0.5 - border;
+        // The thumb is placed against the track's outer edge, inside a layer that spans it, so the
+        // same gap holds whatever the outline's width: 2px on a default toggle, none on a slim one
+        // whose thumb is as tall as its track.
+        let thumb_gap = (track_height - thumb_size) * 0.5;
         let thumb_left_at = |checked: bool| {
             if checked {
-                track_width - thumb_size - thumb_inset - 2.0 * border
+                track_width - thumb_size - thumb_gap
             } else {
-                thumb_inset
+                thumb_gap
             }
         };
         let thumb_left = thumb_left_at(checked);
         let roles = MoonColors::active(cx);
-        let colors = ToggleColors::resolve(p, roles, self.tone, checked, disabled);
+        let colors = ToggleColors::resolve(p, roles, self.variant, self.tone, checked, disabled);
         // The label and supporting text take the checkbox's and radio's text colours.
         let text_colors = ChoiceColors::resolve(p, roles, None, checked, disabled);
         let focus_handle = window
@@ -449,11 +521,14 @@ impl RenderOnce for MoonToggle {
         };
         let track_selector = format!("{}:track", self.id);
         let thumb_selector = format!("{}:thumb", self.id);
+        let thumb_face_selector = format!("{}:thumb-face", self.id);
         let focus_ring_selector = format!("{}:focus-ring", self.id);
         // The whole row is the hit area, so the track takes its hover fill from a pointer anywhere
         // on the row, its label included, rather than only over the track itself.
         let hover_group = SharedString::from(format!("{}:row", self.id));
         let track_hover = colors.track_hover;
+        let border_hover = colors.border_hover;
+        let thumb_border_hover = colors.thumb_border_hover;
         // Empty text counts as no text, so a bare toggle never gains the text column and its gap.
         let label = self.label.filter(|label| !label.is_empty());
         let description = self
@@ -475,16 +550,50 @@ impl RenderOnce for MoonToggle {
         if current != previous {
             travel.update(cx, |travel, _| *travel = current);
         }
+        // A disabled toggle mixes its colours into the surface rather than painting them
+        // translucent, so the shadow is the one part still faded: it is translucent by nature.
+        let mut thumb_shadow = moon_shadow_sm(roles, &tokens);
+        if disabled {
+            for layer in &mut thumb_shadow {
+                layer.color = layer.color.opacity(ToggleColors::DISABLED_ALPHA);
+            }
+        }
+        // A ringed thumb is one filled disc in the ring's colour with a face laid on top, inset by
+        // the ring's width. Drawing the ring as a border instead leaves the disc's own edge and the
+        // stroke on one curve: GPUI's quad shader mixes the fill into a 1px stroke wherever its
+        // inner and outer bands meet, which thins the ring and steps it around the circle.
+        let rings_thumb = self.variant.rings_thumb();
+        let ring = if rings_thumb { border } else { 0.0 };
         let thumb = div()
             .debug_selector(|| thumb_selector)
             .absolute()
             .left(px(thumb_left))
-            .top(px(thumb_inset))
+            .top(px(thumb_gap))
             .w(px(thumb_size))
             .h(px(thumb_size))
             .rounded(px(thumb_size * 0.5))
-            .bg(colors.thumb)
-            .shadow(moon_shadow_sm(roles, &tokens));
+            .bg(if rings_thumb {
+                colors.thumb_border
+            } else {
+                colors.thumb
+            })
+            .when(!disabled && rings_thumb, |this| {
+                this.group_hover(hover_group.clone(), move |this| this.bg(thumb_border_hover))
+            })
+            .shadow(thumb_shadow)
+            .when(rings_thumb, |this| {
+                this.child(
+                    div()
+                        .debug_selector(|| thumb_face_selector)
+                        .absolute()
+                        .top(px(ring))
+                        .left(px(ring))
+                        .right(px(ring))
+                        .bottom(px(ring))
+                        .rounded(px((thumb_size - ring * 2.0) * 0.5))
+                        .bg(colors.thumb),
+                )
+            });
         let thumb = match current.from() {
             None => thumb.into_any_element(),
             Some(from) => {
@@ -504,6 +613,31 @@ impl RenderOnce for MoonToggle {
             }
         };
 
+        // A thumb the height of its track has the track's own cap for a silhouette. Painting both
+        // lays two antialiased edges on one curve, whose coverage compounds into a stepped edge, so
+        // the rail stops at the thumb's centre with a square end and the thumb completes the pill:
+        // the thumb's disc is exactly the cap the rail gives up, and it hides the square end. A
+        // travelling thumb sits away from both caps, so the rail spans the track whole.
+        let radius = track_height * 0.5;
+        // A travelling thumb sits away from both caps, so the rail spans the track whole until it
+        // arrives. The frame requested here is the one that re-cuts the rail once it has.
+        let settled = current.settled();
+        if !settled {
+            window.request_animation_frame();
+        }
+        let rail_end =
+            (settled && thumb_size >= track_height).then(|| thumb_left + thumb_size * 0.5);
+        let (rail_left, rail_width) = match rail_end {
+            Some(end) if checked => (0.0, end),
+            Some(end) => (end, track_width - end),
+            None => (0.0, track_width),
+        };
+        let (rail_left_radius, rail_right_radius) = match rail_end {
+            Some(_) if checked => (radius, 0.0),
+            Some(_) => (0.0, radius),
+            None => (radius, radius),
+        };
+
         let switch = div()
             .relative()
             .debug_selector(|| track_selector)
@@ -511,19 +645,32 @@ impl RenderOnce for MoonToggle {
             .when(has_text, |this| this.mt(choice.box_offset()))
             .w(px(track_width))
             .h(px(track_height))
-            .rounded(px(track_height * 0.5))
-            .border(px(border))
-            .border_color(colors.border)
-            .bg(colors.track)
-            // A disabled toggle dims as one piece, its outline and thumb with it; the label and
-            // supporting text dim through their own colours instead.
-            .opacity(colors.track_opacity)
-            .when(!disabled, |this| {
-                this.group_hover(hover_group.clone(), move |this| this.bg(track_hover))
-            })
-            // The thumb rides in a well the size of the track's inside, which clips it and its
-            // shadow to the track. The well is its own layer rather than a clip on the track,
-            // because the focus ring hangs outside the track and must not be clipped with it.
+            // The rail carries the track's fill and outline. It is a child rather than the track
+            // itself so that its own border never insets the layers placed against the track's box,
+            // and so that it can give up the cap the thumb draws.
+            .child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .left(px(rail_left))
+                    .w(px(rail_width))
+                    .rounded_tl(px(rail_left_radius))
+                    .rounded_bl(px(rail_left_radius))
+                    .rounded_tr(px(rail_right_radius))
+                    .rounded_br(px(rail_right_radius))
+                    .bg(colors.track)
+                    .border(px(border))
+                    .border_color(colors.border)
+                    .when(!disabled, |this| {
+                        this.group_hover(hover_group.clone(), move |this| {
+                            this.bg(track_hover).border_color(border_hover)
+                        })
+                    }),
+            )
+            // The thumb rides in a layer spanning the track. It is its own child rather than a clip
+            // on the track, because the focus ring hangs outside the track and must not be clipped
+            // with it; whether the layer clips at all is the variant's to say.
             .child(
                 div()
                     .absolute()
@@ -531,8 +678,8 @@ impl RenderOnce for MoonToggle {
                     .left_0()
                     .right_0()
                     .bottom_0()
-                    .rounded(px(track_height * 0.5 - border))
-                    .overflow_hidden()
+                    .rounded(px(track_height * 0.5))
+                    .when(self.variant.clips_thumb(), |this| this.overflow_hidden())
                     .child(thumb),
             )
             .when(is_focused, |this| {
@@ -546,7 +693,7 @@ impl RenderOnce for MoonToggle {
                         .bottom(px(inset))
                         .border(px(m.focus_ring_width))
                         .border_color(rgba_from(ring_accent, 1.0))
-                        .rounded(px(m.track_height * 0.5 + m.focus_ring_distance + border)),
+                        .rounded(px(m.track_height * 0.5 + m.focus_ring_distance)),
                 )
             });
 
@@ -640,24 +787,53 @@ struct ToggleColors {
     /// The track under the pointer. Equal to `track` where the state has no hover colour of its
     /// own, which leaves the track unchanged on hover.
     track_hover: Hsla,
+    /// The track's outline, transparent where the variant outlines its thumb instead.
     border: Hsla,
+    /// The track's outline under the pointer. Equal to `border` where the state has no hover
+    /// colour of its own, which leaves the outline unchanged on hover.
+    border_hover: Hsla,
     thumb: Hsla,
-    /// Opacity of the track together with its outline, thumb and shadow. The label and supporting
-    /// text dim through their own colours instead.
-    track_opacity: f32,
+    /// The thumb's own outline, transparent where the variant outlines its track instead.
+    thumb_border: Hsla,
+    /// The thumb's outline under the pointer, equal to `thumb_border` where nothing changes.
+    thumb_border_hover: Hsla,
 }
 
 impl ToggleColors {
-    /// Opacity of a disabled toggle's track, applied to the track as a whole rather than to each
-    /// colour, which is what a disabled checkbox does to its box.
-    const DISABLED_TRACK_OPACITY: f32 = 0.5;
+    /// How much of a disabled toggle's colour survives the mix into the surface behind it.
+    const DISABLED_ALPHA: f32 = 0.5;
+
+    /// Returns `color` as a disabled toggle paints it: the colour itself, mixed halfway into
+    /// `surface`, and still opaque.
+    ///
+    /// A disabled toggle cannot simply be drawn translucent. GPUI fades each element on its own
+    /// rather than the control as a whole, so a translucent thumb would show the track through it
+    /// instead of fading with it, and the thumb would read as a tint of the track. Mixing the
+    /// colours instead reproduces what the design shows for a control at half opacity, as long as
+    /// the surface behind it is the page's; a toggle on a panel of another colour fades toward the
+    /// page's colour rather than the panel's.
+    ///
+    /// A colour that paints nothing stays transparent, so an outline the variant leaves off does
+    /// not come back as a surface-coloured ring.
+    fn disabled(color: Hsla, surface: Hsla) -> Hsla {
+        if color.a == 0.0 {
+            return color;
+        }
+        let faded = Rgba::from(color).alpha(color.a * Self::DISABLED_ALPHA);
+        Rgba::from(surface).blend(faded).into()
+    }
 
     /// Resolves a toggle's colours from the theme's colour roles.
     ///
-    /// An unchecked toggle is a `bg_tertiary` track behind a `border_secondary` outline. A checked
-    /// one is filled with `bg_brand_solid`, `bg_brand_solid_hover` under the pointer, and draws no
-    /// outline at all. An explicit tone replaces the brand fill with that tone, which has no hover
-    /// colour of its own.
+    /// Both variants fill their track the same way: `bg_tertiary` unchecked, `bg_brand_solid`
+    /// checked and `bg_brand_solid_hover` under the pointer. An explicit tone replaces the brand
+    /// fill with that tone, which has no hover colour of its own.
+    ///
+    /// The default toggle outlines an unchecked track in `border_secondary` and leaves a checked one
+    /// to its fill alone, with a plain thumb and no hover change. A slim toggle outlines its track
+    /// and its thumb in one colour per state: `border_secondary` while off, unchanged under the
+    /// pointer, `toggle_slim_border_pressed` once on, and `toggle_slim_border_pressed_hover` when a
+    /// checked one is hovered.
     ///
     /// The thumb is `fg_white` in both states, which is white on every bundled theme. A disabled
     /// toggle paints the same colours and dims the track, its outline and its thumb as one piece,
@@ -666,6 +842,7 @@ impl ToggleColors {
     /// Args:
     ///     p: The active palette, for a tone's fill and the thumb's shadow.
     ///     roles: The active colour roles, normally `MoonColors::active`.
+    ///     variant: The toggle's visual type, which owns the outline.
     ///     tone: The tone set on the toggle, or `None` for the brand fill.
     ///     checked: Whether the toggle is on.
     ///     disabled: Whether the toggle is disabled.
@@ -676,6 +853,7 @@ impl ToggleColors {
     fn resolve(
         p: MoonPalette,
         roles: MoonColors,
+        variant: MoonToggleVariant,
         tone: Option<MoonTone>,
         checked: bool,
         disabled: bool,
@@ -691,25 +869,69 @@ impl ToggleColors {
             ),
         };
         let unchecked = roles.bg_tertiary.into();
-        Self {
+        // A default toggle's checked track is the brand fill alone; only an unchecked one is
+        // outlined, and neither changes under the pointer. A slim toggle's outline is its thumb's:
+        // `toggle_border` while off, the pressed roles once on, and only then does the pointer
+        // change it.
+        // A slim toggle draws one outline colour per state, around its track and its thumb alike, so
+        // the thumb reads as part of the track it rides rather than as a disc laid over it. The
+        // colour is `border_secondary` while the toggle is off and the pressed roles once it is on,
+        // which is the only pair that answers to the pointer.
+        let slim_outline: (Hsla, Hsla) = if checked {
+            (
+                roles.toggle_slim_border_pressed.into(),
+                roles.toggle_slim_border_pressed_hover.into(),
+            )
+        } else {
+            let border: Hsla = roles.border_secondary.into();
+            (border, border)
+        };
+        let (border, border_hover, thumb_border, thumb_border_hover) = match variant {
+            // The default toggle outlines an empty track in `border_secondary` and leaves a checked
+            // one to its fill; its thumb sits inside the track and stays a plain disc.
+            MoonToggleVariant::Default if checked => (
+                transparent_black(),
+                transparent_black(),
+                transparent_black(),
+                transparent_black(),
+            ),
+            MoonToggleVariant::Default => {
+                let border: Hsla = roles.border_secondary.into();
+                (border, border, transparent_black(), transparent_black())
+            }
+            MoonToggleVariant::Slim => (
+                slim_outline.0,
+                slim_outline.1,
+                slim_outline.0,
+                slim_outline.1,
+            ),
+        };
+        let colors = Self {
             track: if checked { checked_track } else { unchecked },
             track_hover: if checked {
                 checked_track_hover
             } else {
                 unchecked
             },
-            // A checked track is the brand fill alone; only an unchecked one is outlined.
-            border: if checked {
-                transparent_black()
-            } else {
-                roles.border_secondary.into()
-            },
+            border,
+            border_hover,
+            thumb_border,
+            thumb_border_hover,
             thumb: roles.fg_white.into(),
-            track_opacity: if disabled {
-                Self::DISABLED_TRACK_OPACITY
-            } else {
-                1.0
-            },
+        };
+        if !disabled {
+            return colors;
+        }
+        let surface: Hsla = roles.bg_primary.into();
+        let dim = |color: Hsla| Self::disabled(color, surface);
+        Self {
+            track: dim(colors.track),
+            track_hover: dim(colors.track_hover),
+            border: dim(colors.border),
+            border_hover: dim(colors.border_hover),
+            thumb: dim(colors.thumb),
+            thumb_border: dim(colors.thumb_border),
+            thumb_border_hover: dim(colors.thumb_border_hover),
         }
     }
 }

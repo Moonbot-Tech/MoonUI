@@ -4803,6 +4803,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
+      "signature": "pub fn reference_metrics_for(self, variant: MoonToggleVariant) -> MoonToggleMetrics"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub fn size(mut self, size: impl Into<MoonToggleSize>) -> Self"
     },
     {
