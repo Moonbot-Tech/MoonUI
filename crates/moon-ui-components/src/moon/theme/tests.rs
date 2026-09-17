@@ -165,3 +165,57 @@ font = 1.1
     assert_eq!(config.light.tier(), MoonSize::Md);
     assert_eq!(MoonThemeConfig::default().dark.tier(), MoonSize::Md);
 }
+
+/// Catches `MoonThemeTokens::fit_band` changing the legacy Sm/Md expression, which moves
+/// Standard or Large chrome even though the compact-density change must leave both unchanged.
+#[test]
+fn fit_band_keeps_the_existing_expression_outside_xsmall() {
+    use super::MoonSize;
+
+    let triples = [
+        (32.0, 13.0, 9.5),
+        (32.0, 14.0, 9.0),
+        (25.0, 14.0, 5.5),
+        (26.0, 11.0, 7.5),
+        (28.0, 13.0, 7.5),
+        (26.0, 14.0, 6.0),
+        (20.0, 12.0, 4.0),
+    ];
+    for (tier, delta) in [(MoonSize::Sm, 3.0), (MoonSize::Md, 6.0)] {
+        let tokens = MoonThemeConfig::moon_terminal()
+            .with_tier(tier)
+            .with_font_delta(delta)
+            .dark;
+        for (base, line, pad) in triples {
+            assert_eq!(
+                tokens.fit_band(base, line),
+                tokens.fit_height(base, line, pad)
+            );
+        }
+    }
+}
+
+/// Catches `MoonThemeTokens::tier_band_base` deriving non-Xs bases from a tier metric, which
+/// moves reviewed Standard or Large bands instead of confining the new geometry to Compact.
+#[test]
+fn tier_band_bases_are_compact_only() {
+    use super::MoonSize;
+
+    let xs = MoonThemeConfig::moon_terminal()
+        .with_tier(MoonSize::Xs)
+        .dark;
+    let sm = MoonThemeConfig::moon_terminal()
+        .with_tier(MoonSize::Sm)
+        .with_font_delta(3.0)
+        .dark;
+    for (standard, compact) in [
+        (25.0, 21.0),
+        (26.0, 22.0),
+        (32.0, 28.0),
+        (28.0, 24.0),
+        (20.0, 16.0),
+    ] {
+        assert_eq!(xs.tier_band_base(standard, |m| m.line_height), compact);
+        assert_eq!(sm.tier_band_base(standard, |m| m.line_height), standard);
+    }
+}

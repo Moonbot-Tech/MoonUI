@@ -91,6 +91,7 @@ pub use breadcrumb::{MoonBreadcrumb, MoonBreadcrumbItem};
 pub use button::{
     MoonButton, MoonButtonIconSlot, MoonButtonSegment, MoonButtonSize, MoonButtonVariant,
 };
+pub(crate) use button::{resolve_button_size, tier_button_metrics};
 pub use checkbox::{MoonCheckbox, MoonCheckboxSize};
 pub use collapsible::MoonCollapsible;
 pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};
@@ -134,7 +135,7 @@ pub use hotkey_input::MoonHotkeyModifierWatch;
 pub use hover_card::{MoonHoverCard, MoonHoverCardState};
 pub use icons::{MOON_ICON_CARET_DOWN, MOON_ICON_CHECK};
 pub use index_path::IndexPath;
-pub use input::{MoonInput, MoonInputEvent, MoonInputState, MoonInputValidator};
+pub use input::{MoonInput, MoonInputEvent, MoonInputSize, MoonInputState, MoonInputValidator};
 pub use input_mask::{MoonInputMaskPattern, MoonInputMaskToken};
 pub use kbd::{MoonKbd, MoonKbdSize};
 pub use label::MoonLabel;

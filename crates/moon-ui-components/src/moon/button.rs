@@ -732,7 +732,7 @@ fn custom_radius(size: MoonButtonSize) -> Option<f32> {
 ///
 /// Returns:
 ///     A snapped `Tier` or the original `Custom`.
-pub(super) fn resolve_button_size(
+pub(crate) fn resolve_button_size(
     size: Option<MoonButtonSize>,
     tokens: &MoonThemeTokens,
 ) -> MoonButtonSize {
@@ -749,7 +749,7 @@ fn density_button_size(tokens: &MoonThemeTokens) -> MoonButtonSize {
 
 /// Build already-scaled native metrics for a tier. Every field goes through `tokens.ui()`;
 /// this must not call `scaled()`, which would font-scale text and clamp the icon.
-fn tier_button_metrics(
+pub(crate) fn tier_button_metrics(
     tier: MoonSize,
     tokens: &MoonThemeTokens,
 ) -> crate::button::MoonButtonMetrics {

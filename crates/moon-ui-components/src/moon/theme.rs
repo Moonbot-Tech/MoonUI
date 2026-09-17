@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     colors::MoonColors,
     foundation::selected_flat,
-    foundation::{MoonSize, ThemeMode},
+    foundation::{MoonControlMetrics, MoonSize, ThemeMode},
     tokens::{MoonMetrics, MoonPalette, rgba_from},
 };
 use crate::theme::{Theme as BaseTheme, ThemeColor, ThemeMode as BaseThemeMode};
@@ -309,6 +309,49 @@ impl MoonThemeTokens {
     pub fn fit_height(&self, base_height: f32, base_line_height: f32, base_pad_y: f32) -> f32 {
         self.ui(base_height)
             .max(self.line_height(base_line_height) + self.ui(base_pad_y) * 2.0)
+    }
+
+    /// The band base this tier draws, derived from the Standard design's slack.
+    ///
+    /// At `Xs` the Standard base's slack around the `Sm` metric is kept around the `Xs` metric;
+    /// every other tier returns `standard_base` unchanged, so Standard and Large never move.
+    pub fn tier_band_base(&self, standard_base: f32, metric: fn(MoonControlMetrics) -> f32) -> f32 {
+        if self.tier() == MoonSize::Xs {
+            metric(MoonSize::Xs.control_metrics())
+                + (standard_base - metric(MoonSize::Sm.control_metrics()))
+        } else {
+            standard_base
+        }
+    }
+
+    /// [`Self::fit_height`] with the vertical padding derived from the base instead of passed in.
+    ///
+    /// Every existing caller's pad literal is exactly `(base - line) / 2` — 6.5 = (26-13)/2,
+    /// 5.5 = (25-14)/2 — so this is an identity at `Sm` and `Md` for every caller.
+    /// Because the pad is exactly half the slack, at `Xs` (font_delta 0) it returns exactly
+    /// `base_height`: the Compact rendered value IS the Xs base.
+    pub fn fit_band(&self, base_height: f32, base_line_height: f32) -> f32 {
+        self.fit_height(
+            base_height,
+            base_line_height,
+            (base_height - base_line_height) * 0.5,
+        )
+    }
+
+    pub fn table_row_base(&self) -> f32 {
+        self.tier_band_base(self.metrics.table_row_h, |m| m.line_height)
+    }
+
+    pub fn table_header_base(&self) -> f32 {
+        self.tier_band_base(self.metrics.table_header_h, |m| m.line_height)
+    }
+
+    pub fn table_row_height(&self) -> f32 {
+        self.fit_band(self.table_row_base(), 14.0)
+    }
+
+    pub fn table_header_height(&self) -> f32 {
+        self.fit_band(self.table_header_base(), 11.0)
     }
 }
 

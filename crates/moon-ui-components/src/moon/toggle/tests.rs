@@ -8,6 +8,12 @@ use crate::moon::{MoonPalette, MoonScale, MoonSize, MoonThemeConfig, MoonThemeTo
 /// 36x20/16/16-24/12), which would resize the rendered switch and its label unexpectedly.
 #[test]
 fn toggle_metrics_match_designer_reference() {
+    let xs = MoonToggleSize::Tier(MoonSize::Xs).reference_metrics();
+    assert_eq!(
+        (xs.track_width, xs.track_height, xs.thumb_size),
+        (20.0, 12.0, 8.0)
+    );
+
     let sm = MoonToggleSize::Tier(MoonSize::Sm).reference_metrics();
     assert_eq!(sm.track_width, 28.0);
     assert_eq!(sm.track_height, 16.0);
@@ -23,6 +29,17 @@ fn toggle_metrics_match_designer_reference() {
     assert_eq!(md.font_size, 16.0);
     assert_eq!(md.line_height, 24.0);
     assert_eq!(md.gap, 12.0);
+}
+
+/// Catches `moon/toggle.rs:MoonToggleSize::reference_metrics` breaking its fixed inset rule,
+/// which mis-centres Compact, Standard, or Large toggle thumbs within their tracks.
+#[test]
+fn toggle_tiers_keep_the_two_pixel_inset_on_each_side() {
+    for tier in [MoonSize::Xs, MoonSize::Sm, MoonSize::Md] {
+        let metrics = MoonToggleSize::Tier(tier).reference_metrics();
+        assert_eq!(metrics.track_height, metrics.line_height - 4.0);
+        assert_eq!(metrics.thumb_size, metrics.track_height - 4.0);
+    }
 }
 
 /// Catches removing disabled handling or controlled-state ownership from
@@ -90,7 +107,7 @@ fn tier_font_follows_ui_zoom_not_font_scale() {
 #[test]
 fn density_default_snaps_every_tier_to_a_supported_one() {
     for (tier, want) in [
-        (MoonSize::Xs, MoonSize::Sm),
+        (MoonSize::Xs, MoonSize::Xs),
         (MoonSize::Sm, MoonSize::Sm),
         (MoonSize::Md, MoonSize::Md),
         (MoonSize::Lg, MoonSize::Md),

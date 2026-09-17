@@ -15,8 +15,8 @@ pub enum MoonToggleLabelSide {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonToggleSize {
-    /// A tier of the shared size scale. Toggles come in `Sm` (28x16 track) or `Md` (36x20);
-    /// `Xs` renders as `Sm`, `Lg` and above as `Md`.
+    /// A tier of the shared size scale. Toggles come in `Xs` (20x12 track), `Sm` (28x16 track) or
+    /// `Md` (36x20); `Lg` and above render as `Md`.
     Tier(MoonSize),
     Custom {
         track_width: f32,
@@ -54,7 +54,7 @@ pub struct MoonToggleMetrics {
 }
 
 impl MoonToggleSize {
-    pub const SUPPORTED_TIERS: [MoonSize; 2] = [MoonSize::Sm, MoonSize::Md];
+    pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];
 
     /// The app's density tier, snapped to a tier this component supports.
     pub fn density_default(tokens: &MoonThemeTokens) -> Self {
@@ -68,6 +68,7 @@ impl MoonToggleSize {
                 let t = t.nearest(&Self::SUPPORTED_TIERS);
                 let c = t.control_metrics();
                 let (track_width, track_height, thumb_size, description_gap) = match t {
+                    MoonSize::Xs => (20.0, 12.0, 8.0, 0.0),
                     MoonSize::Sm => (28.0, 16.0, 12.0, 0.0),
                     _ => (36.0, 20.0, 16.0, 2.0),
                 };

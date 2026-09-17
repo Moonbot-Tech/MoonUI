@@ -19,7 +19,7 @@ use super::{MoonRadio, MoonRadioSize, RadioMetrics, moon_radio_click_value};
 fn radio_tiers_match_checkbox_tiers() {
     let tokens = MoonThemeConfig::moon_terminal().dark;
     for (tier, box_px, font_px, line_px, gap_px, dot_px) in [
-        (MoonSize::Xs, 16., 14., 20., 8., 6.),
+        (MoonSize::Xs, 12., 12., 16., 4., 4.),
         (MoonSize::Sm, 16., 14., 20., 8., 6.),
         (MoonSize::Md, 20., 16., 24., 12., 8.),
         (MoonSize::Lg, 20., 16., 24., 12., 8.),
@@ -291,7 +291,7 @@ fn radio_metrics_match_designer_reference() {
     tokens.scale.font = 3.0;
     tokens.scale.font_delta = 6.0;
     for (tier, outer, inner, font, line, gap, description_gap) in [
-        (MoonSize::Xs, 32.0, 12.0, 28.0, 40.0, 16.0, 0.0),
+        (MoonSize::Xs, 24.0, 8.0, 24.0, 32.0, 8.0, 0.0),
         (MoonSize::Sm, 32.0, 12.0, 28.0, 40.0, 16.0, 0.0),
         (MoonSize::Md, 40.0, 16.0, 32.0, 48.0, 24.0, 4.0),
         (MoonSize::Lg, 40.0, 16.0, 32.0, 48.0, 24.0, 4.0),

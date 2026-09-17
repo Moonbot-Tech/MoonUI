@@ -19,8 +19,8 @@ use super::{
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonRadioSize {
     /// A tier of the shared size scale. Radios come in the checkbox's tiers with the same text and
-    /// spacing: `Sm` (16px circle) and `Md` (20px circle); `Xs` renders as `Sm`, and `Lg` and above
-    /// render as `Md`.
+    /// spacing: `Xs` (12px circle), `Sm` (16px circle) and `Md` (20px circle); every other tier
+    /// renders as the nearest of the three.
     Tier(MoonSize),
     /// A custom radio whose outer circle is `dot_size` across.
     Custom {
@@ -54,9 +54,13 @@ impl RadioMetrics {
                 let size = tier_size(tier);
                 Self {
                     choice: MoonCheckboxMetrics::resolve(size, tokens),
-                    // The 6 and 8px dots leave an even 5 and 6px ring inside the 16 and 20px
-                    // circles.
-                    dot_size: px(tokens.ui(if size == crate::Size::Small { 6. } else { 8. })),
+                    // The 4, 6 and 8px dots leave an even 4, 5 and 6px ring inside the 12, 16 and
+                    // 20px circles.
+                    dot_size: px(tokens.ui(match size {
+                        crate::Size::XSmall => 4.,
+                        crate::Size::Small => 6.,
+                        _ => 8.,
+                    })),
                 }
             }
             MoonRadioSize::Custom {

@@ -17,7 +17,10 @@ use crate::{
     h_flex,
     input::{clear_button, input_style},
     list::{List, ListState},
-    moon::{MoonPalette, rgba_from},
+    moon::{
+        MoonButtonSize, MoonPalette, MoonSize, MoonTheme, resolve_button_size, rgba_from,
+        tier_button_metrics,
+    },
     searchable_list::{
         SearchableListAdapter, SearchableListChange, SearchableListDelegate, SearchableListItem,
         SearchableListRowLook, SearchableListState,
@@ -87,6 +90,7 @@ struct ComboboxOptions {
     appearance: bool,
     trigger_variant: Option<ButtonVariant>,
     trigger_size: Option<Size>,
+    trigger_button_size: Option<MoonButtonSize>,
     trigger_icon: Option<Icon>,
     check_icon: Option<Icon>,
 }
@@ -106,6 +110,7 @@ impl Default for ComboboxOptions {
             appearance: true,
             trigger_variant: None,
             trigger_size: None,
+            trigger_button_size: None,
             trigger_icon: None,
             check_icon: None,
         }
@@ -127,6 +132,7 @@ where
     menu_chrome: ComboboxMenuChrome,
     trigger_variant: Option<ButtonVariant>,
     trigger_size: Option<Size>,
+    trigger_button_size: Option<MoonButtonSize>,
     trigger_icon: Option<Icon>,
     check_icon: Option<Icon>,
     render_trigger:
@@ -279,6 +285,7 @@ where
             menu_chrome: ComboboxMenuChrome::default(),
             trigger_variant: None,
             trigger_size: None,
+            trigger_button_size: None,
             trigger_icon: None,
             check_icon: None,
             render_trigger: None,
@@ -607,9 +614,22 @@ where
             .and_then(|variant| variant.moon_style(MoonPalette::active(cx), false, false));
         let outline_visible =
             trigger_style.is_none() && (self.state.open || (is_focused && !self.state.disabled));
-        let trigger_metrics = self
-            .trigger_size
-            .map(|size| MoonButtonMetrics::for_size(size, cx));
+        let tokens = MoonTheme::active_tokens(cx);
+        let trigger_metrics = if let Some(size) = self.trigger_button_size {
+            // `trigger_button_size` takes precedence over the legacy `trigger_size` when both are
+            // set, so a caller cannot silently get whichever branch happens to be checked first.
+            Some(match resolve_button_size(Some(size), &tokens) {
+                MoonButtonSize::Tier(tier) => tier_button_metrics(tier, &tokens),
+                MoonButtonSize::Custom { height, .. } => {
+                    MoonButtonMetrics::for_size(Size::Size(px(height)), cx)
+                }
+            })
+        } else {
+            self.trigger_size.map(|size| match size {
+                Size::XSmall => tier_button_metrics(MoonSize::Xs, &tokens),
+                other => MoonButtonMetrics::for_size(other, cx),
+            })
+        };
 
         let (input_bg, input_fg) = input_style(disabled, cx);
         let bg = trigger_style.map_or(input_bg, |style| rgba_from(style.bg, style.bg_alpha));
@@ -832,6 +852,16 @@ where
         self
     }
 
+    /// Size the trigger from the Moon tier scale at every density.
+    ///
+    /// Unlike [`Self::trigger_size`], which goes through the legacy button table, this resolves
+    /// through the same tier metrics `MoonButton` uses, so the trigger matches the buttons beside
+    /// it at every density. Takes precedence over `trigger_size` when both are set.
+    pub fn trigger_button_size(mut self, size: impl Into<MoonButtonSize>) -> Self {
+        self.options.trigger_button_size = Some(size.into());
+        self
+    }
+
     /// Set the placeholder text shown when no items are selected.
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.options.placeholder = Some(placeholder.into());
@@ -953,6 +983,7 @@ where
             this.menu_chrome = opts.menu_chrome;
             this.trigger_variant = opts.trigger_variant;
             this.trigger_size = opts.trigger_size;
+            this.trigger_button_size = opts.trigger_button_size;
             this.trigger_icon = opts.trigger_icon;
             this.check_icon = opts.check_icon;
             this.render_trigger = render_trigger;

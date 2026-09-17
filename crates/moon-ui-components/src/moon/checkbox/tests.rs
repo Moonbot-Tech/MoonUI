@@ -9,7 +9,7 @@ use super::{MoonCheckboxSize, size_for};
 fn checkbox_tiers_resolve_to_nearest_supported_size() {
     let box_for = |tier: MoonSize| size_for(tier.into());
 
-    assert_eq!(box_for(MoonSize::Xs), crate::Size::Small);
+    assert_eq!(box_for(MoonSize::Xs), crate::Size::XSmall);
     assert_eq!(box_for(MoonSize::Sm), crate::Size::Small);
     assert_eq!(box_for(MoonSize::Md), crate::Size::Medium);
     assert_eq!(box_for(MoonSize::Lg), crate::Size::Medium);
@@ -38,7 +38,7 @@ fn checkbox_default_follows_density_without_overriding_explicit_sizes() {
     use crate::moon::MoonThemeTokens;
     let mut tokens = MoonThemeTokens::default();
     for (tier, expected) in [
-        (MoonSize::Xs, crate::Size::Small),
+        (MoonSize::Xs, crate::Size::XSmall),
         (MoonSize::Sm, crate::Size::Small),
         (MoonSize::Md, crate::Size::Medium),
         (MoonSize::Lg, crate::Size::Medium),
@@ -71,4 +71,31 @@ fn checkbox_default_follows_density_without_overriding_explicit_sizes() {
             crate::Size::Size(gpui::px(19.0))
         );
     }
+}
+
+/// Catches `checkbox.rs:MoonCheckboxMetrics::base_for_size` restoring XSmall to Small metrics,
+/// which makes Compact checkboxes as large as Standard instead of retaining their compact design.
+#[test]
+fn compact_checkbox_metrics_are_strictly_below_standard() {
+    use crate::checkbox::MoonCheckboxMetrics;
+    use crate::moon::MoonThemeConfig;
+
+    let xs = MoonCheckboxMetrics::resolve(
+        crate::Size::XSmall,
+        &MoonThemeConfig::moon_terminal()
+            .with_tier(MoonSize::Xs)
+            .dark,
+    );
+    let sm = MoonCheckboxMetrics::resolve(
+        crate::Size::Small,
+        &MoonThemeConfig::moon_terminal()
+            .with_tier(MoonSize::Sm)
+            .dark,
+    );
+    assert!(xs.box_size < sm.box_size);
+    assert!(xs.font_size < sm.font_size);
+    assert!(xs.line_height < sm.line_height);
+    assert!(xs.gap < sm.gap);
+    assert!(xs.mark_size < sm.mark_size);
+    assert!(xs.mark_stroke < sm.mark_stroke);
 }

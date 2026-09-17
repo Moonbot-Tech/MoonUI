@@ -188,8 +188,8 @@ impl<E: Styled> StyledExt for E {}
 
 /// The shared size scale for Moon components, from smallest to largest.
 ///
-/// A component renders only the tiers it supports (a checkbox has `Sm` and `Md`); any other
-/// tier resolves to the nearest supported one instead of failing.
+/// A component renders only the tiers it supports (a checkbox has `Xs`, `Sm` and `Md`); any
+/// other tier resolves to the nearest supported one instead of failing.
 #[derive(
     Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
@@ -222,16 +222,22 @@ pub enum MoonSize {
 /// sets a 24 by 24 CSS pixel pointer-target minimum, subject to exceptions. `Sm` is the
 /// smallest tier meeting the height floor and the intended default for terminal controls;
 /// consumers must also provide adequate target width. This does not change [`MoonSize`]'s
-/// existing `Md` default. `Xs` is the sole tier below the floor, reserved for fixed-height
-/// dense strips (header ticker, status bar) where the spacing exception is satisfied:
+/// existing `Md` default. `Xs` is the sole tier below the floor. One sanctioned use is a
+/// fixed-height dense strip (header ticker, status bar) where the spacing exception is satisfied:
 /// 24px diameter circles centred on undersized targets must not intersect another target
-/// or another undersized target's circle. Density alone does not grant the exception.
+/// or another undersized target's circle. `Xs` sits below the SC 2.5.8 floor, plainly — it does
+/// not meet the 24px minimum on its own. The library exposes `Xs` for two uses: a fixed-height
+/// dense strip under the spacing exception above (unchanged), and a product that offers a
+/// user-selectable Compact density and has accepted that trade-off for the users who choose it.
+/// What must actually hold, because it is checkable: a Compact host row is at least the tier's
+/// `control_metrics().height` tall with the tier's `gap` between neighbours, so undersized
+/// targets do not overlap. This consumer's default density is Standard; Compact is opt-in.
 ///
 /// Tier metrics follow UI zoom only: apply `tokens.ui(value)` to every field, text included,
 /// never `tokens.font()` or `font_delta`. A component's `Custom { .. }` size retains its
 /// existing text scaling. These are reference values, not already scaled pixels.
 ///
-/// `Sm` / `Md` text and radius match the reviewed checkbox values so controls align on a row;
+/// `Xs` / `Sm` / `Md` text and radius match the reviewed checkbox values so controls align on a row;
 /// control height is not checkbox box size. Larger tiers extend the stepped scale for future
 /// consumers; adding this table does not migrate any component.
 #[derive(Clone, Copy, Debug, PartialEq)]

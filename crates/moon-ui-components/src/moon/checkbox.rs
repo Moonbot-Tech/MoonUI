@@ -12,8 +12,8 @@ use super::{
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MoonCheckboxSize {
-    /// A tier of the shared size scale. Checkboxes come in `Sm` (16px box) and `Md` (20px box);
-    /// `Xs` renders as `Sm`, and `Lg` and above render as `Md`.
+    /// A tier of the shared size scale. Checkboxes come in `Xs` (12px box), `Sm` (16px box) and
+    /// `Md` (20px box); every other tier renders as the nearest of the three.
     Tier(MoonSize),
     Custom {
         box_size: f32,
@@ -22,6 +22,11 @@ pub enum MoonCheckboxSize {
         gap: f32,
         radius: f32,
     },
+}
+
+impl MoonCheckboxSize {
+    /// Tiers a checkbox renders; any other tier snaps to the nearest of these.
+    pub const SUPPORTED_TIERS: [MoonSize; 3] = [MoonSize::Xs, MoonSize::Sm, MoonSize::Md];
 }
 
 impl From<MoonSize> for MoonCheckboxSize {
@@ -132,7 +137,7 @@ impl MoonCheckbox {
     /// Resolves omitted size from density, preserving explicit Custom and tier overrides.
     fn resolved_size(&self, tokens: &super::theme::MoonThemeTokens) -> MoonCheckboxSize {
         self.size.unwrap_or_else(|| {
-            MoonCheckboxSize::Tier(tokens.tier().nearest(&[MoonSize::Sm, MoonSize::Md]))
+            MoonCheckboxSize::Tier(tokens.tier().nearest(&MoonCheckboxSize::SUPPORTED_TIERS))
         })
     }
 }
@@ -207,11 +212,12 @@ fn size_for(size: MoonCheckboxSize) -> crate::Size {
     }
 }
 
-/// Returns the checkbox size a tier renders at. Checkboxes, and radios with them, come in `Sm` and
-/// `Md`; every other tier renders as the nearest of the two.
+/// Returns the checkbox size a tier renders at. Checkboxes, and radios with them, come in `Xs`,
+/// `Sm` and `Md`; every other tier renders as the nearest of the three.
 pub(crate) fn tier_size(tier: MoonSize) -> crate::Size {
     match tier {
-        MoonSize::Xs | MoonSize::Sm => crate::Size::Small,
+        MoonSize::Xs => crate::Size::XSmall,
+        MoonSize::Sm => crate::Size::Small,
         MoonSize::Md | MoonSize::Lg | MoonSize::Xl | MoonSize::Xxl => crate::Size::Medium,
     }
 }

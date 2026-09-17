@@ -247,9 +247,9 @@ impl MoonCheckboxMetrics {
 
     /// Resolves `size` against the theme's scale.
     ///
-    /// The `Sm` and `Md` tiers are reviewed designs with fixed geometry, so they follow only the UI
-    /// zoom (`scale.ui`): the theme's text scaling (`scale.font`, `scale.font_delta`) does not
-    /// grow their box or their text. A `Size::Size` box keeps following text scaling.
+    /// The `Xs`, `Sm` and `Md` tiers are reviewed designs with fixed geometry, so they follow only
+    /// the UI zoom (`scale.ui`): the theme's text scaling (`scale.font`, `scale.font_delta`) does
+    /// not grow their box or their text. A `Size::Size` box keeps following text scaling.
     pub(crate) fn resolve(size: Size, tokens: &MoonThemeTokens) -> Self {
         let base = Self::base_for_size(size);
         match size {
@@ -260,7 +260,21 @@ impl MoonCheckboxMetrics {
 
     fn base_for_size(size: Size) -> Self {
         match size {
-            Size::XSmall | Size::Small => Self {
+            Size::XSmall => Self {
+                box_size: px(12.),
+                font_size: px(12.),
+                line_height: px(16.),
+                label_weight: FontWeight::MEDIUM,
+                description_weight: FontWeight::NORMAL,
+                gap: px(4.),
+                description_gap: px(0.),
+                radius: px(4.),
+                focus_ring_distance: px(4.),
+                focus_ring_width: px(2.),
+                mark_size: px(9.),
+                mark_stroke: Some(px(1.25)),
+            },
+            Size::Small => Self {
                 box_size: px(16.),
                 font_size: px(14.),
                 line_height: px(20.),
@@ -730,12 +744,12 @@ mod tests {
     #[test]
     fn test_moon_checkbox_metrics_match_terminal_palette() {
         let compact = MoonCheckboxMetrics::base_for_size(Size::XSmall);
-        assert_eq!(compact.box_size, px(16.));
-        assert_eq!(compact.font_size, px(14.));
-        assert_eq!(compact.line_height, px(20.));
+        assert_eq!(compact.box_size, px(12.));
+        assert_eq!(compact.font_size, px(12.));
+        assert_eq!(compact.line_height, px(16.));
         assert_eq!(compact.label_weight, FontWeight::MEDIUM);
         assert_eq!(compact.description_weight, FontWeight::NORMAL);
-        assert_eq!(compact.gap, px(8.));
+        assert_eq!(compact.gap, px(4.));
         assert_eq!(compact.description_gap, px(0.));
         assert_eq!(compact.radius, px(4.));
 
