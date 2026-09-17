@@ -1,8 +1,8 @@
 //! Regression coverage for MoonToggle geometry, interaction, and role-driven colours.
 
 use super::{
-    MoonToggle, MoonToggleLabelSide, MoonToggleSize, MoonToggleVariant, THUMB_TRAVEL, ThumbTravel,
-    ToggleColors, moon_toggle_click_plan,
+    MoonToggle, MoonToggleLabelSide, MoonToggleSize, MoonToggleVariant, THUMB_TRAVEL,
+    THUMB_TRAVEL_CURVE, ThumbTravel, ToggleColors, moon_toggle_click_plan,
 };
 use crate::checkbox::{ChoiceColors, MoonCheckboxMetrics};
 use crate::moon::checkbox::tier_size;
@@ -103,15 +103,15 @@ fn toggle_colors_follow_the_colour_roles() {
         (MoonPalette::LIGHT, MoonColors::DARK),
     ] {
         let off = ToggleColors::resolve(p, roles, MoonToggleVariant::Default, None, false, false);
-        assert_eq!(off.track, roles.bg_tertiary.into());
-        assert_eq!(off.track_hover, off.track);
-        assert_eq!(off.border, roles.border_secondary.into());
+        assert_eq!(off.track.rest, roles.bg_tertiary.into());
+        assert_eq!(off.track.hovered, off.track.rest);
+        assert_eq!(off.border.rest, roles.border_secondary.into());
         assert_eq!(off.thumb, roles.fg_white.into());
 
         let on = ToggleColors::resolve(p, roles, MoonToggleVariant::Default, None, true, false);
-        assert_eq!(on.track, roles.bg_brand_solid.into());
-        assert_eq!(on.track_hover, roles.bg_brand_solid_hover.into());
-        assert!(on.border.is_transparent());
+        assert_eq!(on.track.rest, roles.bg_brand_solid.into());
+        assert_eq!(on.track.hovered, roles.bg_brand_solid_hover.into());
+        assert!(on.border.rest.is_transparent());
         assert_eq!(on.thumb, off.thumb);
     }
 }
@@ -134,9 +134,9 @@ fn an_explicit_tone_fills_a_checked_track_instead_of_the_brand() {
         true,
         false,
     );
-    assert_eq!(on.track, warning);
-    assert_eq!(on.track_hover, warning);
-    assert!(on.border.is_transparent());
+    assert_eq!(on.track.rest, warning);
+    assert_eq!(on.track.hovered, warning);
+    assert!(on.border.rest.is_transparent());
     assert_eq!(on.thumb, roles.fg_white.into());
 
     let off = ToggleColors::resolve(
@@ -147,8 +147,8 @@ fn an_explicit_tone_fills_a_checked_track_instead_of_the_brand() {
         false,
         false,
     );
-    assert_eq!(off.track, roles.bg_tertiary.into());
-    assert_eq!(off.border, roles.border_secondary.into());
+    assert_eq!(off.track.rest, roles.bg_tertiary.into());
+    assert_eq!(off.border.rest, roles.border_secondary.into());
 }
 
 /// Catches a disabled toggle going back to painting its colours translucent. GPUI fades each
@@ -174,11 +174,11 @@ fn a_disabled_toggle_mixes_its_colours_into_the_surface_rather_than_fading_them(
             let disabled = ToggleColors::resolve(p, roles, variant, None, checked, true);
 
             for (enabled, disabled) in [
-                (enabled.track, disabled.track),
-                (enabled.track_hover, disabled.track_hover),
-                (enabled.border, disabled.border),
+                (enabled.track.rest, disabled.track.rest),
+                (enabled.track.hovered, disabled.track.hovered),
+                (enabled.border.rest, disabled.border.rest),
                 (enabled.thumb, disabled.thumb),
-                (enabled.thumb_border, disabled.thumb_border),
+                (enabled.thumb_border.rest, disabled.thumb_border.rest),
             ] {
                 if enabled.a == 0.0 {
                     assert!(
@@ -205,7 +205,7 @@ fn a_disabled_toggle_mixes_its_colours_into_the_surface_rather_than_fading_them(
     }
 }
 
-/// Breakage 1 (band B) -- `MoonToggleSize::resolve` / `MoonToggleMetrics::zoomed`: a Tier's font
+/// Breakage 1 (band B) -- `MoonToggleSize::resolve` / `MoonToggleMetrics::resolved`: a Tier's font
 /// size must follow `tokens.ui()` only. A plausible future edit routes it through `tokens.font()`
 /// (or reinstates the old `MoonText` path) so tier labels "honour the font setting" too; at the
 /// terminal's Standard density (`font_delta = 3`) that would desync every tier toggle's label from
@@ -258,7 +258,7 @@ fn density_default_snaps_every_tier_to_a_supported_one() {
 
 /// Breakage 3 (band B) -- `Custom` must keep following the theme's text scaling
 /// (`tokens.font()` / `tokens.line_height()`) exactly as before, while `Tier` must not: unifying
-/// both onto `zoomed` for simplicity would silently stop every existing `Custom` caller's text
+/// both onto the UI zoom for simplicity would silently stop every existing `Custom` caller's text
 /// from following the user's font setting.
 #[test]
 fn custom_keeps_text_scaling_while_tier_does_not() {
@@ -631,30 +631,30 @@ fn a_slim_toggle_outlines_its_track_and_thumb_alike() {
                 "the thumb must match the track it rides, checked {checked}"
             );
             assert_eq!(
-                slim.thumb_border_hover, slim.border_hover,
+                slim.thumb_border.hovered, slim.border.hovered,
                 "and must keep matching it under the pointer, checked {checked}"
             );
         }
 
         let off = slim(false);
-        assert_eq!(off.border, roles.border_secondary.into());
-        assert_eq!(off.border_hover, off.border);
+        assert_eq!(off.border.rest, roles.border_secondary.into());
+        assert_eq!(off.border.hovered, off.border.rest);
 
         let on = slim(true);
-        assert_eq!(on.border, roles.toggle_slim_border_pressed.into());
+        assert_eq!(on.border.rest, roles.toggle_slim_border_pressed.into());
         assert_eq!(
-            on.border_hover,
+            on.border.hovered,
             roles.toggle_slim_border_pressed_hover.into()
         );
 
-        assert!(default(true).border.is_transparent());
-        assert_eq!(default(false).border, roles.border_secondary.into());
-        assert_eq!(default(false).border_hover, default(false).border);
+        assert!(default(true).border.rest.is_transparent());
+        assert_eq!(default(false).border.rest, roles.border_secondary.into());
+        assert_eq!(default(false).border.hovered, default(false).border.rest);
         for checked in [false, true] {
-            assert!(default(checked).thumb_border.is_transparent());
-            assert!(default(checked).thumb_border_hover.is_transparent());
+            assert!(default(checked).thumb_border.rest.is_transparent());
+            assert!(default(checked).thumb_border.hovered.is_transparent());
             assert_eq!(slim(checked).track, default(checked).track);
-            assert_eq!(slim(checked).track_hover, default(checked).track_hover);
+            assert_eq!(slim(checked).track.hovered, default(checked).track.hovered);
             assert_eq!(slim(checked).thumb, default(checked).thumb);
         }
     }
@@ -686,6 +686,16 @@ fn slim_keeps_the_text_of_the_default_variant() {
         assert_eq!(slim.gap, default.gap, "{tier:?}");
         assert_eq!(slim.description_gap, default.description_gap, "{tier:?}");
     }
+}
+
+/// Catches the thumb's motion drifting from the reviewed spec: a 200ms travel on
+/// `cubic-bezier(0.4, 0.0, 0.2, 1)`. Every other test here reads the constants rather than the
+/// numbers, and a layout test only sees where the thumb starts and ends, so a shortened travel or
+/// a different curve would leave the whole file passing while the toggle moved at the wrong speed.
+#[test]
+fn the_thumb_travels_on_the_reviewed_curve_and_duration() {
+    assert_eq!(THUMB_TRAVEL, std::time::Duration::from_millis(200));
+    assert_eq!(THUMB_TRAVEL_CURVE, [0.4, 0.0, 0.2, 1.0]);
 }
 
 /// Catches the thumb's travel state losing a case that only shows up in motion: a toggle rendered
