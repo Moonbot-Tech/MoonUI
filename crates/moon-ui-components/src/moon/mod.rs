@@ -62,7 +62,6 @@ mod status_bar;
 mod stepper;
 mod surface;
 pub(crate) mod svg;
-mod switch;
 mod tab;
 mod table;
 mod tag;
@@ -123,7 +122,9 @@ pub use dock::{DockNamedLayout, DockTopologyByName, DockTopologyNode, DockTopolo
 pub(crate) use dropdown::{MENU_CHECK_WIDTH, menu_row_metrics};
 pub use dropdown::{MoonDropdown, MoonMenuItem, MoonMenuSize, MoonPopupMenu};
 pub use form::MoonFormRow;
-pub use foundation::{MoonSize, StyledExt, ThemeMode, h_flex, init, v_flex};
+pub use foundation::{
+    MoonSize, StyledExt, ThemeMode, h_flex, init, moon_cubic_bezier, moon_shadow_sm, v_flex,
+};
 pub use group_box::MoonGroupBox;
 pub use hotkey_input::{
     MoonHotkeyCapture, MoonHotkeyChangeHandler, MoonHotkeyInput, MoonHotkeyInputSize,
@@ -186,7 +187,6 @@ pub use spinner::{MoonSpinner, MoonSpinnerSize};
 pub use status_bar::{MoonStatusBar, MoonStatusIndicator, MoonStatusItem};
 pub use stepper::{MoonStepper, MoonStepperSize};
 pub use surface::{MoonSurface, MoonSurfaceVariant};
-pub use switch::MoonSwitch;
 pub use tab::{
     MoonTabItem, MoonTabStrip, moon_active_tab_underline, moon_active_tab_underline_scaled,
 };
@@ -199,7 +199,9 @@ pub use theme::{
     MoonTypography,
 };
 pub use time_picker::{MoonTimePicker, MoonTimePickerEvent, MoonTimePickerState};
-pub use toggle::{MoonToggle, MoonToggleLabelSide, MoonToggleMetrics, MoonToggleSize};
+pub use toggle::{
+    MoonToggle, MoonToggleLabelSide, MoonToggleMetrics, MoonToggleSize, MoonToggleVariant,
+};
 pub use tokens::{MoonMetrics, MoonPalette, MoonRect, MoonTone, rgba_from};
 pub use tooltip::{MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView};
 pub use tree::{

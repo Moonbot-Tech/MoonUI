@@ -1,6 +1,7 @@
 //! The Checkboxes gallery page: checkboxes and radios in every combination of size, text and
 //! state, plus tones, text edge cases and live controlled examples.
 
+use super::choice::*;
 use super::*;
 use gpui::AnyElement;
 
@@ -12,144 +13,6 @@ const MATRIX_SUPPORT_TEXT: &str = "Keep me signed in";
 const RADIO_LABEL: &str = "Limit order";
 /// Support text of the radio matrix cells that carry it.
 const RADIO_SUPPORT_TEXT: &str = "Fill at my price";
-/// Width of the state names that start each matrix row.
-const STATE_COLUMN_WIDTH: f32 = 116.0;
-
-/// The text a showcased control carries: one matrix column each.
-#[derive(Clone, Copy)]
-enum ChoiceText {
-    None,
-    Label,
-    LabelAndSupport,
-    Support,
-}
-
-impl ChoiceText {
-    /// Every text combination; checkboxes and radios support them all.
-    const ALL: [Self; 4] = [
-        Self::None,
-        Self::Label,
-        Self::LabelAndSupport,
-        Self::Support,
-    ];
-
-    /// Returns the column heading.
-    fn title(self) -> &'static str {
-        match self {
-            Self::None => "No text",
-            Self::Label => "Label",
-            Self::LabelAndSupport => "Label + support",
-            Self::Support => "Support only",
-        }
-    }
-
-    /// Returns the id fragment that keeps each cell's element id unique.
-    fn key(self) -> &'static str {
-        match self {
-            Self::None => "none",
-            Self::Label => "label",
-            Self::LabelAndSupport => "label-support",
-            Self::Support => "support",
-        }
-    }
-
-    /// Returns the column width for a checkbox or radio of `size`, wide enough that the shared
-    /// label and support text stay on one line.
-    fn width(self, size: MoonSize) -> f32 {
-        let medium = size >= MoonSize::Md;
-        match self {
-            Self::None => 52.0,
-            Self::Label if medium => 148.0,
-            Self::Label => 128.0,
-            Self::LabelAndSupport | Self::Support if medium => 196.0,
-            Self::LabelAndSupport | Self::Support => 172.0,
-        }
-    }
-}
-
-/// The state a showcased control is drawn in: one matrix row each.
-#[derive(Clone, Copy)]
-enum ChoiceState {
-    Unchecked,
-    Checked,
-    Indeterminate,
-    Disabled,
-    DisabledChecked,
-    DisabledIndeterminate,
-}
-
-impl ChoiceState {
-    /// Every state a checkbox can show.
-    const CHECKBOX: [Self; 6] = [
-        Self::Unchecked,
-        Self::Checked,
-        Self::Indeterminate,
-        Self::Disabled,
-        Self::DisabledChecked,
-        Self::DisabledIndeterminate,
-    ];
-    /// Every state a radio can show; radios have no indeterminate state.
-    const RADIO: [Self; 4] = [
-        Self::Unchecked,
-        Self::Checked,
-        Self::Disabled,
-        Self::DisabledChecked,
-    ];
-
-    /// Returns the row heading.
-    fn title(self) -> &'static str {
-        match self {
-            Self::Unchecked => "Unchecked",
-            Self::Checked => "Checked",
-            Self::Indeterminate => "Indeterminate",
-            Self::Disabled => "Disabled",
-            Self::DisabledChecked => "Disabled checked",
-            Self::DisabledIndeterminate => "Disabled mixed",
-        }
-    }
-
-    /// Returns the id fragment that keeps each cell's element id unique.
-    fn key(self) -> &'static str {
-        match self {
-            Self::Unchecked => "unchecked",
-            Self::Checked => "checked",
-            Self::Indeterminate => "indeterminate",
-            Self::Disabled => "disabled",
-            Self::DisabledChecked => "disabled-checked",
-            Self::DisabledIndeterminate => "disabled-indeterminate",
-        }
-    }
-
-    fn checked(self) -> bool {
-        matches!(self, Self::Checked | Self::DisabledChecked)
-    }
-
-    fn indeterminate(self) -> bool {
-        matches!(self, Self::Indeterminate | Self::DisabledIndeterminate)
-    }
-
-    fn disabled(self) -> bool {
-        matches!(
-            self,
-            Self::Disabled | Self::DisabledChecked | Self::DisabledIndeterminate
-        )
-    }
-}
-
-/// Returns the lowercase id fragment for `size`.
-fn size_key(size: MoonSize) -> String {
-    format!("{size:?}").to_ascii_lowercase()
-}
-
-/// Returns a muted mono caption for matrix headings and case names.
-fn caption(text: impl Into<SharedString>, cx: &App) -> MoonText {
-    MoonText::new(text)
-        .uppercase(false)
-        .mono(true)
-        .font_size(10.5)
-        .line_height(13.0)
-        .color(MoonPalette::active(cx).text_muted)
-}
 
 /// Returns the checkbox for one matrix cell.
 ///
@@ -194,45 +57,6 @@ fn matrix_radio(size: MoonSize, text: ChoiceText, state: ChoiceState) -> MoonRad
         ChoiceText::LabelAndSupport => radio.label(RADIO_LABEL).description(RADIO_SUPPORT_TEXT),
         ChoiceText::Support => radio.description(RADIO_SUPPORT_TEXT),
     }
-}
-
-/// Renders a matrix card: a heading row of `texts`, then a row per state whose cells come from
-/// `cell`.
-fn choice_matrix<E: IntoElement>(
-    title: &'static str,
-    size: MoonSize,
-    texts: &[ChoiceText],
-    states: &[ChoiceState],
-    cell: impl Fn(ChoiceText, ChoiceState) -> E,
-    cx: &App,
-) -> gpui::Div {
-    let heading = h_flex()
-        .gap(px(12.0))
-        .child(div().w(px(STATE_COLUMN_WIDTH)))
-        .children(texts.iter().map(|text| {
-            div()
-                .w(px(text.width(size)))
-                .child(caption(text.title(), cx).render())
-        }));
-    // Rows sit closer than the card's own spacing so both checkbox matrices fit one snapshot.
-    let rows = v_flex()
-        .gap(px(6.0))
-        .child(heading)
-        .children(states.iter().map(|&state| {
-            h_flex()
-                .gap(px(12.0))
-                .child(
-                    div()
-                        .w(px(STATE_COLUMN_WIDTH))
-                        .child(caption(state.title(), cx).render()),
-                )
-                .children(
-                    texts
-                        .iter()
-                        .map(|&text| div().w(px(text.width(size))).child(cell(text, state))),
-                )
-        }));
-    card(title, cx).child(rows)
 }
 
 impl Gallery {
@@ -403,7 +227,7 @@ impl Gallery {
 fn checkbox_matrix(size: MoonSize, title: &'static str, cx: &App) -> gpui::Div {
     choice_matrix(
         title,
-        size,
+        |text| text.width(size),
         &ChoiceText::ALL,
         &ChoiceState::CHECKBOX,
         |text, state| matrix_checkbox(size, text, state),
@@ -415,7 +239,7 @@ fn checkbox_matrix(size: MoonSize, title: &'static str, cx: &App) -> gpui::Div {
 fn radio_matrix(size: MoonSize, title: &'static str, cx: &App) -> gpui::Div {
     choice_matrix(
         title,
-        size,
+        |text| text.width(size),
         &ChoiceText::ALL,
         &ChoiceState::RADIO,
         |text, state| matrix_radio(size, text, state),

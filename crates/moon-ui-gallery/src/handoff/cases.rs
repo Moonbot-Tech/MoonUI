@@ -245,11 +245,6 @@ pub(super) const HANDOFF_CASES: &[HandoffCase] = &[
         height: 58.0,
     },
     HandoffCase {
-        id: "switch.checked",
-        width: 260.0,
-        height: 58.0,
-    },
-    HandoffCase {
         id: "slider.diffused.58",
         width: 300.0,
         height: 58.0,

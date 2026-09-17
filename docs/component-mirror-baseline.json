@@ -1242,12 +1242,12 @@
       "local_paths": [
         "setting"
       ],
-      "local_hash": "f10cbf0d9e63f21c",
+      "local_hash": "163eb02cb166aad5",
       "local_files": [
         {
           "path": "setting/fields/bool.rs",
-          "hash": "1f57e06d3e78ad2f",
-          "bytes": 1709
+          "hash": "0f09dabfa4c2e359",
+          "bytes": 2378
         },
         {
           "path": "setting/fields/dropdown.rs",
@@ -1486,32 +1486,6 @@
       "donor_changed_files": [
         "slider.rs"
       ]
-    },
-    {
-      "concept": "switch",
-      "class": "Mirror",
-      "public_path": "moon_ui::MoonSwitch",
-      "upstream_ref": "Longbridge::switch@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "local_paths": [
-        "switch.rs"
-      ],
-      "local_hash": "06e00f0198e5a60c",
-      "local_files": [
-        {
-          "path": "switch.rs",
-          "hash": "a83d87c6b44e6d9a",
-          "bytes": 8145
-        }
-      ],
-      "donor_hash": "06e00f0198e5a60c",
-      "donor_files": [
-        {
-          "path": "switch.rs",
-          "hash": "a83d87c6b44e6d9a",
-          "bytes": 8145
-        }
-      ],
-      "donor_changed_files": []
     },
     {
       "concept": "text_area",

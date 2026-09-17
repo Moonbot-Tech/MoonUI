@@ -34,14 +34,14 @@ use moon_ui::{
     MoonSettingGroup, MoonSettingItem, MoonSettingPage, MoonSettings, MoonSidebar,
     MoonSidebarGroup, MoonSidebarMenu, MoonSidebarMenuItem, MoonSidebarToggleButton, MoonSize,
     MoonSkeleton, MoonSlider, MoonSliderState, MoonSpinner, MoonSpinnerSize, MoonStatusBar,
-    MoonStatusIndicator, MoonStatusItem, MoonStepper, MoonSurface, MoonSurfaceVariant, MoonSwitch,
-    MoonTabItem, MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle,
-    MoonTag, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonTimePicker,
-    MoonTimePickerState, MoonToggle, MoonTone, MoonTooltip, MoonTooltipPlacement, MoonTooltipSize,
-    MoonTooltipView, MoonTree, MoonTreeItem, MoonTreeSelectionMode, MoonTreeState, MoonVirtualList,
-    MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand,
-    MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex, moon_h_resizable,
-    moon_resizable_panel, rgba_from, v_flex,
+    MoonStatusIndicator, MoonStatusItem, MoonStepper, MoonSurface, MoonSurfaceVariant, MoonTabItem,
+    MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle, MoonTag, MoonText,
+    MoonTextArea, MoonTheme, MoonThemeConfig, MoonTimePicker, MoonTimePickerState, MoonToggle,
+    MoonToggleLabelSide, MoonToggleVariant, MoonTone, MoonTooltip, MoonTooltipPlacement,
+    MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem, MoonTreeSelectionMode, MoonTreeState,
+    MoonVirtualList, MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame,
+    MoonWindowFrameBrand, MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex,
+    moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
 };
 
 mod gallery;
@@ -122,7 +122,6 @@ const COMPONENT_COVERAGE: &[&str] = &[
     "MoonStatusBar",
     "MoonStepper",
     "MoonSurface",
-    "MoonSwitch",
     "MoonTabStrip",
     "MoonTag",
     "MoonTableCell",
@@ -150,6 +149,7 @@ const GALLERY_PAGES: &[&str] = &[
     "Composites",
     "Stateful",
     "Checkboxes",
+    "Toggles",
 ];
 
 #[cfg(feature = "snapshot")]

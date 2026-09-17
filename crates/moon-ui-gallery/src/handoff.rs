@@ -911,10 +911,6 @@ impl CaseGallery {
                 .checked(false)
                 .size(MoonSize::Md)
                 .into_any_element(),
-            "switch.checked" => MoonSwitch::new("handoff-switch-checked")
-                .label("Live")
-                .checked(true)
-                .into_any_element(),
             "slider.diffused.58" => div()
                 .w(px(220.0))
                 .child(

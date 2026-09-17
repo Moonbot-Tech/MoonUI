@@ -17,9 +17,11 @@ pub(super) struct Gallery {
     /// Selected option of the live radio groups on the Checkboxes page.
     radio_sm_index: usize,
     radio_md_index: usize,
+    /// Checked values of the controlled toggles on the Toggles page.
+    toggle_sm_checked: bool,
+    toggle_md_checked: bool,
     new_toggle_checked: bool,
     new_stepper_value: f32,
-    new_switch_checked: bool,
     new_rating_value: usize,
     new_pagination_page: usize,
     new_sidebar_collapsed: bool,
@@ -331,9 +333,10 @@ impl Gallery {
             checkbox_md_checked: true,
             radio_sm_index: 0,
             radio_md_index: 1,
+            toggle_sm_checked: true,
+            toggle_md_checked: false,
             new_toggle_checked: true,
             new_stepper_value: 3.0,
-            new_switch_checked: true,
             new_rating_value: 3,
             new_pagination_page: 4,
             new_sidebar_collapsed: false,
@@ -1833,22 +1836,6 @@ impl Gallery {
                             .items_center()
                             .flex_wrap()
                             .child(
-                                MoonSwitch::new("new-controls-switch")
-                                    .checked(self.new_switch_checked)
-                                    .label("MoonSwitch")
-                                    .tooltip("Longbridge switch behavior through Moon facade")
-                                    .on_click({
-                                        let view = view.clone();
-                                        move |checked, _, app| {
-                                            let checked = *checked;
-                                            view.update(app, |this, cx| {
-                                                this.new_switch_checked = checked;
-                                                this.push_event(format!("MoonSwitch: {checked}"), cx);
-                                            });
-                                        }
-                                    }),
-                            )
-                            .child(
                                 MoonRating::new("new-controls-rating")
                                     .value(self.new_rating_value)
                                     .max(5)
@@ -3254,7 +3241,8 @@ impl Render for Gallery {
             5 => self.render_new_controls(cx).into_any_element(),
             6 => self.render_composites(cx).into_any_element(),
             7 => self.render_stateful(cx).into_any_element(),
-            _ => self.render_checkboxes(cx).into_any_element(),
+            8 => self.render_checkboxes(cx).into_any_element(),
+            _ => self.render_toggles(cx).into_any_element(),
         };
 
         v_flex()
@@ -3462,5 +3450,7 @@ fn open_detached_gallery_panel(panel_name: SharedString, cx: &mut App) {
 }
 
 mod checkboxes;
+mod choice;
 #[cfg(test)]
 mod tests;
+mod toggles;

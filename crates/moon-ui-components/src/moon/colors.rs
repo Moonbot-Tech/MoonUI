@@ -474,8 +474,11 @@ impl MoonColors {
             focus_ring: ring,
             focus_ring_error: solid(p.red),
             shadow_xs: tint(p.shadow, 0.30),
-            shadow_sm_01: tint(p.shadow, 0.38),
-            shadow_sm_02: MoonColor::TRANSPARENT,
+            // The `sm` pair is the one small controls carry, and a toggle's thumb is the first to ask
+            // for it. It takes the colour modes' own strength rather than the overlay strengths the
+            // larger sizes inherit, which under a 16px thumb read as a smear across its track.
+            shadow_sm_01: tint(p.shadow, 0.10),
+            shadow_sm_02: tint(p.shadow, 0.10),
             shadow_md_01: tint(p.shadow, 0.42),
             shadow_md_02: MoonColor::TRANSPARENT,
             shadow_lg_01: tint(p.shadow, 0.46),
