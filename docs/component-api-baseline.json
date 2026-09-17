@@ -2755,10 +2755,6 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use switch::MoonSwitch;"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use tab::{ MoonTabItem, MoonTabStrip, moon_active_tab_underline, moon_active_tab_underline_scaled, };"
     },
     {
@@ -4104,10 +4100,6 @@
     {
       "file": "crates/moon-ui-components/src/moon/surface.rs",
       "signature": "pub struct MoonSurface"
-    },
-    {
-      "file": "crates/moon-ui-components/src/moon/switch.rs",
-      "signature": "pub type MoonSwitch = crate::switch::Switch;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tab.rs",

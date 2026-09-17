@@ -295,6 +295,21 @@
       "reason": "Deprecated size alias removed after the MoonSize tier migration; consumers now use explicit tiers or the active density default.",
       "file": "crates/moon-ui-components/src/moon/toggle.rs",
       "signature": "pub const Normal: Self = Self::Tier(MoonSize::Md);"
+    },
+    {
+      "reason": "MoonSwitch was a one-line alias for the Longbridge Switch and is superseded by MoonToggle, which carries the reviewed design: size tiers, the slim variant, supporting text, and the role-driven colours. Consumers use moon_ui::MoonToggle.",
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use switch::MoonSwitch;"
+    },
+    {
+      "reason": "The Moon-facing switch facade was deleted with its module; MoonToggle is the Moon switch control.",
+      "file": "crates/moon-ui-components/src/moon/switch.rs",
+      "signature": "pub type MoonSwitch = crate::switch::Switch;"
+    },
+    {
+      "reason": "The mirrored Longbridge switch module was deleted. Its one remaining caller, the settings bool field, renders a MoonToggle, so the crate no longer carries a second switch implementation.",
+      "file": "crates/moon-ui-components/src/lib.rs",
+      "signature": "pub mod switch"
     }
   ]
 }

@@ -699,16 +699,6 @@
       "contracts": ["toggle.click_behavior", "gallery.visual_coverage"]
     },
     {
-      "concept": "switch",
-      "class": "Mirror",
-      "behavior_source": "Longbridge Switch",
-      "theme_source": "MoonTheme bridge through MoonSwitch facade",
-      "public_path": "moon_ui::MoonSwitch",
-      "upstream_ref": "Longbridge::switch@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
-      "contracts": ["gallery.visual_coverage"]
-    },
-    {
       "concept": "tooltip",
       "class": "Forged",
       "behavior_source": "Moon tooltip wrapper",

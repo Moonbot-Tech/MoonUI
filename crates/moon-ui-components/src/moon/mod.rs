@@ -62,7 +62,6 @@ mod status_bar;
 mod stepper;
 mod surface;
 pub(crate) mod svg;
-mod switch;
 mod tab;
 mod table;
 mod tag;
@@ -188,7 +187,6 @@ pub use spinner::{MoonSpinner, MoonSpinnerSize};
 pub use status_bar::{MoonStatusBar, MoonStatusIndicator, MoonStatusItem};
 pub use stepper::{MoonStepper, MoonStepperSize};
 pub use surface::{MoonSurface, MoonSurfaceVariant};
-pub use switch::MoonSwitch;
 pub use tab::{
     MoonTabItem, MoonTabStrip, moon_active_tab_underline, moon_active_tab_underline_scaled,
 };

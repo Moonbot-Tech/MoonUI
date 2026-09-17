@@ -22,7 +22,6 @@ pub(super) struct Gallery {
     toggle_md_checked: bool,
     new_toggle_checked: bool,
     new_stepper_value: f32,
-    new_switch_checked: bool,
     new_rating_value: usize,
     new_pagination_page: usize,
     new_sidebar_collapsed: bool,
@@ -338,7 +337,6 @@ impl Gallery {
             toggle_md_checked: false,
             new_toggle_checked: true,
             new_stepper_value: 3.0,
-            new_switch_checked: true,
             new_rating_value: 3,
             new_pagination_page: 4,
             new_sidebar_collapsed: false,
@@ -1837,22 +1835,6 @@ impl Gallery {
                             .gap(px(18.0))
                             .items_center()
                             .flex_wrap()
-                            .child(
-                                MoonSwitch::new("new-controls-switch")
-                                    .checked(self.new_switch_checked)
-                                    .label("MoonSwitch")
-                                    .tooltip("Longbridge switch behavior through Moon facade")
-                                    .on_click({
-                                        let view = view.clone();
-                                        move |checked, _, app| {
-                                            let checked = *checked;
-                                            view.update(app, |this, cx| {
-                                                this.new_switch_checked = checked;
-                                                this.push_event(format!("MoonSwitch: {checked}"), cx);
-                                            });
-                                        }
-                                    }),
-                            )
                             .child(
                                 MoonRating::new("new-controls-rating")
                                     .value(self.new_rating_value)
