@@ -222,6 +222,20 @@ fn data_table_context_menu_uses_root_owned_overlay_layer() {
     );
 }
 
+/// Catches `data_table.rs:MoonDataTable::render` replacing explicit heights with tier bands,
+/// which changes caller-requested row or header geometry at non-unit zoom instead of preserving
+/// the historical fit-height behavior.
+#[test]
+fn explicit_table_heights_keep_the_legacy_fit_height_path() {
+    let source = include_str!("../data_table.rs");
+    let implementation = source.split("#[cfg(test)]").next().unwrap_or(source);
+    assert!(
+        implementation.contains("|h| tokens.fit_height(h, 14.0, 5.5)")
+            && implementation.contains("|h| tokens.fit_height(h, 11.0, 7.5)"),
+        "explicit table heights must retain their fit_height branches instead of using tier defaults"
+    );
+}
+
 /// Catches removing any controlled-selection guard from
 /// `data_table.rs:MoonDataTable::controlled_row_selection`. That regression would let header,
 /// cell, row, row-header, or keyboard navigation paint a second selection that the owning view's

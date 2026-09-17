@@ -744,12 +744,12 @@ mod tests {
     #[test]
     fn test_moon_checkbox_metrics_match_terminal_palette() {
         let compact = MoonCheckboxMetrics::base_for_size(Size::XSmall);
-        assert_eq!(compact.box_size, px(16.));
-        assert_eq!(compact.font_size, px(14.));
-        assert_eq!(compact.line_height, px(20.));
+        assert_eq!(compact.box_size, px(12.));
+        assert_eq!(compact.font_size, px(12.));
+        assert_eq!(compact.line_height, px(16.));
         assert_eq!(compact.label_weight, FontWeight::MEDIUM);
         assert_eq!(compact.description_weight, FontWeight::NORMAL);
-        assert_eq!(compact.gap, px(8.));
+        assert_eq!(compact.gap, px(4.));
         assert_eq!(compact.description_gap, px(0.));
         assert_eq!(compact.radius, px(4.));
 
