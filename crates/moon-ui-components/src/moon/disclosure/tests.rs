@@ -146,6 +146,7 @@ fn caret_geometry_scales_with_the_ui_token(cx: &mut gpui::TestAppContext) {
             font: 1.0,
             font_delta: 0.0,
             tier: Default::default(),
+            zoom: 1.0,
         };
     });
 

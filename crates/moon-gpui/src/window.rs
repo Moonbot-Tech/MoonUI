@@ -62,6 +62,8 @@ use uuid::Uuid;
 
 pub(crate) mod a11y;
 mod prompts;
+#[cfg(test)]
+mod tests;
 
 use self::a11y::A11y;
 #[cfg(not(target_family = "wasm"))]
@@ -1257,7 +1259,16 @@ pub struct Window {
     mouse_hit_test: HitTest,
     modifiers: Modifiers,
     capslock: Capslock,
+    /// Effective scale factor: the platform's factor multiplied by [`Self::content_zoom`].
+    /// Every primitive, glyph raster and layout conversion reads it through
+    /// [`Self::scale_factor`], so zoomed content renders at the combined density.
     scale_factor: f32,
+    /// Browser-style page zoom layered on the platform scale factor. Layout runs in content
+    /// space: `viewport_size` is the platform content size divided by this, pointer input is
+    /// divided by it on entry, and coordinates handed back to the platform are multiplied.
+    content_zoom: f32,
+    /// A zoom requested while a frame was being drawn; applied at the top of the next `draw`.
+    pending_content_zoom: Option<f32>,
     pub(crate) bounds_observers: SubscriberSet<(), AnyObserver>,
     appearance: WindowAppearance,
     pub(crate) appearance_observers: SubscriberSet<(), AnyObserver>,
@@ -1881,6 +1892,10 @@ impl Window {
             modifiers,
             capslock,
             scale_factor,
+            // A window opens unzoomed, so the platform's content size and mouse position above
+            // are already content space; `set_content_zoom` reconciles them from then on.
+            content_zoom: 1.0,
+            pending_content_zoom: None,
             bounds_observers: SubscriberSet::new(),
             appearance,
             appearance_observers: SubscriberSet::new(),
@@ -2147,11 +2162,15 @@ impl Window {
 
     /// Return the `WindowBounds` to indicate that how a window should be opened
     /// after it has been closed
+    ///
+    /// Screen space, in the platform's logical pixels: unaffected by [`Self::content_zoom`].
     pub fn window_bounds(&self) -> WindowBounds {
         self.platform_window.window_bounds()
     }
 
     /// Return the `WindowBounds` excluding insets (Wayland and X11)
+    ///
+    /// Screen space, in the platform's logical pixels: unaffected by [`Self::content_zoom`].
     pub fn inner_window_bounds(&self) -> WindowBounds {
         self.platform_window.inner_window_bounds()
     }
@@ -2385,8 +2404,7 @@ impl Window {
     /// the platform window, then notifies observers. Normally called automatically
     /// by the platform's resize callback, but exposed publicly for test infrastructure.
     pub fn bounds_changed(&mut self, cx: &mut App) {
-        self.scale_factor = self.platform_window.scale_factor();
-        self.viewport_size = self.platform_window.content_size();
+        self.sync_platform_geometry();
         self.display_id = self.platform_window.display().map(|display| display.id());
 
         self.refresh();
@@ -2396,7 +2414,72 @@ impl Window {
             .retain(&(), |callback| callback(self, cx));
     }
 
+    /// Recompute the effective scale factor and the content-space viewport from the platform
+    /// window and the current content zoom.
+    ///
+    /// The platform reports its own factor and content size; multiplying the zoom in here means a
+    /// DPI change (a window dragged to another monitor) keeps the zoom instead of dropping it.
+    fn sync_platform_geometry(&mut self) {
+        let zoom = self.content_zoom;
+        self.scale_factor = self.platform_window.scale_factor() * zoom;
+        self.viewport_size = self.platform_window.content_size().map(|d| d / zoom);
+    }
+
+    /// Browser-style content zoom of this window, `1.0` by default.
+    ///
+    /// See [`Self::set_content_zoom`]. While a zoom requested during a draw is still pending, this
+    /// keeps reporting the applied value.
+    pub fn content_zoom(&self) -> f32 {
+        self.content_zoom
+    }
+
+    /// Set the content zoom, scaling everything the window draws like page zoom in a browser.
+    ///
+    /// The effective [`Self::scale_factor`] becomes the platform factor times `zoom`, so every
+    /// quad, path, glyph and GPU canvas renders at the combined density; [`Self::viewport_size`]
+    /// shrinks or grows accordingly and pointer input arrives in that content space. Screen-space
+    /// queries ([`Self::bounds`], [`Self::window_bounds`]) are unaffected.
+    ///
+    /// Non-finite or non-positive values are ignored and an unchanged value is a no-op. Outside a
+    /// draw the change applies immediately: the geometry is recomputed, the window is refreshed
+    /// and bounds observers run, exactly as for a platform resize. During a draw — a root view's
+    /// `render` is the expected caller — the change is deferred to the top of the next frame so
+    /// the frame in progress stays consistent, and that frame is requested.
+    pub fn set_content_zoom(&mut self, zoom: f32, cx: &mut App) {
+        if !(zoom.is_finite() && zoom > 0.0) {
+            return;
+        }
+        if zoom == self.pending_content_zoom.unwrap_or(self.content_zoom) {
+            return;
+        }
+        if self.invalidator.not_drawing() {
+            self.apply_content_zoom(zoom, cx);
+        } else {
+            self.pending_content_zoom = Some(zoom);
+            // `draw` cleared the dirty flag before rendering, so this survives the frame and
+            // guarantees the one that applies the zoom.
+            self.invalidator.set_dirty(true);
+        }
+    }
+
+    /// Install a validated zoom: geometry, the platform's client inset, a refresh and the bounds
+    /// observers, in that order.
+    fn apply_content_zoom(&mut self, zoom: f32, cx: &mut App) {
+        self.content_zoom = zoom;
+        self.sync_platform_geometry();
+        if let Some(inset) = self.client_inset {
+            self.platform_window.set_client_inset(inset * zoom);
+        }
+        self.refresh();
+        self.bounds_observers
+            .clone()
+            .retain(&(), |callback| callback(self, cx));
+    }
+
     /// Returns the bounds of the current window in the global coordinate space, which could span across multiple displays.
+    ///
+    /// Screen space, in the platform's logical pixels: unaffected by [`Self::content_zoom`]. Use
+    /// [`Self::viewport_size`] for anything laid out inside the window.
     pub fn bounds(&self) -> Bounds<Pixels> {
         self.platform_window.bounds()
     }
@@ -2410,9 +2493,11 @@ impl Window {
             .render_to_image(&self.rendered_frame.scene)
     }
 
-    /// Set the content size of the window.
+    /// Set the content size of the window, in content space (the counterpart of
+    /// [`Self::viewport_size`]); the platform receives it multiplied by the content zoom.
     pub fn resize(&mut self, size: Size<Pixels>) {
-        self.platform_window.resize(size);
+        let zoom = self.content_zoom;
+        self.platform_window.resize(size.map(|d| d * zoom));
     }
 
     /// Returns whether or not the window is currently fullscreen
@@ -2439,7 +2524,8 @@ impl Window {
         self.appearance
     }
 
-    /// Returns the size of the drawable area within the window.
+    /// Returns the size of the drawable area within the window, in content space: the platform
+    /// content size divided by [`Self::content_zoom`].
     pub fn viewport_size(&self) -> Size<Pixels> {
         self.viewport_size
     }
@@ -2471,7 +2557,8 @@ impl Window {
 
     /// Opens the native title bar context menu, useful when implementing client side decorations (Wayland and X11)
     pub fn show_window_menu(&self, position: Point<Pixels>) {
-        self.platform_window.show_window_menu(position)
+        self.platform_window
+            .show_window_menu(position.map(|c| c * self.content_zoom))
     }
 
     /// Handle window movement for Linux and macOS.
@@ -2484,8 +2571,11 @@ impl Window {
 
     /// When using client side decorations, set this to the width of the invisible decorations (Wayland and X11)
     pub fn set_client_inset(&mut self, inset: Pixels) {
+        // Stored in content space, because `client_inset()` feeds layout; the platform gets the
+        // inset in its own pixels.
         self.client_inset = Some(inset);
-        self.platform_window.set_client_inset(inset);
+        self.platform_window
+            .set_client_inset(inset * self.content_zoom);
     }
 
     /// Returns the client_inset value by [`Self::set_client_inset`].
@@ -2511,7 +2601,8 @@ impl Window {
     /// Sets the position of the macOS traffic light buttons.
     #[cfg(target_os = "macos")]
     pub fn set_traffic_light_position(&self, position: Point<Pixels>) {
-        self.platform_window.set_traffic_light_position(position);
+        self.platform_window
+            .set_traffic_light_position(position.map(|c| c * self.content_zoom));
     }
 
     /// Sets the application identifier.
@@ -2556,7 +2647,8 @@ impl Window {
 
     /// The scale factor of the display associated with the window. For example, it could
     /// return 2.0 for a "retina" display, indicating that each logical pixel should actually
-    /// be rendered as two pixels on screen.
+    /// be rendered as two pixels on screen. Includes [`Self::content_zoom`]: glyphs rasterise and
+    /// quads snap at this combined factor, and logical pixels times it are device pixels.
     pub fn scale_factor(&self) -> f32 {
         self.scale_factor
     }
@@ -2728,7 +2820,8 @@ impl Window {
             .is_action_available(action, node_id)
     }
 
-    /// The position of the mouse relative to the window.
+    /// The position of the mouse relative to the window, in content space (already divided by
+    /// [`Self::content_zoom`]).
     pub fn mouse_position(&self) -> Point<Pixels> {
         self.mouse_position
     }
@@ -2805,6 +2898,7 @@ impl Window {
 
         let now = Instant::now();
         let scale_factor = self.scale_factor();
+        let content_zoom = self.content_zoom;
         let presentable = self.platform_window.can_present();
         let text_system = self.text_system.clone();
         let sprite_atlas = self.sprite_atlas.clone();
@@ -2838,6 +2932,7 @@ impl Window {
                 now,
                 bounds,
                 scale_factor,
+                content_zoom,
                 presentable,
             };
             let wants_present = canvas.driver.frame(info).requests_present();
@@ -2856,6 +2951,7 @@ impl Window {
                     sprite_atlas.clone(),
                     bounds,
                     scale_factor,
+                    content_zoom,
                     content_mask,
                     background_appearance,
                     subpixel_rendering_supported,
@@ -2905,6 +3001,12 @@ impl Window {
         // Set up the per-App arena for element allocation during this draw.
         // This ensures that multiple test Apps have isolated arenas.
         let _arena_scope = ElementArenaScope::enter(&cx.element_arena);
+
+        // A zoom requested from the previous frame's render lands here, before the entities it
+        // invalidates are collected, so the frame about to be drawn is the one that shows it.
+        if let Some(zoom) = self.pending_content_zoom.take() {
+            self.apply_content_zoom(zoom, cx);
+        }
 
         self.invalidate_entities();
         cx.entities.clear_accessed();
@@ -4834,12 +4936,81 @@ impl Window {
             .unwrap_or_else(|| action.name().to_string())
     }
 
+    /// Bring a platform event's pointer coordinates into content space.
+    ///
+    /// Every platform hands `dispatch_event` positions in its own logical pixels; under a content
+    /// zoom the element tree is laid out in those pixels divided by the zoom, so the divide happens
+    /// once, here, before anything reads the event. Pixel scroll deltas follow the same rule; line
+    /// deltas and the pinch ratio are unitless. The match is exhaustive on purpose: a variant that
+    /// arrives with an upstream re-sync must be classified rather than silently passed through.
+    fn unzoom_input(&self, event: PlatformInput) -> PlatformInput {
+        let zoom = self.content_zoom;
+        if zoom == 1.0 {
+            return event;
+        }
+        let unzoom = |p: Point<Pixels>| p.map(|c| c / zoom);
+        match event {
+            PlatformInput::MouseMove(mut e) => {
+                e.position = unzoom(e.position);
+                PlatformInput::MouseMove(e)
+            }
+            PlatformInput::MouseDown(mut e) => {
+                e.position = unzoom(e.position);
+                PlatformInput::MouseDown(e)
+            }
+            PlatformInput::MouseUp(mut e) => {
+                e.position = unzoom(e.position);
+                PlatformInput::MouseUp(e)
+            }
+            PlatformInput::MousePressure(mut e) => {
+                e.position = unzoom(e.position);
+                PlatformInput::MousePressure(e)
+            }
+            PlatformInput::MouseExited(mut e) => {
+                e.position = unzoom(e.position);
+                PlatformInput::MouseExited(e)
+            }
+            PlatformInput::Pinch(mut e) => {
+                e.position = unzoom(e.position);
+                PlatformInput::Pinch(e)
+            }
+            PlatformInput::ScrollWheel(mut e) => {
+                e.position = unzoom(e.position);
+                if let crate::ScrollDelta::Pixels(delta) = e.delta {
+                    e.delta = crate::ScrollDelta::Pixels(unzoom(delta));
+                }
+                PlatformInput::ScrollWheel(e)
+            }
+            PlatformInput::FileDrop(FileDropEvent::Entered { position, paths }) => {
+                PlatformInput::FileDrop(FileDropEvent::Entered {
+                    position: unzoom(position),
+                    paths,
+                })
+            }
+            PlatformInput::FileDrop(FileDropEvent::Pending { position }) => {
+                PlatformInput::FileDrop(FileDropEvent::Pending {
+                    position: unzoom(position),
+                })
+            }
+            PlatformInput::FileDrop(FileDropEvent::Submit { position }) => {
+                PlatformInput::FileDrop(FileDropEvent::Submit {
+                    position: unzoom(position),
+                })
+            }
+            event @ (PlatformInput::FileDrop(FileDropEvent::Exited)
+            | PlatformInput::KeyDown(_)
+            | PlatformInput::KeyUp(_)
+            | PlatformInput::ModifiersChanged(_)) => event,
+        }
+    }
+
     /// Dispatch a mouse or keyboard event on the window.
     #[profiling::function]
     pub fn dispatch_event(&mut self, event: PlatformInput, cx: &mut App) -> DispatchEventResult {
         #[cfg(feature = "input-latency-histogram")]
         let dispatch_time = Instant::now();
         let update_count_before = self.invalidator.update_count();
+        let event = self.unzoom_input(event);
         // Track input modality for focus-visible styling and hover suppression.
         // Hover is suppressed during keyboard modality so that keyboard navigation
         // doesn't show hover highlights on the item under the mouse cursor.

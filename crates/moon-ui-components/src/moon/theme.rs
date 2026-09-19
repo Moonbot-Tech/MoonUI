@@ -24,16 +24,22 @@ pub struct MoonScale {
     pub font_delta: f32,
     /// Preferred component density; independent of geometry and text scaling.
     pub tier: MoonSize,
+    /// Browser-style page zoom applied to the whole window by `MoonRoot` through
+    /// `Window::set_content_zoom`: text, geometry, images and GPU canvases scale together and
+    /// every design value reaches the components unscaled. Independent of `ui` (geometry only)
+    /// and of `font` / `font_delta` (text only).
+    pub zoom: f32,
 }
 
 impl Default for MoonScale {
-    /// Return unscaled metrics and MoonUI's default medium tier.
+    /// Return unscaled metrics, MoonUI's default medium tier and no window zoom.
     fn default() -> Self {
         Self {
             ui: 1.0,
             font: 1.0,
             font_delta: 0.0,
             tier: MoonSize::default(),
+            zoom: 1.0,
         }
     }
 }
@@ -99,6 +105,14 @@ impl MoonThemeTokens {
     /// Return the preferred component tier, without applying UI zoom.
     pub fn tier(&self) -> MoonSize {
         self.scale.tier
+    }
+
+    /// Return the window content zoom `MoonRoot` installs, unvalidated.
+    ///
+    /// No floor here, unlike [`Self::ui`]: `Window::set_content_zoom` rejects an impossible value
+    /// itself, and [`MoonThemeConfig::set_zoom`] never stores one.
+    pub fn zoom(&self) -> f32 {
+        self.scale.zoom
     }
 
     pub fn ui(&self, value: f32) -> f32 {
@@ -486,6 +500,29 @@ impl MoonThemeConfig {
         self.set_ui_scale(ui_scale);
         self
     }
+
+    /// Set the window content zoom on both themes, refusing a value that cannot be a zoom.
+    ///
+    /// Same guard as [`Self::set_ui_scale`], for the same reason: a stored zero or a negative
+    /// number would not fail loudly, it would render every window at nothing and take the
+    /// settings screen that could repair it along. Zero, negatives and non-finite values are
+    /// replaced by the default; any positive value is stored verbatim, because a consumer may be
+    /// persisting a deliberate choice outside whatever range its own slider offers.
+    pub fn set_zoom(&mut self, zoom: f32) {
+        let zoom = if zoom.is_finite() && zoom > 0.0 {
+            zoom
+        } else {
+            MoonScale::default().zoom
+        };
+        self.dark.scale.zoom = zoom;
+        self.light.scale.zoom = zoom;
+    }
+
+    /// Return this configuration with the supplied window content zoom on both themes.
+    pub fn with_zoom(mut self, zoom: f32) -> Self {
+        self.set_zoom(zoom);
+        self
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -536,10 +573,15 @@ impl MoonTheme {
         }
     }
 
+    /// Install `config` as the active theme and re-render every open window.
+    ///
+    /// The refresh is what carries a changed [`MoonScale::zoom`] to windows other than the one
+    /// the caller is in: each `MoonRoot` applies the theme's zoom to its window on render.
     pub fn install_config(config: MoonThemeConfig, cx: &mut App) {
         let theme = Self::from_config(config);
         theme.sync_base_theme(cx);
         cx.set_global(theme);
+        cx.refresh_windows();
     }
 
     pub fn load_toml(path: impl AsRef<Path>) -> Result<MoonThemeConfig, MoonThemeConfigError> {
@@ -555,6 +597,16 @@ impl MoonTheme {
 
     pub fn global(cx: &App) -> Option<&Self> {
         cx.try_global::<Self>()
+    }
+
+    /// The window content zoom of the active theme, `1.0` when no theme is installed.
+    ///
+    /// Read directly from the global rather than through [`Self::active_tokens`], because
+    /// `MoonRoot` asks every frame and the tokens clone two `SharedString`s.
+    pub fn content_zoom(cx: &App) -> f32 {
+        cx.try_global::<Self>()
+            .map(|theme| theme.scale.zoom)
+            .unwrap_or(1.0)
     }
 
     pub fn global_mut(cx: &mut App) -> &mut Self {
@@ -573,6 +625,7 @@ impl MoonTheme {
         let next = Self::from_config(config);
         next.sync_base_theme(cx);
         *Self::global_mut(cx) = next;
+        cx.refresh_windows();
     }
 
     pub fn active_tokens(cx: &App) -> MoonThemeTokens {

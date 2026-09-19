@@ -4507,6 +4507,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn content_zoom(cx: &App) -> f32"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn fit_band(&self, base_height: f32, base_line_height: f32) -> f32"
     },
     {
@@ -4595,6 +4599,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn set_zoom(&mut self, zoom: f32)"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn table_header_base(&self) -> f32"
     },
     {
@@ -4636,6 +4644,14 @@
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn with_ui_scale(mut self, ui_scale: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn with_zoom(mut self, zoom: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn zoom(&self) -> f32"
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",

@@ -3,7 +3,7 @@ use crate::{
     dialog::{ANIMATION_DURATION, Dialog},
     focus_trap::FocusTrapManager,
     input::{Copy, InputState},
-    moon::MoonDialog,
+    moon::{MoonDialog, MoonTheme},
     native_menu::FallbackMenuOverlay,
     notification::{Notification, NotificationList},
     sheet::Sheet,
@@ -734,6 +734,14 @@ impl Styled for MoonRoot {
 impl Render for MoonRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(cx.theme().font_size);
+        // The theme's zoom reaches every window through its root, the same way the rem size
+        // does: a new window adopts it on its first frame, and a theme change reaches the others
+        // on the frame `MoonTheme::install_config` requests. `Window` defers a change made here
+        // to the next frame and ignores an equal value, so this is cheap to ask every render.
+        let zoom = MoonTheme::content_zoom(cx);
+        if window.content_zoom() != zoom {
+            window.set_content_zoom(zoom, cx);
+        }
 
         let sheet_layer = self.render_sheet_layer_inline(window, cx);
         let dialog_layer = self.render_dialog_layer_inline(window, cx);
@@ -816,6 +824,42 @@ mod tests {
             Root::new(view, window, cx).bordered(false).bordered(true)
         });
         assert!(root.read_with(cx, |root, _| root.bordered));
+    }
+
+    /// Catches dropping the zoom sync in `root.rs:MoonRoot::render`: a theme zoom would change
+    /// the tokens and never reach the window, so nothing on screen would scale.
+    #[gpui::test]
+    fn root_applies_the_theme_zoom_to_its_window(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        cx.update(|cx| {
+            MoonTheme::install_config(
+                crate::moon::MoonThemeConfig::moon_terminal().with_zoom(2.0),
+                cx,
+            )
+        });
+
+        let (_root, cx) = cx.add_window_view(|window, cx| {
+            let view = cx.new(|_| TestView);
+            Root::new(view, window, cx).bordered(false)
+        });
+        // The first render parks the zoom; the next frame applies it. Two draws cover both
+        // whichever the harness has already run.
+        let (zoom, factor, platform_factor) = cx.update(|window, cx| {
+            let platform_factor = window.scale_factor() / window.content_zoom();
+            window.draw(cx).clear();
+            window.draw(cx).clear();
+            (
+                window.content_zoom(),
+                window.scale_factor(),
+                platform_factor,
+            )
+        });
+        assert_eq!(zoom, 2.0, "the root installs the theme zoom on its window");
+        assert_eq!(
+            factor,
+            platform_factor * 2.0,
+            "and the window renders at it"
+        );
     }
 
     struct FocusProbeView {

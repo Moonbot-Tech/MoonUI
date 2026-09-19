@@ -23,6 +23,7 @@ fn content_width_policies_reserve_scaled_popup_chrome() {
                 font,
                 font_delta,
                 tier: Default::default(),
+                zoom: 1.0,
             };
             let chrome = tokens.ui(POPOVER_PADDING) * 2.0 + POPOVER_BORDER * 2.0;
 
@@ -76,6 +77,7 @@ fn intrinsic_popover_shrink_wraps_its_rendered_child(cx: &mut gpui::TestAppConte
         font: 0.25,
         font_delta: 0.0,
         tier: Default::default(),
+        zoom: 1.0,
     };
     cx.update(|cx| {
         MoonTheme::global_mut(cx).scale = scale;

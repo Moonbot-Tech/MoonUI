@@ -1261,9 +1261,19 @@ impl PlatformInputHandler {
             .ok();
     }
 
+    /// The platform-space bounds of a UTF-16 range, or `None` when the handler has none.
+    ///
+    /// Every platform layer positions its IME candidate window from this (and from
+    /// [`Self::selected_bounds`]), so the content-space bounds the handler reports are multiplied
+    /// by the window's content zoom here, once, rather than in each platform.
     pub fn bounds_for_range(&mut self, range_utf16: Range<usize>) -> Option<Bounds<Pixels>> {
         self.cx
-            .update(|window, cx| self.handler.bounds_for_range(range_utf16, window, cx))
+            .update(|window, cx| {
+                let zoom = window.content_zoom();
+                self.handler
+                    .bounds_for_range(range_utf16, window, cx)
+                    .map(|bounds| bounds.map(|c| c * zoom))
+            })
             .ok()
             .flatten()
     }
@@ -1312,14 +1322,24 @@ impl PlatformInputHandler {
         }
     }
 
+    /// The platform-space bounds the IME candidate window should sit beside, or `None`.
+    ///
+    /// Content-space bounds from the handler, multiplied by the window's content zoom like
+    /// [`Self::bounds_for_range`].
     pub fn selected_bounds(&mut self, window: &mut Window, cx: &mut App) -> Option<Bounds<Pixels>> {
+        let zoom = window.content_zoom();
         let marked_range = self.handler.marked_text_range(window, cx);
         let selection = self.handler.selected_text_range(true, window, cx)?;
         Self::compute_ime_candidate_bounds(marked_range, &selection, |range| {
             self.handler.bounds_for_range(range, window, cx)
         })
+        .map(|bounds| bounds.map(|c| c * zoom))
     }
 
+    /// [`Self::selected_bounds`] for a caller without the window in hand.
+    ///
+    /// Composed from [`Self::bounds_for_range`], which already converts to platform space, so
+    /// nothing is multiplied again here.
     pub fn ime_candidate_bounds(&mut self) -> Option<Bounds<Pixels>> {
         let marked_range = self.marked_text_range();
         let selection = self.selected_text_range(true)?;
@@ -1329,9 +1349,17 @@ impl PlatformInputHandler {
     }
 
     #[allow(unused)]
+    /// The character under a platform-space point, or `None`.
+    ///
+    /// The point arrives in the platform's logical pixels and is divided by the content zoom
+    /// before the handler, which lays text out in content space, sees it.
     pub fn character_index_for_point(&mut self, point: Point<Pixels>) -> Option<usize> {
         self.cx
-            .update(|window, cx| self.handler.character_index_for_point(point, window, cx))
+            .update(|window, cx| {
+                let zoom = window.content_zoom();
+                self.handler
+                    .character_index_for_point(point.map(|c| c / zoom), window, cx)
+            })
             .ok()
             .flatten()
     }

@@ -295,7 +295,8 @@ crates/moon-gpui-wgpu/src/wgpu_renderer.rs
 1. вызывает `driver.frame(info)`;
 2. понимает, будет ли этот tick реально представлен;
 3. если будет, вызывает `driver.prepare_text(ctx)` для всех canvas-ов окна;
-4. даёт `prepare_text(ctx)` доступ к `ctx.bounds()`, `ctx.scale_factor()`,
+4. даёт `prepare_text(ctx)` доступ к `ctx.bounds()`, `ctx.scale_factor()` (платформенный
+   фактор, умноженный на content zoom окна; `ctx.content_zoom()` отдаёт множитель отдельно),
    `ctx.content_mask()`, `ctx.canvas_layer()` и `ctx.text_layer()`;
 5. кладет glyph sprites в `text_layer`, а не обязательно в слой самого canvas.
 

@@ -61,6 +61,7 @@ hairline = 1.0
 ui = 1.0
 font = 1.0
 font_delta = 0.0
+zoom = 1.0
 
 [dark.typography]
 font_family = "Inter"
@@ -130,6 +131,7 @@ hairline = 1.0
 ui = 1.0
 font = 1.0
 font_delta = 0.0
+zoom = 1.0
 
 [light.typography]
 font_family = "Inter"
