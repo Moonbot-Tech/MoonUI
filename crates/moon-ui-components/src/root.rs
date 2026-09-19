@@ -154,6 +154,9 @@ impl ActiveDialog {
 impl MoonRoot {
     /// Create a new Root view.
     pub fn new(view: impl Into<AnyView>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        // Outside a draw, so this applies at once and the window's first frame is already at
+        // the theme's zoom; `render` below keeps it current afterwards.
+        window.set_content_zoom(MoonTheme::content_zoom(cx), cx);
         Self {
             style: StyleRefinement::default(),
             view: view.into(),
@@ -735,9 +738,9 @@ impl Render for MoonRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(cx.theme().font_size);
         // The theme's zoom reaches every window through its root, the same way the rem size
-        // does: a new window adopts it on its first frame, and a theme change reaches the others
-        // on the frame `MoonTheme::install_config` requests. `Window` defers a change made here
-        // to the next frame and ignores an equal value, so this is cheap to ask every render.
+        // does: `new` installs it before the first frame, and a theme change reaches every open
+        // window on the frame `MoonTheme::install_config` requests. `Window` defers a change made
+        // here to the next frame and ignores an equal value, so this is cheap to ask every render.
         let zoom = MoonTheme::content_zoom(cx);
         if window.content_zoom() != zoom {
             window.set_content_zoom(zoom, cx);

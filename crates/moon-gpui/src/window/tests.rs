@@ -15,8 +15,8 @@ use crate::{
     GpuCanvasDrawContext, GpuCanvasDriver, GpuCanvasHandle, GpuCanvasPrepareContext,
     GpuFrameDecision, GpuFrameInfo, InputEvent as _, InputHandler, InteractiveElement as _,
     IntoElement, MouseMoveEvent, Pixels, PlatformInput, PlatformInputHandler, Point, Render,
-    ScrollDelta, ScrollWheelEvent, Size, Styled as _, TestAppContext, TouchPhase, UTF16Selection,
-    Window, div, gpu_canvas, point, px, size,
+    ScrollDelta, ScrollWheelEvent, Size, StatefulInteractiveElement as _, Styled as _,
+    TestAppContext, TouchPhase, UTF16Selection, Window, div, gpu_canvas, point, px, size,
 };
 
 /// A root view that draws nothing; the window's own state is what these tests read.
@@ -59,18 +59,34 @@ fn platform_factor(app: &mut TestAppContext, any: AnyWindowHandle) -> f32 {
         .unwrap()
 }
 
-/// Catches dropping either term of `window.rs:sync_platform_geometry`: the interface would keep
-/// rendering at the platform density, or lay out against a viewport the zoom no longer fits.
+/// Catches dropping either term of `window.rs:sync_platform_geometry` (the interface would keep
+/// rendering at the platform density, or lay out against a viewport the zoom no longer fits) or
+/// leaving `mouse_position` in the old space in `apply_content_zoom` (the frame that applies the
+/// zoom hovers the element at the old position in the new space).
 #[test]
 fn content_zoom_multiplies_the_platform_factor_and_divides_the_viewport() {
     let (mut app, any) = open_window(|_, _| EmptyView);
     app.update_window(any, |_, window, cx| {
+        window.dispatch_event(
+            MouseMoveEvent {
+                position: point(px(100.), px(100.)),
+                modifiers: Default::default(),
+                pressed_button: None,
+            }
+            .to_platform_input(),
+            cx,
+        );
         let factor = window.scale_factor();
         let viewport = window.viewport_size();
         window.set_content_zoom(2.0, cx);
         assert_eq!(window.content_zoom(), 2.0);
         assert_eq!(window.scale_factor(), factor * 2.0);
         assert_eq!(window.viewport_size(), viewport.map(|d| d / 2.0));
+        assert_eq!(
+            window.mouse_position(),
+            point(px(50.), px(50.)),
+            "the tracked pointer follows the space it is compared in"
+        );
     })
     .unwrap();
 }
@@ -90,8 +106,8 @@ fn content_zoom_survives_a_platform_resize() {
     .unwrap();
 }
 
-/// Catches a missing arm in `window.rs:unzoom_input`: a click at zoom would land on the element
-/// twice as far from the origin as the one under the pointer.
+/// Catches an arm of `window.rs:unzoom_input` moved into its pass-through group: a click at zoom
+/// would land on the element twice as far from the origin as the one under the pointer.
 #[test]
 fn pointer_positions_arrive_in_content_space() {
     let (mut app, any) = open_window(|_, _| EmptyView);
@@ -390,6 +406,86 @@ fn ime_geometry_crosses_to_platform_space_and_back() {
         Some(0)
     );
     assert_eq!(seen_point.get(), Some(point(px(20.), px(20.))));
+}
+
+/// Catches `window.rs:apply_content_zoom` leaving a parked request behind: the next `draw` would
+/// take the stale zoom and override the one applied since.
+#[test]
+fn an_immediate_zoom_supersedes_a_parked_one() {
+    let armed = Rc::new(Cell::new(false));
+    let renders: Rc<RefCell<Vec<(f32, Size<Pixels>)>>> = Rc::new(RefCell::new(Vec::new()));
+    let (mut app, any) = open_window({
+        let armed = armed.clone();
+        let renders = renders.clone();
+        move |_, _| ZoomingView { armed, renders }
+    });
+    armed.set(true);
+    draw(&mut app, any);
+    armed.set(false);
+    zoom(&mut app, any, 1.5);
+    draw(&mut app, any);
+    app.update_window(any, |_, window, _| {
+        assert_eq!(
+            window.content_zoom(),
+            1.5,
+            "the zoom applied outside the draw wins over the one a render parked before it"
+        );
+    })
+    .unwrap();
+}
+
+/// A 50 px square that counts its clicks, for the accessibility click fallback.
+struct ClickProbe {
+    clicks: Rc<Cell<usize>>,
+}
+
+impl Render for ClickProbe {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let clicks = self.clicks.clone();
+        div()
+            .id("click-probe")
+            .size(px(50.))
+            .on_click(move |_, _, _| clicks.set(clicks.get() + 1))
+    }
+}
+
+/// Catches `window.rs:handle_a11y_action` handing a content-space centre to `dispatch_event`,
+/// which divides it by the zoom again: a screen-reader click at zoom would land on the wrong
+/// element, or on nothing.
+#[test]
+fn an_accessibility_click_lands_on_its_node_at_zoom() {
+    let clicks = Rc::new(Cell::new(0));
+    let (mut app, any) = open_window({
+        let clicks = clicks.clone();
+        move |_, _| ClickProbe { clicks }
+    });
+    zoom(&mut app, any, 2.0);
+    draw(&mut app, any);
+    app.update_window(any, |_, window, cx| {
+        let node = accesskit::NodeId(7);
+        window.a11y.node_bounds.insert(
+            node,
+            Bounds {
+                origin: point(px(0.), px(0.)),
+                size: size(px(50.), px(50.)),
+            },
+        );
+        window.handle_a11y_action(
+            accesskit::ActionRequest {
+                action: accesskit::Action::Click,
+                target_tree: accesskit::TreeId::ROOT,
+                target_node: node,
+                data: None,
+            },
+            cx,
+        );
+    })
+    .unwrap();
+    assert_eq!(
+        clicks.get(),
+        1,
+        "the synthetic click must reach the node it was aimed at"
+    );
 }
 
 /// A GPU canvas driver that records the factor and zoom of the frame info it receives.

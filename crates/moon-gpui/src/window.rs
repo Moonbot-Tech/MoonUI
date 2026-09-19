@@ -2462,11 +2462,18 @@ impl Window {
         }
     }
 
-    /// Install a validated zoom: geometry, the platform's client inset, a refresh and the bounds
-    /// observers, in that order.
+    /// Install a validated zoom: geometry, the tracked pointer, the platform's client inset, a
+    /// refresh and the bounds observers, in that order.
     fn apply_content_zoom(&mut self, zoom: f32, cx: &mut App) {
+        // An immediate apply supersedes a zoom parked by an earlier render; otherwise the next
+        // `draw` would take the stale request and win over this one.
+        self.pending_content_zoom = None;
+        let previous = self.content_zoom;
         self.content_zoom = zoom;
         self.sync_platform_geometry();
+        // The tracked pointer is content space too. Until the next platform event it would
+        // otherwise hover and cursor-style the element at the old position in the new space.
+        self.mouse_position = self.mouse_position.map(|c| c * previous / zoom);
         if let Some(inset) = self.client_inset {
             self.platform_window.set_client_inset(inset * zoom);
         }
@@ -2493,11 +2500,11 @@ impl Window {
             .render_to_image(&self.rendered_frame.scene)
     }
 
-    /// Set the content size of the window, in content space (the counterpart of
-    /// [`Self::viewport_size`]); the platform receives it multiplied by the content zoom.
+    /// Set the content size of the window, in the platform's logical pixels: the counterpart of
+    /// [`Self::bounds`]`.size`, not of [`Self::viewport_size`], so a size saved from
+    /// [`Self::window_bounds`] restores unchanged under content zoom.
     pub fn resize(&mut self, size: Size<Pixels>) {
-        let zoom = self.content_zoom;
-        self.platform_window.resize(size.map(|d| d * zoom));
+        self.platform_window.resize(size);
     }
 
     /// Returns whether or not the window is currently fullscreen
@@ -6026,7 +6033,9 @@ impl Window {
         match request.action {
             accesskit::Action::Click => {
                 if let Some(bounds) = self.a11y.node_bounds.get(&request.target_node).copied() {
-                    let center = bounds.center();
+                    // Node bounds are content space; the synthetic events below are platform
+                    // events by contract, and `dispatch_event` divides them by the zoom again.
+                    let center = bounds.center().map(|c| c * self.content_zoom);
                     let mouse_down = PlatformInput::MouseDown(crate::MouseDownEvent {
                         button: MouseButton::Left,
                         position: center,
@@ -6260,7 +6269,8 @@ impl Window {
         self.modifiers = modifiers;
     }
 
-    /// For testing: simulate a mouse move event to the given position.
+    /// For testing: simulate a mouse move event to the given position, in the platform's logical
+    /// pixels as a real event would be (divided by the content zoom on the way in).
     /// This dispatches the event through the normal event handling path,
     /// which will trigger hover states and tooltips.
     #[cfg(any(test, feature = "test-support"))]

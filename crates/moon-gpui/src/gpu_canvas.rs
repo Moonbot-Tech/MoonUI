@@ -154,6 +154,9 @@ struct GpuCanvasRetainedTextCacheKey {
     bounds: Bounds<Pixels>,
     content_mask: ContentMask<ScaledPixels>,
     scale_factor_bits: u32,
+    /// Keyed beside the combined factor: a consumer that keeps device density sizes by
+    /// `scale_factor / content_zoom`, which a zoom change offset by a DPI change leaves unchanged.
+    content_zoom_bits: u32,
     background_appearance: WindowBackgroundAppearance,
     subpixel_rendering_supported: bool,
     text_rendering_mode: TextRenderingMode,
@@ -637,6 +640,7 @@ impl<'a> GpuCanvasTextContext<'a> {
             bounds: self.bounds,
             content_mask: self.content_mask,
             scale_factor_bits: self.scale_factor.to_bits(),
+            content_zoom_bits: self.content_zoom.to_bits(),
             background_appearance: self.background_appearance,
             subpixel_rendering_supported: self.subpixel_rendering_supported,
             text_rendering_mode: self.text_rendering_mode,

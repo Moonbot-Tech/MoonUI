@@ -437,7 +437,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "66b8196a2c8bdc79",
+      "local_hash": "5c656e0ef4caf7de",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -576,13 +576,13 @@
         },
         {
           "path": "input/popovers/code_action_menu.rs",
-          "hash": "5758e26153bf8aa1",
-          "bytes": 9480
+          "hash": "6a04a1d08c6b2915",
+          "bytes": 9482
         },
         {
           "path": "input/popovers/completion_menu.rs",
-          "hash": "040d5b8e3cb38d6b",
-          "bytes": 14755
+          "hash": "6eade17c8cc5254b",
+          "bytes": 14759
         },
         {
           "path": "input/popovers/diagnostic_popover.rs",
@@ -591,8 +591,8 @@
         },
         {
           "path": "input/popovers/hover_popover.rs",
-          "hash": "63639b9e8cf89fb5",
-          "bytes": 8814
+          "hash": "1fe6156956a05589",
+          "bytes": 8820
         },
         {
           "path": "input/popovers/mod.rs",
@@ -816,7 +816,10 @@
         "input/mask_pattern.rs",
         "input/mod.rs",
         "input/number_input.rs",
+        "input/popovers/code_action_menu.rs",
+        "input/popovers/completion_menu.rs",
         "input/popovers/diagnostic_popover.rs",
+        "input/popovers/hover_popover.rs",
         "input/popovers/mod.rs",
         "input/search.rs",
         "input/state.rs"
@@ -928,7 +931,7 @@
       "local_paths": [
         "native_menu"
       ],
-      "local_hash": "d8df00f5803a0e99",
+      "local_hash": "36617a8b4a31a71e",
       "local_files": [
         {
           "path": "native_menu/fallback.rs",
@@ -937,8 +940,8 @@
         },
         {
           "path": "native_menu/macos.rs",
-          "hash": "e3d981192ccf16c6",
-          "bytes": 6234
+          "hash": "685cb0856791d46e",
+          "bytes": 6539
         },
         {
           "path": "native_menu/mod.rs",
@@ -976,6 +979,7 @@
       ],
       "donor_changed_files": [
         "native_menu/fallback.rs",
+        "native_menu/macos.rs",
         "native_menu/mod.rs",
         "native_menu/windows.rs"
       ]
@@ -1495,7 +1499,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "66b8196a2c8bdc79",
+      "local_hash": "5c656e0ef4caf7de",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -1634,13 +1638,13 @@
         },
         {
           "path": "input/popovers/code_action_menu.rs",
-          "hash": "5758e26153bf8aa1",
-          "bytes": 9480
+          "hash": "6a04a1d08c6b2915",
+          "bytes": 9482
         },
         {
           "path": "input/popovers/completion_menu.rs",
-          "hash": "040d5b8e3cb38d6b",
-          "bytes": 14755
+          "hash": "6eade17c8cc5254b",
+          "bytes": 14759
         },
         {
           "path": "input/popovers/diagnostic_popover.rs",
@@ -1649,8 +1653,8 @@
         },
         {
           "path": "input/popovers/hover_popover.rs",
-          "hash": "63639b9e8cf89fb5",
-          "bytes": 8814
+          "hash": "1fe6156956a05589",
+          "bytes": 8820
         },
         {
           "path": "input/popovers/mod.rs",
@@ -1874,7 +1878,10 @@
         "input/mask_pattern.rs",
         "input/mod.rs",
         "input/number_input.rs",
+        "input/popovers/code_action_menu.rs",
+        "input/popovers/completion_menu.rs",
         "input/popovers/diagnostic_popover.rs",
+        "input/popovers/hover_popover.rs",
         "input/popovers/mod.rs",
         "input/search.rs",
         "input/state.rs"

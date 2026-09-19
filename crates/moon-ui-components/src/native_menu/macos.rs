@@ -58,6 +58,9 @@ pub(super) fn show(
     // Inherent `Window::window_handle` (GPUI's `AnyWindowHandle`), not the
     // `raw_window_handle::HasWindowHandle` trait method in scope below.
     let handle = Window::window_handle(window);
+    // AppKit positions the menu in view points, the platform's logical pixels, while `position`
+    // is a GPUI content-space point; under content zoom the two differ by the zoom.
+    let position = position.map(|c| c * window.content_zoom());
 
     cx.spawn(async move |cx| {
         let action = run_menu(view_ptr, &items, position);
@@ -94,7 +97,8 @@ fn run_menu(
     let mut actions: Vec<&Box<dyn Action>> = Vec::new();
     let ns_menu = build_menu(items, &target, mtm, &mut actions);
 
-    // `position` is window-relative, logical pixels, origin top-left (GPUI).
+    // `position` is window-relative, in the platform's logical pixels (`show` applied the content
+    // zoom), origin top-left (GPUI).
     // AppKit view coordinates have their origin at the bottom-left, so flip y.
     let height = view.bounds().size.height;
     let location = NSPoint::new(

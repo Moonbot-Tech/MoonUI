@@ -507,13 +507,11 @@ impl MoonThemeConfig {
     /// number would not fail loudly, it would render every window at nothing and take the
     /// settings screen that could repair it along. Zero, negatives and non-finite values are
     /// replaced by the default; any positive value is stored verbatim, because a consumer may be
-    /// persisting a deliberate choice outside whatever range its own slider offers.
+    /// persisting a deliberate choice outside whatever range its own slider offers. No range
+    /// beyond that is enforced here: a consumer that persists the value keeps it within the range
+    /// its own control offers.
     pub fn set_zoom(&mut self, zoom: f32) {
-        let zoom = if zoom.is_finite() && zoom > 0.0 {
-            zoom
-        } else {
-            MoonScale::default().zoom
-        };
+        let zoom = normalized_zoom(zoom);
         self.dark.scale.zoom = zoom;
         self.light.scale.zoom = zoom;
     }
@@ -522,6 +520,15 @@ impl MoonThemeConfig {
     pub fn with_zoom(mut self, zoom: f32) -> Self {
         self.set_zoom(zoom);
         self
+    }
+}
+
+/// `zoom` when it can be a zoom, the default when it cannot; see [`MoonThemeConfig::set_zoom`].
+fn normalized_zoom(zoom: f32) -> f32 {
+    if zoom.is_finite() && zoom > 0.0 {
+        zoom
+    } else {
+        MoonScale::default().zoom
     }
 }
 
@@ -550,6 +557,10 @@ impl MoonTheme {
         let mut config = config;
         config.dark.palette = config.dark.palette.with_legacy_defaults();
         config.light.palette = config.light.palette.with_legacy_defaults();
+        // A theme file bypasses `set_zoom`. An impossible zoom is normalized here for the reason
+        // that setter refuses one, so the tokens never report a zoom no window will take.
+        config.dark.scale.zoom = normalized_zoom(config.dark.scale.zoom);
+        config.light.scale.zoom = normalized_zoom(config.light.scale.zoom);
         let tokens = match config.mode {
             ThemeMode::Light => config.light.clone(),
             ThemeMode::Dark | ThemeMode::System => config.dark.clone(),

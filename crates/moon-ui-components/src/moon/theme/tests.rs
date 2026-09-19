@@ -1,6 +1,6 @@
 //! Guards scale validity and density propagation through theme loading and mode selection.
 
-use super::{MoonScale, MoonThemeConfig, MoonThemeTokens};
+use super::{MoonScale, MoonTheme, MoonThemeConfig, MoonThemeTokens};
 use crate::moon::{
     colors::MoonColors,
     tokens::{MoonPalette, contrast_ratio},
@@ -270,4 +270,22 @@ font = 1.1
     assert_eq!(config.dark.zoom(), 1.0);
     assert_eq!(config.light.zoom(), 1.0);
     assert_eq!(MoonThemeTokens::default().zoom(), 1.0);
+}
+
+/// Catches `theme.rs:MoonTheme::from_config` installing a theme file's impossible zoom: a
+/// hand-edited `zoom = 0` bypasses `set_zoom`, every window would refuse it, and the tokens would
+/// still report 0 to consumers.
+#[test]
+fn an_impossible_zoom_in_a_theme_file_is_normalized_on_install() {
+    let config: MoonThemeConfig = toml::from_str(
+        "[dark.scale]
+zoom = 0.0
+[light.scale]
+zoom = -2.0
+",
+    )
+    .unwrap();
+    let theme = MoonTheme::from_config(config);
+    assert_eq!(theme.scale.zoom, 1.0);
+    assert_eq!(theme.config.light.zoom(), 1.0);
 }
