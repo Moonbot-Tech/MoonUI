@@ -12,6 +12,7 @@ mod icon;
 mod index_path;
 #[cfg(any(feature = "inspector", debug_assertions))]
 mod inspector;
+mod layer;
 pub mod moon;
 mod root;
 mod styled;

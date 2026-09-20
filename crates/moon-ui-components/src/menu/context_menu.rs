@@ -205,7 +205,7 @@ impl<E: ParentElement + Styled + IntoElement + 'static> Element for ContextMenu<
                                         ),
                                 ),
                             )
-                            .with_priority(1)
+                            .with_priority(crate::layer::LAYER_OVERLAY)
                             .into_any(),
                         );
                     }

@@ -7,8 +7,6 @@ use super::{
     tokens::{MoonPalette, MoonRect, rgba_from},
 };
 
-/// Shared layer boundary for popovers and controls opening menus above them.
-pub(super) const MOON_POPOVER_PRIORITY: usize = 30_000;
 const POPOVER_PADDING: f32 = 6.0;
 const POPOVER_BORDER: f32 = 1.0;
 
@@ -368,7 +366,7 @@ impl RenderOnce for MoonPopover {
         let mut popover = CorePopover::new(ElementId::from(self.id.clone()))
             .anchor(anchor_for(self.placement))
             .appearance(false)
-            .deferred_priority(MOON_POPOVER_PRIORITY)
+            .deferred_priority(crate::layer::LAYER_MOON_POPOVER)
             .overlay_closable(self.overlay_closable)
             .open(open)
             .trigger_any(trigger)
