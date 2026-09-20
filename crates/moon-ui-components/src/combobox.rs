@@ -741,7 +741,7 @@ where
                         dismiss_handler,
                         cx,
                     ))
-                    .with_priority(1),
+                    .with_priority(crate::layer::LAYER_OVERLAY),
                 )
             })
     }

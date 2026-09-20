@@ -12,6 +12,7 @@ use crate::{
     animation::{Transition, ease_in_out_cubic, ease_out_cubic},
     h_flex,
     kbd::Kbd,
+    layer::LAYER_TOOLTIP,
     root::Root,
     text::Text,
 };
@@ -498,6 +499,14 @@ impl Render for TooltipOverlay {
         let is_switching = self.is_switching;
         let prev_trigger_bounds = self.prev_trigger_bounds;
 
+        // The managed tooltip overlay must outrank every other deferred band, including
+        // LAYER_MOON_POPOVER, because a tooltip is the topmost transient surface. The matching
+        // literal 2 in src/time/date_picker.rs:512 is deliberately left alone: that file is a
+        // Mirror component with a zero donor-drift budget, and any byte change there fails
+        // `cargo xtask component-mirror`. That literal is the date picker's calendar overlay, so
+        // it is still subject to this bug: a MoonDatePicker inside a MoonPopover has its calendar
+        // painted underneath. Fixing it needs a donor-side change or a component-class change;
+        // it is a follow-up, not resolved.
         deferred(
             tooltip_overlay_positioner(trigger_bounds).child(div().child(content_view).map(|el| {
                 if is_switching {
@@ -538,7 +547,7 @@ impl Render for TooltipOverlay {
                 }
             })),
         )
-        .with_priority(2)
+        .with_priority(LAYER_TOOLTIP)
         .into_any_element()
     }
 }

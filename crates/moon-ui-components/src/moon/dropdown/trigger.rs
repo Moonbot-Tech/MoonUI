@@ -651,7 +651,7 @@ impl RenderOnce for MoonDropdown {
         let mut popover = CorePopover::new(ElementId::from(self.id.clone()))
             .appearance(false)
             .anchor(Anchor::TopLeft)
-            .deferred_priority(30_000)
+            .deferred_priority(crate::layer::LAYER_MOON_POPOVER)
             .open(open)
             .trigger_any(trigger)
             .content(move |_, window, cx| {

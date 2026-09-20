@@ -92,7 +92,7 @@ impl Default for SelectOptions {
             title_prefix: None,
             menu_width: Length::Auto,
             menu_max_h: rems(20.).into(),
-            menu_priority: 1,
+            menu_priority: crate::layer::LAYER_OVERLAY,
             disabled: false,
             appearance: true,
             search_placeholder: None,

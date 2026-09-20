@@ -59,7 +59,7 @@ impl Popover {
             appearance: true,
             overlay_closable: true,
             close_on_content_click: false,
-            deferred_priority: 1,
+            deferred_priority: crate::layer::LAYER_OVERLAY,
             default_open: false,
             open: None,
             on_open_change: None,
@@ -153,7 +153,7 @@ impl Popover {
         self
     }
 
-    /// Override deferred overlay priority.
+    /// Override deferred overlay priority. The default is `LAYER_OVERLAY`.
     pub fn deferred_priority(mut self, priority: usize) -> Self {
         self.deferred_priority = priority;
         self
