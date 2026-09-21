@@ -348,7 +348,7 @@
       "public_path": "moon_ui::MoonInput",
       "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": "Reviewed TrackedFork drift: Moon tone/theme hooks plus UTF-8, mask, number, and search hardening live in base input; Longbridge editor engine remains source-owned",
-      "donor_drift_budget": 16,
+      "donor_drift_budget": 19,
       "contracts": ["input.utf8_boundary_clamp", "input.mask_contract", "gallery.visual_coverage"]
     },
     {
@@ -685,7 +685,7 @@
       "public_path": "moon_ui::MoonTextArea",
       "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": "Reviewed TrackedFork drift: MoonTextArea shares the reviewed Moon input engine drift; Longbridge multiline input behavior remains source-owned",
-      "donor_drift_budget": 16,
+      "donor_drift_budget": 19,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -770,7 +770,7 @@
       "public_path": "moon_ui::MoonNativeMenu",
       "upstream_ref": "Longbridge::native_menu@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": "Reviewed TrackedFork drift: Moon native-menu fallback/window ownership hooks live in base native menu; Longbridge native menu behavior remains source-owned",
-      "donor_drift_budget": 3,
+      "donor_drift_budget": 4,
       "contracts": ["gallery.visual_coverage"]
     },
     {

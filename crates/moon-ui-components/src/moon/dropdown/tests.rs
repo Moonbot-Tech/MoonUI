@@ -414,6 +414,7 @@ fn fitted_dropdown_stays_inside_both_viewport_edges_at_independent_scales(
                 font: 1.35,
                 font_delta: 2.0,
                 tier: Default::default(),
+                zoom: 1.0,
             },
         ),
         (
@@ -423,6 +424,7 @@ fn fitted_dropdown_stays_inside_both_viewport_edges_at_independent_scales(
                 font: 0.9,
                 font_delta: 2.0,
                 tier: Default::default(),
+                zoom: 1.0,
             },
         ),
     ] {
@@ -629,6 +631,7 @@ fn fitted_trigger_preserves_caret_at_independent_scale_extremes() {
                 font,
                 font_delta,
                 tier: Default::default(),
+                zoom: 1.0,
             };
             let font_size = 10.5;
             let text_scale = tokens.font(font_size) / font_size;
@@ -674,6 +677,7 @@ fn scaled_trigger_uses_font_width_without_clipping_component_chrome() {
                 font,
                 font_delta,
                 tier: Default::default(),
+                zoom: 1.0,
             };
             let font_size = 10.5;
             let text_scale = tokens.font(font_size) / font_size;
@@ -721,6 +725,7 @@ fn scaled_menu_width_retains_fitted_rows_at_independent_scale_extremes(
                     font,
                     font_delta,
                     tier: Default::default(),
+                    zoom: 1.0,
                 };
                 let metrics = MoonPopupMenu::new("scaled-menu-test")
                     .size(MoonSize::Sm)
@@ -772,6 +777,7 @@ fn menu_max_height_distinguishes_ui_scaled_and_rendered_values() {
         font: 0.25,
         font_delta: 0.0,
         tier: Default::default(),
+        zoom: 1.0,
     };
 
     assert_eq!(
@@ -1353,6 +1359,7 @@ fn fitted_submenu_resolves_width_from_its_own_items(cx: &mut gpui::TestAppContex
         font: 0.75,
         font_delta: 4.0,
         tier: Default::default(),
+        zoom: 1.0,
     };
     cx.update(|cx| {
         MoonTheme::global_mut(cx).scale = scale;
@@ -1537,6 +1544,7 @@ fn pinned_header_wrapper_enforces_its_declared_height(cx: &mut gpui::TestAppCont
             font: 1.0,
             font_delta: 0.0,
             tier: Default::default(),
+            zoom: 1.0,
         };
     });
     let window = cx.add_window(|_, _| HeaderHeightHarness);
@@ -1791,6 +1799,7 @@ fn pinned_header_scaling_shrinks_the_wrapper_when_the_clamp_engages(cx: &mut gpu
             font: 1.0,
             font_delta: 0.0,
             tier: Default::default(),
+            zoom: 1.0,
         };
     });
     let window = cx.add_window(|_, _| HeaderClampScalingHarness);
@@ -1869,6 +1878,7 @@ fn tier_menu_text_follows_ui_zoom_never_font_scale() {
             font: 1.75,
             font_delta: 4.0,
             tier: Default::default(),
+            zoom: 1.0,
         },
         ..MoonThemeTokens::default()
     };
@@ -1931,6 +1941,7 @@ fn tier_menu_width_follows_ui_zoom_never_font_delta(cx: &mut gpui::TestAppContex
                     font,
                     font_delta,
                     tier: Default::default(),
+                    zoom: 1.0,
                 },
                 ..MoonThemeTokens::default()
             };
@@ -1989,6 +2000,7 @@ fn scaled_menu_width_at_a_tier_follows_ui_zoom_never_font_delta(cx: &mut gpui::T
                     font,
                     font_delta,
                     tier: Default::default(),
+                    zoom: 1.0,
                 },
                 ..MoonThemeTokens::default()
             };

@@ -1,6 +1,6 @@
 //! Guards scale validity and density propagation through theme loading and mode selection.
 
-use super::{MoonScale, MoonThemeConfig, MoonThemeTokens};
+use super::{MoonScale, MoonTheme, MoonThemeConfig, MoonThemeTokens};
 use crate::moon::{
     colors::MoonColors,
     tokens::{MoonPalette, contrast_ratio},
@@ -218,4 +218,74 @@ fn tier_band_bases_are_compact_only() {
         assert_eq!(xs.tier_band_base(standard, |m| m.line_height), compact);
         assert_eq!(sm.tier_band_base(standard, |m| m.line_height), standard);
     }
+}
+
+/// Catches allowing non-positive or non-finite values in `theme.rs:MoonThemeConfig::set_zoom`,
+/// which would render every window at nothing, the settings screen that could repair it included.
+#[test]
+fn an_impossible_zoom_is_replaced_rather_than_stored() {
+    for impossible in [0.0_f32, -1.0, f32::NAN, f32::INFINITY] {
+        let cfg = MoonThemeConfig::moon_terminal().with_zoom(impossible);
+
+        assert_eq!(
+            cfg.dark.scale.zoom,
+            MoonScale::default().zoom,
+            "a zoom of {impossible} cannot be rendered; it must not be stored"
+        );
+        assert_eq!(
+            cfg.light.scale.zoom,
+            MoonScale::default().zoom,
+            "both themes must be guarded, not just the dark one"
+        );
+    }
+}
+
+/// Catches clamping positive values in `theme.rs:MoonThemeConfig::set_zoom`, which would
+/// overwrite a zoom a consumer persisted outside the range of its own slider.
+#[test]
+fn an_unusual_but_positive_zoom_is_stored_verbatim() {
+    for kept in [0.5_f32, 0.8, 1.75, 3.0] {
+        let cfg = MoonThemeConfig::moon_terminal().with_zoom(kept);
+
+        assert_eq!(
+            cfg.dark.scale.zoom, kept,
+            "a positive zoom of {kept} is a legitimate choice; the guard is not a clamp"
+        );
+        assert_eq!(cfg.light.scale.zoom, kept, "both themes take the zoom");
+    }
+}
+
+/// Catches a `MoonScale::default` zoom other than one, or a dropped serde default on the new
+/// field: every theme file written before it existed would open its windows zoomed.
+#[test]
+fn legacy_theme_toml_defaults_zoom_to_one() {
+    let config: MoonThemeConfig = toml::from_str(
+        "[dark.scale]
+ui = 1.2
+[light.scale]
+font = 1.1
+",
+    )
+    .unwrap();
+    assert_eq!(config.dark.zoom(), 1.0);
+    assert_eq!(config.light.zoom(), 1.0);
+    assert_eq!(MoonThemeTokens::default().zoom(), 1.0);
+}
+
+/// Catches `theme.rs:MoonTheme::from_config` installing a theme file's impossible zoom: a
+/// hand-edited `zoom = 0` bypasses `set_zoom`, every window would refuse it, and the tokens would
+/// still report 0 to consumers.
+#[test]
+fn an_impossible_zoom_in_a_theme_file_is_normalized_on_install() {
+    let config: MoonThemeConfig = toml::from_str(
+        "[dark.scale]
+zoom = 0.0
+[light.scale]
+zoom = -2.0
+",
+    )
+    .unwrap();
+    let theme = MoonTheme::from_config(config);
+    assert_eq!(theme.scale.zoom, 1.0);
+    assert_eq!(theme.config.light.zoom(), 1.0);
 }

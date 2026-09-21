@@ -3,6 +3,7 @@ use std::{rc::Rc, time::Duration};
 use crate::{
     Disableable, Selectable, Sizable, Size, StyledExt as _,
     moon::MoonTone,
+    moon::foundation::{snap_border, snap_centered},
     moon::{MoonColors, MoonPalette, MoonTheme, MoonThemeTokens, rgba_from, svg::moon_svg},
     text::Text,
     tooltip::ComponentTooltip,
@@ -606,16 +607,19 @@ fn checkbox_mark(
     window: &mut Window,
     cx: &mut App,
 ) -> Option<AnyElement> {
+    // The mark takes the size that centres on whole device pixels, so a fractional scale factor
+    // cannot round it towards one corner. Absolute insets start inside the box's 1px border
+    // (`border_1` on both the checkbox and radio boxes), so centring within the outer box takes
+    // that border back off, at the width layout draws it.
+    let mark = snap_centered(metrics.box_size, metrics.mark_size, window);
+    let offset = mark.inset - snap_border(px(1.), window);
     fading_mark(id.clone(), checked, window, cx, || {
-        // Absolute insets start inside the box's 1px border (`border_1` on both the checkbox and
-        // radio boxes), so centring within the outer box takes that border back off.
-        let offset = (metrics.box_size - metrics.mark_size) * 0.5 - px(1.);
         moon_svg(icon)
             .debug_selector(|| format!("{id}:mark"))
             .absolute()
             .top(offset)
             .left(offset)
-            .size(metrics.mark_size)
+            .size(mark.inner)
             .when_some(metrics.mark_stroke, |mark, stroke| {
                 mark.stroke_width(stroke)
             })
@@ -954,6 +958,38 @@ mod tests {
             assert_eq!(box_bounds.size, gpui::size(px(box_px), px(box_px)));
             assert_eq!(mark_bounds.size, gpui::size(px(mark_px), px(mark_px)));
             assert_eq!(mark_bounds.center(), box_bounds.center());
+        }
+    }
+
+    /// Catches `checkbox_mark` placing the mark from unsnapped lengths again (dropping
+    /// `snap_centered`), or taking a flat 1px off for the box's border instead of the width layout
+    /// draws it at (`snap_border`). Layout rounds the box, the mark, the inset and the border to
+    /// device pixels separately, so at 150 % a small box left two pixels over the mark and four
+    /// under it. At every scale factor the mark must keep the same space on all four sides.
+    #[gpui::test]
+    fn test_checked_mark_stays_centred_at_any_scale_factor(cx: &mut gpui::TestAppContext) {
+        cx.update(crate::init);
+        for size in [Size::Small, Size::Medium] {
+            let window = cx.add_window(move |_, _| CheckedCheckboxHarness { size });
+            let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+            cx.run_until_parked();
+            // Every 5 % step from 50 % to 300 %; the test platform's own factor is 2.0.
+            for factor in (10..=60).map(|step| step as f32 * 0.05) {
+                cx.update(|window, cx| {
+                    window.set_content_zoom(factor / 2.0, cx);
+                    window.draw(cx).clear();
+                });
+                let box_bounds = cx.debug_bounds("probe:box").expect("box must render");
+                let mark = cx.debug_bounds("probe:mark").expect("mark must render");
+                let device = |length: gpui::Pixels| (length.as_f32() * factor).round();
+                let sides = [
+                    device(mark.top() - box_bounds.top()),
+                    device(box_bounds.bottom() - mark.bottom()),
+                    device(mark.left() - box_bounds.left()),
+                    device(box_bounds.right() - mark.right()),
+                ];
+                assert_eq!(sides, [sides[0]; 4], "{size:?} factor={factor:.2}");
+            }
         }
     }
 

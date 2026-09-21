@@ -153,6 +153,7 @@ fn submenu_flips_left_and_caps_height_at_viewport_edges(cx: &mut gpui::TestAppCo
                     font: 1.0,
                     font_delta: 2.0,
                     tier: Default::default(),
+                    zoom: 1.0,
                 };
             });
             let window = cx.add_window(move |_, _| CascadeHarness {

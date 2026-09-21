@@ -64,8 +64,14 @@ pub struct GpuFrameInfo {
     pub now: Instant,
     /// Canvas bounds in logical pixels.
     pub bounds: Bounds<Pixels>,
-    /// Window scale factor used to convert logical pixels to device pixels.
+    /// Effective window scale factor, the platform factor times the content zoom: `bounds`
+    /// times this is the canvas in device pixels.
     pub scale_factor: f32,
+    /// The window's content zoom folded into `scale_factor`. A canvas that must keep device
+    /// density (a chart whose lines and captions should not follow UI zoom) sizes its own
+    /// geometry by `scale_factor / content_zoom` while still filling `bounds` times
+    /// `scale_factor` device pixels.
+    pub content_zoom: f32,
     /// Whether the platform currently expects a present to be possible.
     pub presentable: bool,
 }
@@ -148,6 +154,9 @@ struct GpuCanvasRetainedTextCacheKey {
     bounds: Bounds<Pixels>,
     content_mask: ContentMask<ScaledPixels>,
     scale_factor_bits: u32,
+    /// Keyed beside the combined factor: a consumer that keeps device density sizes by
+    /// `scale_factor / content_zoom`, which a zoom change offset by a DPI change leaves unchanged.
+    content_zoom_bits: u32,
     background_appearance: WindowBackgroundAppearance,
     subpixel_rendering_supported: bool,
     text_rendering_mode: TextRenderingMode,
@@ -528,6 +537,7 @@ pub struct GpuCanvasTextContext<'a> {
     pub(crate) sprite_atlas: Arc<dyn PlatformAtlas>,
     pub(crate) bounds: Bounds<Pixels>,
     pub(crate) scale_factor: f32,
+    pub(crate) content_zoom: f32,
     pub(crate) content_mask: ContentMask<ScaledPixels>,
     pub(crate) background_appearance: WindowBackgroundAppearance,
     pub(crate) subpixel_rendering_supported: bool,
@@ -545,6 +555,7 @@ impl<'a> GpuCanvasTextContext<'a> {
         sprite_atlas: Arc<dyn PlatformAtlas>,
         bounds: Bounds<Pixels>,
         scale_factor: f32,
+        content_zoom: f32,
         content_mask: ContentMask<ScaledPixels>,
         background_appearance: WindowBackgroundAppearance,
         subpixel_rendering_supported: bool,
@@ -559,6 +570,7 @@ impl<'a> GpuCanvasTextContext<'a> {
             sprite_atlas,
             bounds,
             scale_factor,
+            content_zoom,
             content_mask,
             background_appearance,
             subpixel_rendering_supported,
@@ -581,9 +593,16 @@ impl<'a> GpuCanvasTextContext<'a> {
         self.bounds
     }
 
-    /// Window scale factor used for the current frame.
+    /// Effective window scale factor for the current frame: the platform factor times the
+    /// content zoom. Logical text metrics and origins times this are device pixels.
     pub fn scale_factor(&self) -> f32 {
         self.scale_factor
+    }
+
+    /// The window's content zoom folded into [`Self::scale_factor`]; see
+    /// [`GpuFrameInfo::content_zoom`].
+    pub fn content_zoom(&self) -> f32 {
+        self.content_zoom
     }
 
     /// Effective text clip in scaled/device pixels.
@@ -621,6 +640,7 @@ impl<'a> GpuCanvasTextContext<'a> {
             bounds: self.bounds,
             content_mask: self.content_mask,
             scale_factor_bits: self.scale_factor.to_bits(),
+            content_zoom_bits: self.content_zoom.to_bits(),
             background_appearance: self.background_appearance,
             subpixel_rendering_supported: self.subpixel_rendering_supported,
             text_rendering_mode: self.text_rendering_mode,
@@ -633,6 +653,7 @@ impl<'a> GpuCanvasTextContext<'a> {
                     self.sprite_atlas.clone(),
                     self.bounds,
                     self.scale_factor,
+                    self.content_zoom,
                     self.content_mask,
                     self.background_appearance,
                     self.subpixel_rendering_supported,

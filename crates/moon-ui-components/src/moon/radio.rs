@@ -10,7 +10,7 @@ use crate::checkbox::{
 use super::{
     checkbox::tier_size,
     colors::MoonColors,
-    foundation::MoonSize,
+    foundation::{MoonSize, snap_centered},
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, MoonTone},
 };
@@ -209,10 +209,13 @@ impl RenderOnce for MoonRadio {
             .description
             .filter(|description| !description.is_empty());
         let has_text = label.is_some() || description.is_some();
+        // The dot takes the size that centres on whole device pixels inside the circle, so a
+        // fractional scale factor cannot leave it a pixel off the middle.
+        let dot_size = snap_centered(choice.box_size, metrics.dot_size, window).inner;
         let dot = fading_mark(state_id, checked, window, cx, || {
             div()
                 .debug_selector(|| format!("{}:dot", self.id))
-                .size(metrics.dot_size)
+                .size(dot_size)
                 .rounded_full()
                 .bg(colors.mark)
         });

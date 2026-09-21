@@ -7,7 +7,7 @@ use crate::checkbox::{ChoiceColors, MoonCheckboxMetrics, choice_text_column};
 
 use super::{
     colors::MoonColors,
-    foundation::{MoonSize, moon_cubic_bezier, moon_shadow_sm},
+    foundation::{MoonSize, moon_cubic_bezier, moon_shadow_sm, snap_centered},
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
@@ -213,6 +213,19 @@ impl MoonToggleMetrics {
             border: ui(self.border),
             focus_ring_distance: ui(self.focus_ring_distance),
             focus_ring_width: ui(self.focus_ring_width),
+        }
+    }
+
+    /// These metrics with the track on whole device pixels and the thumb sized from what the
+    /// track and the gap leave (`snap_centered`), so the thumb keeps one gap above, below and at
+    /// the end it rests against at any scale factor instead of rounding a pixel towards one edge.
+    fn snapped(self, window: &Window) -> Self {
+        let track = snap_centered(px(self.track_height), px(self.thumb_size), window);
+        Self {
+            track_width: window.pixel_snap(px(self.track_width)).as_f32(),
+            track_height: track.outer.as_f32(),
+            thumb_size: track.inner.as_f32(),
+            ..self
         }
     }
 
@@ -660,7 +673,7 @@ impl RenderOnce for MoonToggle {
         let size = self
             .size
             .unwrap_or_else(|| MoonToggleSize::density_default(&tokens));
-        let metrics = size.resolve(self.variant, &tokens);
+        let metrics = size.resolve(self.variant, &tokens).snapped(window);
         let choice = metrics.choice();
         let p = tokens.palette;
         let roles = MoonColors::active(cx);

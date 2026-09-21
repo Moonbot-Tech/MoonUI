@@ -115,7 +115,9 @@ impl RenderOnce for WindowBorder {
         if matches!(decorations, Decorations::Client { .. }) {
             window.set_client_inset(platform_inset);
         }
-        let window_size = window.window_bounds().get_bounds().size;
+        // Content space, like `mouse_position()` and the hit zones laid out below; the platform
+        // window size would be off by the content zoom.
+        let window_size = window.viewport_size();
 
         div()
             .id("window-backdrop")
@@ -144,7 +146,7 @@ impl RenderOnce for WindowBorder {
                         if tiling.top && tiling.bottom && tiling.left && tiling.right {
                             return;
                         }
-                        let size = window.window_bounds().get_bounds().size;
+                        let size = window.viewport_size();
                         let pos = window.mouse_position();
                         let insets = client_frame_insets(platform_inset, &tiling);
 

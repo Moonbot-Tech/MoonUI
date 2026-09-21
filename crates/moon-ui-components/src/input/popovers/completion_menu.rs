@@ -408,11 +408,11 @@ impl Render for CompletionMenu {
             .selected_item()
             .and_then(|item| item.documentation.clone());
 
-        let max_width = MAX_MENU_WIDTH.min(window.bounds().size.width - pos.x);
+        let max_width = MAX_MENU_WIDTH.min(window.viewport_size().width - pos.x);
         let abs_pos = self.editor.read(cx).input_bounds.origin + pos;
         let vertical_layout =
             abs_pos.x + MAX_MENU_WIDTH + POPOVER_GAP + MAX_MENU_WIDTH + POPOVER_GAP
-                > window.bounds().size.width;
+                > window.viewport_size().width;
 
         deferred(
             div()
