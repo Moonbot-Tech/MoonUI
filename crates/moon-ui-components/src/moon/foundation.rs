@@ -135,6 +135,39 @@ pub fn moon_cubic_bezier(x1: f32, y1: f32, x2: f32, y2: f32) -> impl Fn(f32) -> 
     }
 }
 
+/// A box, the part centred in it and the inset between them, each on whole device pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Centered {
+    pub outer: Pixels,
+    pub inner: Pixels,
+    pub inset: Pixels,
+}
+
+/// Sizes `inner` so that it centres in `outer` on whole device pixels.
+///
+/// Layout rounds every authored length to device pixels on its own. At a fractional scale factor
+/// a box, the part centred in it and the inset between them then round apart: 20, 16 and 2 at a
+/// factor of 0.8 land as 16, 13 and 2, which leaves two pixels above the part and one under it.
+/// Snapping the box and the inset, and taking the part as what is left between them, keeps the
+/// inset the same on both sides at any factor; the part gives up at most a pixel for it.
+pub(crate) fn snap_centered(outer: Pixels, inner: Pixels, window: &Window) -> Centered {
+    let outer = window.pixel_snap(outer);
+    let inset = window.pixel_snap((outer - inner) * 0.5);
+    Centered {
+        outer,
+        inner: outer - inset * 2.0,
+        inset,
+    }
+}
+
+/// A border width as layout draws it: on whole device pixels, and never thinner than one.
+pub(crate) fn snap_border(width: Pixels, window: &Window) -> Pixels {
+    if width <= px(0.) {
+        return px(0.);
+    }
+    window.pixel_snap(width).max(px(1.) / window.scale_factor())
+}
+
 pub fn selected_background(p: MoonPalette) -> Background {
     linear_gradient(
         90.0,

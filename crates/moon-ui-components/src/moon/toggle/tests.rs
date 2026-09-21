@@ -856,3 +856,61 @@ fn a_slim_thumb_is_a_ring_around_a_face_rather_than_a_bordered_disc(cx: &mut gpu
         );
     }
 }
+
+/// The scale factors a window can take: every 5 % step from 50 % to 300 %, which covers the
+/// content zoom's range on a 1x display and on the common fractional and 2x ones.
+fn scale_factors() -> impl Iterator<Item = f32> {
+    (10..=60).map(|step| step as f32 * 0.05)
+}
+
+/// Catches `MoonToggle::render` going back to the unsnapped metrics (dropping `snapped`), or
+/// `snap_centered` sizing the thumb on its own again. Layout rounds every length to device pixels
+/// separately, so at 80 % a 20px track, a 16px thumb and a 2px gap land as 16, 13 and 2: the
+/// thumb rests on the track's bottom edge with all the space above it. At every scale factor the
+/// thumb must keep exactly one gap above it, below it and at the end it rests against.
+#[gpui::test]
+fn the_thumb_keeps_one_gap_on_every_side_at_any_scale_factor(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for (variant, tier) in [
+        (MoonToggleVariant::Default, MoonSize::Sm),
+        (MoonToggleVariant::Default, MoonSize::Md),
+        (MoonToggleVariant::Slim, MoonSize::Sm),
+        (MoonToggleVariant::Slim, MoonSize::Md),
+    ] {
+        for checked in [false, true] {
+            let mut cx = render_toggle(
+                cx,
+                SizedToggleHarness {
+                    variant,
+                    ..SizedToggleHarness::bare(tier, checked)
+                },
+            );
+            for factor in scale_factors() {
+                cx.update(|window, cx| {
+                    // The test platform's own factor is 2.0; the zoom makes up the rest.
+                    window.set_content_zoom(factor / 2.0, cx);
+                    window.draw(cx).clear();
+                    assert!((window.scale_factor() - factor).abs() < 1e-4);
+                });
+                let track = cx.debug_bounds("sized:track").expect("track must render");
+                let thumb = cx.debug_bounds("sized:thumb").expect("thumb must render");
+                let device = |length: gpui::Pixels| (length.as_f32() * factor).round();
+                let above = device(thumb.top() - track.top());
+                let below = device(track.bottom() - thumb.bottom());
+                let resting = if checked {
+                    device(track.right() - thumb.right())
+                } else {
+                    device(thumb.left() - track.left())
+                };
+                let context = format!("{variant:?} {tier:?} checked={checked} factor={factor:.2}");
+                assert_eq!(above, below, "{context}");
+                assert_eq!(resting, above, "{context}");
+                assert_eq!(
+                    device(thumb.size.width),
+                    device(thumb.size.height),
+                    "{context}"
+                );
+            }
+        }
+    }
+}

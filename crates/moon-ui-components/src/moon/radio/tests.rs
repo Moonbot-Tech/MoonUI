@@ -282,6 +282,40 @@ fn radio_without_text_is_its_circle_with_a_centred_dot(cx: &mut TestAppContext) 
     }
 }
 
+/// Catches `MoonRadio::render` sizing the dot on its own again instead of through
+/// `snap_centered`. Layout rounds the circle and the dot to device pixels separately, so at 110 %
+/// a 16px circle and a 6px dot land as 18 and 7: an odd pixel is left over and the dot sits off
+/// the middle. At every scale factor the dot must keep the same space on all four sides.
+#[gpui::test]
+fn the_dot_stays_centred_at_any_scale_factor(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    for tier in [MoonSize::Sm, MoonSize::Md] {
+        let window = cx.add_window(move |_, _| ProbedRadioHarness {
+            size: tier,
+            label: None,
+        });
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        // Every 5 % step from 50 % to 300 %; the test platform's own factor is 2.0.
+        for factor in (10..=60).map(|step| step as f32 * 0.05) {
+            cx.update(|window, cx| {
+                window.set_content_zoom(factor / 2.0, cx);
+                window.draw(cx).clear();
+            });
+            let circle = cx.debug_bounds("probed:box").expect("circle must render");
+            let dot = cx.debug_bounds("probed:dot").expect("dot must render");
+            let device = |length: Pixels| (length.as_f32() * factor).round();
+            let sides = [
+                device(dot.top() - circle.top()),
+                device(circle.bottom() - dot.bottom()),
+                device(dot.left() - circle.left()),
+                device(circle.right() - dot.right()),
+            ];
+            assert_eq!(sides, [sides[0]; 4], "{tier:?} factor={factor:.2}");
+        }
+    }
+}
+
 /// Catches changing tier metrics or applying legacy font scaling, which enlarges tier labels.
 #[test]
 fn radio_metrics_match_designer_reference() {
