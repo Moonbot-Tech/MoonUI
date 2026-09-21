@@ -888,7 +888,12 @@ impl MoonPopupMenu {
                             }
                             .into_any_element(),
                         })
-                        .with_priority(1),
+                        // Deliberately the base band even though the parent dropdown sits at
+                        // LAYER_MOON_POPOVER (moon/dropdown/trigger.rs:654, set unconditionally),
+                        // so an overlapping submenu paints under its parent. Pre-existing, not
+                        // fixed here; do not "correct" it to LAYER_MOON_POPOVER without checking
+                        // the paint-order consequences.
+                        .with_priority(crate::layer::LAYER_OVERLAY),
                     );
                 }
 

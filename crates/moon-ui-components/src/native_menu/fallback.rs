@@ -107,7 +107,7 @@ impl Render for FallbackMenuOverlay {
                         .snap_to_window_with_margin(px(8.))
                         .child(active.menu.clone()),
                 )
-                .with_priority(1),
+                .with_priority(crate::layer::LAYER_OVERLAY),
             );
         }
         root

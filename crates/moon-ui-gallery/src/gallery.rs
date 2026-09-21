@@ -1232,6 +1232,7 @@ impl Gallery {
                                             MoonButton::new("popover-action")
                                                 .label("Action")
                                                 .variant(MoonButtonVariant::Blue)
+                                                .tooltip("Runs the popover action")
                                                 .render(),
                                         ),
                                 ),

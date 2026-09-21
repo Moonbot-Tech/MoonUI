@@ -408,7 +408,7 @@ where
             .with_size(size_for(trigger_size, menu_size));
 
         if self.in_popover {
-            select = select.menu_priority(super::popover::MOON_POPOVER_PRIORITY + 1);
+            select = select.menu_priority(crate::layer::LAYER_MOON_POPOVER_MENU);
         }
 
         if let Some(trigger_variant) = self.trigger_variant {
