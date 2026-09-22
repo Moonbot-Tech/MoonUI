@@ -5,11 +5,11 @@ for Rust, designed to support a wide variety of applications.
 
 ## Getting Started
 
-GPUI is still in active development as we work on the Zed code editor, and is still pre-1.0. There will often be breaking changes between versions. You'll also need to use the latest version of stable Rust. Add `gpui`, and optionally `gpui_platform`, to your `Cargo.toml`:
+This tree ships GPUI as the `moon-gpui` package (the Rust crate name stays `gpui`). It is not published to crates.io. Applications depend on the MoonUI git repository, and on `moon-gpui-platform` when they want the host windowing and text backends. The public API tracks `master`. You need a recent stable Rust toolchain.
 
 ```toml
-gpui = { version = "*" }
-gpui_platform = { version = "*", features = ["font-kit", "wayland", "x11"] }
+gpui = { package = "moon-gpui", git = "https://github.com/Moonbot-Tech/MoonUI", branch = "master" }
+gpui_platform = { package = "moon-gpui-platform", git = "https://github.com/Moonbot-Tech/MoonUI", branch = "master", features = ["font-kit", "wayland", "x11"] }
 ```
 
 Everything in a standalone GPUI app starts with an `Application`. You can create one with `gpui_platform::application()`, which picks the windowing and text backends for the host OS, and kick off your application by passing a callback to `Application::run()`. Inside this callback, you can create a new window with `App::open_window()` and register your first root view.
@@ -26,18 +26,18 @@ fn main() {
 
 ### `gpui_platform`
 
-The features on `gpui_platform` are platform-specific, so the list above is a safe cross-platform default. If you build for a single platform, you can trim it:
+The features on `moon-gpui-platform` (depended on as `gpui_platform`) are platform-specific, so the list above is a safe cross-platform default. If you build for a single platform, you can trim it:
 
 - **macOS** — Rendering uses Metal and is always available, but glyph rasterization needs `font-kit`. Without it, GPUI falls back to a placeholder text system that lays text out but renders no glyphs.
 
     ```toml
-    gpui_platform = { version = "*", features = ["font-kit"] }
+    gpui_platform = { package = "moon-gpui-platform", git = "https://github.com/Moonbot-Tech/MoonUI", branch = "master", features = ["font-kit"] }
     ```
 
 - **Linux / FreeBSD** — enable at least one windowing backend for desktop windows: `wayland`, `x11`, or both. These features also compile the renderer and text system, so no separate text feature is needed.
 
     ```toml
-    gpui_platform = { version = "*", features = ["wayland", "x11"] }
+    gpui_platform = { package = "moon-gpui-platform", git = "https://github.com/Moonbot-Tech/MoonUI", branch = "master", features = ["wayland", "x11"] }
     ```
 
 - **Windows** — no features are required. Windowing uses Win32 and text uses DirectWrite. `font-kit` has no effect here.

@@ -144,7 +144,7 @@ impl Drop for AppRefMut<'_> {
 pub struct Application(Rc<AppCell>);
 
 /// Represents an application before it is fully launched. Once your app is
-/// configured, you'll start the app with `App::run`.
+/// configured, you'll start the app with `Application::run`.
 impl Application {
     /// Builds an app with a caller-provided platform implementation.
     pub fn with_platform(platform: Rc<dyn Platform>) -> Self {
