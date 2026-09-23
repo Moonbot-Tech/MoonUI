@@ -4,97 +4,56 @@ GPUI is designed for keyboard-first interactivity.
 
 To expose functionality to the mouse, you render a button with a click handler.
 
-To expose functionality to the keyboard, you bind an _action_ in a _key context_.
+To expose functionality to the keyboard, you declare an _action_, listen for it on a focused element, and register a key binding with `App::bind_keys`.
 
-Actions are similar to framework-level events like `MouseDown`, `KeyDown`, etc, but you can define them yourself:
+Unit actions are declared with the `actions!` macro. The first argument is the namespace that appears in the action name (`menu::MoveUp`):
 
 ```rust
-mod menu {
-    #[gpui::action]
-    struct MoveUp;
+actions!(menu, [MoveUp, MoveDown]);
+```
 
-    #[gpui::action]
-    struct MoveDown;
+An action that carries data derives `Action` instead. The derive requires `Clone` and `PartialEq`, plus `serde::Deserialize` and `schemars::JsonSchema` unless you pass `#[action(no_json)]`:
+
+```rust
+#[derive(Clone, PartialEq, serde::Deserialize, schemars::JsonSchema, gpui::Action)]
+#[action(namespace = menu)]
+pub struct Move {
+    pub select: bool,
 }
 ```
 
-Actions are frequently unit structs, for which we have a macro. The above could also be written:
+`on_action` on an element takes `Fn(&Action, &mut Window, &mut App)`. It does not receive the view. `Context::listener` adapts a view method so the callback can update that view. The element has to be on the focus path (`track_focus`); `key_context` is the name a binding's context matches:
 
 ```rust
-mod menu {
-    actions!(gpui, [MoveUp, MoveDown]);
-}
-```
+impl Menu {
+    fn move_up(&mut self, _: &MoveUp, _: &mut Window, cx: &mut Context<Self>) {
+        // ...
+    }
 
-Actions can also be more complex types:
-
-```rust
-mod menu {
-    #[gpui::action]
-    struct Move {
-        direction: Direction,
-        select: bool,
+    fn move_down(&mut self, _: &MoveDown, _: &mut Window, cx: &mut Context<Self>) {
+        // ...
     }
 }
-```
 
-To bind actions, chain `on_action` on to your element:
-
-```rust
 impl Render for Menu {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
-            .on_action(|this: &mut Menu, move: &MoveUp, window: &mut Window, cx: &mut Context<Menu>| {
-                // ...
-            })
-            .on_action(|this, move: &MoveDown, cx| {
-                // ...
-            })
-            .children(unimplemented!())
-    }
-}
-```
-
-In order to bind keys to actions, you need to declare a _key context_ for part of the element tree by calling `key_context`.
-
-```rust
-impl Render for Menu {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
+            .track_focus(&self.focus_handle(cx))
             .key_context("menu")
-            .on_action(|this: &mut Menu, move: &MoveUp, window: &mut Window, cx: &mut Context<Menu>| {
-                // ...
-            })
-            .on_action(|this, move: &MoveDown, cx| {
-                // ...
-            })
-            .children(unimplemented!())
+            .on_action(cx.listener(Self::move_up))
+            .on_action(cx.listener(Self::move_down))
     }
 }
 ```
 
-Now you can target your context in the keymap. Note how actions are identified in the keymap by their fully-qualified type name.
+Register the keys on the app. `KeyBinding::new` takes the keystroke string, an action value, and an optional context. A context of `Some("menu")` fires only when the focused path contains `key_context("menu")`. `None` matches every context.
 
-```json
-{
-  "context": "menu",
-  "bindings": {
-    "up": "menu::MoveUp",
-    "down": "menu::MoveDown"
-  }
-}
+```rust
+cx.bind_keys([
+    KeyBinding::new("up", MoveUp, Some("menu")),
+    KeyBinding::new("down", MoveDown, Some("menu")),
+    KeyBinding::new("shift-up", Move { select: true }, Some("menu")),
+]);
 ```
 
-If you had opted for the more complex type definition, you'd provide the serialized representation of the action alongside the name:
-
-```json
-{
-  "context": "menu",
-  "bindings": {
-    "up": ["menu::Move", {direction: "up", select: false}]
-    "down": ["menu::Move", {direction: "down", select: false}]
-    "shift-up": ["menu::Move", {direction: "up", select: true}]
-    "shift-down": ["menu::Move", {direction: "down", select: true}]
-  }
-}
-```
+A binding can be a sequence of keystrokes separated by spaces, such as `"cmd-k left"`.
