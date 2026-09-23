@@ -502,6 +502,9 @@ impl<'a> DoubleEndedIterator for RelPathComponents<'a> {
 }
 
 #[cfg(test)]
+mod rel_path_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use itertools::Itertools;
