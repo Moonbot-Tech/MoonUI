@@ -1,7 +1,7 @@
 //! KeyDispatch is where GPUI deals with binding actions to key events.
 //!
 //! The key pieces to making a key binding work are to define an action,
-//! implement a method that takes that action as a type parameter,
+//! implement a method that takes that action,
 //! and then to register the action during render on a focused node
 //! with a keymap context:
 //!
@@ -25,14 +25,13 @@
 //! }
 //!```
 //!
-//! The keybindings themselves are managed independently by calling cx.bind_keys().
-//! (Though mostly when developing Zed itself, you just need to add a new line to
-//!  assets/keymaps/default-{platform}.json).
+//! The keybindings themselves are registered on the app with `App::bind_keys`.
+//! `KeyBinding::new` takes the keystroke, an action value, and an optional context.
 //!
 //! ```ignore
 //! cx.bind_keys([
-//!   KeyBinding::new("cmd-z", Editor::undo, Some("Editor")),
-//!   KeyBinding::new("cmd-shift-z", Editor::redo, Some("Editor")),
+//!   KeyBinding::new("cmd-z", Undo, Some("Editor")),
+//!   KeyBinding::new("cmd-shift-z", Redo, Some("Editor")),
 //! ])
 //! ```
 //!
