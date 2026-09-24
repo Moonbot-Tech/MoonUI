@@ -14,11 +14,13 @@ A context provided when interacting with an `Entity<T>`, with additional methods
 
 ## `AsyncApp` and `AsyncWindowContext`
 
-Whereas the above contexts are always passed to your code as references, you can call `to_async` on the reference to create an async context, which has a static lifetime and can be held across `await` points in async code. When you interact with entities with an async context, the calls become fallible, because the context may outlive the window or even the app itself.
+`App::to_async` and `TestAppContext::to_async` return an `AsyncApp`. `Context<T>` dereferences to `App`, so `to_async` on a context reference is `App::to_async` and returns an `AsyncApp` as well. `Window::to_async` takes `&App` and returns an `AsyncWindowContext`. `Context::spawn` passes the task a `WeakEntity<T>` and an `&mut AsyncApp`, and `Context::spawn_in` passes an `&mut AsyncWindowContext`. Both async contexts have a static lifetime and can be held across `await` points.
+
+`AsyncApp` holds a weak reference to the app. `Entity::update` on an `AsyncApp` panics if the app has already been dropped, and that call does not return `Result`. `AsyncApp::update_window` and `AsyncWindowContext::update` return `Result` when the app has been dropped, the app is quitting, or the window is gone. `WeakEntity::update` returns `Result` when the entity was released, on every context, not only an async one.
 
 ## `TestAppContext`
 
-These are similar to the async contexts above, but they panic if you attempt to access a non-existent app or window, and they also contain other features specific to tests.
+A `#[gpui::test]` that takes `&mut TestAppContext` receives one. The context owns the app through `Rc`, so a dropped app is not one of its failure modes. `TestAppContext::update_window` returns `Result` when the window is gone. `VisualTestContext::update` unwraps that result and panics. The test context also exposes input and window helpers such as `simulate_input` and `simulate_window_resize`.
 
 ---
 
@@ -26,7 +28,7 @@ These are similar to the async contexts above, but they panic if you attempt to 
 
 ## `Window`
 
-Provides access to the state of an application window. This type has a root view (an `Entity` implementing `Render`) which it can read/update, but since it is not a context, you must pass a `&mut App` (or a context which dereferences to it) to do so, along with other functions interacting with global state. You can obtain a `Window` from an `WindowHandle` by calling `WindowHandle::update`.
+`Window` is the state of one window, including its root view (an `Entity` that implements `Render`). It is not a context. `WindowHandle::update` takes an `AppContext` — `&mut App`, or a `Context<T>`, which dereferences to `App` — and a closure. The closure receives `&mut V`, `&mut Window`, and `&mut Context<V>`. The call returns `Result`, because the window may already be closed.
 
 ## `Entity<T>`
 
