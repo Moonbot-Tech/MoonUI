@@ -349,3 +349,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod shell_env_tests;
