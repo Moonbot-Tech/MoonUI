@@ -1,9 +1,10 @@
 # GPUI Examples
 
-Examples can be run from the Zed repository root:
+Examples can be run from the MoonUI repository root. The package name is
+`moon-gpui`; there is no package named `gpui`.
 
 ```sh
-cargo run -p gpui --example hello_world
+cargo run -p moon-gpui --example hello_world
 ```
 
 ## Where to start
@@ -15,6 +16,8 @@ cargo run -p gpui --example hello_world
 - `uniform_list` shows how to render a simple virtualized list.
 - `testing` demonstrates `#[gpui::test]`, `TestAppContext`, actions, focus, and
   window-based tests.
+- `a11y` demonstrates AccessKit roles and actions on a heading, a spin button,
+  a switch, and a list.
 
 ## Layout and styling
 
@@ -47,6 +50,8 @@ cargo run -p gpui --example hello_world
 - `image_gallery` demonstrates image caching and loading remote images.
 - `image_loading` shows image loading states and asset loading.
 - `painting` demonstrates custom drawing with paths and canvas.
+- `gpu_canvas` shows a `gpu_canvas` element that requests a present on a timer
+  without dirtying the view.
 - `svg` shows SVG rendering.
 
 ## Windows and application behavior
