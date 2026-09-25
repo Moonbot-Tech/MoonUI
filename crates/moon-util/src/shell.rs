@@ -694,6 +694,9 @@ impl ShellKind {
 }
 
 #[cfg(test)]
+mod shell_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
