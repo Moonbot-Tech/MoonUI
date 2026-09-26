@@ -1,23 +1,29 @@
-/// Embed application assets for GPUI Component.
+/// Bundled SVG icons for Moon UI components.
 ///
-/// This assets provides icons svg files for [IconName](https://docs.rs/gpui-component/latest/gpui_component/enum.IconName.html).
+/// The Rust library name is `gpui_component_assets`. `moon-ui` re-exports
+/// [`Assets`] as `MoonAssets`. `moon-ui-components` generates `IconName` from
+/// `assets/icons` using the directory this crate's build script publishes.
 ///
 /// ## Usage
 ///
+/// Native builds pass the unit struct straight through:
+///
 /// ```rust,no_run
-/// use gpui::*;
 /// use gpui_component_assets::Assets;
 ///
 /// let app = gpui_platform::application().with_assets(Assets);
 /// ```
 ///
-/// ## Platform Differences
+/// ## Platform differences
 ///
-/// - **Native (Desktop)**: Icons are embedded in the binary using RustEmbed
-/// - **WASM (Web)**: Icons are downloaded from CDN using web_sys::Request
-///   - This significantly reduces WASM bundle size
-///   - Icons are downloaded on-demand when first used
-///   - Downloaded icons are cached in memory
+/// - **Native**: `assets/icons/**/*.svg` is embedded with RustEmbed.
+///   [`Assets::new`] ignores its endpoint.
+/// - **WASM**: icons are not embedded. [`Assets::new`] stores an endpoint, and
+///   `load` fetches a path with `reqwest` from `{endpoint}/assets/{path}` only
+///   when that path starts with `icons/` and ends with `.svg`. The bytes are
+///   cached in memory. Until the download finishes, `load` returns an error.
+///   The sprite atlas does not keep that failure, so a later paint calls
+///   `load` again.
 #[cfg(not(target_family = "wasm"))]
 mod native_assets;
 
