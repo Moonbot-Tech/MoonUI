@@ -80,3 +80,94 @@ fn posix_args_add_interactive_only_when_requested() {
         vec!["-i".to_owned(), "-c".to_owned(), "echo hi".to_owned()]
     );
 }
+
+/// Catches `parse_nushell_var` rewriting an empty `${}` into `$env.`, so a
+/// task argument that was an empty expansion becomes the env drive itself.
+#[test]
+fn nushell_keeps_an_empty_brace_expansion() {
+    assert_eq!(ShellKind::Nushell.to_shell_variable("${}"), "${}");
+    assert_eq!(
+        ShellKind::Nushell.to_shell_variable("pre${}post"),
+        "pre${}post"
+    );
+}
+
+/// Catches `parse_nushell_var` treating `$env.FOO` as a new name `env`, so a
+/// value that is already an env-drive path is rewritten to `$env.env.FOO`.
+#[test]
+fn nushell_keeps_an_existing_env_drive() {
+    assert_eq!(ShellKind::Nushell.to_shell_variable("$env.FOO"), "$env.FOO");
+    assert_eq!(
+        ShellKind::Nushell.to_shell_variable("pre$env.FOO"),
+        "pre$env.FOO"
+    );
+}
+
+/// Catches `parse_nushell_var` accepting a digit as a variable name, so `$1`
+/// becomes `$env.1` and a positional parameter is read as an environment value.
+#[test]
+fn nushell_leaves_a_non_identifier_dollar_alone() {
+    assert_eq!(ShellKind::Nushell.to_shell_variable("$1"), "$1");
+    assert_eq!(ShellKind::Nushell.to_shell_variable("pre$1"), "pre$1");
+}
+
+/// Catches `prepend_command_prefix` stacking a second prefix onto a command
+/// that already has one, so PowerShell runs `&&Get-ChildItem` and Nushell
+/// runs `^^echo`.
+#[test]
+fn command_prefix_is_applied_once() {
+    assert_eq!(
+        ShellKind::PowerShell
+            .prepend_command_prefix("Get-ChildItem")
+            .as_ref(),
+        "&Get-ChildItem"
+    );
+    assert_eq!(
+        ShellKind::PowerShell
+            .prepend_command_prefix("&Get-ChildItem")
+            .as_ref(),
+        "&Get-ChildItem"
+    );
+    assert_eq!(
+        ShellKind::Pwsh
+            .prepend_command_prefix("Get-ChildItem")
+            .as_ref(),
+        "&Get-ChildItem"
+    );
+    assert_eq!(
+        ShellKind::Nushell.prepend_command_prefix("echo").as_ref(),
+        "^echo"
+    );
+    assert_eq!(
+        ShellKind::Nushell.prepend_command_prefix("^echo").as_ref(),
+        "^echo"
+    );
+    assert_eq!(
+        ShellKind::Posix.prepend_command_prefix("echo").as_ref(),
+        "echo"
+    );
+}
+
+/// Catches `try_quote_prefix_aware` omitting `&` when PowerShell quoting
+/// changes the command, so a program path with a space runs as a string
+/// instead of as a command.
+#[test]
+fn powershell_prefix_aware_quote_prefixes_only_a_quoted_command() {
+    let shell = ShellKind::PowerShell;
+    assert_eq!(
+        shell.try_quote_prefix_aware("echo").unwrap().as_ref(),
+        "echo"
+    );
+    assert_eq!(
+        shell.try_quote_prefix_aware("echo hi").unwrap().as_ref(),
+        "&'echo hi'"
+    );
+    assert_eq!(
+        shell.try_quote_prefix_aware("&echo").unwrap().as_ref(),
+        "&echo"
+    );
+    assert_eq!(
+        shell.try_quote_prefix_aware("&'echo hi'").unwrap().as_ref(),
+        "&'echo hi'"
+    );
+}
