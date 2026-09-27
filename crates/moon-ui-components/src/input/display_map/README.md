@@ -11,16 +11,16 @@ WrapMap                    Soft-wrapping (buffer_line ↔ wrap_row)
     ↓
 FoldMap                    Fold projection (wrap_row ↔ display_row)
     ↓
-DisplayMap                 Public facade (BufferPos ↔ DisplayPos)
+DisplayMap                 Public facade (BufferPoint ↔ DisplayPoint)
 ```
 
 ## Coordinate Systems
 
 | Type | Fields | Scope | Description |
 |------|--------|-------|-------------|
-| `BufferPos` | `{ line, col }` | public | Logical line/column in Rope |
-| `WrapPos` | `{ row, col }` | internal | Visual row after soft-wrapping |
-| `DisplayPos` | `{ row, col }` | public | Final visible row after folding |
+| `BufferPoint` | `{ line, col }` | public | Logical line, and a byte offset within that line |
+| `WrapPoint` | `{ row, col }` | internal | Visual row after soft-wrapping |
+| `DisplayPoint` | `{ row, col }` | public | Final visible row after folding |
 
 ## Modules
 
