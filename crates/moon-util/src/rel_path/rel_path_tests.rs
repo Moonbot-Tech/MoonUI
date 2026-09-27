@@ -75,3 +75,121 @@ fn display_windows_rewrites_slashes_to_backslashes() {
         "foo\\bar\\baz"
     );
 }
+
+/// Catches `RelPath::last_n_components` skipping one extra component, so a
+/// request for the last two components of `foo/bar/baz` would return only `baz`
+/// and a path suffix would name the wrong file.
+#[test]
+fn last_n_components_returns_the_trailing_suffix() {
+    assert_eq!(
+        rel_path("foo/bar/baz").last_n_components(2),
+        Some(rel_path("bar/baz")),
+        "the last two components are bar/baz"
+    );
+    assert_eq!(
+        rel_path("foo/bar/baz").last_n_components(1),
+        Some(rel_path("baz")),
+        "the last component is baz"
+    );
+}
+
+/// Catches `RelPath::last_n_components` treating an exact component count as
+/// past the end, so asking for every component of a path would return nothing
+/// and a full-path suffix check would miss the file.
+#[test]
+fn last_n_components_returns_the_whole_path_when_the_count_matches() {
+    assert_eq!(
+        rel_path("foo/bar/baz").last_n_components(3),
+        Some(rel_path("foo/bar/baz")),
+        "a count equal to the path length is the path itself"
+    );
+    assert_eq!(
+        rel_path("foo").last_n_components(1),
+        Some(rel_path("foo")),
+        "a single component asked for in full is that component"
+    );
+}
+
+/// Catches `RelPath::last_n_components` returning the original path when the
+/// caller asks for more components than the path has, so a too-long suffix
+/// would still match.
+#[test]
+fn last_n_components_is_none_when_the_count_exceeds_the_path() {
+    assert!(
+        rel_path("foo/bar/baz").last_n_components(4).is_none(),
+        "four components do not fit in a three-component path"
+    );
+    assert!(
+        rel_path("foo").last_n_components(2).is_none(),
+        "two components do not fit in a single-component path"
+    );
+}
+
+/// Catches `RelPath::join` gluing two paths into one component, so `foo` joined
+/// with `bar` would become `foobar` and a later lookup would miss `foo/bar`.
+#[test]
+fn join_inserts_a_slash_between_two_non_empty_paths() {
+    assert_eq!(
+        rel_path("foo").join(rel_path("bar")).as_unix_str(),
+        "foo/bar"
+    );
+    assert_eq!(
+        rel_path("foo/bar").join(rel_path("baz/qux")).as_unix_str(),
+        "foo/bar/baz/qux"
+    );
+}
+
+/// Catches `RelPath::join` inserting a slash around an empty side, so joining
+/// an empty directory with `foo/bar` would produce `/foo/bar` and leave the
+/// relative-path guarantee.
+#[test]
+fn join_keeps_the_non_empty_side_when_the_other_is_empty() {
+    assert_eq!(
+        super::RelPath::empty()
+            .join(rel_path("foo/bar"))
+            .as_unix_str(),
+        "foo/bar",
+        "joining onto an empty path is the other path"
+    );
+    assert_eq!(
+        rel_path("foo/bar")
+            .join(super::RelPath::empty())
+            .as_unix_str(),
+        "foo/bar",
+        "joining an empty path leaves the receiver unchanged"
+    );
+    assert_eq!(
+        super::RelPath::empty()
+            .join(super::RelPath::empty())
+            .as_unix_str(),
+        "",
+        "joining two empty paths stays empty"
+    );
+}
+
+/// Catches `RelPath::from_proto` accepting a path that still contains `..`, `.`,
+/// or an absolute prefix, and rejecting a path that is already a normalized
+/// relative path. A wire value could then escape the relative-path guarantee,
+/// or a stored `foo/bar` could no longer be loaded.
+#[test]
+fn from_proto_accepts_only_an_already_normalized_relative_path() {
+    let path =
+        super::RelPath::from_proto("foo/bar").expect("foo/bar is already a relative wire path");
+    assert_eq!(path.as_unix_str(), "foo/bar");
+
+    let single = super::RelPath::from_proto("readme").expect("a single component is a wire path");
+    assert_eq!(single.as_unix_str(), "readme");
+
+    assert!(
+        super::RelPath::from_proto("foo/../bar").is_err(),
+        "a parent component is not a wire path"
+    );
+    assert!(
+        super::RelPath::from_proto("foo/./bar").is_err(),
+        "a dot component is not a wire path"
+    );
+    assert!(
+        super::RelPath::from_proto("/foo").is_err(),
+        "an absolute path is not a relative wire path"
+    );
+}
