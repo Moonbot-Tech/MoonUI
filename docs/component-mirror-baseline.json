@@ -437,7 +437,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "5c656e0ef4caf7de",
+      "local_hash": "723fe9d6753935b9",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -461,8 +461,8 @@
         },
         {
           "path": "input/display_map/README.md",
-          "hash": "e0a4e886257ed39d",
-          "bytes": 1723
+          "hash": "9ad05cdda2268cba",
+          "bytes": 1754
         },
         {
           "path": "input/display_map/display_map.rs",
@@ -806,6 +806,7 @@
       "donor_changed_files": [
         "input/blink_cursor.rs",
         "input/clear_button.rs",
+        "input/display_map/README.md",
         "input/display_map/display_map.rs",
         "input/display_map/text_wrapper.rs",
         "input/element.rs",
@@ -1499,7 +1500,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "5c656e0ef4caf7de",
+      "local_hash": "723fe9d6753935b9",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -1523,8 +1524,8 @@
         },
         {
           "path": "input/display_map/README.md",
-          "hash": "e0a4e886257ed39d",
-          "bytes": 1723
+          "hash": "9ad05cdda2268cba",
+          "bytes": 1754
         },
         {
           "path": "input/display_map/display_map.rs",
@@ -1868,6 +1869,7 @@
       "donor_changed_files": [
         "input/blink_cursor.rs",
         "input/clear_button.rs",
+        "input/display_map/README.md",
         "input/display_map/display_map.rs",
         "input/display_map/text_wrapper.rs",
         "input/element.rs",
