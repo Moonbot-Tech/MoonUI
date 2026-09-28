@@ -1471,12 +1471,12 @@
       "local_paths": [
         "slider.rs"
       ],
-      "local_hash": "248ee874d7544629",
+      "local_hash": "fa5e588e6dc9663d",
       "local_files": [
         {
           "path": "slider.rs",
-          "hash": "0e2e5d012a1132cb",
-          "bytes": 25724
+          "hash": "415e6ec225fc886f",
+          "bytes": 31475
         }
       ],
       "donor_hash": "845f6d32d82ffd16",

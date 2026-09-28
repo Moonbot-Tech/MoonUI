@@ -8,8 +8,8 @@ use gpui::{
     Along, App, AppContext as _, Axis, Bounds, Context, Corners, DefiniteLength, DragMoveEvent,
     ElementId, Empty, Entity, EntityId, EventEmitter, Hsla, InteractiveElement, IntoElement,
     MouseButton, MouseDownEvent, ParentElement as _, Pixels, Point, Render, RenderOnce,
-    StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div, linear_color_stop,
-    linear_gradient, prelude::FluentBuilder as _, px, relative,
+    ScrollDelta, ScrollWheelEvent, StatefulInteractiveElement as _, StyleRefinement, Styled,
+    Window, div, linear_color_stop, linear_gradient, prelude::FluentBuilder as _, px, relative,
 };
 
 #[derive(Clone)]
@@ -33,6 +33,56 @@ impl Render for DragSlider {
 const MOON_SLIDER_HEIGHT: Pixels = px(18.);
 const MOON_SLIDER_TRACK_HEIGHT: Pixels = px(2.);
 const MOON_SLIDER_THUMB_SIZE: Pixels = px(7.);
+/// Pixel wheel distance (a trackpad's continuous scroll) that counts as one wheel notch.
+const WHEEL_NOTCH_PIXELS: f32 = 20.;
+
+/// Translate one wheel event into slider notches, positive meaning "increase".
+///
+/// A line-based delta is one discrete mouse-wheel notch whatever its size: Windows multiplies a
+/// notch by the system "lines per scroll" setting, and a slider wants one notch to be one step.
+/// A pixel-based delta is continuous, so it is accumulated in `carry` and only whole
+/// [`WHEEL_NOTCH_PIXELS`] distances become notches — otherwise a trackpad flick would jump dozens
+/// of steps. Wheel up (away from the user) increases, on either axis of the slider.
+///
+/// Args:
+///     delta: The wheel event's delta.
+///     carry: Sub-notch remainder left by the previous pixel event.
+///
+/// Returns:
+///     Whole notches to apply and the new remainder.
+fn wheel_notches(delta: &ScrollDelta, carry: f32) -> (i32, f32) {
+    match delta {
+        ScrollDelta::Lines(lines) => {
+            let notches = if lines.y > 0.0 {
+                1
+            } else if lines.y < 0.0 {
+                -1
+            } else {
+                0
+            };
+            (notches, 0.0)
+        }
+        ScrollDelta::Pixels(pixels) => {
+            let notches = f32::from(pixels.y) / WHEEL_NOTCH_PIXELS;
+            if !notches.is_finite() {
+                return (0, carry);
+            }
+            let total = carry + notches;
+            let whole = total.trunc();
+            (whole as i32, total - whole)
+        }
+    }
+}
+
+/// Move `value` by `notches` whole steps, snapped to the step grid and clamped to `min..=max`.
+fn step_value(value: f32, notches: i32, step: f32, min: f32, max: f32) -> f32 {
+    let stepped = if step > 0.0 {
+        ((value / step).round() + notches as f32) * step
+    } else {
+        value
+    };
+    stepped.clamp(min, max)
+}
 
 /// Events emitted by the [`SliderState`].
 pub enum SliderEvent {
@@ -203,6 +253,8 @@ pub struct SliderState {
     /// Tracks whether the user is currently interacting with the slider so we
     /// only emit [`SliderEvent::Release`] after a real press/drag.
     dragging: bool,
+    /// Sub-notch remainder of pixel-based wheel scrolling, see [`wheel_notches`].
+    wheel_carry: f32,
 }
 
 impl SliderState {
@@ -217,6 +269,7 @@ impl SliderState {
             bounds: Bounds::default(),
             scale: SliderScale::default(),
             dragging: false,
+            wheel_carry: 0.0,
         }
     }
 
@@ -385,6 +438,53 @@ impl SliderState {
         }
         cx.emit(SliderEvent::Change(self.value));
         cx.notify();
+    }
+
+    /// Step the value by the mouse wheel: one [`step`](Self::step) per notch, clamped to the range.
+    ///
+    /// A range slider moves the thumb nearer the pointer. A notch is a finished edit, so it emits
+    /// [`SliderEvent::Change`] followed by [`SliderEvent::Release`], exactly what a click emits.
+    ///
+    /// Returns:
+    ///     Whether the event was consumed (it carried vertical movement).
+    fn scroll_by_wheel(
+        &mut self,
+        axis: Axis,
+        event: &ScrollWheelEvent,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let (notches, carry) = wheel_notches(&event.delta, self.wheel_carry);
+        self.wheel_carry = carry;
+        if notches == 0 {
+            return carry != 0.0;
+        }
+
+        let is_start = self.value.is_range() && {
+            let inner_pos = if axis.is_horizontal() {
+                event.position.x - self.bounds.left()
+            } else {
+                self.bounds.bottom() - event.position.y
+            };
+            let center =
+                (self.percentage.start + self.percentage.end) / 2.0 * self.bounds.size.along(axis);
+            inner_pos < center
+        };
+        let current = if is_start {
+            self.value.start()
+        } else {
+            self.value.end()
+        };
+        let value = step_value(current, notches, self.step, self.min, self.max);
+        if is_start {
+            self.value.set_start(value);
+        } else {
+            self.value.set_end(value);
+        }
+        self.update_thumb_pos();
+        cx.emit(SliderEvent::Change(self.value));
+        cx.emit(SliderEvent::Release(self.value));
+        cx.notify();
+        true
     }
 
     /// Emit [`SliderEvent::Release`] if the user was actively interacting
@@ -577,7 +677,16 @@ impl RenderOnce for Slider {
             .bg(rgba_from(p.shell, 0.0))
             .text_color(rgba_from(p.text, 1.0))
             .when(!self.disabled, |this| {
-                this.on_mouse_up(
+                this.on_scroll_wheel(window.listener_for(
+                    &self.state,
+                    move |state, e: &ScrollWheelEvent, _, cx| {
+                        if state.scroll_by_wheel(axis, e, cx) {
+                            // Sliders sit in scrollable panels: without this the panel scrolls too.
+                            cx.stop_propagation();
+                        }
+                    },
+                ))
+                .on_mouse_up(
                     MouseButton::Left,
                     window.listener_for(&self.state, |state, _, _, cx| {
                         state.handle_release(cx);
@@ -744,5 +853,43 @@ mod tests {
 
         assert_eq!(state.value(), SliderValue::Range(2.0, 7.0));
         assert_eq!(state.percentage, 0.2..0.7);
+    }
+
+    #[test]
+    fn test_wheel_notches_line_delta_is_one_notch_whatever_its_size() {
+        let up = ScrollDelta::Lines(gpui::point(0.0, 3.0));
+        let down = ScrollDelta::Lines(gpui::point(0.0, -1.0));
+        let sideways = ScrollDelta::Lines(gpui::point(2.0, 0.0));
+        assert_eq!(wheel_notches(&up, 0.5), (1, 0.0));
+        assert_eq!(wheel_notches(&down, 0.0), (-1, 0.0));
+        assert_eq!(wheel_notches(&sideways, 0.0), (0, 0.0));
+    }
+
+    #[test]
+    fn test_wheel_notches_accumulates_pixel_deltas_to_a_notch() {
+        let small = ScrollDelta::Pixels(gpui::point(px(0.), px(8.)));
+        let (n, carry) = wheel_notches(&small, 0.0);
+        assert_eq!(n, 0);
+        let (n, carry) = wheel_notches(&small, carry);
+        assert_eq!(n, 0);
+        let (n, carry) = wheel_notches(&small, carry);
+        assert_eq!(n, 1);
+        assert!((carry - 0.2).abs() < 1e-5);
+
+        let flick = ScrollDelta::Pixels(gpui::point(px(0.), px(-65.)));
+        let (n, carry) = wheel_notches(&flick, 0.0);
+        assert_eq!(n, -3);
+        assert!((carry + 0.25).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_step_value_moves_one_step_snaps_and_clamps() {
+        assert_eq!(step_value(5.0, 1, 1.0, 1.0, 10.0), 6.0);
+        assert_eq!(step_value(5.0, -1, 1.0, 1.0, 10.0), 4.0);
+        assert_eq!(step_value(10.0, 1, 1.0, 1.0, 10.0), 10.0);
+        assert_eq!(step_value(1.0, -3, 1.0, 1.0, 10.0), 1.0);
+        assert!((step_value(0.5, 1, 0.01, 0.0, 1.0) - 0.51).abs() < 1e-5);
+        assert_eq!(step_value(2.4, 1, 0.5, 0.0, 10.0), 3.0);
+        assert_eq!(step_value(2.0, 1, 0.0, 0.0, 10.0), 2.0);
     }
 }
