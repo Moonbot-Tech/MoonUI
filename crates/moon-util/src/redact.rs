@@ -47,3 +47,6 @@ mod tests {
         assert_eq!(result, expected);
     }
 }
+
+#[cfg(test)]
+mod redact_tests;
