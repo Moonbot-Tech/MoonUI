@@ -42,8 +42,8 @@ MoonUI is a standalone GPUI runtime and component workspace: a self-contained ex
 - **Multi-platform backends** — a single `moon-gpui-platform` selector drives the Windows, macOS, Linux (X11 + Wayland), web, and headless backends.
 - **70+ themed components** — buttons, inputs, tables, menus, overlays, accordions, tooltips, and more, ported from Longbridge `gpui-component` behind a Moon-facing API (`moon-ui`).
 - **Moon theme & palette** — a light/dark design-token system (`MoonTheme` / `MoonPalette`); see [`PALETTE_SPEC.md`](docs/PALETTE_SPEC.md).
-- **Embedded assets** — icons ship bundled in the binary via `RustEmbed`, so a distributed build carries its own glyphs.
-- **Component gallery + visual guardrails** — a live gallery (`moon-ui-gallery`) with snapshot-based visual-regression tests, gated in CI.
+- **Embedded assets** — desktop builds embed icons in the binary with `RustEmbed`. Web builds fetch each icon over HTTP from `{endpoint}/assets/{path}` (`crates/moon-ui-components-assets`).
+- **Component gallery** — a live gallery (`moon-ui-gallery`). The CI workflow `.github/workflows/moonui-guardrails.yml` runs `cargo test -p moon-ui-gallery` along with formatting and the xtask baseline checks. Pixel snapshots are compared locally with `tools/capture-gallery-snapshots.ps1 -Compare`.
 - **Apache-2.0**, preserving upstream Zed and Longbridge licensing.
 
 ## Screenshots
@@ -78,8 +78,8 @@ From the component gallery (`cargo run -p moon-ui-gallery`), Moon dark theme:
 | [`moon-gpui-windows`](crates/moon-gpui-windows) · [`-macos`](crates/moon-gpui-macos) · [`-linux`](crates/moon-gpui-linux) · [`-web`](crates/moon-gpui-web) | Per-platform GPUI backends. |
 | [`moon-ui`](crates/moon-ui) | The public Moon UI facade for application code. |
 | [`moon-ui-components`](crates/moon-ui-components) | The Moon-maintained component port (its Rust crate name stays `gpui_component` to keep port diffs readable). |
-| [`moon-ui-components-assets`](crates/moon-ui-components-assets) | The embedded (`RustEmbed`) icon/asset set. |
-| [`moon-ui-gallery`](crates/moon-ui-gallery) | The component showcase and snapshot tests. |
+| [`moon-ui-components-assets`](crates/moon-ui-components-assets) | Desktop icons embedded with `RustEmbed`. Web icons are fetched from the asset endpoint. |
+| [`moon-ui-gallery`](crates/moon-ui-gallery) | The component showcase. Pixel snapshots use `--features snapshot` and `tools/capture-gallery-snapshots.ps1`. |
 
 The GPUI runtime is supported by a set of Zed-extracted crates (`moon-collections`, `moon-scheduler`, `moon-sum-tree`, `moon-refineable`, `moon-media`, `moon-http-client`, …) that applications never depend on directly.
 
@@ -126,7 +126,7 @@ cargo run -p moon-ui-gallery
 | Doc | What's inside |
 |---|---|
 | [Palette spec](docs/PALETTE_SPEC.md) | The Moon color/token system. |
-| [Visual guardrails](docs/VISUAL_GUARDRAILS.md) | The snapshot/visual-regression rules enforced in CI. |
+| [Visual guardrails](docs/VISUAL_GUARDRAILS.md) | The local gallery screenshot compare (`tools/capture-gallery-snapshots.ps1`). |
 | [Component audit](docs/COMPONENT_AUDIT.md) | Coverage and status of the ported components. |
 | [Patch queue](docs/MOON_PATCH_QUEUE.md) | The maintainer workflow for re-syncing the GPUI extraction from upstream Zed. |
 
