@@ -185,16 +185,6 @@ impl RenderOnce for SearchableListItemElement {
                                 .w(gpui::px(3.0))
                                 .bg(gpui::rgb(p.accent)),
                         )
-                        .child(
-                            gpui::div()
-                                .absolute()
-                                .left(gpui::px(7.0))
-                                .top(gpui::px(10.0))
-                                .w(gpui::px(4.0))
-                                .h(gpui::px(4.0))
-                                .rounded_full()
-                                .bg(gpui::rgb(p.accent)),
-                        )
                     })
             })
             .when(group_row && !self.selected && !self.checked, |this| {
