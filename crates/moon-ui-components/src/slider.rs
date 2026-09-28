@@ -74,12 +74,19 @@ fn wheel_notches(delta: &ScrollDelta, carry: f32) -> (i32, f32) {
     }
 }
 
-/// Move `value` by `notches` whole steps, snapped to the step grid and clamped to `min..=max`.
+/// Move `value` by exactly `notches` steps, clamped to `min..=max`.
+///
+/// A value already on the step grid stays on it (recomputed from the grid index, so repeated
+/// fractional steps do not drift); an off-grid value moves by whole steps from where it is.
 fn step_value(value: f32, notches: i32, step: f32, min: f32, max: f32) -> f32 {
-    let stepped = if step > 0.0 {
-        ((value / step).round() + notches as f32) * step
+    if step <= 0.0 {
+        return value.clamp(min, max);
+    }
+    let index = value / step;
+    let stepped = if (index - index.round()).abs() < 1e-3 {
+        (index.round() + notches as f32) * step
     } else {
-        value
+        value + notches as f32 * step
     };
     stepped.clamp(min, max)
 }
@@ -889,7 +896,7 @@ mod tests {
         assert_eq!(step_value(10.0, 1, 1.0, 1.0, 10.0), 10.0);
         assert_eq!(step_value(1.0, -3, 1.0, 1.0, 10.0), 1.0);
         assert!((step_value(0.5, 1, 0.01, 0.0, 1.0) - 0.51).abs() < 1e-5);
-        assert_eq!(step_value(2.4, 1, 0.5, 0.0, 10.0), 3.0);
+        assert!((step_value(2.4, 1, 0.5, 0.0, 10.0) - 2.9).abs() < 1e-5);
         assert_eq!(step_value(2.0, 1, 0.0, 0.0, 10.0), 2.0);
     }
 }
