@@ -61,6 +61,7 @@ use std::{
 use uuid::Uuid;
 
 pub(crate) mod a11y;
+mod gpu_canvas_text;
 mod prompts;
 #[cfg(test)]
 mod tests;
@@ -68,6 +69,9 @@ mod tests;
 use self::a11y::A11y;
 #[cfg(not(target_family = "wasm"))]
 use self::a11y::ROOT_NODE_ID;
+use self::gpu_canvas_text::{
+    GpuCanvasTextEnv, GpuCanvasTextKey, GpuCanvasTextRetention, TextAction, text_action,
+};
 use crate::util::{
     atomic_incr_if_not_zero, ceil_to_device_pixel, floor_to_device_pixel, round_half_toward_zero,
     round_half_toward_zero_f64, round_stroke_to_device_pixel, round_to_device_pixel,
@@ -1267,6 +1271,7 @@ pub struct Window {
     pub(crate) requested_autoscroll: Option<Bounds<Pixels>>,
     pub(crate) image_cache_stack: Vec<AnyImageCache>,
     pub(crate) rendered_frame: Frame,
+    gpu_canvas_text: GpuCanvasTextRetention,
     pub(crate) next_frame: Frame,
     next_hitbox_id: HitboxId,
     pub(crate) next_tooltip_id: TooltipId,
@@ -1701,6 +1706,7 @@ impl Window {
                                     // Bypass cached view reuse so we don't replay stale
                                     // atlas tile references after a GPU device recovery.
                                     window.refresh();
+                                    window.gpu_canvas_text.clear();
                                 }
                                 let arena_clear_needed = window.draw(cx);
                                 if plan.run_gpu_canvases {
@@ -1912,6 +1918,7 @@ impl Window {
             element_opacity: 1.0,
             requested_autoscroll: None,
             rendered_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
+            gpu_canvas_text: GpuCanvasTextRetention::default(),
             next_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
             next_frame_callbacks,
             next_hitbox_id: HitboxId(0),
@@ -2920,6 +2927,18 @@ impl Window {
             || !self.rendered_frame.scene.gpu_canvases_over_scene.is_empty()
     }
 
+    /// Gpu canvas text frames prepared since the window opened.
+    #[allow(dead_code, reason = "read by the frame diagnostics")]
+    pub(crate) fn gpu_canvas_text_prepares(&self) -> u64 {
+        self.gpu_canvas_text.prepares()
+    }
+
+    /// Gpu canvas text frames replayed from the retention store since the window opened.
+    #[allow(dead_code, reason = "read by the frame diagnostics")]
+    pub(crate) fn gpu_canvas_text_reuses(&self) -> u64 {
+        self.gpu_canvas_text.reuses()
+    }
+
     fn frame_gpu_canvases(&mut self, force_present: bool) -> bool {
         if self
             .rendered_frame
@@ -2980,45 +2999,87 @@ impl Window {
             };
             let wants_present = canvas.driver.frame(info).requests_present();
             request_present |= wants_present;
-            canvases.push((layer, canvas, bounds));
+            canvases.push((layer, canvas, bounds, wants_present));
         }
 
+        // `force_present` is true on every UI redraw, so the scene's text is rebuilt from
+        // scratch then; reuse only happens on GPU-only frames, for canvases that did not
+        // ask to present and whose environment is unchanged.
         if gpu_canvas_prepare_text(force_present, request_present) {
-            for (layer, canvas, bounds) in canvases {
-                let mut canvas_text_frame = GpuCanvasTextFrame::default();
+            let mut seen = FxHashSet::default();
+            for (layer, canvas, bounds, wants_present) in canvases {
                 let content_mask = ContentMask {
                     bounds: canvas.bounds.intersect(&canvas.content_mask.bounds),
                 };
-                let mut text_context = GpuCanvasTextContext::new(
-                    text_system.clone(),
-                    sprite_atlas.clone(),
+                let key = GpuCanvasTextKey {
+                    canvas: canvas.driver.id(),
+                    layer: canvas.text_layer,
+                };
+                let env = GpuCanvasTextEnv {
                     bounds,
+                    content_mask,
                     scale_factor,
                     content_zoom,
-                    content_mask,
-                    background_appearance,
-                    subpixel_rendering_supported,
                     text_rendering_mode,
-                    canvas.order,
-                    layer,
-                    canvas.text_layer,
-                    &mut canvas_text_frame,
+                    subpixel_rendering_supported,
+                    background_appearance,
+                    order: canvas.order,
+                };
+                seen.insert(key);
+                let action = text_action(
+                    force_present,
+                    wants_present,
+                    self.gpu_canvas_text.cached_env(&key),
+                    &env,
                 );
-                match canvas.driver.prepare_text(&mut text_context) {
-                    Ok(()) => {
-                        let text_frame = match canvas.text_layer {
-                            GpuCanvasLayer::UnderScene => {
-                                &mut self.rendered_frame.scene.gpu_canvas_text_under_scene
-                            }
-                            GpuCanvasLayer::OverScene => {
-                                &mut self.rendered_frame.scene.gpu_canvas_text_over_scene
-                            }
-                        };
-                        text_frame.append(canvas_text_frame);
+                let canvas_text_frame = match action {
+                    TextAction::Reuse => {
+                        self.gpu_canvas_text.note_reuse();
+                        self.gpu_canvas_text.cached_frame(&key)
                     }
-                    Err(error) => log::error!("failed to prepare gpu canvas text: {error}"),
+                    TextAction::Prepare => {
+                        let mut canvas_text_frame = GpuCanvasTextFrame::default();
+                        let mut text_context = GpuCanvasTextContext::new(
+                            text_system.clone(),
+                            sprite_atlas.clone(),
+                            bounds,
+                            scale_factor,
+                            content_zoom,
+                            content_mask,
+                            background_appearance,
+                            subpixel_rendering_supported,
+                            text_rendering_mode,
+                            canvas.order,
+                            layer,
+                            canvas.text_layer,
+                            &mut canvas_text_frame,
+                        );
+                        match canvas.driver.prepare_text(&mut text_context) {
+                            Ok(()) => {
+                                self.gpu_canvas_text
+                                    .store(key, env, canvas_text_frame.clone());
+                                Some(canvas_text_frame)
+                            }
+                            Err(error) => {
+                                log::error!("failed to prepare gpu canvas text: {error}");
+                                self.gpu_canvas_text.cached_frame(&key)
+                            }
+                        }
+                    }
+                };
+                if let Some(canvas_text_frame) = canvas_text_frame {
+                    let text_frame = match canvas.text_layer {
+                        GpuCanvasLayer::UnderScene => {
+                            &mut self.rendered_frame.scene.gpu_canvas_text_under_scene
+                        }
+                        GpuCanvasLayer::OverScene => {
+                            &mut self.rendered_frame.scene.gpu_canvas_text_over_scene
+                        }
+                    };
+                    text_frame.append(canvas_text_frame);
                 }
             }
+            self.gpu_canvas_text.retain_seen(&seen);
         }
 
         self.rendered_frame

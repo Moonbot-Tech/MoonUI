@@ -1221,6 +1221,11 @@ impl GpuCanvasHandle {
         Self(Rc::new(RefCell::new(driver)))
     }
 
+    /// Identity of the driver, stable while any handle to it lives.
+    pub(crate) fn id(&self) -> usize {
+        Rc::as_ptr(&self.0) as *const () as usize
+    }
+
     pub(crate) fn frame(&self, info: GpuFrameInfo) -> GpuFrameDecision {
         match self.0.try_borrow_mut() {
             Ok(mut driver) => driver.frame(info),
