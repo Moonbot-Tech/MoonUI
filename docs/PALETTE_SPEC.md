@@ -156,13 +156,22 @@ Examples:
 `moon-ui-gallery` is the canonical human-facing component showcase.
 
 The gallery must be organized as a small number of meaningful horizontal pages,
-not as a long list of Rust type names. The current intended grouping is:
+not as a long list of Rust type names. The tabs are `GALLERY_PAGES` in
+`crates/moon-ui-gallery/src/main.rs`, in this order. The heading each page
+opens with is in `gallery.rs` (Checkboxes and Toggles open from their own
+modules):
 
 - Controls;
 - Inputs;
-- Data;
-- Overlays;
-- Layout / Windows.
+- Data — "Tables / Lists / Dock";
+- Overlays — "Menus / Overlays";
+- Layout — "Navigation / Status / Tokens", which includes the window-frame
+  variants;
+- NewControls — "NewControls / Ready Moon adaptations";
+- Composites — "Composites / Ready Moon adaptations";
+- Stateful — "Stateful / Ready Moon adaptations";
+- Checkboxes — checkboxes and radios;
+- Toggles.
 
 Each page must show realistic compositions of real components. The gallery may
 keep an internal coverage manifest for tests, but that manifest must not become
