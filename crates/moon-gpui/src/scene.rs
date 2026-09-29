@@ -14,7 +14,11 @@ use std::{
     iter::Peekable,
     ops::{Add, Range, Sub},
     slice,
+    sync::atomic::{AtomicU64, Ordering},
 };
+
+/// Source of scene revisions; 0 is reserved for "unknown".
+static NEXT_SCENE_REVISION: AtomicU64 = AtomicU64::new(1);
 
 #[allow(non_camel_case_types, unused)]
 #[expect(missing_docs)]
@@ -41,6 +45,11 @@ pub struct Scene {
     pub gpu_canvases_over_scene: Vec<PaintGpuCanvas>,
     pub gpu_canvas_text_under_scene: GpuCanvasTextFrame,
     pub gpu_canvas_text_over_scene: GpuCanvasTextFrame,
+    /// Identity of the finished primitive set: two scenes with the same non-zero
+    /// revision carry the same shadows, quads, paths, underlines, sprites and
+    /// surfaces, so a renderer may keep buffers it already uploaded. GPU canvas
+    /// text does not take part. 0 means unknown and always forces an upload.
+    revision: u64,
 }
 
 #[expect(missing_docs)]
@@ -61,6 +70,11 @@ impl Scene {
         self.gpu_canvases_over_scene.clear();
         self.gpu_canvas_text_under_scene.clear();
         self.gpu_canvas_text_over_scene.clear();
+        self.revision = 0;
+    }
+
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     pub fn len(&self) -> usize {
@@ -183,6 +197,7 @@ impl Scene {
             .sort_by_key(|canvas| canvas.order);
         self.gpu_canvases_over_scene
             .sort_by_key(|canvas| canvas.order);
+        self.revision = NEXT_SCENE_REVISION.fetch_add(1, Ordering::Relaxed);
     }
 
     #[cfg_attr(
