@@ -247,9 +247,18 @@ mousemove снова начнет будить весь компонент/ок�
 1. Решение о кадре принимает `GpuCanvasDriver::frame()`.
 2. `prepare_text()` вызывается только для кадра, который будет реально
    показан.
-3. Present у окна общий: если один canvas в окне попросил present, text frame
-   готовится для всех видимых canvas-ов этого окна, чтобы соседние canvas-ы не
-   теряли подписи.
+3. Present у окна общий, но текст готовится по canvas-у: если один canvas в
+   окне попросил present, `prepare_text()` вызывается только у тех canvas-ов,
+   которые сами попросили present. Остальные canvas-ы окна повторяют свой
+   text frame из прошлого кадра, поэтому их подписи не пропадают.
+   Сохранённый frame canvas-а выбрасывается и готовится заново, если:
+   - кадр перерисовывает UI (каждый UI redraw готовит текст всех canvas-ов);
+   - у canvas-а изменились bounds, content mask, scale factor, content zoom,
+     text rendering mode, поддержка subpixel, background appearance или draw
+     order;
+   - canvas пропал из сцены (его запись удаляется);
+   - GPU device восстановлен после потери (хранилище очищается целиком).
+   Если `prepare_text()` вернул ошибку, в кадр идёт прошлый frame canvas-а.
 4. Default clip для text sprites равен `canvas.bounds ∩ content_mask`, как и
    scissor native canvas pass-а. Текст не должен вылезать за прямоугольник
    своего `gpu_canvas`.
@@ -294,7 +303,8 @@ crates/moon-gpui-wgpu/src/wgpu_renderer.rs
 
 1. вызывает `driver.frame(info)`;
 2. понимает, будет ли этот tick реально представлен;
-3. если будет, вызывает `driver.prepare_text(ctx)` для всех canvas-ов окна;
+3. если будет, вызывает `driver.prepare_text(ctx)` для canvas-ов, которым нужен
+   новый текст (см. инвариант 3), а для остальных берёт сохранённый text frame;
 4. даёт `prepare_text(ctx)` доступ к `ctx.bounds()`, `ctx.scale_factor()` (платформенный
    фактор, умноженный на content zoom окна; `ctx.content_zoom()` отдаёт множитель отдельно),
    `ctx.content_mask()`, `ctx.canvas_layer()` и `ctx.text_layer()`;

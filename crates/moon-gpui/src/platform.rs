@@ -618,6 +618,35 @@ pub struct RequestFrameOptions {
     pub force_render: bool,
 }
 
+/// Wakes a window's platform frame clock when the window gains a reason to draw.
+///
+/// Called from any thread; a backend that ticks every window unconditionally
+/// does not provide one.
+pub trait PlatformFrameRequester: Send + Sync {
+    /// Asks the platform to deliver a frame to this window on its next tick.
+    fn request_frame(&self);
+}
+
+/// Per-window frame counters, cumulative since the window was created.
+///
+/// `frame_clock_*` and `scene_upload*` are tracked by the Windows backend only
+/// and read 0 on every other backend.
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FrameDiagnostics {
+    /// Vblanks on which the frame clock posted a frame to the window.
+    pub frame_clock_posts: u64,
+    /// Vblanks on which the frame clock skipped the window (idle or already pending).
+    pub frame_clock_skips: u64,
+    /// Frames that uploaded the scene buffers to the GPU.
+    pub scene_uploads: u64,
+    /// Frames that reused the already uploaded scene buffers.
+    pub scene_upload_skips: u64,
+    /// GPU canvas text frames successfully prepared and stored.
+    pub gpu_canvas_text_prepares: u64,
+    /// GPU canvas text frames replayed from the retention store.
+    pub gpu_canvas_text_reuses: u64,
+}
+
 #[expect(missing_docs)]
 pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn bounds(&self) -> Bounds<Pixels>;
@@ -666,6 +695,14 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
         true
     }
     fn set_gpu_canvas_active(&self, _active: bool) {}
+    /// The waker for a frame clock that only ticks windows with a reason to draw.
+    fn frame_requester(&self) -> Option<Arc<dyn PlatformFrameRequester>> {
+        None
+    }
+    /// Backend frame counters; `None` when the backend does not track them.
+    fn frame_diagnostics(&self) -> Option<FrameDiagnostics> {
+        None
+    }
     fn draw(&self, scene: &Scene);
     fn completed_frame(&self) {}
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas>;

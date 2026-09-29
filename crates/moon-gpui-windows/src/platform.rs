@@ -341,7 +341,7 @@ impl WindowsPlatform {
                         break;
                     };
                     for hwnd in all_windows.read().iter() {
-                        if !hwnd.try_mark_frame_clock_pending() {
+                        if hwnd.frame_clock().try_begin_post() != FrameClockDecision::Post {
                             continue;
                         }
                         unsafe {
@@ -351,7 +351,7 @@ impl WindowsPlatform {
                                 WPARAM::default(),
                                 LPARAM::default(),
                             ) {
-                                hwnd.clear_frame_clock_pending();
+                                hwnd.frame_clock().cancel_post();
                                 log::error!("failed to post frame-clock message: {err}");
                             }
                         }
@@ -556,7 +556,7 @@ impl Platform for WindowsPlatform {
         let handle = window.get_raw_handle();
         self.raw_window_handles.write().push(FrameClockWindow::new(
             handle,
-            window.0.state.frame_clock_pending.clone(),
+            window.0.state.frame_clock.clone(),
         ));
 
         Ok(Box::new(window))

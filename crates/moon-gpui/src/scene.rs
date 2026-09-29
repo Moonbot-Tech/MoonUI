@@ -14,7 +14,11 @@ use std::{
     iter::Peekable,
     ops::{Add, Range, Sub},
     slice,
+    sync::atomic::{AtomicU64, Ordering},
 };
+
+/// Source of scene revisions; 0 is reserved for "unknown".
+static NEXT_SCENE_REVISION: AtomicU64 = AtomicU64::new(1);
 
 #[allow(non_camel_case_types, unused)]
 #[expect(missing_docs)]
@@ -41,6 +45,11 @@ pub struct Scene {
     pub gpu_canvases_over_scene: Vec<PaintGpuCanvas>,
     pub gpu_canvas_text_under_scene: GpuCanvasTextFrame,
     pub gpu_canvas_text_over_scene: GpuCanvasTextFrame,
+    /// Identity of the finished primitive set: two scenes with the same non-zero
+    /// revision carry the same shadows, quads, paths, underlines, sprites and
+    /// surfaces, so a renderer may keep buffers it already uploaded. GPU canvas
+    /// text does not take part. 0 means unknown and always forces an upload.
+    revision: u64,
 }
 
 #[expect(missing_docs)]
@@ -61,6 +70,11 @@ impl Scene {
         self.gpu_canvases_over_scene.clear();
         self.gpu_canvas_text_under_scene.clear();
         self.gpu_canvas_text_over_scene.clear();
+        self.revision = 0;
+    }
+
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     pub fn len(&self) -> usize {
@@ -183,6 +197,7 @@ impl Scene {
             .sort_by_key(|canvas| canvas.order);
         self.gpu_canvases_over_scene
             .sort_by_key(|canvas| canvas.order);
+        self.revision = NEXT_SCENE_REVISION.fetch_add(1, Ordering::Relaxed);
     }
 
     #[cfg_attr(
@@ -607,6 +622,43 @@ mod tests {
         assert_eq!(scene.gpu_canvases_under_scene[1].order, 20);
         assert_eq!(scene.gpu_canvases_over_scene[0].order, 30);
         assert_eq!(scene.gpu_canvases_over_scene[1].order, 40);
+    }
+
+    /// Catches `scene.rs:Scene::finish` reusing or zeroing the revision: the renderer would
+    /// keep last frame's buffers for a changed scene, or re-upload every GPU-only frame.
+    #[test]
+    fn finish_assigns_a_new_nonzero_revision() {
+        let mut scene = Scene::default();
+        scene.finish();
+        let first = scene.revision();
+        scene.finish();
+        assert_ne!(first, 0);
+        assert_ne!(scene.revision(), 0);
+        assert_ne!(scene.revision(), first);
+    }
+
+    /// Catches `Scene::clear` keeping the revision: a scene being rebuilt would still claim
+    /// the old identity and skip its upload.
+    #[test]
+    fn clear_resets_the_revision_to_unknown() {
+        let mut scene = Scene::default();
+        scene.finish();
+        scene.clear();
+        assert_eq!(scene.revision(), 0);
+    }
+
+    /// Catches GPU canvas text taking part in the revision: every GPU-only frame rewrites
+    /// the text and would force a full scene upload.
+    #[test]
+    fn gpu_canvas_text_does_not_change_the_revision() {
+        let mut scene = Scene::default();
+        scene.finish();
+        let revision = scene.revision();
+        scene.gpu_canvas_text_over_scene.clear();
+        scene.gpu_canvas_text_over_scene.finish();
+        scene.gpu_canvas_text_under_scene.clear();
+        scene.gpu_canvas_text_under_scene.finish();
+        assert_eq!(scene.revision(), revision);
     }
 }
 

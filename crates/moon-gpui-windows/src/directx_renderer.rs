@@ -26,6 +26,9 @@ use crate::directx_renderer::shader_resources::{RawShaderBytes, ShaderModule, Sh
 use crate::*;
 use gpui::*;
 
+mod scene_upload;
+use scene_upload::SceneUploadTracker;
+
 pub(crate) const DISABLE_DIRECT_COMPOSITION: &str = "GPUI_DISABLE_DIRECT_COMPOSITION";
 const RENDER_TARGET_FORMAT: DXGI_FORMAT = DXGI_FORMAT_B8G8R8A8_UNORM;
 // This configuration is used for MSAA rendering on paths only, and it's guaranteed to be supported by DirectX 11.
@@ -63,6 +66,7 @@ pub(crate) struct DirectXRenderer {
     presentable: bool,
     device_generation: u64,
     retained_gpu_canvas_text: HashMap<usize, RetainedGpuCanvasTextCache>,
+    scene_upload: SceneUploadTracker,
 }
 
 struct D3d11StateGuard {
@@ -395,6 +399,7 @@ impl DirectXRenderer {
             presentable: true,
             device_generation: 0,
             retained_gpu_canvas_text: HashMap::new(),
+            scene_upload: SceneUploadTracker::default(),
         })
     }
 
@@ -514,6 +519,11 @@ impl DirectXRenderer {
     }
 
     #[inline]
+    /// Scene uploads and upload skips since the renderer was created.
+    pub(crate) fn scene_upload_counts(&self) -> (u64, u64) {
+        (self.scene_upload.uploads(), self.scene_upload.skips())
+    }
+
     pub(crate) fn can_present(&mut self) -> bool {
         if self.presentable {
             return true;
@@ -623,6 +633,7 @@ impl DirectXRenderer {
         self.pipelines = pipelines;
         self.direct_composition = direct_composition;
         self.retained_gpu_canvas_text.clear();
+        self.scene_upload.invalidate();
         self.skip_draws = true;
         self.presentable = true;
         self.device_generation = self.device_generation.wrapping_add(1);
@@ -652,7 +663,16 @@ impl DirectXRenderer {
             _ => [0.0f32; 4],
         })?;
 
-        self.upload_scene_buffers(scene)?;
+        let revision = scene.revision();
+        if self.scene_upload.should_upload(revision) {
+            if let Err(error) = self.upload_scene_buffers(scene) {
+                self.scene_upload.invalidate();
+                return Err(error);
+            }
+            self.scene_upload.mark_uploaded(revision);
+        } else {
+            self.scene_upload.record_skip();
+        }
 
         self.run_gpu_canvas_draw(&scene.gpu_canvases_under_scene, GpuCanvasLayer::UnderScene);
         self.draw_gpu_canvas_text(&scene.gpu_canvas_text_under_scene)?;

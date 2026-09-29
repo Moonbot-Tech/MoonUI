@@ -5,21 +5,21 @@ use crate::{
     AsyncWindowContext, AvailableSpace, Background, BorderStyle, Bounds, BoxShadow, Capslock,
     Context, Corners, CursorHideMode, CursorStyle, Decorations, DevicePixels,
     DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Edges, Effect, Entity,
-    EntityId, EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId,
-    GpuCanvasHandle, GpuCanvasLayer, GpuCanvasTextContext, GpuCanvasTextFrame, GpuFrameInfo,
-    GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent, KeyEvent,
-    Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent,
-    MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, PaintGpuCanvas, Path,
-    Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow,
-    Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams,
-    RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge, Rgba,
-    SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow,
-    SharedString, Size, StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription,
-    SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task,
-    TextRenderingMode, TextStyle, TextStyleRefinement, TransformationMatrix, Underline,
-    UnderlineStyle, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls,
-    WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, point, prelude::*, profiler,
-    px, rems, size, transparent_black,
+    EntityId, EventEmitter, FileDropEvent, FontId, FrameDiagnostics, Global, GlobalElementId,
+    GlyphId, GpuCanvasHandle, GpuCanvasLayer, GpuCanvasTextContext, GpuCanvasTextFrame,
+    GpuFrameInfo, GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent,
+    KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers,
+    ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent,
+    PaintGpuCanvas, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformFrameRequester,
+    PlatformInput, PlatformInputHandler, PlatformWindow, Point, PolychromeSprite, Priority,
+    PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams,
+    RenderSvgParams, Replay, ResizeEdge, Rgba, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X,
+    SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size, StrikethroughStyle,
+    Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController,
+    TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement,
+    TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance,
+    WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem,
+    point, prelude::*, profiler, px, rems, size, transparent_black,
 };
 
 use anyhow::{Context as _, Result, anyhow};
@@ -61,6 +61,7 @@ use std::{
 use uuid::Uuid;
 
 pub(crate) mod a11y;
+mod gpu_canvas_text;
 mod prompts;
 #[cfg(test)]
 mod tests;
@@ -68,6 +69,9 @@ mod tests;
 use self::a11y::A11y;
 #[cfg(not(target_family = "wasm"))]
 use self::a11y::ROOT_NODE_ID;
+use self::gpu_canvas_text::{
+    GpuCanvasTextEnv, GpuCanvasTextKey, GpuCanvasTextRetention, TextAction, text_action,
+};
 use crate::util::{
     atomic_incr_if_not_zero, ceil_to_device_pixel, floor_to_device_pixel, round_half_toward_zero,
     round_half_toward_zero_f64, round_stroke_to_device_pixel, round_to_device_pixel,
@@ -107,58 +111,6 @@ fn gpu_canvas_prepare_text(force_present: bool, gpu_wants_present: bool) -> bool
     force_present || gpu_wants_present
 }
 
-#[cfg(test)]
-mod gpu_canvas_frame_plan_tests {
-    use super::*;
-
-    #[test]
-    fn gpu_only_skip_does_not_present() {
-        let plan = gpu_canvas_frame_plan(false, false, false);
-        assert!(!plan.draw_ui);
-        assert!(plan.run_gpu_canvases);
-        assert!(!plan.present);
-    }
-
-    #[test]
-    fn gpu_only_request_presents_same_tick() {
-        let plan = gpu_canvas_frame_plan(false, false, true);
-        assert!(!plan.draw_ui);
-        assert!(plan.run_gpu_canvases);
-        assert!(plan.present);
-    }
-
-    #[test]
-    fn ui_dirty_frame_runs_canvas_and_presents_even_if_canvas_skips() {
-        let plan = gpu_canvas_frame_plan(true, false, false);
-        assert!(plan.draw_ui);
-        assert!(plan.run_gpu_canvases);
-        assert!(plan.present);
-    }
-
-    #[test]
-    fn explicit_present_reason_presents_even_if_canvas_skips() {
-        let plan = gpu_canvas_frame_plan(false, true, false);
-        assert!(!plan.draw_ui);
-        assert!(plan.run_gpu_canvases);
-        assert!(plan.present);
-    }
-
-    #[test]
-    fn gpu_only_skip_does_not_prepare_text() {
-        assert!(!gpu_canvas_prepare_text(false, false));
-    }
-
-    #[test]
-    fn explicit_present_prepares_text_even_if_canvases_skip() {
-        assert!(gpu_canvas_prepare_text(true, false));
-    }
-
-    #[test]
-    fn any_canvas_present_request_prepares_the_window_text_frame() {
-        assert!(gpu_canvas_prepare_text(false, true));
-    }
-}
-
 /// Represents the two different phases when dispatching events.
 #[derive(Default, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum DispatchPhase {
@@ -196,6 +148,7 @@ struct WindowInvalidatorInner {
     pub dirty_views: FxHashSet<EntityId>,
     pub update_count: usize,
     pub frame_dirty: FrameDirtyAccumulator,
+    pub frame_requester: Option<Arc<dyn PlatformFrameRequester>>,
 }
 
 /// Per-frame invalidation bookkeeping, drained at draw time and emitted to the
@@ -222,6 +175,7 @@ impl WindowInvalidator {
                 dirty_views: FxHashSet::default(),
                 update_count: 0,
                 frame_dirty: FrameDirtyAccumulator::default(),
+                frame_requester: None,
             })),
         }
     }
@@ -233,6 +187,7 @@ impl WindowInvalidator {
         if inner.draw_phase == DrawPhase::None {
             Self::record_frame_dirty(&mut inner);
             inner.dirty = true;
+            Self::request_frame_inner(&inner);
             cx.push_effect(Effect::Notify { emitter: entity });
             true
         } else {
@@ -244,12 +199,33 @@ impl WindowInvalidator {
         self.inner.borrow().dirty
     }
 
+    /// Views invalidated while a draw was in progress; they still owe a frame.
+    pub fn has_dirty_views(&self) -> bool {
+        !self.inner.borrow().dirty_views.is_empty()
+    }
+
     pub fn set_dirty(&self, dirty: bool) {
         let mut inner = self.inner.borrow_mut();
         inner.dirty = dirty;
         if dirty {
             inner.update_count += 1;
             Self::record_frame_dirty(&mut inner);
+            Self::request_frame_inner(&inner);
+        }
+    }
+
+    pub fn set_frame_requester(&self, requester: Option<Arc<dyn PlatformFrameRequester>>) {
+        self.inner.borrow_mut().frame_requester = requester;
+    }
+
+    /// Wakes the platform frame clock so the next tick delivers a frame.
+    pub fn request_frame(&self) {
+        Self::request_frame_inner(&self.inner.borrow());
+    }
+
+    fn request_frame_inner(inner: &WindowInvalidatorInner) {
+        if let Some(requester) = &inner.frame_requester {
+            requester.request_frame();
         }
     }
 
@@ -1243,6 +1219,7 @@ pub struct Window {
     pub(crate) requested_autoscroll: Option<Bounds<Pixels>>,
     pub(crate) image_cache_stack: Vec<AnyImageCache>,
     pub(crate) rendered_frame: Frame,
+    gpu_canvas_text: GpuCanvasTextRetention,
     pub(crate) next_frame: Frame,
     next_hitbox_id: HitboxId,
     pub(crate) next_tooltip_id: TooltipId,
@@ -1541,6 +1518,7 @@ impl Window {
         let appearance = platform_window.appearance();
         let text_system = Arc::new(WindowTextSystem::new(cx.text_system().clone()));
         let invalidator = WindowInvalidator::new();
+        invalidator.set_frame_requester(platform_window.frame_requester());
         let active = Rc::new(Cell::new(platform_window.is_active()));
         let hovered = Rc::new(Cell::new(platform_window.is_hovered()));
         let needs_present = Rc::new(Cell::new(false));
@@ -1676,6 +1654,7 @@ impl Window {
                                     // Bypass cached view reuse so we don't replay stale
                                     // atlas tile references after a GPU device recovery.
                                     window.refresh();
+                                    window.gpu_canvas_text.clear();
                                 }
                                 let arena_clear_needed = window.draw(cx);
                                 if plan.run_gpu_canvases {
@@ -1704,6 +1683,16 @@ impl Window {
                 handle
                     .update(&mut cx, |_, window, _| {
                         window.complete_frame();
+                        // A reason to draw that arrived during this frame (an invalidation
+                        // refused mid-draw, a callback queued for the next frame, a present
+                        // still owed) must wake the frame clock again.
+                        if window.invalidator.is_dirty()
+                            || window.invalidator.has_dirty_views()
+                            || !window.next_frame_callbacks.borrow().is_empty()
+                            || window.needs_present.get()
+                        {
+                            window.invalidator.request_frame();
+                        }
                     })
                     .log_err();
             }
@@ -1877,6 +1866,7 @@ impl Window {
             element_opacity: 1.0,
             requested_autoscroll: None,
             rendered_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
+            gpu_canvas_text: GpuCanvasTextRetention::default(),
             next_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
             next_frame_callbacks,
             next_hitbox_id: HitboxId(0),
@@ -2348,6 +2338,7 @@ impl Window {
     /// Schedule the given closure to be run directly after the current frame is rendered.
     pub fn on_next_frame(&self, callback: impl FnOnce(&mut Window, &mut App) + 'static) {
         RefCell::borrow_mut(&self.next_frame_callbacks).push(Box::new(callback));
+        self.invalidator.request_frame();
     }
 
     /// Schedule a frame to be drawn on the next animation frame.
@@ -2884,6 +2875,17 @@ impl Window {
             || !self.rendered_frame.scene.gpu_canvases_over_scene.is_empty()
     }
 
+    /// Frame counters since the window opened: the backend's frame clock and
+    /// scene upload counts (zero when the backend does not track them) plus the
+    /// gpu canvas text prepares and reuses.
+    pub fn frame_diagnostics(&self) -> FrameDiagnostics {
+        FrameDiagnostics {
+            gpu_canvas_text_prepares: self.gpu_canvas_text.prepares(),
+            gpu_canvas_text_reuses: self.gpu_canvas_text.reuses(),
+            ..self.platform_window.frame_diagnostics().unwrap_or_default()
+        }
+    }
+
     fn frame_gpu_canvases(&mut self, force_present: bool) -> bool {
         if self
             .rendered_frame
@@ -2944,45 +2946,102 @@ impl Window {
             };
             let wants_present = canvas.driver.frame(info).requests_present();
             request_present |= wants_present;
-            canvases.push((layer, canvas, bounds));
+            canvases.push((layer, canvas, bounds, wants_present));
         }
 
+        // `force_present` is true on every UI redraw, so the scene's text is rebuilt from
+        // scratch then; reuse only happens on GPU-only frames, for canvases that did not
+        // ask to present and whose environment is unchanged.
         if gpu_canvas_prepare_text(force_present, request_present) {
-            for (layer, canvas, bounds) in canvases {
-                let mut canvas_text_frame = GpuCanvasTextFrame::default();
+            let mut seen = FxHashSet::default();
+            let mut occurrences: FxHashMap<(usize, bool), usize> = FxHashMap::default();
+            for (layer, canvas, bounds, wants_present) in canvases {
                 let content_mask = ContentMask {
                     bounds: canvas.bounds.intersect(&canvas.content_mask.bounds),
                 };
-                let mut text_context = GpuCanvasTextContext::new(
-                    text_system.clone(),
-                    sprite_atlas.clone(),
+                let occurrence = occurrences
+                    .entry((
+                        canvas.driver.id(),
+                        matches!(canvas.text_layer, GpuCanvasLayer::OverScene),
+                    ))
+                    .or_default();
+                let key = GpuCanvasTextKey {
+                    canvas: canvas.driver.id(),
+                    layer: canvas.text_layer,
+                    occurrence: *occurrence,
+                };
+                *occurrence += 1;
+                let env = GpuCanvasTextEnv {
                     bounds,
+                    content_mask,
                     scale_factor,
                     content_zoom,
-                    content_mask,
-                    background_appearance,
-                    subpixel_rendering_supported,
                     text_rendering_mode,
-                    canvas.order,
-                    layer,
-                    canvas.text_layer,
-                    &mut canvas_text_frame,
+                    subpixel_rendering_supported,
+                    background_appearance,
+                    order: canvas.order,
+                };
+                seen.insert(key);
+                let action = text_action(
+                    force_present,
+                    wants_present,
+                    self.gpu_canvas_text.reusable_env(&key),
+                    &env,
                 );
-                match canvas.driver.prepare_text(&mut text_context) {
-                    Ok(()) => {
-                        let text_frame = match canvas.text_layer {
-                            GpuCanvasLayer::UnderScene => {
-                                &mut self.rendered_frame.scene.gpu_canvas_text_under_scene
-                            }
-                            GpuCanvasLayer::OverScene => {
-                                &mut self.rendered_frame.scene.gpu_canvas_text_over_scene
-                            }
-                        };
-                        text_frame.append(canvas_text_frame);
+                let canvas_text_frame = match action {
+                    TextAction::Reuse => {
+                        self.gpu_canvas_text.note_reuse();
+                        self.gpu_canvas_text.cached_frame(&key)
                     }
-                    Err(error) => log::error!("failed to prepare gpu canvas text: {error}"),
+                    TextAction::Prepare => {
+                        let mut canvas_text_frame = GpuCanvasTextFrame::default();
+                        let mut text_context = GpuCanvasTextContext::new(
+                            text_system.clone(),
+                            sprite_atlas.clone(),
+                            bounds,
+                            scale_factor,
+                            content_zoom,
+                            content_mask,
+                            background_appearance,
+                            subpixel_rendering_supported,
+                            text_rendering_mode,
+                            canvas.order,
+                            layer,
+                            canvas.text_layer,
+                            &mut canvas_text_frame,
+                        );
+                        match canvas.driver.prepare_text(&mut text_context) {
+                            Ok(()) => {
+                                self.gpu_canvas_text
+                                    .store(key, env, canvas_text_frame.clone());
+                                Some(canvas_text_frame)
+                            }
+                            Err(error) => {
+                                log::error!("failed to prepare gpu canvas text: {error}");
+                                // Text laid out for another geometry is worse than none.
+                                if self.gpu_canvas_text.cached_env(&key) == Some(&env) {
+                                    self.gpu_canvas_text.cached_frame(&key)
+                                } else {
+                                    self.gpu_canvas_text.evict(&key);
+                                    None
+                                }
+                            }
+                        }
+                    }
+                };
+                if let Some(canvas_text_frame) = canvas_text_frame {
+                    let text_frame = match canvas.text_layer {
+                        GpuCanvasLayer::UnderScene => {
+                            &mut self.rendered_frame.scene.gpu_canvas_text_under_scene
+                        }
+                        GpuCanvasLayer::OverScene => {
+                            &mut self.rendered_frame.scene.gpu_canvas_text_over_scene
+                        }
+                    };
+                    text_frame.append(canvas_text_frame);
                 }
             }
+            self.gpu_canvas_text.retain_seen(&seen);
         }
 
         self.rendered_frame

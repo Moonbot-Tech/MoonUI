@@ -180,6 +180,14 @@ impl WindowsWindowInner {
             self.state
                 .restore_from_minimized
                 .set(self.state.callbacks.request_frame.take());
+            // A minimized window has nothing to draw; the first frame after restore sets
+            // the canvas reason again.
+            self.state
+                .frame_clock
+                .set_sticky(FRAME_REASON_GPU_CANVAS, false);
+            self.state
+                .frame_clock
+                .set_sticky(FRAME_REASON_DIRECT_MANIP, false);
             return Some(0);
         }
 
@@ -194,6 +202,7 @@ impl WindowsWindowInner {
                 .callbacks
                 .request_frame
                 .set(Some(restore_from_minimized));
+            self.state.frame_clock.request(FRAME_REASON_REQUEST);
         } else {
             should_resize_renderer = true;
         }
@@ -267,9 +276,6 @@ impl WindowsWindowInner {
     }
 
     fn handle_frame_clock_msg(&self, handle: HWND) -> Option<isize> {
-        self.state
-            .frame_clock_pending
-            .store(false, std::sync::atomic::Ordering::Release);
         self.draw_window(handle, false)
     }
 
@@ -1217,6 +1223,7 @@ impl WindowsWindowInner {
         // between) is treated as a forced render so it both clears
         // `skip_draws` and bypasses the view cache.
         self.state.force_render_after_recovery.set(true);
+        self.state.frame_clock.request(FRAME_REASON_FORCE_RENDER);
         Some(0)
     }
 
@@ -1227,7 +1234,23 @@ impl WindowsWindowInner {
 
     #[inline]
     fn draw_window(&self, handle: HWND, force_render: bool) -> Option<isize> {
-        let mut request_frame = self.state.callbacks.request_frame.take()?;
+        let Some(mut request_frame) = self.state.callbacks.request_frame.take() else {
+            // Clear `pending` so the vsync thread can post again.
+            let taken = self.state.frame_clock.begin_frame();
+            let minimized = self.state.restore_from_minimized.take();
+            if minimized.is_some() {
+                // Minimized: drop the reasons, the restore requests a frame.
+                self.state.restore_from_minimized.set(minimized);
+            } else {
+                // The frame callback is busy (reentrant draw): keep the reasons for the next vblank.
+                self.state.frame_clock.rearm(taken);
+            }
+            return None;
+        };
+        // Every drawing path (frame clock, WM_PAINT, WM_TIMER, visibility, forced update)
+        // consumes the one-shot reasons, so a draw is never followed by a redundant frame.
+        let taken = self.state.frame_clock.begin_frame();
+        let force_render = force_render || taken & FRAME_REASON_FORCE_RENDER != 0;
 
         self.state.direct_manipulation.update();
 

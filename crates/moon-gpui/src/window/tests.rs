@@ -10,11 +10,13 @@ use std::{
     rc::Rc,
 };
 
+use super::{gpu_canvas_frame_plan, gpu_canvas_prepare_text};
 use crate::{
     AnyWindowHandle, App, AppContext as _, AsyncWindowContext, Bounds, Context, FileDropEvent,
     GpuCanvasDrawContext, GpuCanvasDriver, GpuCanvasHandle, GpuCanvasPrepareContext,
-    GpuFrameDecision, GpuFrameInfo, InputEvent as _, InputHandler, InteractiveElement as _,
-    IntoElement, MouseMoveEvent, Pixels, PlatformInput, PlatformInputHandler, Point, Render,
+    GpuCanvasRetainedTextLayer, GpuCanvasTextContext, GpuCanvasTextTransform, GpuFrameDecision,
+    GpuFrameInfo, InputEvent as _, InputHandler, InteractiveElement as _, IntoElement,
+    MouseMoveEvent, ParentElement as _, Pixels, PlatformInput, PlatformInputHandler, Point, Render,
     ScrollDelta, ScrollWheelEvent, Size, StatefulInteractiveElement as _, Styled as _,
     TestAppContext, TouchPhase, UTF16Selection, Window, div, gpu_canvas, point, px, size,
 };
@@ -535,4 +537,168 @@ fn gpu_canvas_frame_info_carries_the_zoom_beside_the_combined_factor() {
     })
     .unwrap();
     assert_eq!(seen.get(), Some((platform_factor * 2.0, 2.0)));
+}
+
+/// A GPU canvas that submits one retained text layer and counts its text prepares.
+struct TextCanvas {
+    presents: bool,
+    fail: Rc<Cell<bool>>,
+    prepares: Rc<Cell<u32>>,
+    layer: GpuCanvasRetainedTextLayer,
+}
+
+impl TextCanvas {
+    fn new(presents: bool) -> (Self, Rc<Cell<u32>>, Rc<Cell<bool>>) {
+        let prepares = Rc::new(Cell::new(0));
+        let fail = Rc::new(Cell::new(false));
+        let canvas = Self {
+            presents,
+            fail: fail.clone(),
+            prepares: prepares.clone(),
+            layer: GpuCanvasRetainedTextLayer::default(),
+        };
+        (canvas, prepares, fail)
+    }
+}
+
+impl GpuCanvasDriver for TextCanvas {
+    fn frame(&mut self, _: GpuFrameInfo) -> GpuFrameDecision {
+        if self.presents {
+            GpuFrameDecision::RequestPresent
+        } else {
+            GpuFrameDecision::Skip
+        }
+    }
+
+    fn prepare_text(&mut self, ctx: &mut GpuCanvasTextContext<'_>) -> anyhow::Result<()> {
+        self.prepares.set(self.prepares.get() + 1);
+        if self.fail.get() {
+            anyhow::bail!("synthetic text failure");
+        }
+        ctx.draw_retained_text_layer(
+            &mut self.layer,
+            1,
+            1,
+            GpuCanvasTextTransform::translate_logical(point(px(0.), px(0.))),
+            0..0,
+            |_| Ok(()),
+        )
+    }
+
+    fn draw(&mut self, _: &mut GpuCanvasDrawContext<'_>) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+/// A root view that paints each handle as a 50 px GPU canvas.
+struct CanvasesView {
+    handles: Vec<GpuCanvasHandle>,
+}
+
+impl Render for CanvasesView {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().children(
+            self.handles
+                .iter()
+                .map(|handle| gpu_canvas(handle.clone()).size(px(50.))),
+        )
+    }
+}
+
+/// Run the gpu canvases of `any` once and count the text layers the scene carries.
+fn canvas_frame(app: &mut TestAppContext, any: AnyWindowHandle, force_present: bool) -> usize {
+    app.update_window(any, |_, window, _| {
+        window.frame_gpu_canvases(force_present);
+        let scene = &window.rendered_frame.scene;
+        scene.gpu_canvas_text_under_scene.retained_layers.len()
+            + scene.gpu_canvas_text_over_scene.retained_layers.len()
+    })
+    .unwrap()
+}
+
+/// Catches `window.rs:frame_gpu_canvases` preparing every canvas's text whenever any canvas
+/// presents (passing the window-wide request instead of the canvas's own): a live chart
+/// beside a static one would re-lay-out the static labels every GPU-only frame.
+#[test]
+fn static_neighbour_not_reprepared() {
+    let (live, live_prepares, _) = TextCanvas::new(true);
+    let (still, still_prepares, _) = TextCanvas::new(false);
+    let handles = vec![GpuCanvasHandle::new(live), GpuCanvasHandle::new(still)];
+    let (mut app, any) = open_window(move |_, _| CanvasesView { handles });
+    assert_eq!(canvas_frame(&mut app, any, true), 2);
+    for _ in 0..20 {
+        assert_eq!(
+            canvas_frame(&mut app, any, false),
+            2,
+            "the static canvas's labels must stay in every frame"
+        );
+    }
+    assert_eq!(live_prepares.get(), 21);
+    assert_eq!(still_prepares.get(), 1);
+}
+
+/// Catches `window.rs:frame_gpu_canvases` keeping the cached text after a failed prepare
+/// in a changed environment: after a zoom the labels would draw at the old geometry.
+#[test]
+fn err_with_changed_env_drops_text() {
+    let (canvas, _, fail) = TextCanvas::new(false);
+    let handles = vec![GpuCanvasHandle::new(canvas)];
+    let (mut app, any) = open_window(move |_, _| CanvasesView { handles });
+    assert_eq!(canvas_frame(&mut app, any, true), 1);
+    fail.set(true);
+    assert_eq!(
+        canvas_frame(&mut app, any, true),
+        1,
+        "a failure in the same environment keeps the last good text"
+    );
+    zoom(&mut app, any, 2.0);
+    draw(&mut app, any);
+    assert_eq!(canvas_frame(&mut app, any, true), 0);
+}
+
+#[test]
+fn gpu_only_skip_does_not_present() {
+    let plan = gpu_canvas_frame_plan(false, false, false);
+    assert!(!plan.draw_ui);
+    assert!(plan.run_gpu_canvases);
+    assert!(!plan.present);
+}
+
+#[test]
+fn gpu_only_request_presents_same_tick() {
+    let plan = gpu_canvas_frame_plan(false, false, true);
+    assert!(!plan.draw_ui);
+    assert!(plan.run_gpu_canvases);
+    assert!(plan.present);
+}
+
+#[test]
+fn ui_dirty_frame_runs_canvas_and_presents_even_if_canvas_skips() {
+    let plan = gpu_canvas_frame_plan(true, false, false);
+    assert!(plan.draw_ui);
+    assert!(plan.run_gpu_canvases);
+    assert!(plan.present);
+}
+
+#[test]
+fn explicit_present_reason_presents_even_if_canvas_skips() {
+    let plan = gpu_canvas_frame_plan(false, true, false);
+    assert!(!plan.draw_ui);
+    assert!(plan.run_gpu_canvases);
+    assert!(plan.present);
+}
+
+#[test]
+fn gpu_only_skip_does_not_prepare_text() {
+    assert!(!gpu_canvas_prepare_text(false, false));
+}
+
+#[test]
+fn explicit_present_prepares_text_even_if_canvases_skip() {
+    assert!(gpu_canvas_prepare_text(true, false));
+}
+
+#[test]
+fn any_canvas_present_request_prepares_the_window_text_frame() {
+    assert!(gpu_canvas_prepare_text(false, true));
 }

@@ -1,12 +1,8 @@
-use std::{
-    ops::Deref,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
+use std::{ops::Deref, sync::Arc};
 
 use windows::Win32::{Foundation::HWND, UI::WindowsAndMessaging::HCURSOR};
+
+use crate::FrameClockState;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SafeCursor {
@@ -61,14 +57,14 @@ impl Deref for SafeHwnd {
 #[derive(Debug, Clone)]
 pub(crate) struct FrameClockWindow {
     hwnd: SafeHwnd,
-    frame_clock_pending: Arc<AtomicBool>,
+    frame_clock: Arc<FrameClockState>,
 }
 
 impl FrameClockWindow {
-    pub(crate) fn new(hwnd: HWND, frame_clock_pending: Arc<AtomicBool>) -> Self {
+    pub(crate) fn new(hwnd: HWND, frame_clock: Arc<FrameClockState>) -> Self {
         Self {
             hwnd: hwnd.into(),
-            frame_clock_pending,
+            frame_clock,
         }
     }
 
@@ -76,13 +72,7 @@ impl FrameClockWindow {
         self.hwnd.as_raw()
     }
 
-    pub(crate) fn try_mark_frame_clock_pending(&self) -> bool {
-        self.frame_clock_pending
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_ok()
-    }
-
-    pub(crate) fn clear_frame_clock_pending(&self) {
-        self.frame_clock_pending.store(false, Ordering::Release);
+    pub(crate) fn frame_clock(&self) -> &FrameClockState {
+        &self.frame_clock
     }
 }
