@@ -65,6 +65,9 @@ pub fn is_internal_crate(dep_name: &str) -> bool {
         .any(|path| crate_name_from_path(path) == dep_name)
 }
 
+#[cfg(test)]
+mod tests;
+
 /// Transform the configured Zed GPUI crates into the requested output tree.
 ///
 /// The output directory is removed before extraction, so callers must provide a disposable target.
