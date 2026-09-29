@@ -11,12 +11,13 @@ pub(crate) struct SceneUploadTracker {
 impl SceneUploadTracker {
     /// Whether the scene with `revision` must be uploaded; revision 0 is unknown
     /// and always uploads.
-    pub(crate) fn should_upload(&mut self, revision: u64) -> bool {
-        if revision == 0 || self.uploaded != Some(revision) {
-            return true;
-        }
+    pub(crate) fn should_upload(&self, revision: u64) -> bool {
+        revision == 0 || self.uploaded != Some(revision)
+    }
+
+    /// Counts a frame that kept the already uploaded scene.
+    pub(crate) fn record_skip(&mut self) {
         self.skips += 1;
-        false
     }
 
     pub(crate) fn mark_uploaded(&mut self, revision: u64) {
@@ -29,12 +30,10 @@ impl SceneUploadTracker {
         self.uploaded = None;
     }
 
-    #[allow(dead_code)]
     pub(crate) fn uploads(&self) -> u64 {
         self.uploads
     }
 
-    #[allow(dead_code)]
     pub(crate) fn skips(&self) -> u64 {
         self.skips
     }

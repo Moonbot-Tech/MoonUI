@@ -5,18 +5,18 @@ use crate::{
     AsyncWindowContext, AvailableSpace, Background, BorderStyle, Bounds, BoxShadow, Capslock,
     Context, Corners, CursorHideMode, CursorStyle, Decorations, DevicePixels,
     DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Edges, Effect, Entity,
-    EntityId, EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId,
-    GpuCanvasHandle, GpuCanvasLayer, GpuCanvasTextContext, GpuCanvasTextFrame, GpuFrameInfo,
-    GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent, KeyEvent,
-    Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent,
-    MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, PaintGpuCanvas, Path,
-    Pixels, PlatformAtlas, PlatformDisplay, PlatformFrameRequester, PlatformInput,
-    PlatformInputHandler, PlatformWindow, Point, PolychromeSprite, Priority, PromptButton,
-    PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams,
-    Replay, ResizeEdge, Rgba, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y,
-    ScaledPixels, Scene, Shadow, SharedString, Size, StrikethroughStyle, Style, SubpixelSprite,
-    SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap,
-    TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement,
+    EntityId, EventEmitter, FileDropEvent, FontId, FrameDiagnostics, Global, GlobalElementId,
+    GlyphId, GpuCanvasHandle, GpuCanvasLayer, GpuCanvasTextContext, GpuCanvasTextFrame,
+    GpuFrameInfo, GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent,
+    KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers,
+    ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent,
+    PaintGpuCanvas, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformFrameRequester,
+    PlatformInput, PlatformInputHandler, PlatformWindow, Point, PolychromeSprite, Priority,
+    PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams,
+    RenderSvgParams, Replay, ResizeEdge, Rgba, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X,
+    SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size, StrikethroughStyle,
+    Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController,
+    TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement,
     TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance,
     WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem,
     point, prelude::*, profiler, px, rems, size, transparent_black,
@@ -2927,16 +2927,15 @@ impl Window {
             || !self.rendered_frame.scene.gpu_canvases_over_scene.is_empty()
     }
 
-    /// Gpu canvas text frames prepared since the window opened.
-    #[allow(dead_code, reason = "read by the frame diagnostics")]
-    pub(crate) fn gpu_canvas_text_prepares(&self) -> u64 {
-        self.gpu_canvas_text.prepares()
-    }
-
-    /// Gpu canvas text frames replayed from the retention store since the window opened.
-    #[allow(dead_code, reason = "read by the frame diagnostics")]
-    pub(crate) fn gpu_canvas_text_reuses(&self) -> u64 {
-        self.gpu_canvas_text.reuses()
+    /// Frame counters since the window opened: the backend's frame clock and
+    /// scene upload counts (zero when the backend does not track them) plus the
+    /// gpu canvas text prepares and reuses.
+    pub fn frame_diagnostics(&self) -> FrameDiagnostics {
+        FrameDiagnostics {
+            gpu_canvas_text_prepares: self.gpu_canvas_text.prepares(),
+            gpu_canvas_text_reuses: self.gpu_canvas_text.reuses(),
+            ..self.platform_window.frame_diagnostics().unwrap_or_default()
+        }
     }
 
     fn frame_gpu_canvases(&mut self, force_present: bool) -> bool {

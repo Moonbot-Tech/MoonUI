@@ -977,6 +977,19 @@ impl PlatformWindow for WindowsWindow {
         Some(self.0.state.frame_clock.clone())
     }
 
+    fn frame_diagnostics(&self) -> Option<FrameDiagnostics> {
+        let (frame_clock_posts, frame_clock_skips) = self.0.state.frame_clock.post_counts();
+        let (scene_uploads, scene_upload_skips) =
+            self.0.state.renderer.borrow().scene_upload_counts();
+        Some(FrameDiagnostics {
+            frame_clock_posts,
+            frame_clock_skips,
+            scene_uploads,
+            scene_upload_skips,
+            ..FrameDiagnostics::default()
+        })
+    }
+
     fn set_gpu_canvas_active(&self, active: bool) {
         self.0
             .state

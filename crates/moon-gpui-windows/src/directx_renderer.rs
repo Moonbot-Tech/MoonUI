@@ -519,6 +519,11 @@ impl DirectXRenderer {
     }
 
     #[inline]
+    /// Scene uploads and upload skips since the renderer was created.
+    pub(crate) fn scene_upload_counts(&self) -> (u64, u64) {
+        (self.scene_upload.uploads(), self.scene_upload.skips())
+    }
+
     pub(crate) fn can_present(&mut self) -> bool {
         if self.presentable {
             return true;
@@ -665,6 +670,8 @@ impl DirectXRenderer {
                 return Err(error);
             }
             self.scene_upload.mark_uploaded(revision);
+        } else {
+            self.scene_upload.record_skip();
         }
 
         self.run_gpu_canvas_draw(&scene.gpu_canvases_under_scene, GpuCanvasLayer::UnderScene);

@@ -90,6 +90,14 @@ impl FrameClockState {
         decision
     }
 
+    /// Frame clock posts and skips since the window was created.
+    pub(crate) fn post_counts(&self) -> (u64, u64) {
+        (
+            self.posts.load(Ordering::Relaxed),
+            self.skips.load(Ordering::Relaxed),
+        )
+    }
+
     /// Vsync thread: the post failed, so the message is not pending after all.
     pub(crate) fn cancel_post(&self) {
         self.pending.store(false, Ordering::Release);
