@@ -185,6 +185,9 @@ impl WindowsWindowInner {
             self.state
                 .frame_clock
                 .set_sticky(FRAME_REASON_GPU_CANVAS, false);
+            self.state
+                .frame_clock
+                .set_sticky(FRAME_REASON_DIRECT_MANIP, false);
             return Some(0);
         }
 

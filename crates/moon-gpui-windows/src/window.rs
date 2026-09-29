@@ -979,8 +979,14 @@ impl PlatformWindow for WindowsWindow {
 
     fn frame_diagnostics(&self) -> Option<FrameDiagnostics> {
         let (frame_clock_posts, frame_clock_skips) = self.0.state.frame_clock.post_counts();
-        let (scene_uploads, scene_upload_skips) =
-            self.0.state.renderer.borrow().scene_upload_counts();
+        // A read from inside a draw must not panic on the renderer borrow.
+        let (scene_uploads, scene_upload_skips) = self
+            .0
+            .state
+            .renderer
+            .try_borrow()
+            .map(|renderer| renderer.scene_upload_counts())
+            .unwrap_or_default();
         Some(FrameDiagnostics {
             frame_clock_posts,
             frame_clock_skips,

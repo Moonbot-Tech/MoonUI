@@ -2,7 +2,9 @@
 //!
 //! A GPU-only frame prepares text only for the canvases that asked to present;
 //! every other canvas replays the text frame it produced last time, as long as
-//! nothing its text depends on changed.
+//! nothing its text depends on changed. A cached frame holding polychrome
+//! (image/emoji) sprites is never replayed: `Window::drop_image` can free those
+//! atlas tiles without dirtying the window, so such a canvas prepares again.
 
 use std::hash::{Hash, Hasher};
 
@@ -13,18 +15,22 @@ use crate::{
     TextRenderingMode, WindowBackgroundAppearance,
 };
 
-/// One canvas's text in one text layer.
+/// One paint of a canvas's text in one text layer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct GpuCanvasTextKey {
     /// Stable identity of the canvas driver for as long as it lives.
     pub canvas: usize,
     pub layer: GpuCanvasLayer,
+    /// How many times this canvas and layer were already seen in the frame, so a
+    /// handle painted twice keeps separate text.
+    pub occurrence: usize,
 }
 
 impl Hash for GpuCanvasTextKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.canvas.hash(state);
         matches!(self.layer, GpuCanvasLayer::OverScene).hash(state);
+        self.occurrence.hash(state);
     }
 }
 
@@ -73,6 +79,15 @@ impl GpuCanvasTextRetention {
         self.entries.get(key).map(|(env, _)| env)
     }
 
+    /// The cached environment, unless the cached frame must not be replayed
+    /// (it holds polychrome sprites whose atlas tiles may have been freed).
+    pub(crate) fn reusable_env(&self, key: &GpuCanvasTextKey) -> Option<&GpuCanvasTextEnv> {
+        self.entries
+            .get(key)
+            .filter(|(_, frame)| frame.polychrome_sprites.is_empty())
+            .map(|(env, _)| env)
+    }
+
     pub(crate) fn cached_frame(&self, key: &GpuCanvasTextKey) -> Option<GpuCanvasTextFrame> {
         self.entries.get(key).map(|(_, frame)| frame.clone())
     }
@@ -85,6 +100,11 @@ impl GpuCanvasTextRetention {
     ) {
         self.prepares += 1;
         self.entries.insert(key, (env, frame));
+    }
+
+    /// Drops one canvas's cached text.
+    pub(crate) fn evict(&mut self, key: &GpuCanvasTextKey) {
+        self.entries.remove(key);
     }
 
     pub(crate) fn note_reuse(&mut self) {

@@ -3006,14 +3006,23 @@ impl Window {
         // ask to present and whose environment is unchanged.
         if gpu_canvas_prepare_text(force_present, request_present) {
             let mut seen = FxHashSet::default();
+            let mut occurrences: FxHashMap<(usize, bool), usize> = FxHashMap::default();
             for (layer, canvas, bounds, wants_present) in canvases {
                 let content_mask = ContentMask {
                     bounds: canvas.bounds.intersect(&canvas.content_mask.bounds),
                 };
+                let occurrence = occurrences
+                    .entry((
+                        canvas.driver.id(),
+                        matches!(canvas.text_layer, GpuCanvasLayer::OverScene),
+                    ))
+                    .or_default();
                 let key = GpuCanvasTextKey {
                     canvas: canvas.driver.id(),
                     layer: canvas.text_layer,
+                    occurrence: *occurrence,
                 };
+                *occurrence += 1;
                 let env = GpuCanvasTextEnv {
                     bounds,
                     content_mask,
@@ -3028,7 +3037,7 @@ impl Window {
                 let action = text_action(
                     force_present,
                     wants_present,
-                    self.gpu_canvas_text.cached_env(&key),
+                    self.gpu_canvas_text.reusable_env(&key),
                     &env,
                 );
                 let canvas_text_frame = match action {
@@ -3061,7 +3070,13 @@ impl Window {
                             }
                             Err(error) => {
                                 log::error!("failed to prepare gpu canvas text: {error}");
-                                self.gpu_canvas_text.cached_frame(&key)
+                                // Text laid out for another geometry is worse than none.
+                                if self.gpu_canvas_text.cached_env(&key) == Some(&env) {
+                                    self.gpu_canvas_text.cached_frame(&key)
+                                } else {
+                                    self.gpu_canvas_text.evict(&key);
+                                    None
+                                }
                             }
                         }
                     }

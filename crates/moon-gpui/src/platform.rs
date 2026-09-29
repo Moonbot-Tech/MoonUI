@@ -628,6 +628,9 @@ pub trait PlatformFrameRequester: Send + Sync {
 }
 
 /// Per-window frame counters, cumulative since the window was created.
+///
+/// `frame_clock_*` and `scene_upload*` are tracked by the Windows backend only
+/// and read 0 on every other backend.
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameDiagnostics {
     /// Vblanks on which the frame clock posted a frame to the window.
@@ -638,7 +641,7 @@ pub struct FrameDiagnostics {
     pub scene_uploads: u64,
     /// Frames that reused the already uploaded scene buffers.
     pub scene_upload_skips: u64,
-    /// GPU canvas text frames prepared from scratch.
+    /// GPU canvas text frames successfully prepared and stored.
     pub gpu_canvas_text_prepares: u64,
     /// GPU canvas text frames replayed from the retention store.
     pub gpu_canvas_text_reuses: u64,

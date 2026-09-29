@@ -28,7 +28,9 @@ pub(crate) enum FrameClockDecision {
     SkipPending,
 }
 
-/// Reasons decide first, then `pending`: the same order `try_begin_post` uses.
+/// The pure decision table: no reasons skips idle, else a pending post skips.
+/// `try_begin_post` passes `pending = false` and settles pending with its
+/// compare-exchange instead; the parameter exists for the table itself.
 pub(crate) fn frame_clock_decision(reasons: u8, pending: bool) -> FrameClockDecision {
     if reasons == 0 {
         FrameClockDecision::SkipIdle
