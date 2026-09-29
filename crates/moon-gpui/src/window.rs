@@ -247,6 +247,11 @@ impl WindowInvalidator {
         self.inner.borrow().dirty
     }
 
+    /// Views invalidated while a draw was in progress; they still owe a frame.
+    pub fn has_dirty_views(&self) -> bool {
+        !self.inner.borrow().dirty_views.is_empty()
+    }
+
     pub fn set_dirty(&self, dirty: bool) {
         let mut inner = self.inner.borrow_mut();
         inner.dirty = dirty;
@@ -1728,6 +1733,7 @@ impl Window {
                         // refused mid-draw, a callback queued for the next frame, a present
                         // still owed) must wake the frame clock again.
                         if window.invalidator.is_dirty()
+                            || window.invalidator.has_dirty_views()
                             || !window.next_frame_callbacks.borrow().is_empty()
                             || window.needs_present.get()
                         {
@@ -3138,7 +3144,6 @@ impl Window {
         self.refreshing = false;
         self.invalidator.set_phase(DrawPhase::None);
         self.needs_present.set(true);
-        self.invalidator.request_frame();
 
         if let Some(draw_start) = draw_started_at {
             profiler::record_frame_timing(profiler::FrameTiming {
