@@ -28,11 +28,12 @@ pub(crate) enum FrameClockDecision {
     SkipPending,
 }
 
+/// Reasons decide first, then `pending`: the same order `try_begin_post` uses.
 pub(crate) fn frame_clock_decision(reasons: u8, pending: bool) -> FrameClockDecision {
-    if pending {
-        FrameClockDecision::SkipPending
-    } else if reasons == 0 {
+    if reasons == 0 {
         FrameClockDecision::SkipIdle
+    } else if pending {
+        FrameClockDecision::SkipPending
     } else {
         FrameClockDecision::Post
     }
@@ -71,8 +72,8 @@ impl FrameClockState {
 
     /// Vsync thread: decides this vblank and, on `Post`, marks the message pending.
     pub(crate) fn try_begin_post(&self) -> FrameClockDecision {
-        let reasons = self.reasons.load(Ordering::Acquire);
-        let mut decision = frame_clock_decision(reasons, self.pending.load(Ordering::Acquire));
+        // Reasons alone decide; the compare-exchange on `pending` settles a post.
+        let mut decision = frame_clock_decision(self.reasons.load(Ordering::Acquire), false);
         if decision == FrameClockDecision::Post
             && self
                 .pending
