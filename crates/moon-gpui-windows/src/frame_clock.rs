@@ -124,3 +124,6 @@ impl PlatformFrameRequester for FrameClockState {
         self.request(FRAME_REASON_REQUEST);
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -38,3 +38,6 @@ impl SceneUploadTracker {
         self.skips
     }
 }
+
+#[cfg(test)]
+mod tests;

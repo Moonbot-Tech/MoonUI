@@ -111,58 +111,6 @@ fn gpu_canvas_prepare_text(force_present: bool, gpu_wants_present: bool) -> bool
     force_present || gpu_wants_present
 }
 
-#[cfg(test)]
-mod gpu_canvas_frame_plan_tests {
-    use super::*;
-
-    #[test]
-    fn gpu_only_skip_does_not_present() {
-        let plan = gpu_canvas_frame_plan(false, false, false);
-        assert!(!plan.draw_ui);
-        assert!(plan.run_gpu_canvases);
-        assert!(!plan.present);
-    }
-
-    #[test]
-    fn gpu_only_request_presents_same_tick() {
-        let plan = gpu_canvas_frame_plan(false, false, true);
-        assert!(!plan.draw_ui);
-        assert!(plan.run_gpu_canvases);
-        assert!(plan.present);
-    }
-
-    #[test]
-    fn ui_dirty_frame_runs_canvas_and_presents_even_if_canvas_skips() {
-        let plan = gpu_canvas_frame_plan(true, false, false);
-        assert!(plan.draw_ui);
-        assert!(plan.run_gpu_canvases);
-        assert!(plan.present);
-    }
-
-    #[test]
-    fn explicit_present_reason_presents_even_if_canvas_skips() {
-        let plan = gpu_canvas_frame_plan(false, true, false);
-        assert!(!plan.draw_ui);
-        assert!(plan.run_gpu_canvases);
-        assert!(plan.present);
-    }
-
-    #[test]
-    fn gpu_only_skip_does_not_prepare_text() {
-        assert!(!gpu_canvas_prepare_text(false, false));
-    }
-
-    #[test]
-    fn explicit_present_prepares_text_even_if_canvases_skip() {
-        assert!(gpu_canvas_prepare_text(true, false));
-    }
-
-    #[test]
-    fn any_canvas_present_request_prepares_the_window_text_frame() {
-        assert!(gpu_canvas_prepare_text(false, true));
-    }
-}
-
 /// Represents the two different phases when dispatching events.
 #[derive(Default, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum DispatchPhase {

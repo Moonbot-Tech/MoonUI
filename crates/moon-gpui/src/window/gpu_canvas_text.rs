@@ -129,3 +129,6 @@ impl GpuCanvasTextRetention {
         self.reuses
     }
 }
+
+#[cfg(test)]
+mod tests;
