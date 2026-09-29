@@ -267,10 +267,14 @@ impl WindowsWindowInner {
     }
 
     fn handle_frame_clock_msg(&self, handle: HWND) -> Option<isize> {
-        self.state
-            .frame_clock_pending
-            .store(false, std::sync::atomic::Ordering::Release);
-        self.draw_window(handle, false)
+        let taken = self.state.frame_clock.begin_frame();
+        let force_render = taken & FRAME_REASON_FORCE_RENDER != 0;
+        let result = self.draw_window(handle, force_render);
+        if result.is_none() {
+            // The frame callback was busy, so nothing drew: keep the reasons for the next vblank.
+            self.state.frame_clock.rearm(taken);
+        }
+        result
     }
 
     fn handle_close_msg(&self) -> Option<isize> {
@@ -1217,6 +1221,7 @@ impl WindowsWindowInner {
         // between) is treated as a forced render so it both clears
         // `skip_draws` and bypasses the view cache.
         self.state.force_render_after_recovery.set(true);
+        self.state.frame_clock.request(FRAME_REASON_FORCE_RENDER);
         Some(0)
     }
 

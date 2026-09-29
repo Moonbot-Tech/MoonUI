@@ -10,16 +10,16 @@ use crate::{
     GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent, KeyEvent,
     Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent,
     MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, PaintGpuCanvas, Path,
-    Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow,
-    Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams,
-    RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge, Rgba,
-    SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow,
-    SharedString, Size, StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription,
-    SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task,
-    TextRenderingMode, TextStyle, TextStyleRefinement, TransformationMatrix, Underline,
-    UnderlineStyle, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls,
-    WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, point, prelude::*, profiler,
-    px, rems, size, transparent_black,
+    Pixels, PlatformAtlas, PlatformDisplay, PlatformFrameRequester, PlatformInput,
+    PlatformInputHandler, PlatformWindow, Point, PolychromeSprite, Priority, PromptButton,
+    PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams,
+    Replay, ResizeEdge, Rgba, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y,
+    ScaledPixels, Scene, Shadow, SharedString, Size, StrikethroughStyle, Style, SubpixelSprite,
+    SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap,
+    TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement,
+    TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance,
+    WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem,
+    point, prelude::*, profiler, px, rems, size, transparent_black,
 };
 
 use anyhow::{Context as _, Result, anyhow};
@@ -196,6 +196,7 @@ struct WindowInvalidatorInner {
     pub dirty_views: FxHashSet<EntityId>,
     pub update_count: usize,
     pub frame_dirty: FrameDirtyAccumulator,
+    pub frame_requester: Option<Arc<dyn PlatformFrameRequester>>,
 }
 
 /// Per-frame invalidation bookkeeping, drained at draw time and emitted to the
@@ -222,6 +223,7 @@ impl WindowInvalidator {
                 dirty_views: FxHashSet::default(),
                 update_count: 0,
                 frame_dirty: FrameDirtyAccumulator::default(),
+                frame_requester: None,
             })),
         }
     }
@@ -233,6 +235,7 @@ impl WindowInvalidator {
         if inner.draw_phase == DrawPhase::None {
             Self::record_frame_dirty(&mut inner);
             inner.dirty = true;
+            Self::request_frame_inner(&inner);
             cx.push_effect(Effect::Notify { emitter: entity });
             true
         } else {
@@ -250,6 +253,22 @@ impl WindowInvalidator {
         if dirty {
             inner.update_count += 1;
             Self::record_frame_dirty(&mut inner);
+            Self::request_frame_inner(&inner);
+        }
+    }
+
+    pub fn set_frame_requester(&self, requester: Option<Arc<dyn PlatformFrameRequester>>) {
+        self.inner.borrow_mut().frame_requester = requester;
+    }
+
+    /// Wakes the platform frame clock so the next tick delivers a frame.
+    pub fn request_frame(&self) {
+        Self::request_frame_inner(&self.inner.borrow());
+    }
+
+    fn request_frame_inner(inner: &WindowInvalidatorInner) {
+        if let Some(requester) = &inner.frame_requester {
+            requester.request_frame();
         }
     }
 
@@ -1541,6 +1560,7 @@ impl Window {
         let appearance = platform_window.appearance();
         let text_system = Arc::new(WindowTextSystem::new(cx.text_system().clone()));
         let invalidator = WindowInvalidator::new();
+        invalidator.set_frame_requester(platform_window.frame_requester());
         let active = Rc::new(Cell::new(platform_window.is_active()));
         let hovered = Rc::new(Cell::new(platform_window.is_hovered()));
         let needs_present = Rc::new(Cell::new(false));
@@ -1704,6 +1724,15 @@ impl Window {
                 handle
                     .update(&mut cx, |_, window, _| {
                         window.complete_frame();
+                        // A reason to draw that arrived during this frame (an invalidation
+                        // refused mid-draw, a callback queued for the next frame, a present
+                        // still owed) must wake the frame clock again.
+                        if window.invalidator.is_dirty()
+                            || !window.next_frame_callbacks.borrow().is_empty()
+                            || window.needs_present.get()
+                        {
+                            window.invalidator.request_frame();
+                        }
                     })
                     .log_err();
             }
@@ -2348,6 +2377,7 @@ impl Window {
     /// Schedule the given closure to be run directly after the current frame is rendered.
     pub fn on_next_frame(&self, callback: impl FnOnce(&mut Window, &mut App) + 'static) {
         RefCell::borrow_mut(&self.next_frame_callbacks).push(Box::new(callback));
+        self.invalidator.request_frame();
     }
 
     /// Schedule a frame to be drawn on the next animation frame.
@@ -3108,6 +3138,7 @@ impl Window {
         self.refreshing = false;
         self.invalidator.set_phase(DrawPhase::None);
         self.needs_present.set(true);
+        self.invalidator.request_frame();
 
         if let Some(draw_start) = draw_started_at {
             profiler::record_frame_timing(profiler::FrameTiming {

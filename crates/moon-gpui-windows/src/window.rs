@@ -89,7 +89,7 @@ pub struct WindowsWindowState {
     /// as resizing them has failed, causing us to have lost at least the render target.
     pub invalidate_devices: Arc<AtomicBool>,
     /// Coalesces private frame-clock messages posted by the vsync thread.
-    pub frame_clock_pending: Arc<AtomicBool>,
+    pub frame_clock: Arc<FrameClockState>,
     fullscreen: Cell<Option<StyleAndBounds>>,
     initial_placement: Cell<Option<WindowOpenStatus>>,
     hwnd: HWND,
@@ -155,8 +155,10 @@ impl WindowsWindowState {
         let fullscreen = None;
         let initial_placement = None;
 
-        let direct_manipulation = DirectManipulationHandler::new(hwnd, scale_factor)
-            .context("initializing Direct Manipulation")?;
+        let frame_clock = Arc::new(FrameClockState::new());
+        let direct_manipulation =
+            DirectManipulationHandler::new(hwnd, scale_factor, frame_clock.clone())
+                .context("initializing Direct Manipulation")?;
 
         Ok(Self {
             origin: Cell::new(origin),
@@ -187,7 +189,7 @@ impl WindowsWindowState {
             initial_placement: Cell::new(initial_placement),
             hwnd,
             invalidate_devices,
-            frame_clock_pending: Arc::new(AtomicBool::new(false)),
+            frame_clock,
             direct_manipulation,
             a11y: RefCell::new(None),
         })
@@ -969,6 +971,17 @@ impl PlatformWindow for WindowsWindow {
             .callbacks
             .appearance_changed
             .set(Some(callback));
+    }
+
+    fn frame_requester(&self) -> Option<Arc<dyn PlatformFrameRequester>> {
+        Some(self.0.state.frame_clock.clone())
+    }
+
+    fn set_gpu_canvas_active(&self, active: bool) {
+        self.0
+            .state
+            .frame_clock
+            .set_sticky(FRAME_REASON_GPU_CANVAS, active);
     }
 
     fn can_present(&self) -> bool {

@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::Result;
 use gpui::*;
@@ -18,6 +19,11 @@ use crate::*;
 /// visual output.
 const DEFAULT_VIEWPORT_SIZE: i32 = 1000;
 
+/// Frames a touchpad contact may stay idle (no RUNNING or INERTIA) before the
+/// frame clock stops pumping for it; a tap never leaves READY, so no status
+/// callback would clear the reason it set.
+const IDLE_CONTACT_FRAMES: u32 = 60;
+
 pub(crate) struct DirectManipulationHandler {
     manager: IDirectManipulationManager,
     update_manager: IDirectManipulationUpdateManager,
@@ -26,10 +32,15 @@ pub(crate) struct DirectManipulationHandler {
     window: HWND,
     scale_factor: Rc<Cell<f32>>,
     pending_events: Rc<RefCell<Vec<PlatformInput>>>,
+    frame_clock: Arc<FrameClockState>,
+    idle_contact_frames: Cell<u32>,
 }
 
 impl DirectManipulationHandler {
-    pub fn new(window: HWND, scale_factor: f32) -> Result<Self> {
+    /// Keeps `FRAME_REASON_DIRECT_MANIP` set on `frame_clock` from the touchpad
+    /// contact through RUNNING and INERTIA until the viewport returns to READY,
+    /// so the gesture's content updates are pumped on every vblank.
+    pub fn new(window: HWND, scale_factor: f32, frame_clock: Arc<FrameClockState>) -> Result<Self> {
         unsafe {
             let manager: IDirectManipulationManager =
                 CoCreateInstance(&DirectManipulationManager, None, CLSCTX_INPROC_SERVER)?;
@@ -71,6 +82,7 @@ impl DirectManipulationHandler {
                     window,
                     Rc::clone(&scale_factor),
                     Rc::clone(&pending_events),
+                    Arc::clone(&frame_clock),
                 )
                 .into();
 
@@ -86,6 +98,8 @@ impl DirectManipulationHandler {
                 window,
                 scale_factor,
                 pending_events,
+                frame_clock,
+                idle_contact_frames: Cell::new(0),
             })
         }
     }
@@ -100,6 +114,8 @@ impl DirectManipulationHandler {
             let mut pointer_type = POINTER_INPUT_TYPE::default();
             if GetPointerType(pointer_id, &mut pointer_type).is_ok() && pointer_type == PT_TOUCHPAD
             {
+                self.idle_contact_frames.set(0);
+                self.frame_clock.set_sticky(FRAME_REASON_DIRECT_MANIP, true);
                 self.viewport.SetContact(pointer_id).log_err();
             }
         }
@@ -108,6 +124,20 @@ impl DirectManipulationHandler {
     pub fn update(&self) {
         unsafe {
             self.update_manager.Update(None).log_err();
+            let moving = matches!(
+                self.viewport.GetStatus(),
+                Ok(DIRECTMANIPULATION_RUNNING | DIRECTMANIPULATION_INERTIA)
+            );
+            if moving {
+                self.idle_contact_frames.set(0);
+            } else {
+                let idle = self.idle_contact_frames.get().saturating_add(1);
+                self.idle_contact_frames.set(idle);
+                if idle == IDLE_CONTACT_FRAMES {
+                    self.frame_clock
+                        .set_sticky(FRAME_REASON_DIRECT_MANIP, false);
+                }
+            }
         }
     }
 
@@ -143,6 +173,7 @@ struct DirectManipulationEventHandler {
     last_y_offset: Cell<f32>,
     scroll_phase: Cell<TouchPhase>,
     pending_events: Rc<RefCell<Vec<PlatformInput>>>,
+    frame_clock: Arc<FrameClockState>,
 }
 
 impl DirectManipulationEventHandler {
@@ -150,6 +181,7 @@ impl DirectManipulationEventHandler {
         window: HWND,
         scale_factor: Rc<Cell<f32>>,
         pending_events: Rc<RefCell<Vec<PlatformInput>>>,
+        frame_clock: Arc<FrameClockState>,
     ) -> Self {
         Self {
             window,
@@ -160,6 +192,7 @@ impl DirectManipulationEventHandler {
             last_y_offset: Cell::new(0.0),
             scroll_phase: Cell::new(TouchPhase::Started),
             pending_events,
+            frame_clock,
         }
     }
 
@@ -214,6 +247,10 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
             return Ok(());
         }
 
+        if current == DIRECTMANIPULATION_RUNNING || current == DIRECTMANIPULATION_INERTIA {
+            self.frame_clock.set_sticky(FRAME_REASON_DIRECT_MANIP, true);
+        }
+
         // A new gesture interrupted inertia, so end the old sequence.
         if current == DIRECTMANIPULATION_RUNNING && previous == DIRECTMANIPULATION_INERTIA {
             self.end_gesture();
@@ -221,6 +258,10 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
 
         if current == DIRECTMANIPULATION_READY {
             self.end_gesture();
+            // Clear the sticky reason, but still deliver the Ended event queued above.
+            self.frame_clock
+                .set_sticky(FRAME_REASON_DIRECT_MANIP, false);
+            self.frame_clock.request(FRAME_REASON_REQUEST);
 
             // Reset the content transform so the viewport is ready for the next gesture.
             // ZoomToRect triggers a second RUNNING -> READY cycle, so prevent an infinite loop here.

@@ -619,6 +619,15 @@ pub struct RequestFrameOptions {
 }
 
 #[expect(missing_docs)]
+/// Wakes a window's platform frame clock when the window gains a reason to draw.
+///
+/// Called from any thread; a backend that ticks every window unconditionally
+/// does not provide one.
+pub trait PlatformFrameRequester: Send + Sync {
+    /// Asks the platform to deliver a frame to this window on its next tick.
+    fn request_frame(&self);
+}
+
 pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn bounds(&self) -> Bounds<Pixels>;
     fn is_maximized(&self) -> bool;
@@ -666,6 +675,10 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
         true
     }
     fn set_gpu_canvas_active(&self, _active: bool) {}
+    /// The waker for a frame clock that only ticks windows with a reason to draw.
+    fn frame_requester(&self) -> Option<Arc<dyn PlatformFrameRequester>> {
+        None
+    }
     fn draw(&self, scene: &Scene);
     fn completed_frame(&self) {}
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas>;
