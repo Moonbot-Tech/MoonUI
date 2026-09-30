@@ -7,6 +7,9 @@ use super::{
     MetricPolicy, SourceMetric,
 };
 
+#[cfg(test)]
+mod tests;
+
 /// Compares a current audit report with its baseline and returns every regression.
 pub(super) fn compare_with_baseline(
     baseline: &ComponentAuditReport,
