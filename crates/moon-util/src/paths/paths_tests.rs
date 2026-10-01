@@ -128,3 +128,33 @@ fn component_matches_ignore_ascii_case_folds_ascii_case() {
         "an unrelated name must not match .zed"
     );
 }
+
+/// Catches removing the literal-prefix fast path from `PathMatcher::is_match`,
+/// which would stop excluding files inside an ignored directory. Existing
+/// glob tests are disabled and do not guard this descendant case.
+#[test]
+fn matcher_literal_directory_covers_descendants_but_not_prefix_siblings() {
+    let matcher = super::PathMatcher::new(["cache"], super::PathStyle::Posix).unwrap();
+    assert!(matcher.is_match(crate::rel_path::rel_path("cache/item.bin")));
+    assert!(!matcher.is_match(crate::rel_path::rel_path("cache-extra/item.bin")));
+}
+
+/// Catches removing the literal-suffix fast path from `PathMatcher::is_match`,
+/// which would stop ignoring a named directory beneath another directory.
+/// Existing glob tests are disabled and do not guard this nested suffix case.
+#[test]
+fn matcher_literal_suffix_matches_nested_name_but_not_partial_component() {
+    let matcher = super::PathMatcher::new(["cache"], super::PathStyle::Posix).unwrap();
+    assert!(matcher.is_match(crate::rel_path::rel_path("project/cache")));
+    assert!(!matcher.is_match(crate::rel_path::rel_path("project/mycache")));
+}
+
+/// Catches dropping the trailing-separator glob fallback from
+/// `PathMatcher::is_match`, which would make a directory-only glob miss the
+/// directory itself. Existing glob tests are disabled and do not guard this case.
+#[test]
+fn matcher_directory_glob_matches_directory_without_a_trailing_separator() {
+    let matcher = super::PathMatcher::new(["**/cache/"], super::PathStyle::Posix).unwrap();
+    assert!(matcher.is_match(crate::rel_path::rel_path("project/cache")));
+    assert!(!matcher.is_match(crate::rel_path::rel_path("project/cache-extra")));
+}
