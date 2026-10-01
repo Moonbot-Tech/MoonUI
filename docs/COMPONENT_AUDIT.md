@@ -38,7 +38,7 @@ docs/component-audit-baseline.json
 The audit currently records:
 
 - component manifest classification: `Mirror`, `TrackedFork`, `Forged`,
-  `Domain`, `Pending`, `Forbidden`;
+  `Domain`, `Internal`, `Pending`, `Forbidden`;
 - source hygiene counters such as `MoonSkinPalette`, `moon_color`, public facade
   slurp, raw runtime hex and no-op API markers;
 - critical semantic contracts that must not regress;
