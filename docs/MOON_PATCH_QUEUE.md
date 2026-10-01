@@ -34,6 +34,16 @@ cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 
    - raw GPU hooks for DirectX, Metal, and wgpu
    - retained GPU canvas prepare/draw integration
    - visible-canvas pacing hooks where the platform needs them
+   - Windows per-window frame-clock gating (`moon-gpui-windows/src/frame_clock.rs`):
+     vsync posts only when a window has a reason to draw and no post is pending.
+     UI invalidation and next-frame callbacks request frames through
+     `PlatformFrameRequester`; GPU canvases and Direct Manipulation keep sticky
+     reasons. Preserve the requester wiring and the post-frame check for work
+     still owed in `moon-gpui/src/window.rs` when re-syncing.
+   - DirectX scene-upload retention (`directx_renderer/scene_upload.rs`): an
+     already uploaded, nonzero `Scene::revision` skips scene-buffer uploads;
+     failed uploads and device loss invalidate that record. A re-sync must keep
+     the scene revision tracking and the renderer's upload gate together.
    - macOS Control-click policy: Zed rewrites a ctrl-left press into a right
      click unconditionally, dropping the Control flag and the click count with
      it, which makes a ctrl-left application gesture unreachable. MoonUI passes
