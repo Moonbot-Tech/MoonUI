@@ -158,3 +158,56 @@ fn matcher_directory_glob_matches_directory_without_a_trailing_separator() {
     assert!(matcher.is_match(crate::rel_path::rel_path("project/cache")));
     assert!(!matcher.is_match(crate::rel_path::rel_path("project/cache-extra")));
 }
+
+/// Catches `PathExt::try_shell_safe` returning the raw path instead of quoting
+/// it, which would let spaces and shell operators split or execute a file name.
+#[test]
+fn shell_safe_path_quotes_metacharacters_as_one_argument() {
+    use super::PathExt;
+    use crate::shell::ShellKind;
+
+    assert_eq!(
+        Path::new("reports/a b;echo.txt")
+            .try_shell_safe(ShellKind::Posix)
+            .unwrap(),
+        "'reports/a b;echo.txt'"
+    );
+}
+
+/// Catches `PathExt::try_shell_safe` falling back to an unquoted path when
+/// quoting fails, which would silently accept a NUL-containing shell argument.
+#[test]
+fn shell_safe_path_reports_unquotable_arguments() {
+    use super::PathExt;
+    use crate::shell::ShellKind;
+
+    let error = Path::new("reports/a\0b")
+        .try_shell_safe(ShellKind::Posix)
+        .unwrap_err();
+    assert_eq!(error.to_string(), "Failed to quote path");
+}
+
+/// Catches `PathExt::try_shell_safe` using lossy Unicode conversion, which
+/// would silently replace an invalid file name and target a different file.
+#[cfg(any(unix, windows))]
+#[test]
+fn shell_safe_path_rejects_non_unicode_file_names() {
+    use super::PathExt;
+    use crate::shell::ShellKind;
+
+    #[cfg(windows)]
+    let name = {
+        use std::os::windows::ffi::OsStringExt;
+        std::ffi::OsString::from_wide(&[0xD800])
+    };
+    #[cfg(unix)]
+    let name = {
+        use std::os::unix::ffi::OsStringExt;
+        std::ffi::OsString::from_vec(vec![0xFF])
+    };
+
+    let error = PathBuf::from(name)
+        .try_shell_safe(ShellKind::Posix)
+        .unwrap_err();
+    assert_eq!(error.to_string(), "Path contains invalid UTF-8");
+}
