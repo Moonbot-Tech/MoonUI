@@ -758,27 +758,47 @@ impl<O> From<anyhow::Result<O>> for ConnectionResult<O> {
     }
 }
 
-/// Normalizes a path by resolving `.` and `..` components without
-/// requiring the path to exist on disk (unlike `canonicalize`).
+/// Resolves `.` and `..` without reading the filesystem.
+///
+/// A `..` that follows a real directory name removes that name, so
+/// `foo/../bar`, `foo/./bar`, and `foo/bar/..` stay what they are today.
+/// A `..` with nothing left to remove on a relative path is kept:
+/// `../foo` stays `../foo`, `foo/../../bar` becomes `../bar`, and
+/// `../../x` stays `../../x`. A `..` above a root directory or a Windows
+/// prefix is dropped, because that path has nowhere further up to go.
+///
+/// `path` does not need to exist. The result uses the host platform's
+/// separators. This does not panic.
 pub fn normalize_path(path: &Path) -> PathBuf {
     use std::path::Component;
     let mut components = path.components().peekable();
-    let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek().cloned() {
-        components.next();
-        PathBuf::from(c.as_os_str())
-    } else {
-        PathBuf::new()
-    };
+    // A Windows prefix is an anchor on its own: `..` cannot climb past `C:`.
+    let (mut ret, mut anchored) =
+        if let Some(c @ Component::Prefix(..)) = components.peek().cloned() {
+            components.next();
+            (PathBuf::from(c.as_os_str()), true)
+        } else {
+            (PathBuf::new(), false)
+        };
 
     for component in components {
         match component {
             Component::Prefix(..) => unreachable!(),
             Component::RootDir => {
                 ret.push(component.as_os_str());
+                anchored = true;
             }
             Component::CurDir => {}
             Component::ParentDir => {
-                ret.pop();
+                // `PathBuf::pop` also succeeds on a trailing `..`, which would
+                // erase a parent segment a relative path still has to keep.
+                let last_is_normal =
+                    matches!(ret.components().next_back(), Some(Component::Normal(_)));
+                if last_is_normal {
+                    ret.pop();
+                } else if !anchored {
+                    ret.push("..");
+                }
             }
             Component::Normal(c) => {
                 ret.push(c);
