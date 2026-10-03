@@ -2,7 +2,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use super::{
-    component_matches_ignore_ascii_case, insert_subtree, normalize_lexically, path_within_subtree,
+    PathStyle, component_matches_ignore_ascii_case, insert_subtree, normalize_lexically,
+    path_within_subtree,
 };
 
 /// Catches `normalize_lexically` dropping a `..` pop or keeping a `.` component,
@@ -210,4 +211,51 @@ fn shell_safe_path_rejects_non_unicode_file_names() {
         .try_shell_safe(ShellKind::Posix)
         .unwrap_err();
     assert_eq!(error.to_string(), "Path contains invalid UTF-8");
+}
+
+/// Catches `normalize_path` dropping a `..` that `PathBuf::pop` cannot remove,
+/// so `../foo` would become `foo` and the Windows path style would disagree
+/// with POSIX on the same relative path.
+#[test]
+fn normalize_keeps_a_parent_segment_it_cannot_resolve() {
+    fn slashes(path: &str) -> String {
+        path.replace('\\', "/")
+    }
+
+    let cases = [
+        ("../foo", "../foo"),
+        ("foo/../../bar", "../bar"),
+        ("../../x", "../../x"),
+        ("foo/../bar", "bar"),
+        ("foo/./bar", "foo/bar"),
+        ("foo/bar/..", "foo"),
+        ("/../../x", "/x"),
+        ("/foo/../bar", "/bar"),
+    ];
+    for (input, expected) in cases {
+        let posix = PathStyle::Posix.normalize(input);
+        let windows = slashes(&PathStyle::Windows.normalize(input));
+        assert_eq!(posix, expected, "posix normalize of {input}");
+        assert_eq!(windows, expected, "windows normalize of {input}");
+        assert_eq!(posix, windows, "styles disagree on {input}");
+    }
+
+    #[cfg(windows)]
+    {
+        assert_eq!(
+            crate::normalize_path(Path::new(r"C:\foo\..\..\bar")),
+            PathBuf::from(r"C:\bar"),
+            "a .. above a drive root is dropped"
+        );
+        assert_eq!(
+            crate::normalize_path(Path::new(r"C:\..\bar")),
+            PathBuf::from(r"C:\bar"),
+            "a .. directly above a drive root is dropped and the root stays"
+        );
+        assert_eq!(
+            crate::normalize_path(Path::new(r"C:foo\..\..\bar")),
+            PathBuf::from(r"C:bar"),
+            "a .. above a Windows prefix is dropped"
+        );
+    }
 }
