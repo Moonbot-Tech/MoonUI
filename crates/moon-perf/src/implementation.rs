@@ -207,11 +207,12 @@ impl Output {
     pub fn sort(&mut self) {
         self.tests.sort_unstable_by(|a, b| match (a, b) {
             // Tests where we got no metadata go at the end.
-            ((_, Some(_), _), (_, None, _)) => std::cmp::Ordering::Greater,
-            ((_, None, _), (_, Some(_), _)) => std::cmp::Ordering::Less,
-            // Then sort by importance, then weight.
+            ((_, Some(_), _), (_, None, _)) => std::cmp::Ordering::Less,
+            ((_, None, _), (_, Some(_), _)) => std::cmp::Ordering::Greater,
+            // Then sort by importance, then weight. Derived `Ord` is Fluff-first,
+            // so compare it backwards and Critical prints first.
             ((_, Some(a_mdata), _), (_, Some(b_mdata), _)) => {
-                let c = a_mdata.importance.cmp(&b_mdata.importance);
+                let c = b_mdata.importance.cmp(&a_mdata.importance);
                 if matches!(c, std::cmp::Ordering::Equal) {
                     a_mdata.weight.cmp(&b_mdata.weight)
                 } else {
@@ -273,8 +274,10 @@ impl Output {
                     let Some((o_timings, o_iters, _)) = other_data.remove(&name) else {
                         continue;
                     };
+                    // Positive when `self` does more iterations per second than
+                    // `baseline`. The report's up arrow then means an improvement.
                     let shift =
-                        (o_timings.iters_per_sec(o_iters) / s_timings.iters_per_sec(s_iters)) - 1.;
+                        (s_timings.iters_per_sec(s_iters) / o_timings.iters_per_sec(o_iters)) - 1.;
                     if shift > max {
                         max = shift;
                     }
@@ -448,3 +451,6 @@ impl std::fmt::Display for PerfReport {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;
