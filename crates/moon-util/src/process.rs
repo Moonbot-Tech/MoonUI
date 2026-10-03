@@ -30,6 +30,8 @@ impl std::ops::DerefMut for Child {
 }
 
 impl Child {
+    /// Starts a child in its own session using the supplied standard streams.
+    /// Spawn failures include a command context redacted before display quoting.
     #[cfg(not(windows))]
     pub fn spawn(
         mut command: std::process::Command,
@@ -38,21 +40,19 @@ impl Child {
         stderr: Stdio,
     ) -> Result<Self> {
         crate::set_pre_exec_to_start_new_session(&mut command);
+        let command_context = crate::redact::format_redacted_command(&command);
         let mut command = smol::process::Command::from(command);
         let process = command
             .stdin(stdin)
             .stdout(stdout)
             .stderr(stderr)
             .spawn()
-            .with_context(|| {
-                format!(
-                    "failed to spawn command {}",
-                    crate::redact::redact_command(&format!("{command:?}"))
-                )
-            })?;
+            .with_context(|| format!("failed to spawn command {command_context}"))?;
         Ok(Self { process })
     }
 
+    /// Starts a child with the supplied standard streams and assigns a job object.
+    /// Spawn failures include a command context redacted before display quoting.
     #[cfg(windows)]
     pub fn spawn(
         command: std::process::Command,
@@ -60,18 +60,14 @@ impl Child {
         stdout: Stdio,
         stderr: Stdio,
     ) -> Result<Self> {
+        let command_context = crate::redact::format_redacted_command(&command);
         let mut command = smol::process::Command::from(command);
         let process = command
             .stdin(stdin)
             .stdout(stdout)
             .stderr(stderr)
             .spawn()
-            .with_context(|| {
-                format!(
-                    "failed to spawn command {}",
-                    crate::redact::redact_command(&format!("{command:?}"))
-                )
-            })?;
+            .with_context(|| format!("failed to spawn command {command_context}"))?;
 
         // Assign the child to a job object configured to kill the entire
         // process tree when the last job handle is closed, so descendants
