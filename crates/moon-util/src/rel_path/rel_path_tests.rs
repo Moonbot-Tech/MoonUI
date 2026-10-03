@@ -167,6 +167,34 @@ fn join_keeps_the_non_empty_side_when_the_other_is_empty() {
     );
 }
 
+/// Catches `RelPathBuf::set_extension` dropping the slash that `pop` removes,
+/// so `foo/bar.rs` would become `foobar.txt` and the renamed file would sit
+/// beside its parent instead of inside it.
+#[test]
+fn set_extension_keeps_the_parent_separator() {
+    let mut nested = super::rel_path_buf("foo/bar.rs");
+    assert!(
+        nested.set_extension("txt"),
+        "foo/bar.rs has a file name whose extension can change"
+    );
+    assert_eq!(
+        nested.as_unix_str(),
+        "foo/bar.txt",
+        "the parent separator must stay between foo and bar.txt"
+    );
+
+    let mut flat = super::rel_path_buf("bar.rs");
+    assert!(
+        flat.set_extension("txt"),
+        "bar.rs has a file name whose extension can change"
+    );
+    assert_eq!(
+        flat.as_unix_str(),
+        "bar.txt",
+        "a path with no slash still replaces only the extension"
+    );
+}
+
 /// Catches `RelPath::from_proto` accepting a path that still contains `..`, `.`,
 /// or an absolute prefix, and rejecting a path that is already a normalized
 /// relative path. A wire value could then escape the relative-path guarantee,

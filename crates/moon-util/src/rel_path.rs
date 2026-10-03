@@ -334,11 +334,22 @@ impl RelPathBuf {
         RelPath::new_unchecked(self.0.as_str())
     }
 
+    /// Replaces this path's file extension and keeps the parent separator.
+    ///
+    /// `foo/bar.rs` with `extension` `txt` becomes `foo/bar.txt`. A path
+    /// with no slash, such as `bar.rs`, becomes `bar.txt`. `extension` is
+    /// the new suffix without a leading dot; an empty string removes the
+    /// extension. Returns `false` when the path has no file name.
     pub fn set_extension(&mut self, extension: &str) -> bool {
         if let Some(filename) = self.file_name() {
             let mut filename = PathBuf::from(filename);
             filename.set_extension(extension);
-            self.pop();
+            // `pop` removes the `/` in front of the file name along with the
+            // name. Put that separator back when a parent directory remains.
+            let had_parent = self.pop();
+            if had_parent && !self.0.is_empty() {
+                self.0.push('/');
+            }
             self.0.push_str(filename.to_str().unwrap());
             true
         } else {
