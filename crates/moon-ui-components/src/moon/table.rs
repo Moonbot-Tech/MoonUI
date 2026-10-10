@@ -12,6 +12,8 @@ use super::{
 pub enum MoonTableAlign {
     Left,
     Right,
+    /// Header and cells sit in the middle of the column.
+    Center,
 }
 
 #[derive(Clone, Debug)]
@@ -40,6 +42,12 @@ impl MoonTableColumn {
 
     pub fn right(mut self) -> Self {
         self.align = MoonTableAlign::Right;
+        self
+    }
+
+    /// Center the header and every cell of this column.
+    pub fn center(mut self) -> Self {
+        self.align = MoonTableAlign::Center;
         self
     }
 
@@ -365,16 +373,17 @@ impl MoonTable {
         p: MoonPalette,
         tokens: &MoonThemeTokens,
     ) -> Div {
-        let justify_right = matches!(column.align, MoonTableAlign::Right);
-
         let mut el = div()
             .when(column.fill, |this| this.min_w(px(column.width)).flex_1())
             .when(!column.fill, |this| this.w(px(column.width)).flex_none())
             .h_full()
             .flex()
             .items_center()
-            .when(justify_right, |this| this.justify_end())
-            .when(!justify_right, |this| this.justify_start())
+            .map(|this| match column.align {
+                MoonTableAlign::Left => this.justify_start(),
+                MoonTableAlign::Right => this.justify_end(),
+                MoonTableAlign::Center => this.justify_center(),
+            })
             .pl(px(column.cell_pad_left))
             .pr(px(column.cell_pad_right))
             .overflow_hidden()

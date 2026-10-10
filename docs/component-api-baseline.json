@@ -803,6 +803,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn center(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn close_context_menu(&mut self)"
     },
     {
@@ -4216,6 +4220,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/table.rs",
       "signature": "pub fn cells(mut self, cells: impl IntoIterator<Item = MoonTableCell>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/table.rs",
+      "signature": "pub fn center(mut self) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/table.rs",
