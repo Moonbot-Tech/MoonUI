@@ -157,6 +157,12 @@ impl MoonDataTableColumn {
         self
     }
 
+    /// Center the header and every cell of this column.
+    pub fn center(mut self) -> Self {
+        self.align = MoonTableAlign::Center;
+        self
+    }
+
     /// Make this column consume remaining width and clear any [`Self::no_grow`] setting.
     pub fn fill(mut self) -> Self {
         self.fill = true;

@@ -106,11 +106,10 @@ pub(super) fn render_header(
             .h_full()
             .flex()
             .items_center()
-            .when(matches!(column.align, MoonTableAlign::Right), |this| {
-                this.justify_end()
-            })
-            .when(matches!(column.align, MoonTableAlign::Left), |this| {
-                this.justify_start()
+            .map(|this| match column.align {
+                MoonTableAlign::Left => this.justify_start(),
+                MoonTableAlign::Right => this.justify_end(),
+                MoonTableAlign::Center => this.justify_center(),
             })
             .pl(px(tokens.ui(10.0)))
             .pr(px(tokens.ui(8.0)))
