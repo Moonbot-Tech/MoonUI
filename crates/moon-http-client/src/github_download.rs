@@ -68,6 +68,16 @@ pub async fn download_server_binary(
     Ok(())
 }
 
+/// Downloads an uncompressed binary from `url` into `destination_path/binary_file_name`.
+///
+/// The file is staged in a temporary directory next to `destination_path`, checked against
+/// `digest` (a lowercase hex SHA-256) when one is given, marked executable and then moved into
+/// place, replacing any previous `destination_path`.
+///
+/// # Errors
+///
+/// Fails, leaving no staging directory behind, when the request fails, the server answers with a
+/// non-success status, writing the file fails, or the digest does not match.
 pub async fn download_server_raw_binary(
     http_client: &dyn HttpClient,
     url: &str,
@@ -86,6 +96,12 @@ pub async fn download_server_raw_binary(
             .get(url, Default::default(), true)
             .await
             .with_context(|| format!("downloading release from {url}"))?;
+        // Without a digest nothing else would notice that the body is an error page.
+        anyhow::ensure!(
+            response.status().is_success(),
+            "downloading {url} failed with status {}",
+            response.status()
+        );
 
         let binary_path = staging_path.join(binary_file_name);
         let mut writer = HashingWriter {
