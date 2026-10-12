@@ -566,6 +566,16 @@
       "contracts": ["gallery.visual_coverage"]
     },
     {
+      "concept": "number_input",
+      "class": "Forged",
+      "behavior_source": "Moon tier-sized wrapper over the base number input",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonNumberInput",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot typed numeric settings entry with a unit suffix and range clamping",
+      "contracts": ["number_input.step_behavior", "gallery.visual_coverage"]
+    },
+    {
       "concept": "stepper",
       "class": "Forged",
       "behavior_source": "Moon designer-stand numeric stepper renderer",

@@ -2651,6 +2651,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use number_input::MoonNumberInput;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use pagination::MoonPagination;"
     },
     {
@@ -2856,6 +2860,62 @@
     {
       "file": "crates/moon-ui-components/src/moon/notification.rs",
       "signature": "pub struct MoonNotification"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn default_value(mut self, value: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn max(mut self, max: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn min(mut self, min: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn range(self, min: f64, max: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn read_value(state: &Entity<MoonInputState>, cx: &App) -> Option<f64>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn size(mut self, size: MoonSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn state(mut self, state: &Entity<MoonInputState>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn step(mut self, step: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn unit(mut self, unit: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub struct MoonNumberInput"
     },
     {
       "file": "crates/moon-ui-components/src/moon/pagination.rs",

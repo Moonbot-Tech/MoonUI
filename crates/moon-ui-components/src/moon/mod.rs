@@ -35,6 +35,7 @@ mod link;
 mod list;
 mod menu;
 mod notification;
+mod number_input;
 mod pagination;
 mod picker_field;
 mod placement;
@@ -146,6 +147,7 @@ pub use list::{
 };
 pub use menu::MoonNativeMenu;
 pub use notification::MoonNotification;
+pub use number_input::MoonNumberInput;
 pub use pagination::MoonPagination;
 pub use placement::MoonPlacement;
 pub use popover::{MoonPopover, MoonPopoverPlacement};

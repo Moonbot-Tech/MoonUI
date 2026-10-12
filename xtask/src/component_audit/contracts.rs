@@ -399,6 +399,17 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "time drums must wrap in both directions, follow the platform scroll direction, move exactly one value per wheel notch regardless of the system lines-per-scroll setting, accumulate sub-row trackpad movement, walk whole minute steps, and read back as zero-padded hh:mm",
         ),
         test_contract(
+            "number_input.step_behavior",
+            ContractSeverity::Guardrail,
+            &[
+                "up_and_down_keys_step_and_clamp_to_the_range",
+                "partial_and_empty_entries_have_no_value",
+                "seed_values_clamp_into_the_range",
+            ],
+            &tests,
+            "number inputs must step by the configured step on Up/Down, clamp to min/max, and never read a half-typed entry as a value",
+        ),
+        test_contract(
             "stepper.value_behavior",
             ContractSeverity::Guardrail,
             &["stepper_next_value_clamps_to_range_and_positive_step"],

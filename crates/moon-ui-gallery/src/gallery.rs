@@ -977,6 +977,42 @@ impl Gallery {
 
         section("Inputs", cx)
             .child(
+                card("Number inputs", cx).child(
+                    h_flex()
+                        .gap(px(8.0))
+                        .child(div().w(px(150.0)).child(
+                            MoonNumberInput::new("number-input-xs")
+                                .size(MoonSize::Xs)
+                                .range(0.0, 100.0)
+                                .step(5.0)
+                                .default_value(25.0)
+                                .unit("%"),
+                        ))
+                        .child(div().w(px(160.0)).child(
+                            MoonNumberInput::new("number-input-sm")
+                                .size(MoonSize::Sm)
+                                .range(100.0, 5000.0)
+                                .step(100.0)
+                                .default_value(800.0)
+                                .unit("ms"),
+                        ))
+                        .child(div().w(px(180.0)).child(
+                            MoonNumberInput::new("number-input-md")
+                                .size(MoonSize::Md)
+                                .min(0.0)
+                                .step(0.5)
+                                .default_value(1.5),
+                        ))
+                        .child(div().w(px(150.0)).child(
+                            MoonNumberInput::new("number-input-disabled")
+                                .size(MoonSize::Sm)
+                                .default_value(3.0)
+                                .unit("x")
+                                .disabled(true),
+                        )),
+                ),
+            )
+            .child(
                 card("Text inputs", cx)
                     .child(
                         h_flex()
