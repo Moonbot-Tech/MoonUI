@@ -586,6 +586,16 @@
       "contracts": ["stepper.value_behavior", "gallery.visual_coverage"]
     },
     {
+      "concept": "steps",
+      "class": "Forged",
+      "behavior_source": "Moon numbered step indicator",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSteps",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot install/login progress with Moon-palette done/current/pending markers; the Longbridge stepper is icon-based and not Moon-themed",
+      "contracts": ["steps.state_layout", "gallery.visual_coverage"]
+    },
+    {
       "concept": "progress",
       "class": "TrackedFork",
       "behavior_source": "Longbridge Progress",

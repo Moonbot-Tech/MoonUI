@@ -2763,6 +2763,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use steps::{MoonStepState, MoonSteps};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use surface::{MoonSurface, MoonSurfaceVariant};"
     },
     {
@@ -4124,6 +4128,46 @@
     {
       "file": "crates/moon-ui-components/src/moon/stepper.rs",
       "signature": "pub struct MoonStepper"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub enum MoonStepState"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn current(mut self, index: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn new(id: impl Into<ElementId>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn size(mut self, size: MoonSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn states(&self) -> Vec<MoonStepState>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn step(mut self, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn steps(mut self, labels: impl IntoIterator<Item = impl Into<SharedString>>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn vertical(mut self, vertical: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub struct MoonSteps"
     },
     {
       "file": "crates/moon-ui-components/src/moon/surface.rs",

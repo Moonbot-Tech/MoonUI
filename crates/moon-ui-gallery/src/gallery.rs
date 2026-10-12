@@ -1740,6 +1740,35 @@ impl Gallery {
                     ),
             )
             .child(
+                card("Steps", cx)
+                    .child(
+                        MoonSteps::new("new-controls-steps")
+                            .steps(["Download", "Install", "Login", "Ready"])
+                            .current(2)
+                            .tone(MoonTone::Info),
+                    )
+                    .child(
+                        h_flex()
+                            .items_start()
+                            .gap(px(24.0))
+                            .child(
+                                div().w(px(280.0)).child(
+                                    MoonSteps::new("new-controls-steps-narrow")
+                                        .steps(["Download", "Install", "Login", "Ready"])
+                                        .current(1)
+                                        .size(MoonSize::Xs),
+                                ),
+                            )
+                            .child(
+                                MoonSteps::new("new-controls-steps-vertical")
+                                    .steps(["Connect", "Verify", "Done"])
+                                    .current(3)
+                                    .tone(MoonTone::Positive)
+                                    .vertical(true),
+                            ),
+                    ),
+            )
+            .child(
                 h_flex()
                     .items_start()
                     .gap(px(12.0))

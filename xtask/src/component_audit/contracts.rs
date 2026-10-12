@@ -417,6 +417,18 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "stepper value changes must clamp to min/max and normalize non-positive steps",
         ),
         test_contract(
+            "steps.state_layout",
+            ContractSeverity::Guardrail,
+            &[
+                "steps_before_the_current_one_are_done_and_after_it_pending",
+                "only_done_markers_are_filled_and_pending_steps_lose_the_accent",
+                "a_narrow_row_wraps_and_a_wide_one_stays_on_one_line",
+                "vertical_steps_stack_one_below_another",
+            ],
+            &tests,
+            "step indicators must derive done/current/pending from the current index, keep the states visually distinct, and wrap or stack instead of squeezing",
+        ),
+        test_contract(
             "toggle.click_behavior",
             ContractSeverity::Guardrail,
             &["toggle_click_plan_respects_disabled_and_controlled_state"],
