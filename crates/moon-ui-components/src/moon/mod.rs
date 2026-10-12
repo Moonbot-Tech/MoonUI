@@ -98,6 +98,8 @@ pub(crate) use button::{resolve_button_size, tier_button_metrics};
 pub use checkbox::{MoonCheckbox, MoonCheckboxSize};
 pub use collapsible::MoonCollapsible;
 pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};
+// Exported on its own line so the recorded API item above stays byte-identical.
+pub use color_picker::MoonColorPickerTrigger;
 pub use colors::MoonColors;
 pub use combobox::{
     MoonCombobox, MoonComboboxChange, MoonComboboxEvent, MoonComboboxMenuChrome, MoonComboboxState,

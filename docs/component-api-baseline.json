@@ -635,6 +635,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub enum MoonColorPickerTrigger"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
       "signature": "pub fn colors(mut self, colors: impl IntoIterator<Item = Hsla>) -> Self"
     },
     {
@@ -668,6 +672,14 @@
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
       "signature": "pub fn set_custom_colors( &mut self, colors: impl IntoIterator<Item = Hsla>, cx: &mut Context<Self>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn show_hex(mut self, show: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn trigger_style(mut self, style: MoonColorPickerTrigger) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
@@ -2524,6 +2536,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use collapsible::MoonCollapsible;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use color_picker::MoonColorPickerTrigger;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",

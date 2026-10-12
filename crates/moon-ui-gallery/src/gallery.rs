@@ -1178,6 +1178,18 @@ impl Gallery {
                                     .child(
                                         MoonColorPicker::new(&self.color_state)
                                             .id("gallery-color-picker"),
+                                    )
+                                    // Compact swatch triggers, bare and with the hex label.
+                                    .child(
+                                        MoonColorPicker::new(&self.color_state)
+                                            .id("gallery-color-picker-swatch")
+                                            .trigger_style(MoonColorPickerTrigger::Swatch),
+                                    )
+                                    .child(
+                                        MoonColorPicker::new(&self.color_state)
+                                            .id("gallery-color-picker-swatch-hex")
+                                            .trigger_style(MoonColorPickerTrigger::Swatch)
+                                            .show_hex(true),
                                     ),
                             ),
                     ),

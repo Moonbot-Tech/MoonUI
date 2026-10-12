@@ -141,7 +141,7 @@
       "public_path": "moon_ui::MoonColorPicker",
       "upstream_ref": "Longbridge::color_picker@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": null,
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["color_picker.trigger_style", "gallery.visual_coverage"]
     },
     {
       "concept": "combobox",

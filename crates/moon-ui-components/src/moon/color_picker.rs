@@ -11,7 +11,7 @@ use super::{
         moon_scrollbar_overlay_with_palette,
     },
     text::MoonText,
-    theme::MoonTheme,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonTone, rgba_from},
 };
 use crate::ElementExt;
@@ -236,12 +236,72 @@ impl MoonColorPickerState {
     }
 }
 
+/// What the closed [`MoonColorPicker`] shows before its popover opens.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MoonColorPickerTrigger {
+    /// The original 128px field: a small swatch followed by the `#RRGGBB` label.
+    #[default]
+    Field,
+    /// A compact colour swatch on its own, with the hex label beside it only on request.
+    Swatch,
+}
+
+/// Resolved geometry of a picker trigger, computed apart from rendering so it can be tested.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct TriggerChrome {
+    /// Fixed trigger width in already-resolved pixels; `None` lets the content size it.
+    width: Option<f32>,
+    /// Height of the framed field; `None` for the frameless swatch trigger.
+    field_height: Option<f32>,
+    swatch_w: f32,
+    swatch_h: f32,
+    swatch_radius: f32,
+    show_hex: bool,
+}
+
+/// Resolve the trigger geometry for a style.
+///
+/// Args:
+///     tokens: Active theme tokens (scale).
+///     style: The trigger style.
+///     show_hex: The caller's hex-label choice; `None` keeps the style's default (shown for
+///         `Field`, hidden for `Swatch`). `Field` always shows it.
+///
+/// Returns:
+///     The resolved [`TriggerChrome`].
+fn trigger_chrome(
+    tokens: &MoonThemeTokens,
+    style: MoonColorPickerTrigger,
+    show_hex: Option<bool>,
+) -> TriggerChrome {
+    match style {
+        MoonColorPickerTrigger::Field => TriggerChrome {
+            width: Some(128.0),
+            field_height: Some(tokens.fit_height(26.0, 13.0, 6.5)),
+            swatch_w: tokens.ui(14.0),
+            swatch_h: tokens.ui(14.0),
+            swatch_radius: tokens.ui(3.0),
+            show_hex: true,
+        },
+        MoonColorPickerTrigger::Swatch => TriggerChrome {
+            width: None,
+            field_height: None,
+            swatch_w: tokens.ui(28.0),
+            swatch_h: tokens.ui(20.0),
+            swatch_radius: tokens.ui(3.0),
+            show_hex: show_hex.unwrap_or(false),
+        },
+    }
+}
+
 #[derive(IntoElement)]
 pub struct MoonColorPicker {
     id: SharedString,
     state: Entity<MoonColorPickerState>,
     disabled: bool,
     colors: Vec<Hsla>,
+    trigger_style: MoonColorPickerTrigger,
+    show_hex: Option<bool>,
 }
 
 impl MoonColorPicker {
@@ -251,7 +311,22 @@ impl MoonColorPicker {
             state: state.clone(),
             disabled: false,
             colors: Vec::new(),
+            trigger_style: MoonColorPickerTrigger::Field,
+            show_hex: None,
         }
+    }
+
+    /// Choose what the closed picker shows: the 128px field (default) or a compact swatch.
+    pub fn trigger_style(mut self, style: MoonColorPickerTrigger) -> Self {
+        self.trigger_style = style;
+        self
+    }
+
+    /// Show or hide the `#RRGGBB` label beside a [`MoonColorPickerTrigger::Swatch`] trigger.
+    /// Hidden by default there; the field trigger always shows it.
+    pub fn show_hex(mut self, show: bool) -> Self {
+        self.show_hex = Some(show);
+        self
     }
 
     pub fn id(mut self, id: impl Into<SharedString>) -> Self {
@@ -321,47 +396,74 @@ impl RenderOnce for MoonColorPicker {
             )
             .collect();
 
-        let trigger = div()
-            .id(ElementId::from(SharedString::from(format!(
-                "{}:trigger",
-                self.id
-            ))))
-            .h(px(tokens.fit_height(26.0, 13.0, 6.5)))
-            .w(px(128.0))
-            .rounded(px(tokens.ui(4.0)))
-            .border(px(1.0))
-            .border_color(rgba_from(p.border, 1.0))
-            .bg(rgba_from(
-                p.shell_high,
-                if self.disabled { 0.55 } else { 1.0 },
-            ))
-            .flex()
-            .items_center()
-            .gap(px(tokens.ui(8.0)))
-            .px(px(tokens.ui(7.0)))
-            .cursor_default()
-            .when(!self.disabled, |this| {
-                this.hover(move |this| this.border_color(rgba_from(p.border_hover, 1.0)))
-            })
-            .child(
-                div()
-                    .size(px(tokens.ui(14.0)))
-                    .rounded(px(tokens.ui(3.0)))
-                    .border(px(1.0))
-                    .border_color(rgba_from(p.shadow, 0.38))
-                    .bg(value),
-            )
-            .child(
-                MoonText::new(hex_label(value))
-                    .color(p.text_soft)
-                    .alpha(if self.disabled { 0.45 } else { 1.0 })
-                    .font_size(10.0)
-                    .line_height(13.0)
-                    .weight(500.0)
-                    .mono(true)
-                    .uppercase(false)
-                    .render(),
-            );
+        let chrome = trigger_chrome(&tokens, self.trigger_style, self.show_hex);
+        let label_alpha = if self.disabled { 0.45 } else { 1.0 };
+        let hex_text = MoonText::new(hex_label(value))
+            .color(p.text_soft)
+            .alpha(label_alpha)
+            .font_size(10.0)
+            .line_height(13.0)
+            .weight(500.0)
+            .mono(true)
+            .uppercase(false)
+            .render();
+        let trigger_id = ElementId::from(SharedString::from(format!("{}:trigger", self.id)));
+        let trigger = match chrome.field_height {
+            Some(height) => div()
+                .id(trigger_id)
+                .h(px(height))
+                .when_some(chrome.width, |this, width| this.w(px(width)))
+                .rounded(px(tokens.ui(4.0)))
+                .border(px(1.0))
+                .border_color(rgba_from(p.border, 1.0))
+                .bg(rgba_from(
+                    p.shell_high,
+                    if self.disabled { 0.55 } else { 1.0 },
+                ))
+                .flex()
+                .items_center()
+                .gap(px(tokens.ui(8.0)))
+                .px(px(tokens.ui(7.0)))
+                .cursor_default()
+                .when(!self.disabled, |this| {
+                    this.hover(move |this| this.border_color(rgba_from(p.border_hover, 1.0)))
+                })
+                .child(
+                    div()
+                        .w(px(chrome.swatch_w))
+                        .h(px(chrome.swatch_h))
+                        .rounded(px(chrome.swatch_radius))
+                        .border(px(1.0))
+                        .border_color(rgba_from(p.shadow, 0.38))
+                        .bg(value),
+                )
+                .child(hex_text),
+            // Frameless: the swatch itself is the click target, the hex label optional beside it.
+            None => div()
+                .id(trigger_id)
+                .flex()
+                .flex_none()
+                .items_center()
+                .gap(px(tokens.ui(6.0)))
+                .cursor_default()
+                .child(
+                    div()
+                        .flex_none()
+                        .w(px(chrome.swatch_w))
+                        .h(px(chrome.swatch_h))
+                        .rounded(px(chrome.swatch_radius))
+                        .border(px(1.0))
+                        .border_color(rgba_from(p.border, 1.0))
+                        .bg(value)
+                        .when(self.disabled, |this| this.opacity(0.55))
+                        .when(!self.disabled, |this| {
+                            this.hover(move |this| {
+                                this.border_color(rgba_from(p.border_hover, 1.0))
+                            })
+                        }),
+                )
+                .when(chrome.show_hex, |this| this.child(hex_text)),
+        };
 
         let scroll_state = window.use_keyed_state(
             ElementId::from(SharedString::from(format!("{}:scroll", self.id))),

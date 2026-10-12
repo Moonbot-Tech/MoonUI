@@ -360,6 +360,17 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "tags must keep the outline pill by default, and soft or filled tags must keep their labels above the contrast floor on both palettes",
         ),
         test_contract(
+            "color_picker.trigger_style",
+            ContractSeverity::Guardrail,
+            &[
+                "default_trigger_keeps_the_original_field",
+                "swatch_trigger_is_a_frameless_mockup_sized_swatch",
+                "swatch_trigger_follows_the_ui_scale",
+            ],
+            &tests,
+            "colour pickers must keep the 128px field trigger by default, and the swatch trigger must be a frameless scaled swatch with an optional hex label",
+        ),
+        test_contract(
             "segmented_control.density",
             ContractSeverity::Guardrail,
             &[
