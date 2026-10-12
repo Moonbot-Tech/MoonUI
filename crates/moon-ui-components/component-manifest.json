@@ -576,6 +576,16 @@
       "contracts": ["number_input.step_behavior", "gallery.visual_coverage"]
     },
     {
+      "concept": "selectable_card",
+      "class": "Forged",
+      "behavior_source": "Moon focusable selectable content card",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSelectableCard",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot theme-picker cards: arbitrary preview content with an accent selected state and keyboard selection",
+      "contracts": ["selectable_card.selection_behavior", "gallery.visual_coverage"]
+    },
+    {
       "concept": "stepper",
       "class": "Forged",
       "behavior_source": "Moon designer-stand numeric stepper renderer",

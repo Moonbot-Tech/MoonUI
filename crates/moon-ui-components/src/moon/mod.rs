@@ -51,6 +51,7 @@ mod root;
 mod scroll_area;
 mod segment;
 mod select;
+mod selectable_card;
 mod selector;
 mod separator;
 mod setting;
@@ -175,6 +176,7 @@ pub use segment::{MoonAccent, MoonSegmentItem, MoonSegmentedControl};
 // Exported on its own line so the recorded API item above stays byte-identical.
 pub use segment::MoonSegmentSelection;
 pub use select::{MoonSelect, MoonSelectEvent, MoonSelectItem, MoonSelectState};
+pub use selectable_card::MoonSelectableCard;
 pub use selector::{MoonSelectorPill, MoonSelectorSegment};
 pub use separator::{MoonSeparator, MoonSeparatorAxis};
 pub use setting::{

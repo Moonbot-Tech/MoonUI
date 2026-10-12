@@ -31,6 +31,8 @@ pub(super) struct Gallery {
     settings_mode: Rc<RefCell<SharedString>>,
     settings_risk: Rc<Cell<f64>>,
     segment_index: usize,
+    /// Index of the picked card in the NewControls theme-card example.
+    theme_card_index: usize,
     tab_index: usize,
     dropdown_value: SharedString,
     popover_open: bool,
@@ -346,6 +348,7 @@ impl Gallery {
             settings_mode: Rc::new(RefCell::new(SharedString::from("paper"))),
             settings_risk: Rc::new(Cell::new(2.5)),
             segment_index: 2,
+            theme_card_index: 0,
             tab_index: 0,
             dropdown_value: SharedString::from("Auto"),
             popover_open: false,
@@ -1767,6 +1770,50 @@ impl Gallery {
                                     .vertical(true),
                             ),
                     ),
+            )
+            .child(
+                card("Selectable cards", cx).child(
+                    h_flex().gap(px(12.0)).children(
+                        [("Dark", p.shell, p.text), ("Light", p.text, p.shell), ("Graphite", p.panel_high, p.text_soft)]
+                            .into_iter()
+                            .enumerate()
+                            .map(|(ix, (name, swatch_bg, swatch_fg))| {
+                                MoonSelectableCard::new(format!("theme-card-{ix}"))
+                                    .selected(self.theme_card_index == ix)
+                                    .disabled(ix == 2)
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |_, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.theme_card_index = ix;
+                                                this.push_event(format!("Theme card picked: {name}"), cx);
+                                            });
+                                        }
+                                    })
+                                    .child(
+                                        div()
+                                            .w(px(120.0))
+                                            .h(px(56.0))
+                                            .rounded(px(4.0))
+                                            .bg(rgba_from(swatch_bg, 1.0))
+                                            .border_1()
+                                            .border_color(rgba_from(p.border, 1.0))
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .child(MoonText::new("Aa").color(swatch_fg).render()),
+                                    )
+                                    .child(
+                                        div().pt(px(6.0)).child(
+                                            MoonText::new(name)
+                                                .uppercase(false)
+                                                .color(p.text)
+                                                .render(),
+                                        ),
+                                    )
+                            }),
+                    ),
+                ),
             )
             .child(
                 h_flex()

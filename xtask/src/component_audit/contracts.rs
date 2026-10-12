@@ -422,6 +422,16 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "stacked bars must draw each segment at its share of the larger of total and sum, ignore unusable amounts, and never spill past the track",
         ),
         test_contract(
+            "selectable_card.selection_behavior",
+            ContractSeverity::Guardrail,
+            &[
+                "only_the_selected_card_takes_the_accent_border",
+                "cards_select_by_click_and_keyboard_but_not_when_disabled",
+            ],
+            &tests,
+            "selectable cards must show an accent border only when selected, select by click and by Space on the focused card, and ignore a disabled card",
+        ),
+        test_contract(
             "stepper.value_behavior",
             ContractSeverity::Guardrail,
             &["stepper_next_value_clamps_to_range_and_positive_step"],
