@@ -2755,6 +2755,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use stacked_bar::{MoonBarSegment, MoonStackedBar};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use status_bar::{MoonStatusBar, MoonStatusIndicator, MoonStatusItem};"
     },
     {
@@ -3948,6 +3952,54 @@
     {
       "file": "crates/moon-ui-components/src/moon/spinner.rs",
       "signature": "pub struct MoonSpinner"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn color(mut self, color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn height(mut self, height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn label(mut self, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn new(id: impl Into<ElementId>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn new(value: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn radius(mut self, radius: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn segment(mut self, segment: MoonBarSegment) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn segments(mut self, segments: impl IntoIterator<Item = MoonBarSegment>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn total(mut self, total: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub struct MoonBarSegment"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub struct MoonStackedBar"
     },
     {
       "file": "crates/moon-ui-components/src/moon/status_bar.rs",

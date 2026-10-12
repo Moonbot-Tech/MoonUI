@@ -607,6 +607,16 @@
       "contracts": ["gallery.visual_coverage"]
     },
     {
+      "concept": "stacked_bar",
+      "class": "Forged",
+      "behavior_source": "Moon multi-segment usage bar",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonStackedBar",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot storage-usage split; the Longbridge progress draws a single value",
+      "contracts": ["stacked_bar.proportions", "gallery.visual_coverage"]
+    },
+    {
       "concept": "progress_circle",
       "class": "TrackedFork",
       "behavior_source": "Longbridge ProgressCircle",

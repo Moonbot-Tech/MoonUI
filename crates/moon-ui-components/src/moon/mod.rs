@@ -59,6 +59,7 @@ mod sidebar;
 mod skeleton;
 mod slider;
 mod spinner;
+mod stacked_bar;
 mod status_bar;
 mod stepper;
 mod steps;
@@ -189,6 +190,7 @@ pub use sidebar::{
 pub use skeleton::MoonSkeleton;
 pub use slider::{MoonSlider, MoonSliderEvent, MoonSliderState};
 pub use spinner::{MoonSpinner, MoonSpinnerSize};
+pub use stacked_bar::{MoonBarSegment, MoonStackedBar};
 pub use status_bar::{MoonStatusBar, MoonStatusIndicator, MoonStatusItem};
 pub use stepper::{MoonStepper, MoonStepperSize};
 pub use steps::{MoonStepState, MoonSteps};

@@ -410,6 +410,18 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "number inputs must step by the configured step on Up/Down, clamp to min/max, and never read a half-typed entry as a value",
         ),
         test_contract(
+            "stacked_bar.proportions",
+            ContractSeverity::Guardrail,
+            &[
+                "a_larger_total_leaves_the_rest_of_the_track_empty",
+                "overflowing_segments_are_scaled_to_fit_the_bar",
+                "unusable_amounts_draw_nothing",
+                "rendered_segments_take_their_share_of_the_track",
+            ],
+            &tests,
+            "stacked bars must draw each segment at its share of the larger of total and sum, ignore unusable amounts, and never spill past the track",
+        ),
+        test_contract(
             "stepper.value_behavior",
             ContractSeverity::Guardrail,
             &["stepper_next_value_clamps_to_range_and_positive_step"],

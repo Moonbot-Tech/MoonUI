@@ -1798,6 +1798,23 @@ impl Gallery {
                                         .height(5.0)
                                         .render(),
                                 ),
+                            )
+                            .child(
+                                div().w(px(240.0)).child(
+                                    MoonStackedBar::new("new-controls-stacked-bar")
+                                        .total(256.0)
+                                        .segments([
+                                            MoonBarSegment::new(96.0)
+                                                .tone(MoonTone::Info)
+                                                .label("Logs 96 GB"),
+                                            MoonBarSegment::new(40.0)
+                                                .tone(MoonTone::Warning)
+                                                .label("Charts 40 GB"),
+                                            MoonBarSegment::new(24.0)
+                                                .tone(MoonTone::Positive)
+                                                .label("Settings 24 GB"),
+                                        ]),
+                                ),
                             ),
                     )
                     .child(
