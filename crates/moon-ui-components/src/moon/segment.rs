@@ -29,12 +29,25 @@ pub enum MoonSegmentSelection {
     Filled,
 }
 
+/// How much horizontal room a [`MoonSegmentedControl`] gives each cell around its text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MoonSegmentDensity {
+    /// The original geometry: generous side padding and a hotkey gap on every cell.
+    #[default]
+    Regular,
+    /// Toolbar preset-strip geometry: tight side padding, and no hotkey gap on a cell whose
+    /// hotkey hint is empty. Height and font still follow the size tier.
+    Compact,
+}
+
 /// The WCAG 2.x contrast floor the selected label must clear against the panel.
 ///
 /// AA for normal-size text. The label renders at 11px, below the 18px/14px-bold threshold that
 /// would let the 3:1 large-text floor apply.
 const LABEL_CONTRAST_FLOOR: f32 = 4.5;
 const SEGMENT_PAD_X: f32 = 11.0;
+/// Design-reference side padding of a [`MoonSegmentDensity::Compact`] cell.
+const SEGMENT_COMPACT_PAD_X: f32 = 8.0;
 const SEGMENT_GAP: f32 = 5.0;
 const SEGMENT_HOTKEY_SIZE: f32 = 8.5;
 const SEGMENT_HOTKEY_WEIGHT: f32 = 400.0;
@@ -130,24 +143,50 @@ fn segment_cell_interaction(
     }
 }
 
+/// Resolve the design-reference hotkey gap and side padding of a normal cell.
+///
+/// Fitting and rendering both read this, so a fitted width always matches the drawn chrome.
+///
+/// Args:
+///     density: Density of the control.
+///     has_hotkey: Whether the cell shows a non-empty hotkey hint.
+///
+/// Returns:
+///     Unscaled `(gap, pad_x)`.
+fn segment_density_chrome(density: MoonSegmentDensity, has_hotkey: bool) -> (f32, f32) {
+    match density {
+        MoonSegmentDensity::Regular => (SEGMENT_GAP, SEGMENT_PAD_X),
+        MoonSegmentDensity::Compact if has_hotkey => (SEGMENT_GAP, SEGMENT_COMPACT_PAD_X),
+        MoonSegmentDensity::Compact => (0.0, SEGMENT_COMPACT_PAD_X),
+    }
+}
+
 /// Resolve normal cell spacing or release the full width to an inline replacement.
 ///
 /// Args:
 ///     tokens: Active theme tokens used to scale normal cell spacing.
 ///     replaced: Whether inline content replaces the hotkey and label.
+///     density: Density of the control.
+///     has_hotkey: Whether the cell shows a non-empty hotkey hint.
 ///
 /// Returns:
 ///     Scaled gap and horizontal padding for the rendered cell.
-fn segment_cell_chrome(tokens: &MoonThemeTokens, replaced: bool) -> SegmentCellChrome {
+fn segment_cell_chrome(
+    tokens: &MoonThemeTokens,
+    replaced: bool,
+    density: MoonSegmentDensity,
+    has_hotkey: bool,
+) -> SegmentCellChrome {
     if replaced {
         SegmentCellChrome {
             gap: 0.0,
             pad_x: 0.0,
         }
     } else {
+        let (gap, pad_x) = segment_density_chrome(density, has_hotkey);
         SegmentCellChrome {
-            gap: tokens.ui(SEGMENT_GAP),
-            pad_x: tokens.ui(SEGMENT_PAD_X),
+            gap: tokens.ui(gap),
+            pad_x: tokens.ui(pad_x),
         }
     }
 }
@@ -283,6 +322,7 @@ pub struct MoonSegmentItem {
     selected: bool,
     disabled: bool,
     tooltip: Option<SharedString>,
+    density: MoonSegmentDensity,
 }
 
 impl MoonSegmentItem {
@@ -302,6 +342,7 @@ impl MoonSegmentItem {
             selected: false,
             disabled: false,
             tooltip: None,
+            density: MoonSegmentDensity::Regular,
         }
     }
 
@@ -310,11 +351,26 @@ impl MoonSegmentItem {
         self
     }
 
+    /// Fit this item for a control of the given density; [`MoonSegmentDensity::Regular`] by default.
+    ///
+    /// Call it before [`Self::fit_width`] with the same density the control gets through
+    /// [`MoonSegmentedControl::density`], so the fitted width reserves exactly the drawn chrome.
+    ///
+    /// Args:
+    ///     density: Density of the control this item renders in.
+    ///
+    /// Returns:
+    ///     The updated item.
+    pub fn density(mut self, density: MoonSegmentDensity) -> Self {
+        self.density = density;
+        self
+    }
+
     /// Fit this item's rendered width between font-scaled design-reference bounds.
     ///
     /// The method runs before render so a parent can use [`Self::resolved_width`] for layout
     /// budgeting. It truncates only the label; the hotkey and the component's own scaled padding
-    /// and gap remain reserved.
+    /// and gap, as set by [`Self::density`], remain reserved.
     ///
     /// Args:
     ///     cx: Application context used for theme-aware text measurement.
@@ -328,7 +384,8 @@ impl MoonSegmentItem {
         let (label_size, _, hotkey_size, _) = segment_text_metrics(&tokens);
         let min_width = tokens.font_width(min_width);
         let max_width = tokens.font_width(max_width).max(min_width);
-        let chrome_width = tokens.ui(SEGMENT_PAD_X) * 2.0 + tokens.ui(SEGMENT_GAP);
+        let (gap, pad_x) = segment_density_chrome(self.density, !self.hotkey.is_empty());
+        let chrome_width = tokens.ui(pad_x) * 2.0 + tokens.ui(gap);
         let hotkey = self.hotkey.clone();
         let label = self.label.clone();
         let (label, width) = fit_segment_item(
@@ -393,6 +450,7 @@ pub struct MoonSegmentedControl {
     items: Vec<MoonSegmentItem>,
     accent: MoonAccent,
     selection: MoonSegmentSelection,
+    density: MoonSegmentDensity,
     item_gap: f32,
     on_click: Option<MoonIndexedClickHandler>,
     on_scroll: Option<MoonIndexedScrollHandler>,
@@ -414,6 +472,7 @@ impl MoonSegmentedControl {
             items: Vec::new(),
             accent: MoonAccent::Amber,
             selection: MoonSegmentSelection::Underline,
+            density: MoonSegmentDensity::Regular,
             item_gap: 0.0,
             on_click: None,
             on_scroll: None,
@@ -440,6 +499,20 @@ impl MoonSegmentedControl {
     ///     The updated segmented control.
     pub fn selection(mut self, selection: MoonSegmentSelection) -> Self {
         self.selection = selection;
+        self
+    }
+
+    /// Choose the cells' horizontal density; [`MoonSegmentDensity::Regular`] by default.
+    ///
+    /// Fitted items should be fitted with the same density through [`MoonSegmentItem::density`].
+    ///
+    /// Args:
+    ///     density: Cell density.
+    ///
+    /// Returns:
+    ///     The updated segmented control.
+    pub fn density(mut self, density: MoonSegmentDensity) -> Self {
+        self.density = density;
         self
     }
 
@@ -525,6 +598,7 @@ impl MoonSegmentedControl {
         let on_click = self.on_click.clone();
         let on_scroll = self.on_scroll.clone();
         let mut replacements = self.replacements;
+        let density = self.density;
         let (label_size, label_line, hotkey_size, hotkey_line) = segment_text_metrics(&tokens);
 
         let mut root = div()
@@ -583,7 +657,7 @@ impl MoonSegmentedControl {
                 item_scroll.is_some(),
                 item.tooltip.is_some(),
             );
-            let chrome = segment_cell_chrome(&tokens, replaced);
+            let chrome = segment_cell_chrome(&tokens, replaced, density, !item.hotkey.is_empty());
 
             let mut cell = div()
                 .id(("segment-item", ix))

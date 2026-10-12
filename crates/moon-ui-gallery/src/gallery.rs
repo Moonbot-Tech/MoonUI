@@ -968,6 +968,24 @@ impl Gallery {
                                         MoonSegmentItem::new("S3", "100%").width(64.0),
                                     ])
                                     .render(),
+                            )
+                            // Compact density: the toolbar preset-strip geometry, fitted to
+                            // hotkey-less labels so each cell is the label plus tight padding.
+                            .child(
+                                MoonSegmentedControl::new("segmented-filled-compact")
+                                    .selection(MoonSegmentSelection::Filled)
+                                    .density(MoonSegmentDensity::Compact)
+                                    .accent(MoonAccent::Blue)
+                                    .item_gap(0.0)
+                                    .items(["50", "100", "250", "1k"].into_iter().enumerate().map(
+                                        |(ix, label)| {
+                                            MoonSegmentItem::new("", label)
+                                                .density(MoonSegmentDensity::Compact)
+                                                .fit_width(cx, 34.0, 104.0)
+                                                .selected(self.segment_index == ix)
+                                        },
+                                    ))
+                                    .render(),
                             ),
                     ),
             )

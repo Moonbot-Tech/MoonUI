@@ -2711,11 +2711,11 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use segment::MoonSegmentSelection;"
+      "signature": "pub use segment::{MoonAccent, MoonSegmentItem, MoonSegmentedControl};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use segment::{MoonAccent, MoonSegmentItem, MoonSegmentedControl};"
+      "signature": "pub use segment::{MoonSegmentDensity, MoonSegmentSelection};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -3459,6 +3459,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub enum MoonSegmentDensity"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub enum MoonSegmentSelection"
     },
     {
@@ -3468,6 +3472,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn density(mut self, density: MoonSegmentDensity) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",

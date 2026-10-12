@@ -348,6 +348,17 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "segmented controls must default to the underline selection, keep filled labels legible on their fill, and join gapless filled items without widening them",
         ),
         test_contract(
+            "segmented_control.density",
+            ContractSeverity::Guardrail,
+            &[
+                "regular_density_keeps_the_original_cell_chrome",
+                "compact_density_tightens_padding_and_drops_an_empty_hotkey_gap",
+                "compact_cells_fit_narrower_and_render_at_their_fitted_width",
+            ],
+            &tests,
+            "segmented controls must keep the regular cell geometry by default, and a compact control must fit and render narrower cells at their fitted width",
+        ),
+        test_contract(
             "select.open_select_lifecycle",
             ContractSeverity::Guardrail,
             &[
