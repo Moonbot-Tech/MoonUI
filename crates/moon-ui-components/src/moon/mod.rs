@@ -84,6 +84,9 @@ mod window_frame;
 
 pub mod foundation;
 
+/// An SVG icon by asset path (`MoonIcon::empty().path("icons/cpu.svg")`), for builders such as
+/// `MoonSidebarMenuItem::icon` that take one.
+pub use crate::icon::Icon as MoonIcon;
 pub use crate::scroll::ScrollableElement as MoonScrollableElement;
 pub use accordion::{MoonAccordion, MoonAccordionItem};
 pub use alert::MoonAlert;
