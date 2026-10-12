@@ -6,8 +6,15 @@ use crate::input::{NumberInput, NumberStep};
 use crate::{Disableable as _, Sizable as _, Size};
 
 use super::{
-    foundation::MoonSize, input::MoonInputState, text::MoonText, theme::MoonTheme, tokens::MoonRect,
+    foundation::MoonSize,
+    input::MoonInputState,
+    text::{MoonText, measure_text_width},
+    theme::MoonTheme,
+    tokens::MoonRect,
 };
+
+/// Placeholder digits measured for an unbounded side of the range.
+const UNBOUNDED_DIGITS: &str = "000000";
 
 /// Moon numeric input: a typed value between a - and a + button, with an optional unit suffix.
 ///
@@ -243,6 +250,49 @@ fn clamp_to_range(value: f64, min: Option<f64>, max: Option<f64>) -> f64 {
     min.map_or(value, |min| value.max(min))
 }
 
+/// The longest text the field has to show: the range ends, or six digits for an open end.
+///
+/// Args:
+///     min: Optional inclusive lower bound.
+///     max: Optional inclusive upper bound.
+///     current: The text the field holds now.
+///
+/// Returns:
+///     The candidate with the most characters; the first one wins a tie.
+fn widest_value_text(min: Option<f64>, max: Option<f64>, current: &str) -> String {
+    let end =
+        |bound: Option<f64>| bound.map_or_else(|| UNBOUNDED_DIGITS.to_string(), |v| v.to_string());
+    [end(min), end(max), current.to_string()]
+        .into_iter()
+        .fold(String::new(), |widest, text| {
+            if text.chars().count() > widest.chars().count() {
+                text
+            } else {
+                widest
+            }
+        })
+}
+
+/// The narrowest the whole control may get: both square buttons plus the field's padding, its
+/// widest value and, when present, the unit and the gap before it.
+///
+/// Without this floor the base control (`flex_1`, no intrinsic width) collapses to a few pixels
+/// in a content-sized row and the value disappears between the buttons.
+///
+/// Args:
+///     value_w: Rendered width of the widest value text.
+///     unit_w: Rendered width of the unit, `0.0` without one.
+///     button_w: Rendered width of one button.
+///     pad_x: Rendered side padding of the field.
+///     gap: Rendered gap between value and unit.
+///
+/// Returns:
+///     The minimum rendered width of the control.
+fn min_control_width(value_w: f32, unit_w: f32, button_w: f32, pad_x: f32, gap: f32) -> f32 {
+    let unit = if unit_w > 0.0 { unit_w + gap } else { 0.0 };
+    2.0 * button_w + 2.0 * pad_x + value_w + unit
+}
+
 /// Map a density tier onto the base input size the control renders at.
 ///
 /// Args:
@@ -298,9 +348,26 @@ impl RenderOnce for MoonNumberInput {
         let metrics = tier
             .nearest(&[MoonSize::Xs, MoonSize::Sm, MoonSize::Md])
             .control_metrics();
+        // Measured in both faces and the larger kept: the field inherits its family from the
+        // caller (Settings draws numbers mono), and a too-wide floor only costs a few pixels.
+        let font = metrics.font_size;
+        let widest = widest_value_text(min, max, state.read(cx).value().as_ref());
+        let value_w = measure_text_width(cx, &tokens, &widest, font, 500.0, true)
+            .max(measure_text_width(cx, &tokens, &widest, font, 500.0, false));
+        let unit_w = self.unit.as_ref().map_or(0.0, |unit| {
+            measure_text_width(cx, &tokens, unit, font - 2.0, 400.0, true)
+        });
+        let min_w = min_control_width(
+            value_w,
+            unit_w,
+            tokens.ui(metrics.height),
+            tokens.ui(metrics.pad_x),
+            tokens.ui(4.0),
+        );
         let mut input = NumberInput::new(&state)
             .with_size(base_size_for(tier))
-            .disabled(self.disabled);
+            .disabled(self.disabled)
+            .min_w(px(min_w));
         if let Some(unit) = self.unit {
             input = input.suffix(
                 MoonText::new(unit)

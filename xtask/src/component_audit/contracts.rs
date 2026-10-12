@@ -371,6 +371,17 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "colour pickers must keep the 128px field trigger by default, and the swatch trigger must be a frameless scaled swatch with an optional hex label",
         ),
         test_contract(
+            "number_input.value_room",
+            ContractSeverity::Guardrail,
+            &[
+                "the_widest_value_is_the_longest_range_end_or_six_open_digits",
+                "the_width_floor_adds_buttons_padding_value_and_unit",
+                "a_content_sized_number_input_keeps_room_for_its_value",
+            ],
+            &tests,
+            "number inputs must keep room for their widest value and unit between the buttons, even in a content-sized row",
+        ),
+        test_contract(
             "segmented_control.density",
             ContractSeverity::Guardrail,
             &[

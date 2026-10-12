@@ -574,7 +574,11 @@
       "public_path": "moon_ui::MoonNumberInput",
       "upstream_ref": null,
       "fork_reason": "MoonBot typed numeric settings entry with a unit suffix and range clamping",
-      "contracts": ["number_input.step_behavior", "gallery.visual_coverage"]
+      "contracts": [
+        "number_input.step_behavior",
+        "number_input.value_room",
+        "gallery.visual_coverage"
+      ]
     },
     {
       "concept": "selectable_card",
