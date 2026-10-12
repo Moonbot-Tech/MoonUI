@@ -2559,6 +2559,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use crate::icon::Icon as MoonIcon;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use crate::scroll::ScrollableElement as MoonScrollableElement;"
     },
     {
