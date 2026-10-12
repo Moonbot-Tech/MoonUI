@@ -168,6 +168,8 @@ pub use scroll_area::{
     MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette,
 };
 pub use segment::{MoonAccent, MoonSegmentItem, MoonSegmentedControl};
+// Exported on its own line so the recorded API item above stays byte-identical.
+pub use segment::MoonSegmentSelection;
 pub use select::{MoonSelect, MoonSelectEvent, MoonSelectItem, MoonSelectState};
 pub use selector::{MoonSelectorPill, MoonSelectorSegment};
 pub use separator::{MoonSeparator, MoonSeparatorAxis};

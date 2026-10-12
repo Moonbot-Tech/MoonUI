@@ -2707,6 +2707,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use segment::MoonSegmentSelection;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use segment::{MoonAccent, MoonSegmentItem, MoonSegmentedControl};"
     },
     {
@@ -3383,6 +3387,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub enum MoonSegmentSelection"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn accent(mut self, accent: MoonAccent) -> Self"
     },
     {
@@ -3448,6 +3456,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn selection(mut self, selection: MoonSegmentSelection) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",

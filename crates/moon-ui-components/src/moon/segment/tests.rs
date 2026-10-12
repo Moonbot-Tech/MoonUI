@@ -11,9 +11,10 @@ use gpui::{
 // Do not use `super::*`: the glob would import the `gpui::test` macro, causing `#[test]` to
 // recursively expand into itself.
 use super::{
-    LABEL_CONTRAST_FLOOR, MoonAccent, MoonPalette, MoonSegmentItem, MoonSegmentedControl,
-    SEGMENT_GAP, SEGMENT_LABEL_SIZE, SEGMENT_PAD_X, SegmentCellChrome, SegmentCellInteraction,
-    contrast_ratio, fit_segment_item, segment_cell_chrome, segment_cell_interaction,
+    LABEL_CONTRAST_FLOOR, MoonAccent, MoonPalette, MoonSegmentItem, MoonSegmentSelection,
+    MoonSegmentedControl, SEGMENT_GAP, SEGMENT_LABEL_SIZE, SEGMENT_PAD_X, SegmentCellChrome,
+    SegmentCellInteraction, SegmentFillFrame, contrast_ratio, fit_segment_item,
+    segment_cell_chrome, segment_cell_interaction, segment_fill_frame,
 };
 use crate::moon::{MoonScale, MoonTheme, MoonThemeTokens};
 
@@ -369,4 +370,126 @@ fn fitted_segment_width_survives_high_ui_low_font_render(cx: &mut gpui::TestAppC
         .expect("fitted segment cell must render");
 
     assert_eq!(cell.size.width, px(resolved));
+}
+
+/// Catches flipping the `MoonSegmentedControl::new` default to the filled style, which would
+/// repaint every existing toolbar strip that never asked for a selection style.
+#[test]
+fn a_new_control_keeps_the_underline_selection() {
+    assert_eq!(
+        MoonSegmentSelection::default(),
+        MoonSegmentSelection::Underline
+    );
+    assert_eq!(
+        MoonSegmentedControl::new("default-selection").selection,
+        MoonSegmentSelection::Underline
+    );
+}
+
+/// Catches `segment.rs:MoonAccent::fill_colors` measuring the label against the panel instead of
+/// the fill, which would draw an illegible label on the selected Blue or Amber cell of the size and
+/// sell strips. Green and Red have no palette role that clears the floor on their dark fills, so
+/// for them the test pins the documented fallback: the highest-contrast candidate.
+#[test]
+fn filled_label_clears_the_contrast_floor_on_its_fill_in_both_themes() {
+    for p in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        for accent in ACCENTS {
+            let (fill, label) = accent.fill_colors(p);
+            assert_eq!(
+                fill,
+                accent.colors(p).underline,
+                "{accent:?} fill must be the accent hue"
+            );
+            let ratio = contrast_ratio(label, fill);
+            if matches!(accent, MoonAccent::Blue | MoonAccent::Amber) {
+                assert!(
+                    ratio >= LABEL_CONTRAST_FLOOR,
+                    "{accent:?} filled label is {ratio:.2}:1 on its fill (is_light={}), under                      the {LABEL_CONTRAST_FLOOR}:1 floor",
+                    p.is_light()
+                );
+            }
+            for candidate in [p.on_accent, p.text, p.panel, p.shell] {
+                assert!(
+                    ratio >= LABEL_CONTRAST_FLOOR || ratio >= contrast_ratio(candidate, fill),
+                    "{accent:?} filled label is not the most legible candidate (is_light={})",
+                    p.is_light()
+                );
+            }
+        }
+    }
+}
+
+/// Catches `segment.rs:segment_fill_frame` outlining underline strips, or joining filled items
+/// that were given a gap, either of which changes how an existing strip is drawn.
+#[test]
+fn only_a_gapless_filled_strip_joins_into_one_outline() {
+    assert_eq!(
+        segment_fill_frame(MoonSegmentSelection::Underline, 0.0),
+        SegmentFillFrame::None
+    );
+    assert_eq!(
+        segment_fill_frame(MoonSegmentSelection::Underline, 4.0),
+        SegmentFillFrame::None
+    );
+    assert_eq!(
+        segment_fill_frame(MoonSegmentSelection::Filled, 0.0),
+        SegmentFillFrame::JoinedStrip
+    );
+    assert_eq!(
+        segment_fill_frame(MoonSegmentSelection::Filled, 4.0),
+        SegmentFillFrame::SeparateCells
+    );
+}
+
+/// Root view with a gapless filled strip of three fixed-width items.
+struct FilledStripHarness;
+
+impl Render for FilledStripHarness {
+    /// Render a filled strip whose middle item is selected.
+    ///
+    /// Args:
+    ///     _window: Test window.
+    ///     _cx: Test view context.
+    ///
+    /// Returns:
+    ///     The rendered segmented control.
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        MoonSegmentedControl::new("filled-strip-harness")
+            .selection(MoonSegmentSelection::Filled)
+            .accent(MoonAccent::Blue)
+            .item_gap(0.0)
+            .items([
+                MoonSegmentItem::new("B1", "0.1").width(60.0),
+                MoonSegmentItem::new("B2", "0.5").width(60.0).selected(true),
+                MoonSegmentItem::new("B3", "1.0").width(60.0),
+            ])
+    }
+}
+
+/// Catches the joined filled strip adding its separators or outline OUTSIDE the cells, which
+/// would widen every cell and push a fitted toolbar strip past its pre-render budget.
+#[gpui::test]
+fn joined_filled_cells_abut_and_keep_their_widths(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let window = cx.add_window(|_, _| FilledStripHarness);
+    let mut cx = VisualTestContext::from_window(window.into(), cx);
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+
+    let cells: Vec<_> = [
+        "moon-segment-cell:0",
+        "moon-segment-cell:1",
+        "moon-segment-cell:2",
+    ]
+    .into_iter()
+    .map(|selector| {
+        cx.debug_bounds(selector)
+            .expect("every filled cell must register rendered bounds")
+    })
+    .collect();
+    for cell in &cells {
+        assert_eq!(cell.size.width, px(60.0));
+    }
+    assert_eq!(cells[1].origin.x, cells[0].origin.x + px(60.0));
+    assert_eq!(cells[2].origin.x, cells[1].origin.x + px(60.0));
 }

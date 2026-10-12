@@ -336,6 +336,18 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "fitted segmented cells must keep viable pre-render widths, reserve replacement width for inline content, and gate rendered native interactions",
         ),
         test_contract(
+            "segmented_control.filled_selection",
+            ContractSeverity::Guardrail,
+            &[
+                "a_new_control_keeps_the_underline_selection",
+                "filled_label_clears_the_contrast_floor_on_its_fill_in_both_themes",
+                "only_a_gapless_filled_strip_joins_into_one_outline",
+                "joined_filled_cells_abut_and_keep_their_widths",
+            ],
+            &tests,
+            "segmented controls must default to the underline selection, keep filled labels legible on their fill, and join gapless filled items without widening them",
+        ),
+        test_contract(
             "select.open_select_lifecycle",
             ContractSeverity::Guardrail,
             &[

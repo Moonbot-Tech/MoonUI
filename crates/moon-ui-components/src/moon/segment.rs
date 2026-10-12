@@ -18,6 +18,17 @@ pub enum MoonAccent {
     Red,
 }
 
+/// How a [`MoonSegmentedControl`] marks its selected item.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MoonSegmentSelection {
+    /// Accent-coloured label with a glowing accent underline on the panel background.
+    #[default]
+    Underline,
+    /// Accent-filled cell with a contrasting label. With an item gap of `0.0` the items join into
+    /// one bordered strip separated by hairlines.
+    Filled,
+}
+
 /// The WCAG 2.x contrast floor the selected label must clear against the panel.
 ///
 /// AA for normal-size text. The label renders at 11px, below the 18px/14px-bold threshold that
@@ -29,6 +40,35 @@ const SEGMENT_HOTKEY_SIZE: f32 = 8.5;
 const SEGMENT_HOTKEY_WEIGHT: f32 = 400.0;
 const SEGMENT_LABEL_SIZE: f32 = 11.0;
 const SEGMENT_LABEL_FIT_WEIGHT: f32 = 500.0;
+/// Design-reference corner radius of a filled strip, or of each filled cell when items are apart.
+const SEGMENT_FILL_RADIUS: f32 = 4.0;
+
+/// Outline drawn around filled segments, resolved from the selection style and item gap.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SegmentFillFrame {
+    /// Underline style: no outline at all, exactly as before the filled style existed.
+    None,
+    /// Filled items touching each other: one outline around the strip, hairlines between items.
+    JoinedStrip,
+    /// Filled items with a gap: every item carries its own outline and radius.
+    SeparateCells,
+}
+
+/// Resolve the outline a segmented control draws for its selection style.
+///
+/// Args:
+///     selection: Selection style of the control.
+///     item_gap: Design-reference gap between items.
+///
+/// Returns:
+///     The frame policy the renderer applies.
+fn segment_fill_frame(selection: MoonSegmentSelection, item_gap: f32) -> SegmentFillFrame {
+    match selection {
+        MoonSegmentSelection::Underline => SegmentFillFrame::None,
+        MoonSegmentSelection::Filled if item_gap <= 0.0 => SegmentFillFrame::JoinedStrip,
+        MoonSegmentSelection::Filled => SegmentFillFrame::SeparateCells,
+    }
+}
 
 /// Label and hotkey text metrics for the active tier: `(label_size, label_line, hotkey_size, hotkey_line)`.
 ///
@@ -204,6 +244,34 @@ impl MoonAccent {
             .unwrap_or(p.text);
         AccentColors { text, underline }
     }
+
+    /// Resolve this accent to the colours of a selected [`MoonSegmentSelection::Filled`] cell.
+    ///
+    /// The fill is the accent's own hue, the same one the underline style draws its bar with. The
+    /// label sits ON that fill, so it is measured against the fill rather than the panel: it takes
+    /// the first of `on_accent`, `text`, `panel` and `shell` that clears [`LABEL_CONTRAST_FLOOR`], and if
+    /// none does, the one with the highest contrast. Blue and Amber clear the floor in both built-in
+    /// palettes; the dark Green and Red fills are mid-luminance and no role reaches it there.
+    ///
+    /// Args:
+    ///     p: Palette the control paints with.
+    ///
+    /// Returns:
+    ///     `(fill, label)` colours.
+    fn fill_colors(self, p: MoonPalette) -> (u32, u32) {
+        let fill = self.colors(p).underline;
+        let candidates = [p.on_accent, p.text, p.panel, p.shell];
+        let label = candidates
+            .into_iter()
+            .find(|candidate| contrast_ratio(*candidate, fill) >= LABEL_CONTRAST_FLOOR)
+            .unwrap_or_else(|| {
+                candidates
+                    .into_iter()
+                    .max_by(|a, b| contrast_ratio(*a, fill).total_cmp(&contrast_ratio(*b, fill)))
+                    .unwrap_or(p.text)
+            });
+        (fill, label)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -324,6 +392,7 @@ pub struct MoonSegmentedControl {
     bounds: Option<MoonRect>,
     items: Vec<MoonSegmentItem>,
     accent: MoonAccent,
+    selection: MoonSegmentSelection,
     item_gap: f32,
     on_click: Option<MoonIndexedClickHandler>,
     on_scroll: Option<MoonIndexedScrollHandler>,
@@ -344,6 +413,7 @@ impl MoonSegmentedControl {
             bounds: None,
             items: Vec::new(),
             accent: MoonAccent::Amber,
+            selection: MoonSegmentSelection::Underline,
             item_gap: 0.0,
             on_click: None,
             on_scroll: None,
@@ -358,6 +428,18 @@ impl MoonSegmentedControl {
 
     pub fn accent(mut self, accent: MoonAccent) -> Self {
         self.accent = accent;
+        self
+    }
+
+    /// Choose how the selected item is marked; [`MoonSegmentSelection::Underline`] by default.
+    ///
+    /// Args:
+    ///     selection: Selection style.
+    ///
+    /// Returns:
+    ///     The updated segmented control.
+    pub fn selection(mut self, selection: MoonSegmentSelection) -> Self {
+        self.selection = selection;
         self
     }
 
@@ -435,6 +517,11 @@ impl MoonSegmentedControl {
     ///     The rendered segmented control.
     pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
         let accent = self.accent.colors(p);
+        let (fill, fill_label) = self.accent.fill_colors(p);
+        let filled = self.selection == MoonSegmentSelection::Filled;
+        let frame = segment_fill_frame(self.selection, self.item_gap);
+        let hairline = px(tokens.ui(1.0));
+        let fill_radius = px(tokens.ui(SEGMENT_FILL_RADIUS));
         let on_click = self.on_click.clone();
         let on_scroll = self.on_scroll.clone();
         let mut replacements = self.replacements;
@@ -450,7 +537,13 @@ impl MoonSegmentedControl {
                 14.0,
             )))
             .gap(px(tokens.ui(self.item_gap)))
-            .whitespace_nowrap();
+            .whitespace_nowrap()
+            .when(frame == SegmentFillFrame::JoinedStrip, |this| {
+                this.border(hairline)
+                    .border_color(rgba_from(p.border, 1.0))
+                    .rounded(fill_radius)
+                    .overflow_hidden()
+            });
 
         if let Some(bounds) = self.bounds {
             root = root
@@ -469,9 +562,18 @@ impl MoonSegmentedControl {
                 .position(|(index, _)| *index == ix)
                 .map(|position| replacements.swap_remove(position).1);
             let replaced = replacement.is_some();
-            let key_color = if selected { accent.text } else { p.text_muted };
+            let selected_text = if filled { fill_label } else { accent.text };
+            let key_color = if selected {
+                selected_text
+            } else {
+                p.text_muted
+            };
             let key_alpha = if selected { 0.60 } else { 0.667 };
-            let label_color = if selected { accent.text } else { p.text_muted };
+            let label_color = if selected {
+                selected_text
+            } else {
+                p.text_muted
+            };
             let item_click = on_click.clone();
             let item_scroll = on_scroll.clone();
             let interaction = segment_cell_interaction(
@@ -503,6 +605,16 @@ impl MoonSegmentedControl {
                 .when(!selected && !disabled && !replaced, |this| {
                     this.hover(move |this| this.bg(rgba_from(p.overlay, 0.025)))
                         .active(move |this| this.bg(rgba_from(p.overlay, 0.016)))
+                })
+                .when(filled && selected, |this| this.bg(rgba_from(fill, 1.0)))
+                .when(frame == SegmentFillFrame::JoinedStrip && ix > 0, |this| {
+                    this.border_l(hairline)
+                        .border_color(rgba_from(p.border, 1.0))
+                })
+                .when(frame == SegmentFillFrame::SeparateCells, |this| {
+                    this.border(hairline)
+                        .border_color(rgba_from(if selected { fill } else { p.border }, 1.0))
+                        .rounded(fill_radius)
                 });
 
             if let Some(replacement) = replacement {
@@ -537,7 +649,7 @@ impl MoonSegmentedControl {
                     );
             }
 
-            if selected {
+            if selected && !filled {
                 cell = cell.child(accent_underline_colored(
                     accent.underline,
                     &tokens,

@@ -467,6 +467,7 @@
       "fork_reason": "MoonBot toolbar/page control styling",
       "contracts": [
         "segmented_control.fitted_interaction",
+        "segmented_control.filled_selection",
         "gallery.visual_coverage"
       ]
     },

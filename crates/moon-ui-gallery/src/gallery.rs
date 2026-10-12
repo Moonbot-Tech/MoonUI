@@ -924,6 +924,48 @@ impl Gallery {
                                     .render()
                             }),
                         ),
+                    )
+                    // Filled selection: Blue as one joined strip (no gap) sharing the preset
+                    // index above, Amber with a gap so each cell keeps its own outline.
+                    .child(
+                        h_flex()
+                            .gap_3()
+                            .child(
+                                MoonSegmentedControl::new("segmented-filled-blue")
+                                    .selection(MoonSegmentSelection::Filled)
+                                    .accent(MoonAccent::Blue)
+                                    .item_gap(0.0)
+                                    .items((0..4).map(|ix| {
+                                        MoonSegmentItem::new(format!("B{}", ix + 1), "0.5")
+                                            .width(64.0)
+                                            .selected(self.segment_index == ix)
+                                    }))
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |ix, _, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.segment_index = ix;
+                                                this.push_event(
+                                                    format!("Filled segment selected: B{}", ix + 1),
+                                                    cx,
+                                                );
+                                            });
+                                        }
+                                    })
+                                    .render(),
+                            )
+                            .child(
+                                MoonSegmentedControl::new("segmented-filled-amber")
+                                    .selection(MoonSegmentSelection::Filled)
+                                    .accent(MoonAccent::Amber)
+                                    .item_gap(4.0)
+                                    .items([
+                                        MoonSegmentItem::new("S1", "25%").width(60.0).selected(true),
+                                        MoonSegmentItem::new("S2", "50%").width(60.0),
+                                        MoonSegmentItem::new("S3", "100%").width(64.0),
+                                    ])
+                                    .render(),
+                            ),
                     ),
             )
     }
