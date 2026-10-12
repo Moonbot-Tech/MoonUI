@@ -687,7 +687,7 @@
       "public_path": "moon_ui::MoonTag",
       "upstream_ref": null,
       "fork_reason": "Moon density, typography, tone, and status-pill styling",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["tag.variants", "gallery.visual_coverage"]
     },
     {
       "concept": "tab_strip",

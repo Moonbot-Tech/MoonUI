@@ -348,6 +348,18 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "segmented controls must default to the underline selection, keep filled labels legible on their fill, and join gapless filled items without widening them",
         ),
         test_contract(
+            "tag.variants",
+            ContractSeverity::Guardrail,
+            &[
+                "default_tag_keeps_the_original_outline_pill",
+                "soft_and_filled_labels_clear_the_contrast_floor",
+                "soft_and_filled_paint_their_fill_not_a_border",
+                "small_radius_and_compact_geometry_match_the_status_chip",
+            ],
+            &tests,
+            "tags must keep the outline pill by default, and soft or filled tags must keep their labels above the contrast floor on both palettes",
+        ),
+        test_contract(
             "segmented_control.density",
             ContractSeverity::Guardrail,
             &[

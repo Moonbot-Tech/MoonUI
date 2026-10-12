@@ -2791,6 +2791,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use tag::{MoonTagRadius, MoonTagVariant};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use text::MoonText;"
     },
     {
@@ -4511,6 +4515,18 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub enum MoonTagRadius"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub enum MoonTagVariant"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn compact(mut self, compact: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn danger() -> Self"
     },
     {
@@ -4539,6 +4555,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn radius(mut self, radius: MoonTagRadius) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn render(self) -> impl IntoElement"
     },
     {
@@ -4548,6 +4568,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn variant(mut self, variant: MoonTagVariant) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",

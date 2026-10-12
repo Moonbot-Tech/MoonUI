@@ -202,6 +202,8 @@ pub use tab::{
 };
 pub use table::{MoonTableAlign, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle};
 pub use tag::MoonTag;
+// Exported on its own line so the recorded API item above stays byte-identical.
+pub use tag::{MoonTagRadius, MoonTagVariant};
 pub use text::MoonText;
 pub use text_area::{MoonTextArea, MoonTextAreaEvent, MoonTextAreaState};
 pub use theme::{

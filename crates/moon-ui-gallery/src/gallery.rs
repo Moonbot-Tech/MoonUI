@@ -818,6 +818,35 @@ impl Gallery {
                                     .label("MoonTag warning")
                                     .render(),
                             )
+                            // Soft and filled status chips: square-ish corners, compact geometry,
+                            // sentence-case labels.
+                            .child(
+                                MoonTag::info()
+                                    .variant(MoonTagVariant::Soft)
+                                    .radius(MoonTagRadius::Small)
+                                    .compact(true)
+                                    .mono(false)
+                                    .child("Saved with a button")
+                                    .render(),
+                            )
+                            .child(
+                                MoonTag::positive()
+                                    .variant(MoonTagVariant::Soft)
+                                    .radius(MoonTagRadius::Small)
+                                    .compact(true)
+                                    .mono(false)
+                                    .child("Applies at once")
+                                    .render(),
+                            )
+                            .child(
+                                MoonTag::warning()
+                                    .variant(MoonTagVariant::Filled)
+                                    .radius(MoonTagRadius::Small)
+                                    .compact(true)
+                                    .mono(false)
+                                    .child("Filled")
+                                    .render(),
+                            )
                             .child(
                                 MoonProgress::new("moon-progress-positive")
                                     .value(68.0)

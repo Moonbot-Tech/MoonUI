@@ -37,12 +37,13 @@ use moon_ui::{
     MoonSliderState, MoonSpinner, MoonSpinnerSize, MoonStackedBar, MoonStatusBar,
     MoonStatusIndicator, MoonStatusItem, MoonStepper, MoonSteps, MoonSurface, MoonSurfaceVariant,
     MoonTabItem, MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle,
-    MoonTag, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonTimePicker,
-    MoonTimePickerState, MoonToggle, MoonToggleLabelSide, MoonToggleVariant, MoonTone, MoonTooltip,
-    MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem,
-    MoonTreeSelectionMode, MoonTreeState, MoonVirtualList, MoonVirtualListScrollHandle,
-    MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, PanelView,
-    Root, TabPanel, ThemeMode, h_flex, moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
+    MoonTag, MoonTagRadius, MoonTagVariant, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig,
+    MoonTimePicker, MoonTimePickerState, MoonToggle, MoonToggleLabelSide, MoonToggleVariant,
+    MoonTone, MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree,
+    MoonTreeItem, MoonTreeSelectionMode, MoonTreeState, MoonVirtualList,
+    MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand,
+    MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex, moon_h_resizable,
+    moon_resizable_panel, rgba_from, v_flex,
 };
 
 mod gallery;
