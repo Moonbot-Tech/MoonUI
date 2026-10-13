@@ -393,6 +393,16 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "segmented controls must keep the regular cell geometry by default, and a compact control must fit and render narrower cells at their fitted width",
         ),
         test_contract(
+            "segmented_control.count_pill",
+            ContractSeverity::Guardrail,
+            &[
+                "count_pill_label_clears_the_contrast_floor_in_both_themes",
+                "counted_item_reserves_its_pill_and_renders_it_inside_the_cell",
+            ],
+            &tests,
+            "segment count pills must keep their digits above the contrast floor in every tone on both palettes, and a fitted cell must reserve and contain its pill",
+        ),
+        test_contract(
             "select.open_select_lifecycle",
             ContractSeverity::Guardrail,
             &[

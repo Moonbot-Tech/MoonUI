@@ -12,11 +12,12 @@ use gpui::{
 // recursively expand into itself.
 use super::{
     LABEL_CONTRAST_FLOOR, MoonAccent, MoonPalette, MoonSegmentDensity, MoonSegmentItem,
-    MoonSegmentSelection, MoonSegmentedControl, SEGMENT_GAP, SEGMENT_LABEL_SIZE, SEGMENT_PAD_X,
-    SegmentCellChrome, SegmentCellInteraction, SegmentFillFrame, contrast_ratio, fit_segment_item,
-    segment_cell_chrome, segment_cell_interaction, segment_fill_frame,
+    MoonSegmentSelection, MoonSegmentedControl, SEGMENT_COUNT_GAP, SEGMENT_COUNT_PAD_X,
+    SEGMENT_GAP, SEGMENT_LABEL_SIZE, SEGMENT_PAD_X, SegmentCellChrome, SegmentCellInteraction,
+    SegmentFillFrame, contrast_ratio, count_pill_colors, fit_segment_item, segment_cell_chrome,
+    segment_cell_interaction, segment_fill_frame,
 };
-use crate::moon::{MoonScale, MoonTheme, MoonThemeTokens};
+use crate::moon::{MoonScale, MoonTheme, MoonThemeTokens, MoonTone};
 
 /// Accent variants whose semantic colors must remain distinct and readable.
 const ACCENTS: [MoonAccent; 4] = [
@@ -624,4 +625,100 @@ fn compact_cells_fit_narrower_and_render_at_their_fitted_width(cx: &mut gpui::Te
     assert_eq!(first.size.width, px(widths[0]));
     assert_eq!(second.size.width, px(widths[1]));
     assert_eq!(second.origin.x, first.origin.x + px(widths[0]));
+}
+
+/// The count tones a segment pill is offered in: neutral, red, amber and blue.
+const COUNT_TONES: [MoonTone; 4] = [
+    MoonTone::Default,
+    MoonTone::Danger,
+    MoonTone::Warning,
+    MoonTone::Info,
+];
+
+/// Blend `fg` over `bg` at `alpha`, computed here independently of the widget's own helper.
+fn blend(fg: u32, bg: u32, alpha: f32) -> u32 {
+    let channel = |shift: u32| {
+        let f = ((fg >> shift) & 0xFF) as f32;
+        let b = ((bg >> shift) & 0xFF) as f32;
+        ((f * alpha + b * (1.0 - alpha)).round() as u32) << shift
+    };
+    channel(16) | channel(8) | channel(0)
+}
+
+/// Catches a count pill whose digits drop under the AA floor on their own wash — `Problems [13]`
+/// turning unreadable in one theme — or a pill painted with no visible wash at all. The wash the
+/// eye sees is recomposited here from the tone and the panel at the soft-tag opacity.
+#[test]
+fn count_pill_label_clears_the_contrast_floor_in_both_themes() {
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        for tone in COUNT_TONES {
+            let (fill, label) = count_pill_colors(tone, palette);
+            assert_eq!(fill, blend(tone.color(palette), palette.panel, 0.14));
+            assert_ne!(fill, palette.panel, "{tone:?} pill has no wash");
+            let ratio = contrast_ratio(label, fill);
+            assert!(
+                ratio >= LABEL_CONTRAST_FLOOR,
+                "{tone:?} count on {:06X}: {ratio:.2}",
+                palette.shell
+            );
+        }
+    }
+}
+
+/// Catches a count that is drawn but not reserved by `fit_width` (the label gets ellipsized or the
+/// pill spills out of its cell), and a default item that suddenly reserves room for a pill it does
+/// not show, which would widen every existing strip. The oracle is the rendered geometry: the pill
+/// must sit inside its cell with the fitted width, `SEGMENT_COUNT_GAP` after the label.
+#[gpui::test]
+fn counted_item_reserves_its_pill_and_renders_it_inside_the_cell(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let (plain, plain_again, counted) = cx.update(|cx| {
+        MoonTheme::global_mut(cx).scale = MoonScale {
+            ui: 1.0,
+            font: 1.0,
+            font_delta: 0.0,
+            tier: Default::default(),
+            zoom: 1.0,
+        };
+        let fit = |item: MoonSegmentItem| {
+            item.density(MoonSegmentDensity::Compact)
+                .fit_width(cx, 0.0, f32::MAX)
+        };
+        (
+            fit(MoonSegmentItem::new("", "Problems")),
+            fit(MoonSegmentItem::new("", "Problems").count_tone(MoonTone::Danger)),
+            fit(MoonSegmentItem::new("", "Problems")
+                .count("13")
+                .count_tone(MoonTone::Danger))
+            .selected(true),
+        )
+    });
+    assert_eq!(plain.resolved_width(), plain_again.resolved_width());
+    let pill_room = counted.resolved_width() - plain.resolved_width();
+    assert!(
+        pill_room > SEGMENT_COUNT_GAP + 2.0 * SEGMENT_COUNT_PAD_X,
+        "pill room {pill_room} reserves no digits"
+    );
+
+    let cell_width = counted.resolved_width();
+    let window = cx.add_window(move |_, _| CompactStripHarness {
+        items: vec![plain, counted],
+    });
+    let mut cx = VisualTestContext::from_window(window.into(), cx);
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("moon-segment-count:0").is_none());
+    let cell = cx
+        .debug_bounds("moon-segment-cell:1")
+        .expect("counted cell must render");
+    let pill = cx
+        .debug_bounds("moon-segment-count:1")
+        .expect("count pill must render");
+
+    assert_eq!(cell.size.width, px(cell_width));
+    assert!(pill.origin.x >= cell.origin.x);
+    assert!(pill.origin.x + pill.size.width <= cell.origin.x + cell.size.width);
+    // Fitting ceils the whole cell to a pixel, so the reserve may exceed the pill by under 1px.
+    let slack = pill_room - SEGMENT_COUNT_GAP - f32::from(pill.size.width);
+    assert!((0.0..1.0).contains(&slack), "pill reserve slack {slack}");
 }

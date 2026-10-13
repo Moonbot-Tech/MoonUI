@@ -4,9 +4,10 @@ use std::rc::Rc;
 
 use super::{
     foundation::{MoonIndexedClickHandler, MoonSize, accent_underline_colored},
+    tag::tone_wash,
     text::{MoonText, fit_text_to_width, measure_text_width},
     theme::{MoonTheme, MoonThemeTokens},
-    tokens::{MoonPalette, MoonRect, contrast_ratio, rgba_from},
+    tokens::{MoonPalette, MoonRect, MoonTone, contrast_ratio, rgba_from},
     tooltip::MoonTooltipView,
 };
 
@@ -55,6 +56,16 @@ const SEGMENT_LABEL_SIZE: f32 = 11.0;
 const SEGMENT_LABEL_FIT_WEIGHT: f32 = 500.0;
 /// Design-reference corner radius of a filled strip, or of each filled cell when items are apart.
 const SEGMENT_FILL_RADIUS: f32 = 4.0;
+/// Design-reference gap between a cell's label and its count pill.
+const SEGMENT_COUNT_GAP: f32 = 6.0;
+/// Design-reference side padding inside a count pill.
+const SEGMENT_COUNT_PAD_X: f32 = 5.0;
+/// Design-reference corner radius of a count pill.
+const SEGMENT_COUNT_RADIUS: f32 = 3.0;
+/// Font size, line height and weight of a count pill's digits.
+const SEGMENT_COUNT_SIZE: f32 = 10.0;
+const SEGMENT_COUNT_LINE: f32 = 12.0;
+const SEGMENT_COUNT_WEIGHT: f32 = 500.0;
 
 /// Outline drawn around filled segments, resolved from the selection style and item gap.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -191,6 +202,37 @@ fn segment_cell_chrome(
     }
 }
 
+/// Resolve the rendered width a count pill adds to its cell.
+///
+/// Fitting reserves exactly this, so a fitted cell with a count never truncates its label to make
+/// room for the pill the renderer then draws.
+///
+/// Args:
+///     tokens: Active theme tokens used to scale the pill chrome.
+///     text_width: Rendered width of the count text.
+///
+/// Returns:
+///     The gap before the pill, its two side paddings and its text, in rendered pixels.
+fn segment_count_reserve(tokens: &MoonThemeTokens, text_width: f32) -> f32 {
+    tokens.ui(SEGMENT_COUNT_GAP) + tokens.ui(SEGMENT_COUNT_PAD_X) * 2.0 + text_width
+}
+
+/// Resolve the `(fill, label)` colours of a count pill in `tone`.
+///
+/// The fill is the soft tag's tone wash made opaque, so the pill reads the same on the panel, on a
+/// hovered cell and on a solid [`MoonSegmentSelection::Filled`] cell; the label is measured
+/// against that fill, which keeps it legible whichever cell state surrounds it.
+///
+/// Args:
+///     tone: Tone of the count.
+///     p: Palette the control paints with.
+///
+/// Returns:
+///     Opaque `(fill, label)` colours.
+fn count_pill_colors(tone: MoonTone, p: MoonPalette) -> (u32, u32) {
+    tone_wash(tone, p)
+}
+
 /// Fit one segment item using already-resolved layout metrics.
 ///
 /// The selected label weight is used even while the item is unselected so selecting it never
@@ -323,6 +365,8 @@ pub struct MoonSegmentItem {
     disabled: bool,
     tooltip: Option<SharedString>,
     density: MoonSegmentDensity,
+    count: Option<SharedString>,
+    count_tone: MoonTone,
 }
 
 impl MoonSegmentItem {
@@ -343,6 +387,8 @@ impl MoonSegmentItem {
             disabled: false,
             tooltip: None,
             density: MoonSegmentDensity::Regular,
+            count: None,
+            count_tone: MoonTone::Default,
         }
     }
 
@@ -366,11 +412,44 @@ impl MoonSegmentItem {
         self
     }
 
+    /// Show a count in a small pill after the label, for example `Problems [13]`.
+    ///
+    /// The text is drawn as given, so the caller formats it (`"13"`, `"99+"`). The pill is never
+    /// truncated: call this before [`Self::fit_width`] so the fitted width reserves it. No count
+    /// is shown by default.
+    ///
+    /// Args:
+    ///     count: Count text.
+    ///
+    /// Returns:
+    ///     The updated item.
+    pub fn count(mut self, count: impl Into<SharedString>) -> Self {
+        self.count = Some(count.into());
+        self
+    }
+
+    /// Choose the tone of the count pill; [`MoonTone::Default`] (neutral) by default.
+    ///
+    /// [`MoonTone::Danger`], [`MoonTone::Warning`] and [`MoonTone::Info`] give the red, amber and
+    /// blue pills. The pill is a soft tone wash whose label clears the AA contrast floor in both
+    /// built-in palettes, selected or not.
+    ///
+    /// Args:
+    ///     tone: Tone of the count pill.
+    ///
+    /// Returns:
+    ///     The updated item.
+    pub fn count_tone(mut self, tone: MoonTone) -> Self {
+        self.count_tone = tone;
+        self
+    }
+
     /// Fit this item's rendered width between font-scaled design-reference bounds.
     ///
     /// The method runs before render so a parent can use [`Self::resolved_width`] for layout
-    /// budgeting. It truncates only the label; the hotkey and the component's own scaled padding
-    /// and gap, as set by [`Self::density`], remain reserved.
+    /// budgeting. It truncates only the label; the hotkey, the count pill set by [`Self::count`]
+    /// and the component's own scaled padding and gap, as set by [`Self::density`], remain
+    /// reserved.
     ///
     /// Args:
     ///     cx: Application context used for theme-aware text measurement.
@@ -385,7 +464,20 @@ impl MoonSegmentItem {
         let min_width = tokens.font_width(min_width);
         let max_width = tokens.font_width(max_width).max(min_width);
         let (gap, pad_x) = segment_density_chrome(self.density, !self.hotkey.is_empty());
-        let chrome_width = tokens.ui(pad_x) * 2.0 + tokens.ui(gap);
+        let count_width = self.count.as_ref().map_or(0.0, |count| {
+            segment_count_reserve(
+                &tokens,
+                measure_text_width(
+                    cx,
+                    &tokens,
+                    count,
+                    SEGMENT_COUNT_SIZE,
+                    SEGMENT_COUNT_WEIGHT,
+                    true,
+                ),
+            )
+        });
+        let chrome_width = tokens.ui(pad_x) * 2.0 + tokens.ui(gap) + count_width;
         let hotkey = self.hotkey.clone();
         let label = self.label.clone();
         let (label, width) = fit_segment_item(
@@ -721,6 +813,29 @@ impl MoonSegmentedControl {
                             .uppercase(false)
                             .render(),
                     );
+                if let Some(count) = item.count {
+                    let (pill_fill, pill_label) = count_pill_colors(item.count_tone, p);
+                    cell = cell.child(
+                        div()
+                            .debug_selector(move || format!("moon-segment-count:{ix}"))
+                            .flex_none()
+                            .ml(px(tokens.ui(SEGMENT_COUNT_GAP) - chrome.gap))
+                            .px(px(tokens.ui(SEGMENT_COUNT_PAD_X)))
+                            .rounded(px(tokens.ui(SEGMENT_COUNT_RADIUS)))
+                            .bg(rgba_from(pill_fill, if disabled { 0.40 } else { 1.0 }))
+                            .child(
+                                MoonText::new(count)
+                                    .color(pill_label)
+                                    .alpha(if disabled { 0.40 } else { 1.0 })
+                                    .font_size(SEGMENT_COUNT_SIZE)
+                                    .line_height(SEGMENT_COUNT_LINE)
+                                    .weight(SEGMENT_COUNT_WEIGHT)
+                                    .mono(true)
+                                    .uppercase(false)
+                                    .render(),
+                            ),
+                    );
+                }
             }
 
             if selected && !filled {

@@ -469,6 +469,7 @@
         "segmented_control.fitted_interaction",
         "segmented_control.filled_selection",
         "segmented_control.density",
+        "segmented_control.count_pill",
         "gallery.visual_coverage"
       ]
     },

@@ -1015,6 +1015,46 @@ impl Gallery {
                                         },
                                     ))
                                     .render(),
+                            )
+                            // Count pills: a neutral, red, amber and blue count after the label,
+                            // reserved by the fitted width and legible on the selected fill.
+                            .child(
+                                MoonSegmentedControl::new("segmented-counts")
+                                    .selection(MoonSegmentSelection::Filled)
+                                    .density(MoonSegmentDensity::Compact)
+                                    .accent(MoonAccent::Blue)
+                                    .item_gap(0.0)
+                                    .items(
+                                        [
+                                            ("All", "24", MoonTone::Default),
+                                            ("Problems", "13", MoonTone::Danger),
+                                            ("Behind", "3", MoonTone::Warning),
+                                            ("Updating", "1", MoonTone::Info),
+                                        ]
+                                        .into_iter()
+                                        .enumerate()
+                                        .map(|(ix, (label, count, tone))| {
+                                            MoonSegmentItem::new("", label)
+                                                .count(count)
+                                                .count_tone(tone)
+                                                .density(MoonSegmentDensity::Compact)
+                                                .fit_width(cx, 34.0, 160.0)
+                                                .selected(self.segment_index == ix)
+                                        }),
+                                    )
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |ix, _, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.segment_index = ix;
+                                                this.push_event(
+                                                    format!("Counted segment selected: {ix}"),
+                                                    cx,
+                                                );
+                                            });
+                                        }
+                                    })
+                                    .render(),
                             ),
                     ),
             )

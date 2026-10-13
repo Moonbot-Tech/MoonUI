@@ -3507,6 +3507,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn count(mut self, count: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn count_tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn density(mut self, density: MoonSegmentDensity) -> Self"
     },
     {

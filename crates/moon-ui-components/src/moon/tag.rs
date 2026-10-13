@@ -190,6 +190,25 @@ fn soft_label(tone: MoonTone, color: u32, fill: u32, p: MoonPalette) -> u32 {
         .unwrap_or(p.text)
 }
 
+/// The opaque tone wash and its readable label, as a soft tag paints them on the panel.
+///
+/// Shared by every Moon count badge that sits on a soft tone wash, so a segment count pill and a
+/// soft tag of the same tone are the same two colours. The fill is returned opaque (already
+/// composited over the panel), which lets a caller paint it on any surface — including a solid
+/// accent fill — without the label's measured contrast changing.
+///
+/// Args:
+///     tone: Tone of the wash.
+///     p: Palette to paint with.
+///
+/// Returns:
+///     `(fill, label)` as opaque `0xRRGGBB` colours.
+pub(super) fn tone_wash(tone: MoonTone, p: MoonPalette) -> (u32, u32) {
+    let color = tone.color(p);
+    let fill = composite(color, p.panel, SOFT_FILL_ALPHA);
+    (fill, soft_label(tone, color, fill, p))
+}
+
 /// Resolve a tag's paint and geometry.
 ///
 /// The outline variant reproduces the original tag exactly; the label contrast of the soft and
@@ -215,14 +234,11 @@ fn tag_chrome(
     let color = tone.color(p);
     let (border, background, text) = match variant {
         MoonTagVariant::Outline => (rgba_from(color, 0.48), rgba_from(color, 0.0), color),
-        MoonTagVariant::Soft => {
-            let fill = composite(color, p.panel, SOFT_FILL_ALPHA);
-            (
-                rgba_from(color, 0.0),
-                rgba_from(color, SOFT_FILL_ALPHA),
-                soft_label(tone, color, fill, p),
-            )
-        }
+        MoonTagVariant::Soft => (
+            rgba_from(color, 0.0),
+            rgba_from(color, SOFT_FILL_ALPHA),
+            tone_wash(tone, p).1,
+        ),
         MoonTagVariant::Filled => (
             rgba_from(color, 1.0),
             rgba_from(color, 1.0),
