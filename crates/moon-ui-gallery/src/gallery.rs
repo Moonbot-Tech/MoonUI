@@ -31,6 +31,7 @@ pub(super) struct Gallery {
     settings_mode: Rc<RefCell<SharedString>>,
     settings_risk: Rc<Cell<f64>>,
     segment_index: usize,
+    chip_filter: Option<usize>,
     /// Index of the picked card in the NewControls theme-card example.
     theme_card_index: usize,
     tab_index: usize,
@@ -348,6 +349,7 @@ impl Gallery {
             settings_mode: Rc::new(RefCell::new(SharedString::from("paper"))),
             settings_risk: Rc::new(Cell::new(2.5)),
             segment_index: 2,
+            chip_filter: None,
             theme_card_index: 0,
             tab_index: 0,
             dropdown_value: SharedString::from("Auto"),
@@ -855,6 +857,39 @@ impl Gallery {
                                     .mono(false)
                                     .child("Filled")
                                     .render(),
+                            )
+                            // Tinted severity chips: the health-strip filters. A zero count goes
+                            // neutral and dimmed; a click toggles the accent-ringed filter.
+                            .children(
+                                [
+                                    ("Offline", 2, MoonTone::Danger),
+                                    ("Ping over 400 ms", 0, MoonTone::Warning),
+                                    ("Version behind", 3, MoonTone::Warning),
+                                    ("Updating", 1, MoonTone::Info),
+                                ]
+                                .into_iter()
+                                .enumerate()
+                                .map(|(ix, (label, count, tone))| {
+                                    let view = view.clone();
+                                    MoonTag::new()
+                                        .variant(MoonTagVariant::Tinted)
+                                        .radius(MoonTagRadius::Small)
+                                        .mono(false)
+                                        .severity_count(count, tone)
+                                        .selected(self.chip_filter == Some(ix))
+                                        .child(label)
+                                        .on_click(("tinted-chip", ix), move |_, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.chip_filter = if this.chip_filter == Some(ix) {
+                                                    None
+                                                } else {
+                                                    Some(ix)
+                                                };
+                                                this.push_event(format!("Chip filter: {label}"), cx);
+                                            });
+                                        })
+                                        .render()
+                                }),
                             )
                             .child(
                                 MoonProgress::new("moon-progress-positive")

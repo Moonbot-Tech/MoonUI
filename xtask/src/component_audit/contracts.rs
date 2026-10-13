@@ -371,6 +371,19 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "tags must keep the outline pill by default, and soft or filled tags must keep their labels above the contrast floor on both palettes",
         ),
         test_contract(
+            "tag.severity_chip",
+            ContractSeverity::Guardrail,
+            &[
+                "tinted_chip_label_and_count_clear_the_contrast_floor",
+                "neutral_tinted_chip_stays_plain",
+                "severity_count_goes_neutral_and_dimmed_only_at_zero",
+                "a_new_tag_has_no_count_click_or_selection",
+                "clickable_tag_dispatches_its_click",
+            ],
+            &tests,
+            "tinted severity chips must keep label and count above the contrast floor, go neutral and dimmed at zero, stay inert by default, and dispatch their click",
+        ),
+        test_contract(
             "color_picker.trigger_style",
             ContractSeverity::Guardrail,
             &[

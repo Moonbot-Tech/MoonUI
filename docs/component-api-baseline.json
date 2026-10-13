@@ -4563,7 +4563,15 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn count(mut self, count: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn danger() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn dimmed(mut self, dimmed: bool) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
@@ -4580,6 +4588,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn new() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn on_click( mut self, id: impl Into<ElementId>, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, ) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
@@ -4600,6 +4612,14 @@
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn rounded_full(mut self) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn severity_count(mut self, count: usize, tone: MoonTone) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
