@@ -339,6 +339,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn dropdown_caret(mut self, dropdown_caret: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn font_size(mut self, font_size: f32) -> Self"
     },
     {
@@ -1832,6 +1836,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn trigger_caret(mut self, visible: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_caret_end(mut self, at_end: bool) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",

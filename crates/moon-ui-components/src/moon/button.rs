@@ -326,6 +326,7 @@ pub struct MoonButton {
     on_click: Option<std::rc::Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>>,
     tab_index: isize,
     tab_stop: bool,
+    dropdown_caret: bool,
 }
 
 impl MoonButton {
@@ -360,6 +361,7 @@ impl MoonButton {
             on_click: None,
             tab_index: 0,
             tab_stop: true,
+            dropdown_caret: false,
         }
     }
 
@@ -534,6 +536,18 @@ impl MoonButton {
         self
     }
 
+    /// Pin a chevron to the button's right edge and left-align the label, as a select draws it.
+    ///
+    /// Args:
+    ///     dropdown_caret: Whether the chevron is drawn.
+    ///
+    /// Returns:
+    ///     The updated button.
+    pub fn dropdown_caret(mut self, dropdown_caret: bool) -> Self {
+        self.dropdown_caret = dropdown_caret;
+        self
+    }
+
     pub fn on_click(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -574,7 +588,8 @@ impl RenderOnce for MoonButton {
             .disabled(self.disabled)
             .loading(self.loading)
             .tab_index(self.tab_index)
-            .tab_stop(self.tab_stop);
+            .tab_stop(self.tab_stop)
+            .dropdown_caret(self.dropdown_caret);
 
         match size {
             MoonButtonSize::Tier(tier) => {
