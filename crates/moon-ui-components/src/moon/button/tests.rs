@@ -2,9 +2,11 @@
 
 use super::super::{MoonDisclosureDirection, MoonPalette, MoonSize};
 use super::{
-    MoonButton, MoonButtonIconSlot, MoonButtonSize, MoonTheme, MoonThemeTokens,
-    button_text_metrics, tier_button_metrics,
+    MoonButton, MoonButtonIconSlot, MoonButtonSize, MoonButtonVariant, MoonTheme, MoonThemeTokens,
+    SOLID_LABEL_CONTRAST_FLOOR, button_text_metrics, contrast_ratio, solid_colors,
+    tier_button_metrics,
 };
+use crate::button::ButtonVariant;
 
 /// Catches ignoring `button.rs:MoonButton::width` or `full_width` during rendering, which would
 /// make fixed controls use content width or prevent full-row actions from filling their parent.
@@ -474,5 +476,73 @@ fn tier_compat_surfaces_return_the_tiers_own_numbers() {
         crate::Size::from(MoonButtonSize::Tier(MoonSize::Xl)),
         crate::Size::Large,
         "Tier(Xl) must snap before crossing into crate::Size"
+    );
+}
+
+/// Blend `fg` over `bg` at `alpha`, computed here independently of any widget helper.
+fn blend(fg: u32, bg: u32, alpha: f32) -> u32 {
+    let channel = |shift: u32| {
+        let f = ((fg >> shift) & 0xFF) as f32;
+        let b = ((bg >> shift) & 0xFF) as f32;
+        ((f * alpha + b * (1.0 - alpha)).round() as u32) << shift
+    };
+    channel(16) | channel(8) | channel(0)
+}
+
+/// Catches a solid primary button whose label drops under the AA floor in any palette or state —
+/// white on the light palette's bright accent measures 2.97:1 — and a fill that drifts off the
+/// palette accent. Hover and pressed fills are recomposited here over the panel they sit on.
+#[test]
+fn solid_label_clears_the_contrast_floor_in_every_palette_and_state() {
+    for palette in [
+        MoonPalette::TERMINAL,
+        MoonPalette::LIGHT,
+        MoonPalette::GRAPHITE,
+    ] {
+        let solid = solid_colors(palette);
+        assert_eq!(solid.fill, palette.accent);
+        for alpha in [1.0, solid.hover_alpha, solid.active_alpha] {
+            let fill = blend(palette.accent, palette.panel, alpha);
+            let ratio = contrast_ratio(solid.label, fill);
+            assert!(
+                ratio >= SOLID_LABEL_CONTRAST_FLOOR,
+                "solid label {:06X} on {fill:06X}: {ratio:.2}",
+                solid.label
+            );
+        }
+    }
+}
+
+/// Catches the solid label ignoring `on_accent` where it is legible: the mockup's primary button
+/// is white on the accent, and the dark palettes must not trade it for a body-text ink.
+#[test]
+fn solid_label_prefers_on_accent_where_it_is_legible() {
+    for palette in [
+        MoonPalette::TERMINAL,
+        MoonPalette::LIGHT,
+        MoonPalette::GRAPHITE,
+    ] {
+        let solid = solid_colors(palette);
+        let on_accent_legible =
+            contrast_ratio(palette.on_accent, palette.accent) >= SOLID_LABEL_CONTRAST_FLOOR;
+        assert_eq!(solid.label == palette.on_accent, on_accent_legible);
+    }
+}
+
+/// Catches the new variant leaking into the existing palette-free conversion, which every
+/// existing button goes through: the old variants must still map exactly as before.
+#[test]
+fn existing_variants_keep_their_native_mapping() {
+    assert_eq!(
+        ButtonVariant::from(MoonButtonVariant::Neutral),
+        ButtonVariant::Default
+    );
+    assert_eq!(
+        ButtonVariant::from(MoonButtonVariant::Blue),
+        ButtonVariant::Blue
+    );
+    assert_eq!(
+        ButtonVariant::from(MoonButtonVariant::Solid),
+        ButtonVariant::Primary
     );
 }

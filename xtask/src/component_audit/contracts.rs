@@ -47,6 +47,17 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &tests,
             "MoonButton width/full_width builders must preserve layout intent",
         ),
+        test_contract(
+            "button.solid_variant",
+            ContractSeverity::Guardrail,
+            &[
+                "solid_label_clears_the_contrast_floor_in_every_palette_and_state",
+                "solid_label_prefers_on_accent_where_it_is_legible",
+                "existing_variants_keep_their_native_mapping",
+            ],
+            &tests,
+            "the solid primary button must keep its label above the contrast floor on every palette and state without changing how existing variants map",
+        ),
         pass_if(
             "button.mono_font",
             ContractSeverity::Critical,

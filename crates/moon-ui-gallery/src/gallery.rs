@@ -624,6 +624,15 @@ impl Gallery {
                                     .render(),
                             )
                             .child(
+                                MoonButton::new("btn-solid")
+                                    .label("Solid")
+                                    .variant(MoonButtonVariant::Solid)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.push_event("Solid button clicked".to_string(), cx);
+                                    }))
+                                    .render(),
+                            )
+                            .child(
                                 MoonButton::new("btn-blue")
                                     .label("Blue")
                                     .variant(MoonButtonVariant::Blue)

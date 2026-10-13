@@ -1,4 +1,4 @@
-use crate::button::{Button, ButtonRounded, ButtonVariant, ButtonVariants};
+use crate::button::{Button, ButtonCustomVariant, ButtonRounded, ButtonVariant, ButtonVariants};
 use crate::{Disableable, Icon, Selectable, Sizable};
 use gpui::prelude::FluentBuilder as _;
 use gpui::*;
@@ -8,8 +8,16 @@ use super::{
     foundation::MoonSize,
     icons::MOON_ICON_CARET_DOWN,
     theme::{MoonTheme, MoonThemeTokens},
-    tokens::{MoonRect, rgb_from},
+    tokens::{MoonPalette, MoonRect, contrast_ratio, rgb_from, rgba_from},
 };
+
+/// The WCAG 2.x contrast floor a [`MoonButtonVariant::Solid`] label must clear on its fill, in
+/// every interaction state. AA for normal-size text: button labels render at 11-13px.
+const SOLID_LABEL_CONTRAST_FLOOR: f32 = 4.5;
+/// Fill opacity of a hovered [`MoonButtonVariant::Solid`] button.
+const SOLID_HOVER_ALPHA: f32 = 0.90;
+/// Fill opacity of a pressed or selected [`MoonButtonVariant::Solid`] button.
+const SOLID_ACTIVE_ALPHA: f32 = 0.80;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoonButtonVariant {
@@ -25,6 +33,12 @@ pub enum MoonButtonVariant {
     OutlineRed,
     Ghost,
     Bare,
+    /// The primary action: a solid accent fill with a label in the palette ink that reads on it.
+    ///
+    /// The label is `on_accent` wherever that clears the AA contrast floor on the accent, and
+    /// otherwise the palette ink with the highest contrast against it, so the variant stays
+    /// legible on every palette rather than only the one it was drawn for.
+    Solid,
 }
 
 impl From<MoonButtonVariant> for ButtonVariant {
@@ -42,8 +56,68 @@ impl From<MoonButtonVariant> for ButtonVariant {
             MoonButtonVariant::OutlineRed => ButtonVariant::OutlineRed,
             MoonButtonVariant::Ghost => ButtonVariant::Ghost,
             MoonButtonVariant::Bare => ButtonVariant::Bare,
+            // The solid fill needs the active palette, which this conversion has no access to;
+            // `MoonButton` resolves it at render through `solid_variant`. A bare conversion gets
+            // the nearest palette-free variant, the primary accent tint.
+            MoonButtonVariant::Solid => ButtonVariant::Primary,
         }
     }
+}
+
+/// Resolved colours of a [`MoonButtonVariant::Solid`] button, as opaque `0xRRGGBB` values plus the
+/// fill opacities of its interaction states.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct SolidColors {
+    fill: u32,
+    label: u32,
+    hover_alpha: f32,
+    active_alpha: f32,
+}
+
+/// Resolve the fill and label of a solid button for `p`.
+///
+/// The fill is the palette accent. The label prefers `on_accent` (the mockup's white-on-accent)
+/// and falls back to [`MoonPalette::ink_on`] where `on_accent` would sit under the AA floor — the
+/// light palette's bright `#009DFF` accent reads 2.97:1 under white but well over 4.5:1 under the
+/// body text.
+///
+/// Args:
+///     p: Palette the button paints with.
+///
+/// Returns:
+///     The resolved [`SolidColors`].
+fn solid_colors(p: MoonPalette) -> SolidColors {
+    let fill = p.accent;
+    let label = if contrast_ratio(p.on_accent, fill) >= SOLID_LABEL_CONTRAST_FLOOR {
+        p.on_accent
+    } else {
+        p.ink_on(fill)
+    };
+    SolidColors {
+        fill,
+        label,
+        hover_alpha: SOLID_HOVER_ALPHA,
+        active_alpha: SOLID_ACTIVE_ALPHA,
+    }
+}
+
+/// Build the native custom variant that paints a [`MoonButtonVariant::Solid`] button.
+///
+/// Args:
+///     p: Palette the button paints with.
+///     cx: Application context the native custom variant is seeded from.
+///
+/// Returns:
+///     A custom button variant with the solid fill, its hover and active states, and the label.
+fn solid_variant(p: MoonPalette, cx: &App) -> ButtonVariant {
+    let colors = solid_colors(p);
+    ButtonVariant::Custom(
+        ButtonCustomVariant::new(cx)
+            .color(rgba_from(colors.fill, 1.0))
+            .hover(rgba_from(colors.fill, colors.hover_alpha))
+            .active(rgba_from(colors.fill, colors.active_alpha))
+            .foreground(rgba_from(colors.label, 1.0)),
+    )
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -582,8 +656,12 @@ impl RenderOnce for MoonButton {
             MoonButtonSize::Tier(tier) => MoonButtonSize::tier_icon_size(tier),
             MoonButtonSize::Custom { .. } => 12.0,
         };
+        let variant = match self.variant {
+            MoonButtonVariant::Solid => solid_variant(MoonPalette::active(cx), cx),
+            variant => variant.into(),
+        };
         let mut button = Button::new(self.id)
-            .with_variant(self.variant.into())
+            .with_variant(variant)
             .selected(self.selected)
             .disabled(self.disabled)
             .loading(self.loading)
