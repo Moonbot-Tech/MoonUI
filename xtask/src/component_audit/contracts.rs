@@ -47,6 +47,17 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             &tests,
             "MoonButton width/full_width builders must preserve layout intent",
         ),
+        test_contract(
+            "button.solid_variant",
+            ContractSeverity::Guardrail,
+            &[
+                "solid_label_clears_the_contrast_floor_in_every_palette_and_state",
+                "solid_label_prefers_on_accent_where_it_is_legible",
+                "existing_variants_keep_their_native_mapping",
+            ],
+            &tests,
+            "the solid primary button must keep its label above the contrast floor on every palette and state without changing how existing variants map",
+        ),
         pass_if(
             "button.mono_font",
             ContractSeverity::Critical,
@@ -336,6 +347,87 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "fitted segmented cells must keep viable pre-render widths, reserve replacement width for inline content, and gate rendered native interactions",
         ),
         test_contract(
+            "segmented_control.filled_selection",
+            ContractSeverity::Guardrail,
+            &[
+                "a_new_control_keeps_the_underline_selection",
+                "filled_label_clears_the_contrast_floor_on_its_fill_in_both_themes",
+                "only_a_gapless_filled_strip_joins_into_one_outline",
+                "joined_filled_cells_abut_and_keep_their_widths",
+            ],
+            &tests,
+            "segmented controls must default to the underline selection, keep filled labels legible on their fill, and join gapless filled items without widening them",
+        ),
+        test_contract(
+            "tag.variants",
+            ContractSeverity::Guardrail,
+            &[
+                "default_tag_keeps_the_original_outline_pill",
+                "soft_and_filled_labels_clear_the_contrast_floor",
+                "soft_and_filled_paint_their_fill_not_a_border",
+                "small_radius_and_compact_geometry_match_the_status_chip",
+            ],
+            &tests,
+            "tags must keep the outline pill by default, and soft or filled tags must keep their labels above the contrast floor on both palettes",
+        ),
+        test_contract(
+            "tag.severity_chip",
+            ContractSeverity::Guardrail,
+            &[
+                "tinted_chip_label_and_count_clear_the_contrast_floor",
+                "neutral_tinted_chip_stays_plain",
+                "severity_count_goes_neutral_and_dimmed_only_at_zero",
+                "a_new_tag_has_no_count_click_or_selection",
+                "clickable_tag_dispatches_its_click",
+                "dimmed_label_stays_above_the_contrast_floor",
+            ],
+            &tests,
+            "tinted severity chips must keep label and count above the contrast floor, go neutral and dimmed at zero, stay inert by default, and dispatch their click",
+        ),
+        test_contract(
+            "color_picker.trigger_style",
+            ContractSeverity::Guardrail,
+            &[
+                "default_trigger_keeps_the_original_field",
+                "swatch_trigger_is_a_frameless_mockup_sized_swatch",
+                "swatch_trigger_follows_the_ui_scale",
+            ],
+            &tests,
+            "colour pickers must keep the 128px field trigger by default, and the swatch trigger must be a frameless scaled swatch with an optional hex label",
+        ),
+        test_contract(
+            "number_input.value_room",
+            ContractSeverity::Guardrail,
+            &[
+                "the_widest_value_is_the_longest_range_end_or_six_open_digits",
+                "the_width_floor_adds_buttons_padding_value_and_unit",
+                "a_content_sized_number_input_keeps_room_for_its_value",
+            ],
+            &tests,
+            "number inputs must keep room for their widest value and unit between the buttons, even in a content-sized row",
+        ),
+        test_contract(
+            "segmented_control.density",
+            ContractSeverity::Guardrail,
+            &[
+                "regular_density_keeps_the_original_cell_chrome",
+                "compact_density_tightens_padding_and_drops_an_empty_hotkey_gap",
+                "compact_cells_fit_narrower_and_render_at_their_fitted_width",
+            ],
+            &tests,
+            "segmented controls must keep the regular cell geometry by default, and a compact control must fit and render narrower cells at their fitted width",
+        ),
+        test_contract(
+            "segmented_control.count_pill",
+            ContractSeverity::Guardrail,
+            &[
+                "count_pill_label_clears_the_contrast_floor_in_both_themes",
+                "counted_item_reserves_its_pill_and_renders_it_inside_the_cell",
+            ],
+            &tests,
+            "segment count pills must keep their digits above the contrast floor in every tone on both palettes, and a fitted cell must reserve and contain its pill",
+        ),
+        test_contract(
             "select.open_select_lifecycle",
             ContractSeverity::Guardrail,
             &[
@@ -387,11 +479,56 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             "time drums must wrap in both directions, follow the platform scroll direction, move exactly one value per wheel notch regardless of the system lines-per-scroll setting, accumulate sub-row trackpad movement, walk whole minute steps, and read back as zero-padded hh:mm",
         ),
         test_contract(
+            "number_input.step_behavior",
+            ContractSeverity::Guardrail,
+            &[
+                "up_and_down_keys_step_and_clamp_to_the_range",
+                "partial_and_empty_entries_have_no_value",
+                "seed_values_clamp_into_the_range",
+            ],
+            &tests,
+            "number inputs must step by the configured step on Up/Down, clamp to min/max, and never read a half-typed entry as a value",
+        ),
+        test_contract(
+            "stacked_bar.proportions",
+            ContractSeverity::Guardrail,
+            &[
+                "a_larger_total_leaves_the_rest_of_the_track_empty",
+                "overflowing_segments_are_scaled_to_fit_the_bar",
+                "unusable_amounts_draw_nothing",
+                "rendered_segments_take_their_share_of_the_track",
+            ],
+            &tests,
+            "stacked bars must draw each segment at its share of the larger of total and sum, ignore unusable amounts, and never spill past the track",
+        ),
+        test_contract(
+            "selectable_card.selection_behavior",
+            ContractSeverity::Guardrail,
+            &[
+                "only_the_selected_card_takes_the_accent_border",
+                "cards_select_by_click_and_keyboard_but_not_when_disabled",
+            ],
+            &tests,
+            "selectable cards must show an accent border only when selected, select by click and by Space on the focused card, and ignore a disabled card",
+        ),
+        test_contract(
             "stepper.value_behavior",
             ContractSeverity::Guardrail,
             &["stepper_next_value_clamps_to_range_and_positive_step"],
             &tests,
             "stepper value changes must clamp to min/max and normalize non-positive steps",
+        ),
+        test_contract(
+            "steps.state_layout",
+            ContractSeverity::Guardrail,
+            &[
+                "steps_before_the_current_one_are_done_and_after_it_pending",
+                "only_done_markers_are_filled_and_pending_steps_lose_the_accent",
+                "a_narrow_row_wraps_and_a_wide_one_stays_on_one_line",
+                "vertical_steps_stack_one_below_another",
+            ],
+            &tests,
+            "step indicators must derive done/current/pending from the current index, keep the states visually distinct, and wrap or stack instead of squeezing",
         ),
         test_contract(
             "toggle.click_behavior",

@@ -70,7 +70,7 @@
       "upstream_ref": "Longbridge::button@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": "Reviewed TrackedFork drift: Moon width/mono/style hooks and regression tests live in base button files; Longbridge button behavior remains source-owned",
       "donor_drift_budget": 3,
-      "contracts": ["button.click", "button.width_api", "button.mono_font", "gallery.visual_coverage"]
+      "contracts": ["button.click", "button.width_api", "button.mono_font", "button.solid_variant", "gallery.visual_coverage"]
     },
     {
       "concept": "button_segment",
@@ -141,7 +141,7 @@
       "public_path": "moon_ui::MoonColorPicker",
       "upstream_ref": "Longbridge::color_picker@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "fork_reason": null,
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["color_picker.trigger_style", "gallery.visual_coverage"]
     },
     {
       "concept": "combobox",
@@ -467,6 +467,9 @@
       "fork_reason": "MoonBot toolbar/page control styling",
       "contracts": [
         "segmented_control.fitted_interaction",
+        "segmented_control.filled_selection",
+        "segmented_control.density",
+        "segmented_control.count_pill",
         "gallery.visual_coverage"
       ]
     },
@@ -565,6 +568,30 @@
       "contracts": ["gallery.visual_coverage"]
     },
     {
+      "concept": "number_input",
+      "class": "Forged",
+      "behavior_source": "Moon tier-sized wrapper over the base number input",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonNumberInput",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot typed numeric settings entry with a unit suffix and range clamping",
+      "contracts": [
+        "number_input.step_behavior",
+        "number_input.value_room",
+        "gallery.visual_coverage"
+      ]
+    },
+    {
+      "concept": "selectable_card",
+      "class": "Forged",
+      "behavior_source": "Moon focusable selectable content card",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSelectableCard",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot theme-picker cards: arbitrary preview content with an accent selected state and keyboard selection",
+      "contracts": ["selectable_card.selection_behavior", "gallery.visual_coverage"]
+    },
+    {
       "concept": "stepper",
       "class": "Forged",
       "behavior_source": "Moon designer-stand numeric stepper renderer",
@@ -573,6 +600,16 @@
       "upstream_ref": null,
       "fork_reason": "MoonBot compact numeric [-] value [+] control",
       "contracts": ["stepper.value_behavior", "gallery.visual_coverage"]
+    },
+    {
+      "concept": "steps",
+      "class": "Forged",
+      "behavior_source": "Moon numbered step indicator",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonSteps",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot install/login progress with Moon-palette done/current/pending markers; the Longbridge stepper is icon-based and not Moon-themed",
+      "contracts": ["steps.state_layout", "gallery.visual_coverage"]
     },
     {
       "concept": "progress",
@@ -584,6 +621,16 @@
       "fork_reason": "Reviewed TrackedFork drift: Moon progress circle style hook shares the base progress module; Longbridge progress behavior remains source-owned",
       "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
+    },
+    {
+      "concept": "stacked_bar",
+      "class": "Forged",
+      "behavior_source": "Moon multi-segment usage bar",
+      "theme_source": "MoonTheme tokens",
+      "public_path": "moon_ui::MoonStackedBar",
+      "upstream_ref": null,
+      "fork_reason": "MoonBot storage-usage split; the Longbridge progress draws a single value",
+      "contracts": ["stacked_bar.proportions", "gallery.visual_coverage"]
     },
     {
       "concept": "progress_circle",
@@ -645,7 +692,7 @@
       "public_path": "moon_ui::MoonTag",
       "upstream_ref": null,
       "fork_reason": "Moon density, typography, tone, and status-pill styling",
-      "contracts": ["gallery.visual_coverage"]
+      "contracts": ["tag.variants", "tag.severity_chip", "gallery.visual_coverage"]
     },
     {
       "concept": "tab_strip",

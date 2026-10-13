@@ -4,9 +4,10 @@ use std::rc::Rc;
 
 use super::{
     foundation::{MoonIndexedClickHandler, MoonSize, accent_underline_colored},
+    tag::tone_wash,
     text::{MoonText, fit_text_to_width, measure_text_width},
     theme::{MoonTheme, MoonThemeTokens},
-    tokens::{MoonPalette, MoonRect, contrast_ratio, rgba_from},
+    tokens::{MoonPalette, MoonRect, MoonTone, contrast_ratio, rgba_from},
     tooltip::MoonTooltipView,
 };
 
@@ -18,17 +19,80 @@ pub enum MoonAccent {
     Red,
 }
 
+/// How a [`MoonSegmentedControl`] marks its selected item.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MoonSegmentSelection {
+    /// Accent-coloured label with a glowing accent underline on the panel background.
+    #[default]
+    Underline,
+    /// Accent-filled cell with a contrasting label. With an item gap of `0.0` the items join into
+    /// one bordered strip separated by hairlines.
+    Filled,
+}
+
+/// How much horizontal room a [`MoonSegmentedControl`] gives each cell around its text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MoonSegmentDensity {
+    /// The original geometry: generous side padding and a hotkey gap on every cell.
+    #[default]
+    Regular,
+    /// Toolbar preset-strip geometry: tight side padding, and no hotkey gap on a cell whose
+    /// hotkey hint is empty. Height and font still follow the size tier.
+    Compact,
+}
+
 /// The WCAG 2.x contrast floor the selected label must clear against the panel.
 ///
 /// AA for normal-size text. The label renders at 11px, below the 18px/14px-bold threshold that
 /// would let the 3:1 large-text floor apply.
 const LABEL_CONTRAST_FLOOR: f32 = 4.5;
 const SEGMENT_PAD_X: f32 = 11.0;
+/// Design-reference side padding of a [`MoonSegmentDensity::Compact`] cell.
+const SEGMENT_COMPACT_PAD_X: f32 = 8.0;
 const SEGMENT_GAP: f32 = 5.0;
 const SEGMENT_HOTKEY_SIZE: f32 = 8.5;
 const SEGMENT_HOTKEY_WEIGHT: f32 = 400.0;
 const SEGMENT_LABEL_SIZE: f32 = 11.0;
 const SEGMENT_LABEL_FIT_WEIGHT: f32 = 500.0;
+/// Design-reference corner radius of a filled strip, or of each filled cell when items are apart.
+const SEGMENT_FILL_RADIUS: f32 = 4.0;
+/// Design-reference gap between a cell's label and its count pill.
+const SEGMENT_COUNT_GAP: f32 = 6.0;
+/// Design-reference side padding inside a count pill.
+const SEGMENT_COUNT_PAD_X: f32 = 5.0;
+/// Design-reference corner radius of a count pill.
+const SEGMENT_COUNT_RADIUS: f32 = 3.0;
+/// Font size, line height and weight of a count pill's digits.
+const SEGMENT_COUNT_SIZE: f32 = 10.0;
+const SEGMENT_COUNT_LINE: f32 = 12.0;
+const SEGMENT_COUNT_WEIGHT: f32 = 500.0;
+
+/// Outline drawn around filled segments, resolved from the selection style and item gap.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SegmentFillFrame {
+    /// Underline style: no outline at all, exactly as before the filled style existed.
+    None,
+    /// Filled items touching each other: one outline around the strip, hairlines between items.
+    JoinedStrip,
+    /// Filled items with a gap: every item carries its own outline and radius.
+    SeparateCells,
+}
+
+/// Resolve the outline a segmented control draws for its selection style.
+///
+/// Args:
+///     selection: Selection style of the control.
+///     item_gap: Design-reference gap between items.
+///
+/// Returns:
+///     The frame policy the renderer applies.
+fn segment_fill_frame(selection: MoonSegmentSelection, item_gap: f32) -> SegmentFillFrame {
+    match selection {
+        MoonSegmentSelection::Underline => SegmentFillFrame::None,
+        MoonSegmentSelection::Filled if item_gap <= 0.0 => SegmentFillFrame::JoinedStrip,
+        MoonSegmentSelection::Filled => SegmentFillFrame::SeparateCells,
+    }
+}
 
 /// Label and hotkey text metrics for the active tier: `(label_size, label_line, hotkey_size, hotkey_line)`.
 ///
@@ -90,26 +154,83 @@ fn segment_cell_interaction(
     }
 }
 
+/// Resolve the design-reference hotkey gap and side padding of a normal cell.
+///
+/// Fitting and rendering both read this, so a fitted width always matches the drawn chrome.
+///
+/// Args:
+///     density: Density of the control.
+///     has_hotkey: Whether the cell shows a non-empty hotkey hint.
+///
+/// Returns:
+///     Unscaled `(gap, pad_x)`.
+fn segment_density_chrome(density: MoonSegmentDensity, has_hotkey: bool) -> (f32, f32) {
+    match density {
+        MoonSegmentDensity::Regular => (SEGMENT_GAP, SEGMENT_PAD_X),
+        MoonSegmentDensity::Compact if has_hotkey => (SEGMENT_GAP, SEGMENT_COMPACT_PAD_X),
+        MoonSegmentDensity::Compact => (0.0, SEGMENT_COMPACT_PAD_X),
+    }
+}
+
 /// Resolve normal cell spacing or release the full width to an inline replacement.
 ///
 /// Args:
 ///     tokens: Active theme tokens used to scale normal cell spacing.
 ///     replaced: Whether inline content replaces the hotkey and label.
+///     density: Density of the control.
+///     has_hotkey: Whether the cell shows a non-empty hotkey hint.
 ///
 /// Returns:
 ///     Scaled gap and horizontal padding for the rendered cell.
-fn segment_cell_chrome(tokens: &MoonThemeTokens, replaced: bool) -> SegmentCellChrome {
+fn segment_cell_chrome(
+    tokens: &MoonThemeTokens,
+    replaced: bool,
+    density: MoonSegmentDensity,
+    has_hotkey: bool,
+) -> SegmentCellChrome {
     if replaced {
         SegmentCellChrome {
             gap: 0.0,
             pad_x: 0.0,
         }
     } else {
+        let (gap, pad_x) = segment_density_chrome(density, has_hotkey);
         SegmentCellChrome {
-            gap: tokens.ui(SEGMENT_GAP),
-            pad_x: tokens.ui(SEGMENT_PAD_X),
+            gap: tokens.ui(gap),
+            pad_x: tokens.ui(pad_x),
         }
     }
+}
+
+/// Resolve the rendered width a count pill adds to its cell.
+///
+/// Fitting reserves exactly this, so a fitted cell with a count never truncates its label to make
+/// room for the pill the renderer then draws.
+///
+/// Args:
+///     tokens: Active theme tokens used to scale the pill chrome.
+///     text_width: Rendered width of the count text.
+///
+/// Returns:
+///     The gap before the pill, its two side paddings and its text, in rendered pixels.
+fn segment_count_reserve(tokens: &MoonThemeTokens, text_width: f32) -> f32 {
+    tokens.ui(SEGMENT_COUNT_GAP) + tokens.ui(SEGMENT_COUNT_PAD_X) * 2.0 + text_width
+}
+
+/// Resolve the `(fill, label)` colours of a count pill in `tone`.
+///
+/// The fill is the soft tag's tone wash made opaque, so the pill reads the same on the panel, on a
+/// hovered cell and on a solid [`MoonSegmentSelection::Filled`] cell; the label is measured
+/// against that fill, which keeps it legible whichever cell state surrounds it.
+///
+/// Args:
+///     tone: Tone of the count.
+///     p: Palette the control paints with.
+///
+/// Returns:
+///     Opaque `(fill, label)` colours.
+fn count_pill_colors(tone: MoonTone, p: MoonPalette) -> (u32, u32) {
+    tone_wash(tone, p)
 }
 
 /// Fit one segment item using already-resolved layout metrics.
@@ -204,6 +325,34 @@ impl MoonAccent {
             .unwrap_or(p.text);
         AccentColors { text, underline }
     }
+
+    /// Resolve this accent to the colours of a selected [`MoonSegmentSelection::Filled`] cell.
+    ///
+    /// The fill is the accent's own hue, the same one the underline style draws its bar with. The
+    /// label sits ON that fill, so it is measured against the fill rather than the panel: it takes
+    /// the first of `on_accent`, `text`, `panel` and `shell` that clears [`LABEL_CONTRAST_FLOOR`], and if
+    /// none does, the one with the highest contrast. Blue and Amber clear the floor in both built-in
+    /// palettes; the dark Green and Red fills are mid-luminance and no role reaches it there.
+    ///
+    /// Args:
+    ///     p: Palette the control paints with.
+    ///
+    /// Returns:
+    ///     `(fill, label)` colours.
+    fn fill_colors(self, p: MoonPalette) -> (u32, u32) {
+        let fill = self.colors(p).underline;
+        let candidates = [p.on_accent, p.text, p.panel, p.shell];
+        let label = candidates
+            .into_iter()
+            .find(|candidate| contrast_ratio(*candidate, fill) >= LABEL_CONTRAST_FLOOR)
+            .unwrap_or_else(|| {
+                candidates
+                    .into_iter()
+                    .max_by(|a, b| contrast_ratio(*a, fill).total_cmp(&contrast_ratio(*b, fill)))
+                    .unwrap_or(p.text)
+            });
+        (fill, label)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -215,6 +364,9 @@ pub struct MoonSegmentItem {
     selected: bool,
     disabled: bool,
     tooltip: Option<SharedString>,
+    density: MoonSegmentDensity,
+    count: Option<SharedString>,
+    count_tone: MoonTone,
 }
 
 impl MoonSegmentItem {
@@ -234,6 +386,9 @@ impl MoonSegmentItem {
             selected: false,
             disabled: false,
             tooltip: None,
+            density: MoonSegmentDensity::Regular,
+            count: None,
+            count_tone: MoonTone::Default,
         }
     }
 
@@ -242,11 +397,59 @@ impl MoonSegmentItem {
         self
     }
 
+    /// Fit this item for a control of the given density; [`MoonSegmentDensity::Regular`] by default.
+    ///
+    /// Call it before [`Self::fit_width`] with the same density the control gets through
+    /// [`MoonSegmentedControl::density`], so the fitted width reserves exactly the drawn chrome.
+    ///
+    /// Args:
+    ///     density: Density of the control this item renders in.
+    ///
+    /// Returns:
+    ///     The updated item.
+    pub fn density(mut self, density: MoonSegmentDensity) -> Self {
+        self.density = density;
+        self
+    }
+
+    /// Show a count in a small pill after the label, for example `Problems [13]`.
+    ///
+    /// The text is drawn as given, so the caller formats it (`"13"`, `"99+"`). The pill is never
+    /// truncated: call this before [`Self::fit_width`] so the fitted width reserves it. No count
+    /// is shown by default.
+    ///
+    /// Args:
+    ///     count: Count text.
+    ///
+    /// Returns:
+    ///     The updated item.
+    pub fn count(mut self, count: impl Into<SharedString>) -> Self {
+        self.count = Some(count.into());
+        self
+    }
+
+    /// Choose the tone of the count pill; [`MoonTone::Default`] (neutral) by default.
+    ///
+    /// [`MoonTone::Danger`], [`MoonTone::Warning`] and [`MoonTone::Info`] give the red, amber and
+    /// blue pills. The pill is a soft tone wash whose label clears the AA contrast floor in both
+    /// built-in palettes, selected or not.
+    ///
+    /// Args:
+    ///     tone: Tone of the count pill.
+    ///
+    /// Returns:
+    ///     The updated item.
+    pub fn count_tone(mut self, tone: MoonTone) -> Self {
+        self.count_tone = tone;
+        self
+    }
+
     /// Fit this item's rendered width between font-scaled design-reference bounds.
     ///
     /// The method runs before render so a parent can use [`Self::resolved_width`] for layout
-    /// budgeting. It truncates only the label; the hotkey and the component's own scaled padding
-    /// and gap remain reserved.
+    /// budgeting. It truncates only the label; the hotkey, the count pill set by [`Self::count`]
+    /// and the component's own scaled padding and gap, as set by [`Self::density`], remain
+    /// reserved.
     ///
     /// Args:
     ///     cx: Application context used for theme-aware text measurement.
@@ -260,7 +463,21 @@ impl MoonSegmentItem {
         let (label_size, _, hotkey_size, _) = segment_text_metrics(&tokens);
         let min_width = tokens.font_width(min_width);
         let max_width = tokens.font_width(max_width).max(min_width);
-        let chrome_width = tokens.ui(SEGMENT_PAD_X) * 2.0 + tokens.ui(SEGMENT_GAP);
+        let (gap, pad_x) = segment_density_chrome(self.density, !self.hotkey.is_empty());
+        let count_width = self.count.as_ref().map_or(0.0, |count| {
+            segment_count_reserve(
+                &tokens,
+                measure_text_width(
+                    cx,
+                    &tokens,
+                    count,
+                    SEGMENT_COUNT_SIZE,
+                    SEGMENT_COUNT_WEIGHT,
+                    true,
+                ),
+            )
+        });
+        let chrome_width = tokens.ui(pad_x) * 2.0 + tokens.ui(gap) + count_width;
         let hotkey = self.hotkey.clone();
         let label = self.label.clone();
         let (label, width) = fit_segment_item(
@@ -324,6 +541,8 @@ pub struct MoonSegmentedControl {
     bounds: Option<MoonRect>,
     items: Vec<MoonSegmentItem>,
     accent: MoonAccent,
+    selection: MoonSegmentSelection,
+    density: MoonSegmentDensity,
     item_gap: f32,
     on_click: Option<MoonIndexedClickHandler>,
     on_scroll: Option<MoonIndexedScrollHandler>,
@@ -344,6 +563,8 @@ impl MoonSegmentedControl {
             bounds: None,
             items: Vec::new(),
             accent: MoonAccent::Amber,
+            selection: MoonSegmentSelection::Underline,
+            density: MoonSegmentDensity::Regular,
             item_gap: 0.0,
             on_click: None,
             on_scroll: None,
@@ -358,6 +579,32 @@ impl MoonSegmentedControl {
 
     pub fn accent(mut self, accent: MoonAccent) -> Self {
         self.accent = accent;
+        self
+    }
+
+    /// Choose how the selected item is marked; [`MoonSegmentSelection::Underline`] by default.
+    ///
+    /// Args:
+    ///     selection: Selection style.
+    ///
+    /// Returns:
+    ///     The updated segmented control.
+    pub fn selection(mut self, selection: MoonSegmentSelection) -> Self {
+        self.selection = selection;
+        self
+    }
+
+    /// Choose the cells' horizontal density; [`MoonSegmentDensity::Regular`] by default.
+    ///
+    /// Fitted items should be fitted with the same density through [`MoonSegmentItem::density`].
+    ///
+    /// Args:
+    ///     density: Cell density.
+    ///
+    /// Returns:
+    ///     The updated segmented control.
+    pub fn density(mut self, density: MoonSegmentDensity) -> Self {
+        self.density = density;
         self
     }
 
@@ -435,9 +682,15 @@ impl MoonSegmentedControl {
     ///     The rendered segmented control.
     pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
         let accent = self.accent.colors(p);
+        let (fill, fill_label) = self.accent.fill_colors(p);
+        let filled = self.selection == MoonSegmentSelection::Filled;
+        let frame = segment_fill_frame(self.selection, self.item_gap);
+        let hairline = px(tokens.ui(1.0));
+        let fill_radius = px(tokens.ui(SEGMENT_FILL_RADIUS));
         let on_click = self.on_click.clone();
         let on_scroll = self.on_scroll.clone();
         let mut replacements = self.replacements;
+        let density = self.density;
         let (label_size, label_line, hotkey_size, hotkey_line) = segment_text_metrics(&tokens);
 
         let mut root = div()
@@ -450,7 +703,13 @@ impl MoonSegmentedControl {
                 14.0,
             )))
             .gap(px(tokens.ui(self.item_gap)))
-            .whitespace_nowrap();
+            .whitespace_nowrap()
+            .when(frame == SegmentFillFrame::JoinedStrip, |this| {
+                this.border(hairline)
+                    .border_color(rgba_from(p.border, 1.0))
+                    .rounded(fill_radius)
+                    .overflow_hidden()
+            });
 
         if let Some(bounds) = self.bounds {
             root = root
@@ -469,9 +728,18 @@ impl MoonSegmentedControl {
                 .position(|(index, _)| *index == ix)
                 .map(|position| replacements.swap_remove(position).1);
             let replaced = replacement.is_some();
-            let key_color = if selected { accent.text } else { p.text_muted };
+            let selected_text = if filled { fill_label } else { accent.text };
+            let key_color = if selected {
+                selected_text
+            } else {
+                p.text_muted
+            };
             let key_alpha = if selected { 0.60 } else { 0.667 };
-            let label_color = if selected { accent.text } else { p.text_muted };
+            let label_color = if selected {
+                selected_text
+            } else {
+                p.text_muted
+            };
             let item_click = on_click.clone();
             let item_scroll = on_scroll.clone();
             let interaction = segment_cell_interaction(
@@ -481,7 +749,7 @@ impl MoonSegmentedControl {
                 item_scroll.is_some(),
                 item.tooltip.is_some(),
             );
-            let chrome = segment_cell_chrome(&tokens, replaced);
+            let chrome = segment_cell_chrome(&tokens, replaced, density, !item.hotkey.is_empty());
 
             let mut cell = div()
                 .id(("segment-item", ix))
@@ -503,6 +771,16 @@ impl MoonSegmentedControl {
                 .when(!selected && !disabled && !replaced, |this| {
                     this.hover(move |this| this.bg(rgba_from(p.overlay, 0.025)))
                         .active(move |this| this.bg(rgba_from(p.overlay, 0.016)))
+                })
+                .when(filled && selected, |this| this.bg(rgba_from(fill, 1.0)))
+                .when(frame == SegmentFillFrame::JoinedStrip && ix > 0, |this| {
+                    this.border_l(hairline)
+                        .border_color(rgba_from(p.border, 1.0))
+                })
+                .when(frame == SegmentFillFrame::SeparateCells, |this| {
+                    this.border(hairline)
+                        .border_color(rgba_from(if selected { fill } else { p.border }, 1.0))
+                        .rounded(fill_radius)
                 });
 
             if let Some(replacement) = replacement {
@@ -535,9 +813,32 @@ impl MoonSegmentedControl {
                             .uppercase(false)
                             .render(),
                     );
+                if let Some(count) = item.count {
+                    let (pill_fill, pill_label) = count_pill_colors(item.count_tone, p);
+                    cell = cell.child(
+                        div()
+                            .debug_selector(move || format!("moon-segment-count:{ix}"))
+                            .flex_none()
+                            .ml(px(tokens.ui(SEGMENT_COUNT_GAP) - chrome.gap))
+                            .px(px(tokens.ui(SEGMENT_COUNT_PAD_X)))
+                            .rounded(px(tokens.ui(SEGMENT_COUNT_RADIUS)))
+                            .bg(rgba_from(pill_fill, if disabled { 0.40 } else { 1.0 }))
+                            .child(
+                                MoonText::new(count)
+                                    .color(pill_label)
+                                    .alpha(if disabled { 0.40 } else { 1.0 })
+                                    .font_size(SEGMENT_COUNT_SIZE)
+                                    .line_height(SEGMENT_COUNT_LINE)
+                                    .weight(SEGMENT_COUNT_WEIGHT)
+                                    .mono(true)
+                                    .uppercase(false)
+                                    .render(),
+                            ),
+                    );
+                }
             }
 
-            if selected {
+            if selected && !filled {
                 cell = cell.child(accent_underline_colored(
                     accent.underline,
                     &tokens,

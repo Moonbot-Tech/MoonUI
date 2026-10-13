@@ -31,6 +31,9 @@ pub(super) struct Gallery {
     settings_mode: Rc<RefCell<SharedString>>,
     settings_risk: Rc<Cell<f64>>,
     segment_index: usize,
+    chip_filter: Option<usize>,
+    /// Index of the picked card in the NewControls theme-card example.
+    theme_card_index: usize,
     tab_index: usize,
     dropdown_value: SharedString,
     popover_open: bool,
@@ -346,6 +349,8 @@ impl Gallery {
             settings_mode: Rc::new(RefCell::new(SharedString::from("paper"))),
             settings_risk: Rc::new(Cell::new(2.5)),
             segment_index: 2,
+            chip_filter: None,
+            theme_card_index: 0,
             tab_index: 0,
             dropdown_value: SharedString::from("Auto"),
             popover_open: false,
@@ -621,6 +626,15 @@ impl Gallery {
                                     .render(),
                             )
                             .child(
+                                MoonButton::new("btn-solid")
+                                    .label("Solid")
+                                    .variant(MoonButtonVariant::Solid)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.push_event("Solid button clicked".to_string(), cx);
+                                    }))
+                                    .render(),
+                            )
+                            .child(
                                 MoonButton::new("btn-blue")
                                     .label("Blue")
                                     .variant(MoonButtonVariant::Blue)
@@ -815,6 +829,68 @@ impl Gallery {
                                     .label("MoonTag warning")
                                     .render(),
                             )
+                            // Soft and filled status chips: square-ish corners, compact geometry,
+                            // sentence-case labels.
+                            .child(
+                                MoonTag::info()
+                                    .variant(MoonTagVariant::Soft)
+                                    .radius(MoonTagRadius::Small)
+                                    .compact(true)
+                                    .mono(false)
+                                    .child("Saved with a button")
+                                    .render(),
+                            )
+                            .child(
+                                MoonTag::positive()
+                                    .variant(MoonTagVariant::Soft)
+                                    .radius(MoonTagRadius::Small)
+                                    .compact(true)
+                                    .mono(false)
+                                    .child("Applies at once")
+                                    .render(),
+                            )
+                            .child(
+                                MoonTag::warning()
+                                    .variant(MoonTagVariant::Filled)
+                                    .radius(MoonTagRadius::Small)
+                                    .compact(true)
+                                    .mono(false)
+                                    .child("Filled")
+                                    .render(),
+                            )
+                            // Tinted severity chips: the health-strip filters. A zero count goes
+                            // neutral and dimmed; a click toggles the accent-ringed filter.
+                            .children(
+                                [
+                                    ("Offline", 2, MoonTone::Danger),
+                                    ("Ping over 400 ms", 0, MoonTone::Warning),
+                                    ("Version behind", 3, MoonTone::Warning),
+                                    ("Updating", 1, MoonTone::Info),
+                                ]
+                                .into_iter()
+                                .enumerate()
+                                .map(|(ix, (label, count, tone))| {
+                                    let view = view.clone();
+                                    MoonTag::new()
+                                        .variant(MoonTagVariant::Tinted)
+                                        .radius(MoonTagRadius::Small)
+                                        .mono(false)
+                                        .severity_count(count, tone)
+                                        .selected(self.chip_filter == Some(ix))
+                                        .child(label)
+                                        .on_click(("tinted-chip", ix), move |_, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.chip_filter = if this.chip_filter == Some(ix) {
+                                                    None
+                                                } else {
+                                                    Some(ix)
+                                                };
+                                                this.push_event(format!("Chip filter: {label}"), cx);
+                                            });
+                                        })
+                                        .render()
+                                }),
+                            )
                             .child(
                                 MoonProgress::new("moon-progress-positive")
                                     .value(68.0)
@@ -924,6 +1000,106 @@ impl Gallery {
                                     .render()
                             }),
                         ),
+                    )
+                    // Filled selection: Blue as one joined strip (no gap) sharing the preset
+                    // index above, Amber with a gap so each cell keeps its own outline.
+                    .child(
+                        h_flex()
+                            .gap_3()
+                            .child(
+                                MoonSegmentedControl::new("segmented-filled-blue")
+                                    .selection(MoonSegmentSelection::Filled)
+                                    .accent(MoonAccent::Blue)
+                                    .item_gap(0.0)
+                                    .items((0..4).map(|ix| {
+                                        MoonSegmentItem::new(format!("B{}", ix + 1), "0.5")
+                                            .width(64.0)
+                                            .selected(self.segment_index == ix)
+                                    }))
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |ix, _, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.segment_index = ix;
+                                                this.push_event(
+                                                    format!("Filled segment selected: B{}", ix + 1),
+                                                    cx,
+                                                );
+                                            });
+                                        }
+                                    })
+                                    .render(),
+                            )
+                            .child(
+                                MoonSegmentedControl::new("segmented-filled-amber")
+                                    .selection(MoonSegmentSelection::Filled)
+                                    .accent(MoonAccent::Amber)
+                                    .item_gap(4.0)
+                                    .items([
+                                        MoonSegmentItem::new("S1", "25%").width(60.0).selected(true),
+                                        MoonSegmentItem::new("S2", "50%").width(60.0),
+                                        MoonSegmentItem::new("S3", "100%").width(64.0),
+                                    ])
+                                    .render(),
+                            )
+                            // Compact density: the toolbar preset-strip geometry, fitted to
+                            // hotkey-less labels so each cell is the label plus tight padding.
+                            .child(
+                                MoonSegmentedControl::new("segmented-filled-compact")
+                                    .selection(MoonSegmentSelection::Filled)
+                                    .density(MoonSegmentDensity::Compact)
+                                    .accent(MoonAccent::Blue)
+                                    .item_gap(0.0)
+                                    .items(["50", "100", "250", "1k"].into_iter().enumerate().map(
+                                        |(ix, label)| {
+                                            MoonSegmentItem::new("", label)
+                                                .density(MoonSegmentDensity::Compact)
+                                                .fit_width(cx, 34.0, 104.0)
+                                                .selected(self.segment_index == ix)
+                                        },
+                                    ))
+                                    .render(),
+                            )
+                            // Count pills: a neutral, red, amber and blue count after the label,
+                            // reserved by the fitted width and legible on the selected fill.
+                            .child(
+                                MoonSegmentedControl::new("segmented-counts")
+                                    .selection(MoonSegmentSelection::Filled)
+                                    .density(MoonSegmentDensity::Compact)
+                                    .accent(MoonAccent::Blue)
+                                    .item_gap(0.0)
+                                    .items(
+                                        [
+                                            ("All", "24", MoonTone::Default),
+                                            ("Problems", "13", MoonTone::Danger),
+                                            ("Behind", "3", MoonTone::Warning),
+                                            ("Updating", "1", MoonTone::Info),
+                                        ]
+                                        .into_iter()
+                                        .enumerate()
+                                        .map(|(ix, (label, count, tone))| {
+                                            MoonSegmentItem::new("", label)
+                                                .count(count)
+                                                .count_tone(tone)
+                                                .density(MoonSegmentDensity::Compact)
+                                                .fit_width(cx, 34.0, 160.0)
+                                                .selected(self.segment_index == ix)
+                                        }),
+                                    )
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |ix, _, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.segment_index = ix;
+                                                this.push_event(
+                                                    format!("Counted segment selected: {ix}"),
+                                                    cx,
+                                                );
+                                            });
+                                        }
+                                    })
+                                    .render(),
+                            ),
                     ),
             )
     }
@@ -934,6 +1110,42 @@ impl Gallery {
         let price_mask = MoonInputMaskPattern::number_with_fraction(Some(' '), Some(2));
 
         section("Inputs", cx)
+            .child(
+                card("Number inputs", cx).child(
+                    h_flex()
+                        .gap(px(8.0))
+                        .child(div().w(px(150.0)).child(
+                            MoonNumberInput::new("number-input-xs")
+                                .size(MoonSize::Xs)
+                                .range(0.0, 100.0)
+                                .step(5.0)
+                                .default_value(25.0)
+                                .unit("%"),
+                        ))
+                        .child(div().w(px(160.0)).child(
+                            MoonNumberInput::new("number-input-sm")
+                                .size(MoonSize::Sm)
+                                .range(100.0, 5000.0)
+                                .step(100.0)
+                                .default_value(800.0)
+                                .unit("ms"),
+                        ))
+                        .child(div().w(px(180.0)).child(
+                            MoonNumberInput::new("number-input-md")
+                                .size(MoonSize::Md)
+                                .min(0.0)
+                                .step(0.5)
+                                .default_value(1.5),
+                        ))
+                        .child(div().w(px(150.0)).child(
+                            MoonNumberInput::new("number-input-disabled")
+                                .size(MoonSize::Sm)
+                                .default_value(3.0)
+                                .unit("x")
+                                .disabled(true),
+                        )),
+                ),
+            )
             .child(
                 card("Text inputs", cx)
                     .child(
@@ -1050,6 +1262,18 @@ impl Gallery {
                                     .child(
                                         MoonColorPicker::new(&self.color_state)
                                             .id("gallery-color-picker"),
+                                    )
+                                    // Compact swatch triggers, bare and with the hex label.
+                                    .child(
+                                        MoonColorPicker::new(&self.color_state)
+                                            .id("gallery-color-picker-swatch")
+                                            .trigger_style(MoonColorPickerTrigger::Swatch),
+                                    )
+                                    .child(
+                                        MoonColorPicker::new(&self.color_state)
+                                            .id("gallery-color-picker-swatch-hex")
+                                            .trigger_style(MoonColorPickerTrigger::Swatch)
+                                            .show_hex(true),
                                     ),
                             ),
                     ),
@@ -1662,6 +1886,79 @@ impl Gallery {
                     ),
             )
             .child(
+                card("Steps", cx)
+                    .child(
+                        MoonSteps::new("new-controls-steps")
+                            .steps(["Download", "Install", "Login", "Ready"])
+                            .current(2)
+                            .tone(MoonTone::Info),
+                    )
+                    .child(
+                        h_flex()
+                            .items_start()
+                            .gap(px(24.0))
+                            .child(
+                                div().w(px(280.0)).child(
+                                    MoonSteps::new("new-controls-steps-narrow")
+                                        .steps(["Download", "Install", "Login", "Ready"])
+                                        .current(1)
+                                        .size(MoonSize::Xs),
+                                ),
+                            )
+                            .child(
+                                MoonSteps::new("new-controls-steps-vertical")
+                                    .steps(["Connect", "Verify", "Done"])
+                                    .current(3)
+                                    .tone(MoonTone::Positive)
+                                    .vertical(true),
+                            ),
+                    ),
+            )
+            .child(
+                card("Selectable cards", cx).child(
+                    h_flex().gap(px(12.0)).children(
+                        [("Dark", p.shell, p.text), ("Light", p.text, p.shell), ("Graphite", p.panel_high, p.text_soft)]
+                            .into_iter()
+                            .enumerate()
+                            .map(|(ix, (name, swatch_bg, swatch_fg))| {
+                                MoonSelectableCard::new(format!("theme-card-{ix}"))
+                                    .selected(self.theme_card_index == ix)
+                                    .disabled(ix == 2)
+                                    .on_click({
+                                        let view = view.clone();
+                                        move |_, _, app| {
+                                            view.update(app, |this, cx| {
+                                                this.theme_card_index = ix;
+                                                this.push_event(format!("Theme card picked: {name}"), cx);
+                                            });
+                                        }
+                                    })
+                                    .child(
+                                        div()
+                                            .w(px(120.0))
+                                            .h(px(56.0))
+                                            .rounded(px(4.0))
+                                            .bg(rgba_from(swatch_bg, 1.0))
+                                            .border_1()
+                                            .border_color(rgba_from(p.border, 1.0))
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .child(MoonText::new("Aa").color(swatch_fg).render()),
+                                    )
+                                    .child(
+                                        div().pt(px(6.0)).child(
+                                            MoonText::new(name)
+                                                .uppercase(false)
+                                                .color(p.text)
+                                                .render(),
+                                        ),
+                                    )
+                            }),
+                    ),
+                ),
+            )
+            .child(
                 h_flex()
                     .items_start()
                     .gap(px(12.0))
@@ -1690,6 +1987,23 @@ impl Gallery {
                                         .tone(MoonTone::Positive)
                                         .height(5.0)
                                         .render(),
+                                ),
+                            )
+                            .child(
+                                div().w(px(240.0)).child(
+                                    MoonStackedBar::new("new-controls-stacked-bar")
+                                        .total(256.0)
+                                        .segments([
+                                            MoonBarSegment::new(96.0)
+                                                .tone(MoonTone::Info)
+                                                .label("Logs 96 GB"),
+                                            MoonBarSegment::new(40.0)
+                                                .tone(MoonTone::Warning)
+                                                .label("Charts 40 GB"),
+                                            MoonBarSegment::new(24.0)
+                                                .tone(MoonTone::Positive)
+                                                .label("Settings 24 GB"),
+                                        ]),
                                 ),
                             ),
                     )

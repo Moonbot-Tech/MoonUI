@@ -86,6 +86,7 @@ pub struct MoonDropdown {
     trigger_leading_icon: Option<MoonButtonIconSlot>,
     trigger_width: MoonDropdownTriggerWidth,
     trigger_caret: bool,
+    trigger_caret_end: bool,
     trigger_tooltip: Option<SharedString>,
     selected: bool,
     disabled: bool,
@@ -124,6 +125,7 @@ impl MoonDropdown {
             trigger_leading_icon: None,
             trigger_width: MoonDropdownTriggerWidth::Intrinsic,
             trigger_caret: false,
+            trigger_caret_end: false,
             trigger_tooltip: None,
             selected: false,
             disabled: false,
@@ -275,6 +277,20 @@ impl MoonDropdown {
     ///     The updated dropdown.
     pub fn trigger_caret(mut self, visible: bool) -> Self {
         self.trigger_caret = visible;
+        self
+    }
+
+    /// Draw the caret as a chevron pinned to the trigger's right edge, the label left-aligned,
+    /// the way a select trigger reads. Applies to a plain-label trigger with
+    /// [`Self::trigger_caret`] on; the chevron's room is reserved while the label is fitted.
+    ///
+    /// Args:
+    ///     at_end: Whether the caret sits at the right edge instead of after the label.
+    ///
+    /// Returns:
+    ///     The updated dropdown.
+    pub fn trigger_caret_end(mut self, at_end: bool) -> Self {
+        self.trigger_caret_end = at_end;
         self
     }
 
@@ -512,10 +528,15 @@ impl MoonDropdown {
 
         let (font_size, _, _) = button_text_metrics(trigger_size);
         let tokens = MoonTheme::active_tokens(cx);
-        let reserved_content_width = self.trigger_leading_icon.map_or(0.0, |_| {
+        let caret_end = self.trigger_caret && self.trigger_caret_end && self.segments.is_empty();
+        let mut reserved_content_width = self.trigger_leading_icon.map_or(0.0, |_| {
             button_leading_icon_reservation(trigger_size, &tokens)
         });
-        let suffix = if self.trigger_caret && self.segments.is_empty() {
+        if caret_end {
+            // The chevron takes an icon slot plus the content gap, like a leading icon does.
+            reserved_content_width += button_leading_icon_reservation(trigger_size, &tokens);
+        }
+        let suffix = if self.trigger_caret && self.segments.is_empty() && !caret_end {
             DROPDOWN_CARET
         } else {
             ""
@@ -554,6 +575,9 @@ impl MoonDropdown {
 
         if let Some(icon) = self.trigger_leading_icon {
             trigger = trigger.leading_icon(icon);
+        }
+        if caret_end {
+            trigger = trigger.dropdown_caret(true);
         }
 
         if self.segments.is_empty() {

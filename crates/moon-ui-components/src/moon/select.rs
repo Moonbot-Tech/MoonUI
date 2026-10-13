@@ -412,7 +412,7 @@ where
         }
 
         if let Some(trigger_variant) = self.trigger_variant {
-            select = select.trigger_variant(trigger_variant.into());
+            select = select.trigger_variant(super::button::native_variant(trigger_variant, cx));
         }
 
         if let Some(prefix) = self.title_prefix {

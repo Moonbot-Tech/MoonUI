@@ -339,6 +339,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/button.rs",
+      "signature": "pub fn dropdown_caret(mut self, dropdown_caret: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/button.rs",
       "signature": "pub fn font_size(mut self, font_size: f32) -> Self"
     },
     {
@@ -635,6 +639,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub enum MoonColorPickerTrigger"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
       "signature": "pub fn colors(mut self, colors: impl IntoIterator<Item = Hsla>) -> Self"
     },
     {
@@ -668,6 +676,14 @@
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
       "signature": "pub fn set_custom_colors( &mut self, colors: impl IntoIterator<Item = Hsla>, cx: &mut Context<Self>, )"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn show_hex(mut self, show: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/color_picker.rs",
+      "signature": "pub fn trigger_style(mut self, style: MoonColorPickerTrigger) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/color_picker.rs",
@@ -1823,6 +1839,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn trigger_caret_end(mut self, at_end: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn trigger_icon(self, path: &'static str) -> Self"
     },
     {
@@ -2527,6 +2547,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use color_picker::MoonColorPickerTrigger;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};"
     },
     {
@@ -2540,6 +2564,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use context_menu::{MoonContextMenu, MoonContextMenuOverlay, MoonContextMenuWindowExt};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use crate::icon::Icon as MoonIcon;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -2651,6 +2679,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use number_input::MoonNumberInput;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use pagination::MoonPagination;"
     },
     {
@@ -2711,7 +2743,15 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use segment::{MoonSegmentDensity, MoonSegmentSelection};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use select::{MoonSelect, MoonSelectEvent, MoonSelectItem, MoonSelectState};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use selectable_card::MoonSelectableCard;"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -2747,11 +2787,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use stacked_bar::{MoonBarSegment, MoonStackedBar};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use status_bar::{MoonStatusBar, MoonStatusIndicator, MoonStatusItem};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use stepper::{MoonStepper, MoonStepperSize};"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use steps::{MoonStepState, MoonSteps};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -2768,6 +2816,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use tag::MoonTag;"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use tag::{MoonTagRadius, MoonTagVariant};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -2852,6 +2904,62 @@
     {
       "file": "crates/moon-ui-components/src/moon/notification.rs",
       "signature": "pub struct MoonNotification"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn default_value(mut self, value: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn max(mut self, max: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn min(mut self, min: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn range(self, min: f64, max: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn read_value(state: &Entity<MoonInputState>, cx: &App) -> Option<f64>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn size(mut self, size: MoonSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn state(mut self, state: &Entity<MoonInputState>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn step(mut self, step: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub fn unit(mut self, unit: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/number_input.rs",
+      "signature": "pub struct MoonNumberInput"
     },
     {
       "file": "crates/moon-ui-components/src/moon/pagination.rs",
@@ -3383,11 +3491,31 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub enum MoonSegmentDensity"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub enum MoonSegmentSelection"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn accent(mut self, accent: MoonAccent) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn count(mut self, count: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn count_tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn density(mut self, density: MoonSegmentDensity) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
@@ -3448,6 +3576,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
       "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/segment.rs",
+      "signature": "pub fn selection(mut self, selection: MoonSegmentSelection) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/segment.rs",
@@ -3596,6 +3728,30 @@
     {
       "file": "crates/moon-ui-components/src/moon/select.rs",
       "signature": "pub struct MoonSelectState<T> where T: Clone + PartialEq + 'static,"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/selectable_card.rs",
+      "signature": "pub fn disabled(mut self, disabled: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/selectable_card.rs",
+      "signature": "pub fn new(id: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/selectable_card.rs",
+      "signature": "pub fn on_click( mut self, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/selectable_card.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/selectable_card.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/selectable_card.rs",
+      "signature": "pub struct MoonSelectableCard"
     },
     {
       "file": "crates/moon-ui-components/src/moon/selector.rs",
@@ -3874,6 +4030,54 @@
       "signature": "pub struct MoonSpinner"
     },
     {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn color(mut self, color: u32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn height(mut self, height: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn label(mut self, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn new(id: impl Into<ElementId>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn new(value: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn radius(mut self, radius: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn segment(mut self, segment: MoonBarSegment) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn segments(mut self, segments: impl IntoIterator<Item = MoonBarSegment>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub fn total(mut self, total: f64) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub struct MoonBarSegment"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/stacked_bar.rs",
+      "signature": "pub struct MoonStackedBar"
+    },
+    {
       "file": "crates/moon-ui-components/src/moon/status_bar.rs",
       "signature": "pub fn alpha(mut self, alpha: f32) -> Self"
     },
@@ -4052,6 +4256,46 @@
     {
       "file": "crates/moon-ui-components/src/moon/stepper.rs",
       "signature": "pub struct MoonStepper"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub enum MoonStepState"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn current(mut self, index: usize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn new(id: impl Into<ElementId>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn size(mut self, size: MoonSize) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn states(&self) -> Vec<MoonStepState>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn step(mut self, label: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn steps(mut self, labels: impl IntoIterator<Item = impl Into<SharedString>>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub fn vertical(mut self, vertical: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/steps.rs",
+      "signature": "pub struct MoonSteps"
     },
     {
       "file": "crates/moon-ui-components/src/moon/surface.rs",
@@ -4307,7 +4551,27 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub enum MoonTagRadius"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub enum MoonTagVariant"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn compact(mut self, compact: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn count(mut self, count: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn danger() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn dimmed(mut self, dimmed: bool) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
@@ -4327,11 +4591,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn on_click( mut self, id: impl Into<ElementId>, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn outline(mut self) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn positive() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn radius(mut self, radius: MoonTagRadius) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
@@ -4343,7 +4615,19 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn selected(mut self, selected: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn severity_count(mut self, count: usize, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
       "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tag.rs",
+      "signature": "pub fn variant(mut self, variant: MoonTagVariant) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tag.rs",

@@ -35,6 +35,7 @@ mod link;
 mod list;
 mod menu;
 mod notification;
+mod number_input;
 mod pagination;
 mod picker_field;
 mod placement;
@@ -50,6 +51,7 @@ mod root;
 mod scroll_area;
 mod segment;
 mod select;
+mod selectable_card;
 mod selector;
 mod separator;
 mod setting;
@@ -58,8 +60,10 @@ mod sidebar;
 mod skeleton;
 mod slider;
 mod spinner;
+mod stacked_bar;
 mod status_bar;
 mod stepper;
+mod steps;
 mod surface;
 pub(crate) mod svg;
 mod tab;
@@ -80,6 +84,9 @@ mod window_frame;
 
 pub mod foundation;
 
+/// An SVG icon by asset path (`MoonIcon::empty().path("icons/cpu.svg")`), for builders such as
+/// `MoonSidebarMenuItem::icon` that take one.
+pub use crate::icon::Icon as MoonIcon;
 pub use crate::scroll::ScrollableElement as MoonScrollableElement;
 pub use accordion::{MoonAccordion, MoonAccordionItem};
 pub use alert::MoonAlert;
@@ -94,6 +101,8 @@ pub(crate) use button::{resolve_button_size, tier_button_metrics};
 pub use checkbox::{MoonCheckbox, MoonCheckboxSize};
 pub use collapsible::MoonCollapsible;
 pub use color_picker::{MoonColorPicker, MoonColorPickerEvent, MoonColorPickerState};
+// Exported on its own line so the recorded API item above stays byte-identical.
+pub use color_picker::MoonColorPickerTrigger;
 pub use colors::MoonColors;
 pub use combobox::{
     MoonCombobox, MoonComboboxChange, MoonComboboxEvent, MoonComboboxMenuChrome, MoonComboboxState,
@@ -146,6 +155,7 @@ pub use list::{
 };
 pub use menu::MoonNativeMenu;
 pub use notification::MoonNotification;
+pub use number_input::MoonNumberInput;
 pub use pagination::MoonPagination;
 pub use placement::MoonPlacement;
 pub use popover::{MoonPopover, MoonPopoverPlacement};
@@ -168,7 +178,10 @@ pub use scroll_area::{
     MoonScrollAxis, MoonScrollbarVisibility, moon_scrollbar_overlay_with_palette,
 };
 pub use segment::{MoonAccent, MoonSegmentItem, MoonSegmentedControl};
+// Exported on its own line so the recorded API item above stays byte-identical.
+pub use segment::{MoonSegmentDensity, MoonSegmentSelection};
 pub use select::{MoonSelect, MoonSelectEvent, MoonSelectItem, MoonSelectState};
+pub use selectable_card::MoonSelectableCard;
 pub use selector::{MoonSelectorPill, MoonSelectorSegment};
 pub use separator::{MoonSeparator, MoonSeparatorAxis};
 pub use setting::{
@@ -184,14 +197,18 @@ pub use sidebar::{
 pub use skeleton::MoonSkeleton;
 pub use slider::{MoonSlider, MoonSliderEvent, MoonSliderState};
 pub use spinner::{MoonSpinner, MoonSpinnerSize};
+pub use stacked_bar::{MoonBarSegment, MoonStackedBar};
 pub use status_bar::{MoonStatusBar, MoonStatusIndicator, MoonStatusItem};
 pub use stepper::{MoonStepper, MoonStepperSize};
+pub use steps::{MoonStepState, MoonSteps};
 pub use surface::{MoonSurface, MoonSurfaceVariant};
 pub use tab::{
     MoonTabItem, MoonTabStrip, moon_active_tab_underline, moon_active_tab_underline_scaled,
 };
 pub use table::{MoonTableAlign, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle};
 pub use tag::MoonTag;
+// Exported on its own line so the recorded API item above stays byte-identical.
+pub use tag::{MoonTagRadius, MoonTagVariant};
 pub use text::MoonText;
 pub use text_area::{MoonTextArea, MoonTextAreaEvent, MoonTextAreaState};
 pub use theme::{
