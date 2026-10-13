@@ -10,8 +10,8 @@ use gpui::{
 };
 
 use super::{
-    LABEL_CONTRAST_FLOOR, MoonTag, MoonTagRadius, MoonTagVariant, SOFT_FILL_ALPHA, TagChrome,
-    composite, contrast_ratio, count_color, tag_chrome,
+    DIMMED_OPACITY, LABEL_CONTRAST_FLOOR, MoonTag, MoonTagRadius, MoonTagVariant, SOFT_FILL_ALPHA,
+    TagChrome, composite, contrast_ratio, count_color, tag_chrome,
 };
 use crate::h_flex;
 use crate::moon::{MoonPalette, MoonThemeTokens, MoonTone, rgba_from};
@@ -303,4 +303,16 @@ fn clickable_tag_dispatches_its_click(cx: &mut gpui::TestAppContext) {
     cx.simulate_click(point(px(4.0), px(4.0)), Modifiers::default());
     cx.run_until_parked();
     assert_eq!(clicks.get(), 1);
+}
+
+/// Catches a dimmed zero-count chip whose label fades under the AA floor: `text_soft` at the
+/// dimmed opacity measures about 3:1. The label a dimmed tag draws (the body text) is faded over
+/// the panel here and measured as the eye sees it.
+#[test]
+fn dimmed_label_stays_above_the_contrast_floor() {
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        let seen = composite(palette.text, palette.panel, DIMMED_OPACITY);
+        let ratio = contrast_ratio(seen, palette.panel);
+        assert!(ratio >= LABEL_CONTRAST_FLOOR, "dimmed label: {ratio:.2}");
+    }
 }

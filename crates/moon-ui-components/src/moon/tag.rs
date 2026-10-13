@@ -23,6 +23,9 @@ const SOFT_FILL_ALPHA: f32 = 0.14;
 const TINTED_BORDER_ALPHA: f32 = 0.35;
 
 /// Opacity of a whole tag dimmed by [`MoonTag::severity_count`] for a zero count.
+///
+/// A dimmed tag draws its label in the body text, not its quiet label colour: `text_soft` at this
+/// opacity falls to about 3:1 on the panel, while the body text stays above the AA floor.
 const DIMMED_OPACITY: f32 = 0.65;
 
 /// Design-reference width of the accent ring around a selected clickable tag.
@@ -426,7 +429,10 @@ impl RenderOnce for MoonTag {
             .border_1()
             .border_color(chrome.border)
             .bg(chrome.background)
-            .text_color(rgba_from(chrome.text, 1.0))
+            .text_color(rgba_from(
+                if self.dimmed { p.text } else { chrome.text },
+                1.0,
+            ))
             .font_family(tokens.font_family(self.mono))
             .text_size(px(text.font_size))
             .line_height(px(text.line_height))

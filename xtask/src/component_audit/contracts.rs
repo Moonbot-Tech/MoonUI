@@ -379,6 +379,7 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
                 "severity_count_goes_neutral_and_dimmed_only_at_zero",
                 "a_new_tag_has_no_count_click_or_selection",
                 "clickable_tag_dispatches_its_click",
+                "dimmed_label_stays_above_the_contrast_floor",
             ],
             &tests,
             "tinted severity chips must keep label and count above the contrast floor, go neutral and dimmed at zero, stay inert by default, and dispatch their click",

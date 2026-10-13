@@ -58,7 +58,8 @@ impl From<MoonButtonVariant> for ButtonVariant {
             MoonButtonVariant::Bare => ButtonVariant::Bare,
             // The solid fill needs the active palette, which this conversion has no access to;
             // `MoonButton` resolves it at render through `solid_variant`. A bare conversion gets
-            // the nearest palette-free variant, the primary accent tint.
+            // the nearest palette-free variant, the primary accent tint. Moon widgets go through
+            // `native_variant` instead, which resolves it against the active palette.
             MoonButtonVariant::Solid => ButtonVariant::Primary,
         }
     }
@@ -98,6 +99,25 @@ fn solid_colors(p: MoonPalette) -> SolidColors {
         label,
         hover_alpha: SOLID_HOVER_ALPHA,
         active_alpha: SOLID_ACTIVE_ALPHA,
+    }
+}
+
+/// Resolve a Moon variant to the native one a widget renders with, against the active palette.
+///
+/// Every Moon widget that hands a [`MoonButtonVariant`] to a native control goes through this
+/// rather than `into()`, so [`MoonButtonVariant::Solid`] paints its solid fill everywhere instead
+/// of degrading to the palette-free primary tint.
+///
+/// Args:
+///     variant: The Moon variant.
+///     cx: Application context the active palette is read from.
+///
+/// Returns:
+///     The native variant.
+pub(super) fn native_variant(variant: MoonButtonVariant, cx: &App) -> ButtonVariant {
+    match variant {
+        MoonButtonVariant::Solid => solid_variant(MoonPalette::active(cx), cx),
+        variant => variant.into(),
     }
 }
 
@@ -656,12 +676,8 @@ impl RenderOnce for MoonButton {
             MoonButtonSize::Tier(tier) => MoonButtonSize::tier_icon_size(tier),
             MoonButtonSize::Custom { .. } => 12.0,
         };
-        let variant = match self.variant {
-            MoonButtonVariant::Solid => solid_variant(MoonPalette::active(cx), cx),
-            variant => variant.into(),
-        };
         let mut button = Button::new(self.id)
-            .with_variant(variant)
+            .with_variant(native_variant(self.variant, cx))
             .selected(self.selected)
             .disabled(self.disabled)
             .loading(self.loading)
