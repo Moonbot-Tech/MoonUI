@@ -532,8 +532,8 @@
       "theme_source": "MoonTheme bridge through MoonSidebar facade",
       "public_path": "moon_ui::MoonSidebar",
       "upstream_ref": "Longbridge::sidebar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon footer/header/menu styling hooks live in base sidebar; Longbridge sidebar behavior remains source-owned",
-      "donor_drift_budget": 3,
+      "fork_reason": "Reviewed TrackedFork drift: Moon footer/header/menu styling hooks live in base sidebar; contiguous hit rows (group/menu + menu tests) live there too; Longbridge sidebar behavior remains source-owned",
+      "donor_drift_budget": 5,
       "contracts": ["gallery.visual_coverage"]
     },
     {

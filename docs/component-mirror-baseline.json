@@ -1401,7 +1401,7 @@
       "local_paths": [
         "sidebar"
       ],
-      "local_hash": "7cced9c0920e2e8f",
+      "local_hash": "0eeeac4e89296fa8",
       "local_files": [
         {
           "path": "sidebar/footer.rs",
@@ -1410,8 +1410,8 @@
         },
         {
           "path": "sidebar/group.rs",
-          "hash": "770b4cd5166fb8d8",
-          "bytes": 2513
+          "hash": "7898a6f41e1dbdc0",
+          "bytes": 4088
         },
         {
           "path": "sidebar/header.rs",
@@ -1420,8 +1420,13 @@
         },
         {
           "path": "sidebar/menu.rs",
-          "hash": "53b0585f16c16a85",
-          "bytes": 14383
+          "hash": "c7f8c396358965a5",
+          "bytes": 18454
+        },
+        {
+          "path": "sidebar/menu/tests.rs",
+          "hash": "357c42078fe07cec",
+          "bytes": 13872
         },
         {
           "path": "sidebar/mod.rs",
@@ -1459,8 +1464,10 @@
       ],
       "donor_changed_files": [
         "sidebar/footer.rs",
+        "sidebar/group.rs",
         "sidebar/header.rs",
-        "sidebar/menu.rs"
+        "sidebar/menu.rs",
+        "sidebar/menu/tests.rs"
       ]
     },
     {
