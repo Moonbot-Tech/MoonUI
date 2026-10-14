@@ -1,3 +1,5 @@
+//! Regression coverage for div scrolling, tooltip lifecycle, and inspector hit testing.
+
 use super::*;
 use crate::{
     AppContext as _, Context, InputEvent, MouseMoveEvent, TestAppContext, util::FluentBuilder as _,
@@ -90,8 +92,14 @@ struct TooltipOwner {
 }
 
 impl Render for TooltipOwner {
+    /// Render a trigger with real click state so press suppression is tested while a button is held.
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let target = div().id("target").w(px(50.)).h(px(50.));
+        let target = div()
+            .id("target")
+            .w(px(50.))
+            .h(px(50.))
+            .on_click(|_, _, _| {})
+            .on_aux_click(|_, _, _| {});
         let target = if self.hoverable {
             target.hoverable_tooltip(|_, cx| cx.new(|_| TestTooltipView).into())
         } else {
@@ -228,6 +236,180 @@ fn move_test_pointer(
             );
         })
         .unwrap();
+}
+
+/// Dispatch a press through production handlers, including the trigger's pending-click state.
+fn press_test_pointer(
+    test_app: &mut TestAppContext,
+    any_window: crate::AnyWindowHandle,
+    button: MouseButton,
+    x: f32,
+    y: f32,
+) {
+    test_app
+        .update_window(any_window, |_, window, cx| {
+            window.dispatch_event(
+                MouseDownEvent {
+                    button,
+                    position: point(px(x), px(y)),
+                    ..Default::default()
+                }
+                .to_platform_input(),
+                cx,
+            );
+        })
+        .unwrap();
+}
+
+/// Release a pressed button so later hover checks are eligible to show tooltip content.
+fn release_test_pointer(
+    test_app: &mut TestAppContext,
+    any_window: crate::AnyWindowHandle,
+    button: MouseButton,
+) {
+    test_app
+        .update_window(any_window, |_, window, cx| {
+            window.dispatch_event(
+                MouseUpEvent {
+                    button,
+                    position: window.mouse_position(),
+                    ..Default::default()
+                }
+                .to_platform_input(),
+                cx,
+            );
+        })
+        .unwrap();
+}
+
+/// Draw the real deferred overlay and return whether tooltip geometry was published.
+fn tooltip_is_painted(test_app: &mut TestAppContext, any_window: crate::AnyWindowHandle) -> bool {
+    test_app
+        .update_window(any_window, |_, window, cx| {
+            window.draw(cx).clear();
+            window.tooltip_bounds.is_some()
+        })
+        .unwrap()
+}
+
+/// Catches leaving a show task alive on press, which would cover a newly opened context menu.
+#[test]
+fn tooltip_press_cancels_pending_show_until_pointer_leaves() {
+    for button in [MouseButton::Left, MouseButton::Right] {
+        let (mut test_app, any_window, captured) = setup_tooltip_owner_test(None);
+        let active = captured.borrow().as_ref().unwrap().upgrade().unwrap();
+        test_app.run_until_parked();
+        press_test_pointer(&mut test_app, any_window, button, 10., 10.);
+        assert!(matches!(
+            active.borrow().as_ref(),
+            Some(ActiveTooltip::SuppressedUntilMouseLeaves)
+        ));
+        move_test_pointer(&mut test_app, any_window, 12., 12.);
+        test_app
+            .dispatcher
+            .advance_clock(DEFAULT_TOOLTIP_SHOW_DELAY);
+        test_app.run_until_parked();
+        assert!(!tooltip_is_painted(&mut test_app, any_window));
+        assert!(matches!(
+            active.borrow().as_ref(),
+            Some(ActiveTooltip::SuppressedUntilMouseLeaves)
+        ));
+        release_test_pointer(&mut test_app, any_window, button);
+        move_test_pointer(&mut test_app, any_window, 10., 10.);
+        assert!(matches!(
+            active.borrow().as_ref(),
+            Some(ActiveTooltip::SuppressedUntilMouseLeaves)
+        ));
+
+        move_test_pointer(&mut test_app, any_window, 75., 75.);
+        assert!(active.borrow().is_none());
+        move_test_pointer(&mut test_app, any_window, 10., 10.);
+        test_app
+            .dispatcher
+            .advance_clock(DEFAULT_TOOLTIP_SHOW_DELAY);
+        test_app.run_until_parked();
+        assert!(tooltip_is_painted(&mut test_app, any_window));
+    }
+}
+
+/// Catches clearing visible state to None on press, which rearms a tooltip under pointer jitter.
+#[test]
+fn tooltip_press_hides_visible_content_without_rearming_on_trigger() {
+    let (mut test_app, any_window, captured) = setup_tooltip_owner_test(None);
+    let active = captured.borrow().as_ref().unwrap().upgrade().unwrap();
+    test_app
+        .dispatcher
+        .advance_clock(DEFAULT_TOOLTIP_SHOW_DELAY);
+    test_app.run_until_parked();
+    assert!(tooltip_is_painted(&mut test_app, any_window));
+    // Regular content overlaps the trigger here; only hoverable content may exempt a press.
+    press_test_pointer(&mut test_app, any_window, MouseButton::Right, 15., 15.);
+    assert!(matches!(
+        active.borrow().as_ref(),
+        Some(ActiveTooltip::SuppressedUntilMouseLeaves)
+    ));
+    assert!(!tooltip_is_painted(&mut test_app, any_window));
+    release_test_pointer(&mut test_app, any_window, MouseButton::Right);
+    move_test_pointer(&mut test_app, any_window, 12., 12.);
+    test_app.dispatcher.advance_clock(Duration::from_secs(6));
+    test_app.run_until_parked();
+    assert!(!tooltip_is_painted(&mut test_app, any_window));
+    assert!(matches!(
+        active.borrow().as_ref(),
+        Some(ActiveTooltip::SuppressedUntilMouseLeaves)
+    ));
+}
+
+/// Catches suppressing an unrelated trigger on outside press instead of preserving old clearing.
+#[test]
+fn tooltip_press_elsewhere_preserves_pending_show_and_clears_visible_content() {
+    let (mut test_app, any_window, captured) = setup_tooltip_owner_test(None);
+    let active = captured.borrow().as_ref().unwrap().upgrade().unwrap();
+    press_test_pointer(&mut test_app, any_window, MouseButton::Right, 75., 75.);
+    assert!(matches!(
+        active.borrow().as_ref(),
+        Some(ActiveTooltip::WaitingForShow { .. })
+    ));
+    move_test_pointer(&mut test_app, any_window, 10., 10.);
+    test_app
+        .dispatcher
+        .advance_clock(DEFAULT_TOOLTIP_SHOW_DELAY);
+    test_app.run_until_parked();
+    assert!(tooltip_is_painted(&mut test_app, any_window));
+    press_test_pointer(&mut test_app, any_window, MouseButton::Right, 75., 75.);
+    assert!(active.borrow().is_none());
+    assert!(!tooltip_is_painted(&mut test_app, any_window));
+}
+
+/// Catches applying press suppression to interactive hoverable tooltip content or its trigger.
+#[test]
+fn tooltip_press_preserves_hoverable_pending_and_visible_states() {
+    let (mut test_app, any_window, captured) =
+        setup_tooltip_owner_test_with_hoverability(None, true);
+    let active = captured.borrow().as_ref().unwrap().upgrade().unwrap();
+    press_test_pointer(&mut test_app, any_window, MouseButton::Right, 10., 10.);
+    assert!(matches!(
+        active.borrow().as_ref(),
+        Some(ActiveTooltip::WaitingForShow { .. })
+    ));
+    release_test_pointer(&mut test_app, any_window, MouseButton::Right);
+    test_app
+        .dispatcher
+        .advance_clock(DEFAULT_TOOLTIP_SHOW_DELAY);
+    test_app.run_until_parked();
+    assert!(tooltip_is_painted(&mut test_app, any_window));
+    for (x, y) in [(10., 10.), (15., 15.), (75., 75.)] {
+        press_test_pointer(&mut test_app, any_window, MouseButton::Right, x, y);
+        assert!(matches!(
+            active.borrow().as_ref(),
+            Some(ActiveTooltip::Visible {
+                is_hoverable: true,
+                ..
+            }) | Some(ActiveTooltip::WaitingForHide { .. })
+        ));
+        assert!(tooltip_is_painted(&mut test_app, any_window));
+        release_test_pointer(&mut test_app, any_window, MouseButton::Right);
+    }
 }
 
 #[test]

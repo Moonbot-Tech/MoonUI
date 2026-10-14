@@ -2427,6 +2427,8 @@ impl Interactivity {
         }
     }
 
+    /// Register handlers for the hitbox and optional retained state in the supplied window/app.
+    /// Tooltip registration keeps physical hover distinct from pending-click show eligibility.
     fn paint_mouse_listeners(
         &mut self,
         hitbox: &Hitbox,
@@ -2791,15 +2793,23 @@ impl Interactivity {
                 });
                 let check_is_hovered = Rc::new({
                     let hitbox = hitbox.clone();
+                    move |window: &Window| hitbox.is_hovered(window)
+                });
+                let check_can_show = Rc::new({
+                    let check_is_hovered = check_is_hovered.clone();
                     move |window: &Window| {
-                        pending_mouse_down.borrow().is_none() && hitbox.is_hovered(window)
+                        pending_mouse_down.borrow().is_none() && check_is_hovered(window)
                     }
                 });
                 register_tooltip_mouse_handlers(
                     &active_tooltip,
                     self.tooltip_id,
                     build_tooltip,
-                    check_is_hovered,
+                    TooltipTrigger {
+                        check_is_hovered,
+                        check_can_show,
+                        is_hoverable: tooltip_is_hoverable,
+                    },
                     check_is_hovered_during_prepaint,
                     self.tooltip_show_delay,
                     window,
@@ -3186,6 +3196,7 @@ pub struct ElementHoverState {
     pub element: bool,
 }
 
+/// Per-element tooltip lifecycle, owning pending tasks and visible content until cleared.
 pub(crate) enum ActiveTooltip {
     /// Currently delaying before showing the tooltip.
     WaitingForShow { _task: Task<()> },
@@ -3202,7 +3213,7 @@ pub(crate) enum ActiveTooltip {
         tooltip: AnyTooltip,
         _task: Task<()>,
     },
-    /// A regular tooltip expired and must stay hidden until the pointer leaves its trigger.
+    /// A regular tooltip expired or was pressed and stays hidden until the pointer leaves.
     SuppressedUntilMouseLeaves,
 }
 
@@ -3253,11 +3264,22 @@ pub(crate) fn set_tooltip_on_window(
     Some(window.set_tooltip(tooltip))
 }
 
+/// Trigger hover checks separate physical pointer presence from eligibility to show a tooltip.
+#[derive(Clone)]
+pub(crate) struct TooltipTrigger {
+    pub(crate) check_is_hovered: Rc<dyn Fn(&Window) -> bool>,
+    pub(crate) check_can_show: Rc<dyn Fn(&Window) -> bool>,
+    pub(crate) is_hoverable: bool,
+}
+
+/// Register movement, press, and scroll handlers for an element-owned tooltip.
+/// Trigger checks preserve suppression during a press; hoverable content and scrolling retain
+/// their existing lifecycle. The optional delay applies only when scheduling a new tooltip.
 pub(crate) fn register_tooltip_mouse_handlers(
     active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
     tooltip_id: Option<TooltipId>,
     build_tooltip: Rc<dyn Fn(&mut Window, &mut App) -> Option<(AnyView, bool)>>,
-    check_is_hovered: Rc<dyn Fn(&Window) -> bool>,
+    trigger: TooltipTrigger,
     check_is_hovered_during_prepaint: Rc<dyn Fn(&Window) -> bool>,
     show_delay: Option<Duration>,
     window: &mut Window,
@@ -3268,12 +3290,12 @@ pub(crate) fn register_tooltip_mouse_handlers(
     window.on_mouse_event({
         let active_tooltip = active_tooltip.clone();
         let build_tooltip = build_tooltip.clone();
-        let check_is_hovered = check_is_hovered.clone();
+        let trigger = trigger.clone();
         move |_: &MouseMoveEvent, phase, window, cx| {
             handle_tooltip_mouse_move(
                 &active_tooltip,
                 &build_tooltip,
-                &check_is_hovered,
+                &trigger,
                 &check_is_hovered_during_prepaint,
                 tooltip_id,
                 current_view,
@@ -3288,7 +3310,21 @@ pub(crate) fn register_tooltip_mouse_handlers(
     window.on_mouse_event({
         let active_tooltip = active_tooltip.clone();
         move |_: &MouseDownEvent, _phase, window: &mut Window, _cx| {
-            if !tooltip_id.is_some_and(|tooltip_id| tooltip_id.is_hovered(window)) {
+            if !trigger.is_hoverable && (trigger.check_is_hovered)(window) {
+                let was_visible = matches!(
+                    active_tooltip.borrow().as_ref(),
+                    Some(ActiveTooltip::Visible {
+                        is_hoverable: false,
+                        ..
+                    })
+                );
+                active_tooltip
+                    .borrow_mut()
+                    .replace(ActiveTooltip::SuppressedUntilMouseLeaves);
+                if was_visible {
+                    window.refresh();
+                }
+            } else if !tooltip_id.is_some_and(|tooltip_id| tooltip_id.is_hovered(window)) {
                 clear_active_tooltip_if_not_hoverable(&active_tooltip, window);
             }
         }
@@ -3305,6 +3341,9 @@ pub(crate) fn register_tooltip_mouse_handlers(
 }
 
 /// Handles displaying tooltips when an element is hovered.
+/// The trigger's eligibility check gates showing; its pointer-only check clears suppression
+/// after departure even if a button is still held. The remaining inputs identify the rendered
+/// tooltip, owning view, dispatch phase, delay, and window/application scheduling contexts.
 ///
 /// The mouse hovering logic also relies on being called from window prepaint in order to handle the
 /// case where the element the tooltip is on is not rendered - in that case its mouse listeners are
@@ -3318,7 +3357,7 @@ pub(crate) fn register_tooltip_mouse_handlers(
 fn handle_tooltip_mouse_move(
     active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
     build_tooltip: &Rc<dyn Fn(&mut Window, &mut App) -> Option<(AnyView, bool)>>,
-    check_is_hovered: &Rc<dyn Fn(&Window) -> bool>,
+    trigger: &TooltipTrigger,
     check_is_hovered_during_prepaint: &Rc<dyn Fn(&Window) -> bool>,
     tooltip_id: Option<TooltipId>,
     current_view: EntityId,
@@ -3339,7 +3378,7 @@ fn handle_tooltip_mouse_move(
 
     let action = match active_tooltip.borrow().as_ref() {
         None => {
-            let is_hovered = check_is_hovered(window);
+            let is_hovered = (trigger.check_can_show)(window);
             if is_hovered && phase.bubble() {
                 Action::ScheduleShow
             } else {
@@ -3347,7 +3386,7 @@ fn handle_tooltip_mouse_move(
             }
         }
         Some(ActiveTooltip::WaitingForShow { .. }) => {
-            let is_hovered = check_is_hovered(window);
+            let is_hovered = (trigger.check_can_show)(window);
             if is_hovered {
                 Action::None
             } else {
@@ -3356,7 +3395,7 @@ fn handle_tooltip_mouse_move(
         }
         Some(ActiveTooltip::Visible { is_hoverable, .. }) => {
             if phase.capture()
-                && !check_is_hovered(window)
+                && !(trigger.check_can_show)(window)
                 && (!*is_hoverable
                     || !tooltip_id.is_some_and(|tooltip_id| tooltip_id.is_hovered(window)))
             {
@@ -3367,7 +3406,7 @@ fn handle_tooltip_mouse_move(
         }
         Some(ActiveTooltip::WaitingForHide { .. }) => {
             if phase.capture()
-                && (check_is_hovered(window)
+                && ((trigger.check_can_show)(window)
                     || tooltip_id.is_some_and(|tooltip_id| tooltip_id.is_hovered(window)))
             {
                 Action::CheckVisible
@@ -3376,7 +3415,8 @@ fn handle_tooltip_mouse_move(
             }
         }
         Some(ActiveTooltip::SuppressedUntilMouseLeaves) => {
-            if check_is_hovered(window) {
+            // Press eligibility must not rearm a tooltip while its button is held.
+            if (trigger.check_is_hovered)(window) {
                 Action::None
             } else {
                 Action::ClearSuppression
