@@ -63,6 +63,7 @@ impl MoonKbd {
         Self::new(Self::format_keystroke(&stroke))
     }
 
+    /// Formats a keystroke with platform labels, distinguishing forward-delete from backspace.
     pub fn format_keystroke(key: &Keystroke) -> String {
         #[cfg(target_os = "macos")]
         const SEPARATOR: &str = "";
@@ -140,7 +141,7 @@ impl MoonKbd {
             #[cfg(not(target_os = "macos"))]
             "backspace" => keys.push_str("Backspace"),
             #[cfg(target_os = "macos")]
-            "delete" => keys.push('⌫'),
+            "delete" => keys.push('⌦'),
             #[cfg(not(target_os = "macos"))]
             "delete" => keys.push_str("Delete"),
             #[cfg(target_os = "macos")]

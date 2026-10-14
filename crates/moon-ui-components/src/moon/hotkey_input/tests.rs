@@ -4,6 +4,79 @@ use gpui::{Capslock, Keystroke, Modifiers};
 
 use super::{MoonHotkeyCapture, MoonHotkeyModifierWatch, moon_hotkey_capture};
 
+/// Renders the production field at fixed bounds and records its change callbacks.
+struct HotkeyHarness {
+    changes: std::rc::Rc<std::cell::RefCell<Vec<Option<Keystroke>>>>,
+}
+
+impl gpui::Render for HotkeyHarness {
+    /// Returns a field whose fixed bounds let the test press its body and clear button.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        let changes = self.changes.clone();
+        super::MoonHotkeyInput::new("hotkey-harness")
+            .bounds(crate::moon::MoonRect::new(0.0, 0.0, 240.0, 30.0))
+            .default_value(Keystroke::parse("ctrl-k").unwrap())
+            .on_change(move |value, _, _| changes.borrow_mut().push(value))
+    }
+}
+
+/// Catches disconnecting capture from the rendered field or the clear button: deletion keys
+/// must record after activation, clear while idle, and remain recordable after clicking clear.
+#[gpui::test]
+fn hotkey_input_records_and_clears_through_rendered_handlers(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let changes = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let window = cx.add_window({
+        let changes = changes.clone();
+        move |_, _| HotkeyHarness { changes }
+    });
+    let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+
+    for key in ["delete", "backspace"] {
+        cx.simulate_click(
+            gpui::point(gpui::px(20.0), gpui::px(15.0)),
+            Modifiers::none(),
+        );
+        cx.simulate_keystrokes(key);
+        cx.run_until_parked();
+        assert_eq!(
+            changes.borrow().last(),
+            Some(&Some(Keystroke::parse(key).unwrap()))
+        );
+
+        // Clearing during recording must stop it without bubbling back into body activation.
+        cx.simulate_click(
+            gpui::point(gpui::px(20.0), gpui::px(15.0)),
+            Modifiers::none(),
+        );
+        cx.simulate_click(
+            gpui::point(gpui::px(222.0), gpui::px(15.0)),
+            Modifiers::none(),
+        );
+        cx.run_until_parked();
+        assert_eq!(changes.borrow().last(), Some(&None));
+
+        cx.simulate_keystrokes("enter");
+        cx.simulate_keystrokes(key);
+        cx.run_until_parked();
+        assert_eq!(
+            changes.borrow().last(),
+            Some(&Some(Keystroke::parse(key).unwrap()))
+        );
+
+        cx.simulate_keystrokes(key);
+        cx.run_until_parked();
+        assert_eq!(changes.borrow().last(), Some(&None));
+    }
+    assert_eq!(changes.borrow().len(), 8);
+}
+
 /// Catches handling ordinary chords while idle in `hotkey_input.rs:moon_hotkey_capture`, which
 /// would steal global shortcuts before the user activates the field.
 #[test]
@@ -54,9 +127,9 @@ fn hotkey_input_commits_full_chord_while_recording() {
 }
 
 /// Catches merging cancel and clear handling in `hotkey_input.rs:moon_hotkey_capture`, which
-/// would either erase a shortcut on Escape or leave Delete unable to clear it.
+/// would either erase a shortcut on Escape or leave idle Delete unable to clear it.
 #[test]
-fn hotkey_input_escape_cancels_and_delete_clears() {
+fn hotkey_input_escape_cancels_and_idle_delete_clears() {
     let escape = Keystroke::parse("escape").unwrap();
     let delete = Keystroke::parse("delete").unwrap();
     let backspace = Keystroke::parse("backspace").unwrap();
@@ -64,11 +137,27 @@ fn hotkey_input_escape_cancels_and_delete_clears() {
         moon_hotkey_capture(&escape, true),
         MoonHotkeyCapture::Cancel
     );
-    assert_eq!(moon_hotkey_capture(&delete, true), MoonHotkeyCapture::Clear);
+    assert_eq!(
+        moon_hotkey_capture(&delete, false),
+        MoonHotkeyCapture::Clear
+    );
     assert_eq!(
         moon_hotkey_capture(&backspace, false),
         MoonHotkeyCapture::Clear
     );
+}
+
+/// Catches treating bare deletion keys as Clear during recording, preventing factory bindings
+/// from being entered again after a user clears them.
+#[test]
+fn hotkey_input_records_bare_delete_and_backspace() {
+    for source in ["delete", "backspace"] {
+        let stroke = Keystroke::parse(source).unwrap();
+        assert_eq!(
+            moon_hotkey_capture(&stroke, true),
+            MoonHotkeyCapture::Commit(stroke)
+        );
+    }
 }
 
 /// Catches classifying modified control keys as field controls in
