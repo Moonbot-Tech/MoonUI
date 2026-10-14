@@ -133,13 +133,18 @@ pub struct Timings {
 
 impl Timings {
     /// How many iterations does this test seem to do per second?
+    ///
+    /// `total_iters` is the number of iterations one timed run performed, and
+    /// `self.mean` is that run's mean wall time. The mean is read in fractional
+    /// seconds, so a sub-millisecond run yields a finite rate instead of
+    /// dividing by a truncated zero.
     #[expect(
         clippy::cast_precision_loss,
         reason = "We only care about a couple sig figs anyways"
     )]
     #[must_use]
     pub fn iters_per_sec(&self, total_iters: NonZero<usize>) -> f64 {
-        (1000. / self.mean.as_millis() as f64) * total_iters.get() as f64
+        total_iters.get() as f64 / self.mean.as_secs_f64()
     }
 }
 

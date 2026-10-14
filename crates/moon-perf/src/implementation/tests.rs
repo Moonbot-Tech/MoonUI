@@ -9,8 +9,8 @@ use std::time::Duration;
 
 /// Builds timings whose mean is exactly `mean_ms` milliseconds.
 ///
-/// `Timings::iters_per_sec` reads `Duration::as_millis`, so this mean is an
-/// exact millisecond count. The standard deviation is unused by the orderings
+/// A whole millisecond count is exact in `Timings::iters_per_sec`'s
+/// fractional seconds. The standard deviation is unused by the orderings
 /// under test.
 ///
 /// # Panics
@@ -252,5 +252,30 @@ fn critical_prints_before_fluff() {
     assert!(
         critical_at < fluff_at,
         "Critical must print above Fluff: {text}"
+    );
+}
+
+/// Catches reading the mean back through `Duration::as_millis` again.
+///
+/// Whole milliseconds truncate a 1.5 ms run to 1 ms, so the table shows half
+/// as many iterations per second again as the run did, and a mean under 1 ms
+/// divides by zero and prints `inf`. By hand: 3 iterations in 1.5 ms is
+/// 3 / 0.0015 s = 2000 iterations per second, and 1 iteration in 0.5 ms is
+/// 1 / 0.0005 s = 2000 iterations per second.
+#[test]
+fn iters_per_sec_keeps_sub_millisecond_precision() {
+    let one_and_a_half_ms = Timings {
+        mean: Duration::from_micros(1500),
+        stddev: Duration::from_micros(10),
+    };
+    let half_ms = Timings {
+        mean: Duration::from_micros(500),
+        stddev: Duration::from_micros(10),
+    };
+    let fractional = one_and_a_half_ms.iters_per_sec(iters(3));
+    let sub_ms = half_ms.iters_per_sec(iters(1));
+    assert!(
+        close_to(fractional, 2000.) && close_to(sub_ms, 2000.),
+        "expected 2000 iterations/sec for both runs, got {fractional} and {sub_ms}"
     );
 }
