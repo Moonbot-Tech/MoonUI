@@ -2,7 +2,7 @@ use crate::{
     ActiveTooltip, AnyView, App, Bounds, DispatchPhase, Element, ElementId, GlobalElementId,
     HighlightStyle, Hitbox, HitboxBehavior, InspectorElementId, IntoElement, LayoutId,
     MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, SharedString, Size, TextOverflow,
-    TextRun, TextStyle, TooltipId, TruncateFrom, WhiteSpace, Window, WrappedLine,
+    TextRun, TextStyle, TooltipId, TooltipTrigger, TruncateFrom, WhiteSpace, Window, WrappedLine,
     WrappedLineLayout, register_tooltip_mouse_handlers, set_tooltip_on_window,
 };
 use anyhow::Context as _;
@@ -1092,6 +1092,8 @@ impl Element for InteractiveText {
         )
     }
 
+    /// Paint text and bind hitbox interactions to the retained state in this window/app.
+    /// Tooltip trigger checks preserve press suppression separately from show eligibility.
     fn paint(
         &mut self,
         global_id: Option<&GlobalElementId>,
@@ -1212,13 +1214,19 @@ impl Element for InteractiveText {
                     let check_is_hovered = Rc::new({
                         let hitbox = hitbox.clone();
                         let text_layout = text_layout.clone();
-                        let pending_mouse_down = interactive_state.mouse_down_index.clone();
                         move |window: &Window| {
                             text_layout
                                 .index_for_position(window.mouse_position())
                                 .is_ok()
                                 && hitbox.is_hovered(window)
-                                && pending_mouse_down.get().is_none()
+                        }
+                    });
+
+                    let check_can_show = Rc::new({
+                        let check_is_hovered = check_is_hovered.clone();
+                        let pending_mouse_down = interactive_state.mouse_down_index.clone();
+                        move |window: &Window| {
+                            pending_mouse_down.get().is_none() && check_is_hovered(window)
                         }
                     });
 
@@ -1226,7 +1234,11 @@ impl Element for InteractiveText {
                         &active_tooltip,
                         self.tooltip_id,
                         build_tooltip,
-                        check_is_hovered,
+                        TooltipTrigger {
+                            check_is_hovered,
+                            check_can_show,
+                            is_hoverable: false,
+                        },
                         check_is_hovered_during_prepaint,
                         None,
                         window,

@@ -1,8 +1,13 @@
-use crate::{ActiveTheme, Collapsible, h_flex, sidebar::SidebarItem, v_flex};
+use crate::{
+    ActiveTheme, Collapsible, h_flex,
+    sidebar::{SidebarItem, SidebarMenu, SidebarMenuItem},
+    v_flex,
+};
 use gpui::{
     App, ElementId, IntoElement, ParentElement, SharedString, Styled as _, Window, div,
-    prelude::FluentBuilder as _,
+    prelude::FluentBuilder as _, px,
 };
+use std::any::Any;
 
 /// A group of items in the [`super::Sidebar`].
 #[derive(Clone)]
@@ -49,6 +54,7 @@ impl<E: SidebarItem> Collapsible for SidebarGroup<E> {
 }
 
 impl<E: SidebarItem> SidebarItem for SidebarGroup<E> {
+    /// Render children without adding gaps outside their padded hit rows.
     fn render(
         self,
         id: impl Into<ElementId>,
@@ -56,6 +62,8 @@ impl<E: SidebarItem> SidebarItem for SidebarGroup<E> {
         cx: &mut App,
     ) -> impl IntoElement {
         let id = id.into();
+        let count = self.children.len();
+        let half_gap = window.rem_size() * 0.25;
 
         v_flex()
             .relative()
@@ -72,13 +80,34 @@ impl<E: SidebarItem> SidebarItem for SidebarGroup<E> {
                 )
             })
             .child(
-                div()
-                    .gap_2()
-                    .flex_col()
+                v_flex()
+                    .gap_0()
                     .children(self.children.into_iter().enumerate().map(|(ix, child)| {
-                        child
-                            .collapsed(self.collapsed)
-                            .render(format!("{}-{}", id, ix), window, cx)
+                        let top = if ix == 0 { px(0.0) } else { half_gap };
+                        let bottom = if ix + 1 == count { px(0.0) } else { half_gap };
+                        // Direct menu items need the same edge trimming as a SidebarMenu.
+                        // Other SidebarItem implementations retain their own rendering contract.
+                        if let Some(item) = (&child as &dyn Any).downcast_ref::<SidebarMenuItem>() {
+                            return item
+                                .clone()
+                                .collapsed(self.collapsed)
+                                .render_padded(format!("{}-{}", id, ix), top, bottom, window, cx)
+                                .into_any_element();
+                        }
+                        if let Some(menu) = (&child as &dyn Any).downcast_ref::<SidebarMenu>() {
+                            return menu
+                                .clone()
+                                .collapsed(self.collapsed)
+                                .render_padded(format!("{}-{}", id, ix), top, bottom, window, cx)
+                                .into_any_element();
+                        }
+                        div()
+                            .when(ix > 0, |this| this.mt(half_gap * 2.0))
+                            .child(child.collapsed(self.collapsed).render(
+                                format!("{}-{}", id, ix),
+                                window,
+                                cx,
+                            ))
                             .into_any_element()
                     })),
             )
