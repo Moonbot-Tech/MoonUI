@@ -62,21 +62,44 @@ impl Collapsible for SidebarMenu {
 }
 
 impl SidebarItem for SidebarMenu {
+    /// Render contiguous item hit rows while keeping the original plate spacing.
     fn render(
         self,
         id: impl Into<ElementId>,
         window: &mut Window,
         cx: &mut App,
     ) -> impl IntoElement {
+        self.render_padded(id, px(0.0), px(0.0), window, cx)
+    }
+}
+
+impl SidebarMenu {
+    /// Render optional outer hit padding where this menu neighbors another group child.
+    pub(super) fn render_padded(
+        self,
+        id: impl Into<ElementId>,
+        top: gpui::Pixels,
+        bottom: gpui::Pixels,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> impl IntoElement {
         let id = id.into();
+        let count = self.items.len();
+        let half_gap = window.rem_size() * 0.25;
 
         v_flex()
-            .gap_2()
+            .gap_0()
             .refine_style(&self.style)
             .children(self.items.into_iter().enumerate().map(|(ix, item)| {
                 let id = SharedString::from(format!("{}-{}", id, ix));
                 item.collapsed(self.collapsed)
-                    .render(id, window, cx)
+                    .render_padded(
+                        id,
+                        if ix == 0 { top } else { half_gap },
+                        if ix + 1 == count { bottom } else { half_gap },
+                        window,
+                        cx,
+                    )
                     .into_any_element()
             }))
     }
@@ -230,9 +253,26 @@ impl Collapsible for SidebarMenuItem {
 }
 
 impl SidebarItem for SidebarMenuItem {
+    /// Render the padded hit row and any independently clickable submenu children.
     fn render(
         self,
         id: impl Into<ElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> impl IntoElement {
+        let half_gap = window.rem_size() * 0.25;
+        self.render_padded(id, half_gap, half_gap, window, cx)
+    }
+}
+
+impl SidebarMenuItem {
+    /// Render a plate inside a hit row with the supplied top and bottom spacing.
+    /// Submenu spacing is split between its children to retain their original pitch.
+    pub(super) fn render_padded(
+        self,
+        id: impl Into<ElementId>,
+        top: gpui::Pixels,
+        bottom: gpui::Pixels,
         window: &mut Window,
         cx: &mut App,
     ) -> impl IntoElement {
@@ -255,106 +295,119 @@ impl SidebarItem for SidebarMenuItem {
             .as_ref()
             .map_or(false, |s| !is_collapsed && *s.read(cx));
         let p = MoonPalette::active(cx);
+        let hover_group = SharedString::from(format!("sidebar-row-{id}"));
+        let child_count = self.children.len();
+        let submenu_half_gap = window.rem_size() * 0.125;
 
         div()
             .id(id.clone())
             .w_full()
             .child(
-                h_flex()
-                    .size_full()
-                    .id("item")
-                    .relative()
-                    .overflow_x_hidden()
-                    .flex_shrink_0()
-                    .p_2()
-                    .gap_x_2()
-                    .rounded(cx.theme().radius)
-                    .text_sm()
-                    .when(is_hoverable, |this| {
-                        this.hover(|this| {
-                            this.bg(cx.theme().sidebar_accent.opacity(0.8))
-                                .text_color(cx.theme().sidebar_accent_foreground)
-                        })
-                    })
-                    .when(is_active, |this| {
-                        this.font_medium()
-                            .bg(selected_background(p))
-                            .text_color(cx.theme().sidebar_accent_foreground)
-                    })
-                    .when(is_active && !is_collapsed, |this| {
-                        this.child(
-                            div()
-                                .absolute()
-                                .left(px(0.0))
-                                .top(px(3.0))
-                                .bottom(px(3.0))
-                                .w(px(3.0))
-                                .bg(cx.theme().sidebar_primary),
-                        )
-                        .child(
-                            div()
-                                .absolute()
-                                .left(px(8.0))
-                                .top(px(12.0))
-                                .w(px(4.0))
-                                .h(px(4.0))
-                                .rounded_full()
-                                .bg(cx.theme().sidebar_primary),
-                        )
-                    })
-                    .when_some(self.icon.clone(), |this, icon| this.child(icon))
-                    .when(is_collapsed, |this| {
-                        this.justify_center().when(is_active, |this| {
-                            this.bg(selected_background(p))
-                                .text_color(cx.theme().sidebar_accent_foreground)
-                        })
-                    })
-                    .when(!is_collapsed, |this| {
-                        this.h_7()
-                            .child(
-                                h_flex()
-                                    .flex_1()
-                                    .gap_x_2()
-                                    .justify_between()
-                                    .overflow_x_hidden()
+                div()
+                    .id("hit-row")
+                    .debug_selector(|| format!("{id}:hit-row"))
+                    .group(hover_group.clone())
+                    .w_full()
+                    .pt(top)
+                    .pb(if is_open { px(0.0) } else { bottom })
+                    .child(
+                        h_flex()
+                            .w_full()
+                            .id("item")
+                            .debug_selector(|| format!("{id}:plate"))
+                            .relative()
+                            .overflow_x_hidden()
+                            .flex_shrink_0()
+                            .p_2()
+                            .gap_x_2()
+                            .rounded(cx.theme().radius)
+                            .text_sm()
+                            .when(is_hoverable, |this| {
+                                this.group_hover(hover_group, |this| {
+                                    this.bg(cx.theme().sidebar_accent.opacity(0.8))
+                                        .text_color(cx.theme().sidebar_accent_foreground)
+                                })
+                            })
+                            .when(is_active, |this| {
+                                this.font_medium()
+                                    .bg(selected_background(p))
+                                    .text_color(cx.theme().sidebar_accent_foreground)
+                            })
+                            .when(is_active && !is_collapsed, |this| {
+                                this.child(
+                                    div()
+                                        .absolute()
+                                        .left(px(0.0))
+                                        .top(px(3.0))
+                                        .bottom(px(3.0))
+                                        .w(px(3.0))
+                                        .bg(cx.theme().sidebar_primary),
+                                )
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .left(px(8.0))
+                                        .top(px(12.0))
+                                        .w(px(4.0))
+                                        .h(px(4.0))
+                                        .rounded_full()
+                                        .bg(cx.theme().sidebar_primary),
+                                )
+                            })
+                            .when_some(self.icon.clone(), |this, icon| this.child(icon))
+                            .when(is_collapsed, |this| {
+                                this.justify_center().when(is_active, |this| {
+                                    this.bg(selected_background(p))
+                                        .text_color(cx.theme().sidebar_accent_foreground)
+                                })
+                            })
+                            .when(!is_collapsed, |this| {
+                                this.h_7()
                                     .child(
                                         h_flex()
                                             .flex_1()
+                                            .gap_x_2()
+                                            .justify_between()
                                             .overflow_x_hidden()
-                                            .child(self.label.clone()),
+                                            .child(
+                                                h_flex()
+                                                    .flex_1()
+                                                    .overflow_x_hidden()
+                                                    .child(self.label.clone()),
+                                            )
+                                            .when_some(self.suffix.clone(), |this, suffix| {
+                                                this.child(suffix(window, cx).into_any_element())
+                                            }),
                                     )
-                                    .when_some(self.suffix.clone(), |this, suffix| {
-                                        this.child(suffix(window, cx).into_any_element())
-                                    }),
-                            )
-                            .when_some(open_state.clone(), |this, open_state| {
-                                this.child(
-                                    Button::new("caret")
-                                        .xsmall()
-                                        .ghost()
-                                        .icon(
-                                            Icon::new(IconName::ChevronRight)
-                                                .size_4()
-                                                .when(is_open, |this| {
-                                                    this.rotate(percentage(90. / 360.))
+                                    .when_some(open_state.clone(), |this, open_state| {
+                                        this.child(
+                                            Button::new("caret")
+                                                .xsmall()
+                                                .ghost()
+                                                .icon(
+                                                    Icon::new(IconName::ChevronRight)
+                                                        .size_4()
+                                                        .when(is_open, |this| {
+                                                            this.rotate(percentage(90. / 360.))
+                                                        }),
+                                                )
+                                                .on_click({
+                                                    move |_, _, cx| {
+                                                        // Avoid trigger item click, just expand/collapse submenu
+                                                        cx.stop_propagation();
+                                                        open_state.update(cx, |is_open, cx| {
+                                                            *is_open = !*is_open;
+                                                            cx.notify();
+                                                        })
+                                                    }
                                                 }),
                                         )
-                                        .on_click({
-                                            move |_, _, cx| {
-                                                // Avoid trigger item click, just expand/collapse submenu
-                                                cx.stop_propagation();
-                                                open_state.update(cx, |is_open, cx| {
-                                                    *is_open = !*is_open;
-                                                    cx.notify();
-                                                })
-                                            }
-                                        }),
-                                )
+                                    })
                             })
-                    })
-                    .when(is_disabled, |this| {
-                        this.text_color(cx.theme().muted_foreground)
-                    })
+                            .when(is_disabled, |this| {
+                                this.text_color(cx.theme().muted_foreground)
+                            }),
+                    )
                     .when(!is_disabled, |this| {
                         this.on_click({
                             let open_state = open_state.clone();
@@ -393,17 +446,45 @@ impl SidebarItem for SidebarMenuItem {
                 this.child(
                     v_flex()
                         .id("submenu")
-                        .border_l_1()
-                        .border_color(cx.theme().sidebar_border)
-                        .gap_1()
+                        .relative()
+                        .gap_0()
                         .ml_3p5()
-                        .pl_2p5()
-                        .py_0p5()
+                        .pl(window.rem_size() * 0.625 + px(1.0))
+                        .pb_0p5()
+                        // The final child's hit padding extends past the old border endpoint.
+                        .child(
+                            div()
+                                .id("submenu-line")
+                                .debug_selector(|| format!("{id}:submenu-line"))
+                                .absolute()
+                                .left(px(0.0))
+                                .top(px(0.0))
+                                .bottom(bottom)
+                                .w(px(1.0))
+                                .bg(cx.theme().sidebar_border),
+                        )
                         .children(self.children.into_iter().enumerate().map(|(ix, item)| {
                             let id = format!("{}-{}", id, ix);
-                            item.render(id, window, cx).into_any_element()
+                            let is_last = ix + 1 == child_count;
+                            div()
+                                .when(is_last, |this| this.mb(-submenu_half_gap))
+                                .child(item.render_padded(
+                                    id,
+                                    submenu_half_gap,
+                                    if is_last {
+                                        bottom + submenu_half_gap
+                                    } else {
+                                        submenu_half_gap
+                                    },
+                                    window,
+                                    cx,
+                                ))
+                                .into_any_element()
                         })),
                 )
             })
     }
 }
+
+#[cfg(test)]
+mod tests;
