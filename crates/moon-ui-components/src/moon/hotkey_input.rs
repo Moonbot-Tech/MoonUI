@@ -663,6 +663,9 @@ fn lone_modifier_key(modifiers: Modifiers) -> Option<&'static str> {
     only
 }
 
+/// Classifies a keystroke as a field command or a binding for the current recording state.
+///
+/// Bare Delete and Backspace clear only while idle; recording captures them as bindings.
 pub fn moon_hotkey_capture(stroke: &Keystroke, recording: bool) -> MoonHotkeyCapture {
     let key = stroke.key.as_str();
     let plain = !stroke.modifiers.modified();
@@ -676,7 +679,6 @@ pub fn moon_hotkey_capture(stroke: &Keystroke, recording: bool) -> MoonHotkeyCap
 
     match key {
         "escape" if plain => MoonHotkeyCapture::Cancel,
-        "backspace" | "delete" if plain => MoonHotkeyCapture::Clear,
         key if is_modifier_key_name(key) => MoonHotkeyCapture::WaitForKey,
         _ => MoonHotkeyCapture::Commit(stroke.clone()),
     }

@@ -3,6 +3,25 @@
 use super::{MoonKbd, MoonKbdSize};
 use gpui::Keystroke;
 
+/// Catches conflating forward-delete and backspace labels, making distinct bindings look alike.
+#[test]
+fn kbd_distinguishes_delete_and_backspace() {
+    #[cfg(target_os = "macos")]
+    let cases = [("delete", "⌦"), ("backspace", "⌫"), ("shift-delete", "⇧⌦")];
+    #[cfg(not(target_os = "macos"))]
+    let cases = [
+        ("delete", "Delete"),
+        ("backspace", "Backspace"),
+        ("shift-delete", "Shift+Delete"),
+    ];
+    for (source, expected) in cases {
+        assert_eq!(
+            MoonKbd::format_keystroke(&Keystroke::parse(source).unwrap()),
+            expected
+        );
+    }
+}
+
 /// Catches using pointer-target height or legacy font scaling, which enlarges shortcut chips.
 #[test]
 fn kbd_metrics_match_designer_reference() {

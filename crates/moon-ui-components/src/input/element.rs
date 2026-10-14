@@ -30,6 +30,9 @@ const FOLD_ICON_WIDTH: Pixels = px(14.);
 const FOLD_ICON_HITBOX_WIDTH: Pixels = px(18.);
 const MAX_HIGHLIGHT_LINE_LENGTH: usize = 10_000;
 
+#[cfg(test)]
+mod regression_tests;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct EditorScrollbarLayout {
     bounds: Bounds<Pixels>,
@@ -335,13 +338,15 @@ impl TextElement {
         });
     }
 
-    /// Returns the:
+    /// Lay out the cursor and follow its selection within the supplied viewport.
     ///
     /// - cursor bounds
     /// - scroll offset
     /// - current row index (No only the visible lines, but all lines)
     ///
-    /// This method also will update for track scroll to cursor.
+    /// Mutates `bounds` to the painted text origin and returns the cursor bounds, scroll
+    /// target and current row. Plain single-line inputs never move vertically; fitting
+    /// values return to their horizontal origin before both cursor and text are positioned.
     fn layout_cursor(
         &self,
         last_layout: &LastLayout,
@@ -374,6 +379,20 @@ impl TextElement {
         let mut current_row = None;
         let mut scroll_offset = state.scroll_handle.offset();
         let mut cursor_bounds = None;
+        let single_line = matches!(
+            state.mode,
+            InputMode::PlainText {
+                multi_line: false,
+                ..
+            }
+        );
+        let fits_horizontally = last_layout.lines.first().is_some_and(|line| {
+            line.size(line_height).width + line_number_width <= bounds.size.width
+        });
+        if single_line && fits_horizontally {
+            // A shorter edit or wider viewport no longer needs the previous horizontal offset.
+            scroll_offset.x = px(0.);
+        }
 
         // Padding kept between the cursor and the viewport's top/bottom
         // edges, used by the auto-scroll-into-view computation below.
@@ -474,17 +493,19 @@ impl TextElement {
                     TextAlign::Center => CURSOR_WIDTH,
                 };
 
-                scroll_offset.x = if scroll_offset.x + cursor_pos.x
-                    > (bounds.size.width - line_number_width - safety_margin)
-                {
-                    // cursor is out of right
-                    bounds.size.width - line_number_width - safety_margin - cursor_pos.x
-                } else if scroll_offset.x + cursor_pos.x < px(0.) {
-                    // cursor is out of left
-                    scroll_offset.x - cursor_pos.x
-                } else {
-                    scroll_offset.x
-                };
+                if !(single_line && fits_horizontally) {
+                    scroll_offset.x = if scroll_offset.x + cursor_pos.x
+                        > (bounds.size.width - line_number_width - safety_margin)
+                    {
+                        // cursor is out of right
+                        bounds.size.width - line_number_width - safety_margin - cursor_pos.x
+                    } else if scroll_offset.x + cursor_pos.x < px(0.) {
+                        // cursor is out of left
+                        scroll_offset.x - cursor_pos.x
+                    } else {
+                        scroll_offset.x
+                    };
+                }
 
                 // Vertical cursor-follow is suppressed while auto-scroll manages the y axis,
                 // to prevent fighting the background scroll task.
@@ -561,6 +582,15 @@ impl TextElement {
             scroll_size.height,
             bounds.size.height,
         );
+
+        if single_line {
+            // Persistence clamps after paint; enforce the invariant before moving the sole line,
+            // including when a deferred target was computed against an earlier layout.
+            scroll_offset.y = px(0.);
+            if fits_horizontally {
+                scroll_offset.x = px(0.);
+            }
+        }
 
         bounds.origin = bounds.origin + scroll_offset;
 
