@@ -11,7 +11,7 @@ use gpui::{
 use super::TextElement;
 use crate::{
     Root, h_flex,
-    input::{InputState, display_map::LineLayout},
+    input::{InputState, blink_cursor::CURSOR_WIDTH, display_map::LineLayout},
     moon::{MoonNumberInput, MoonSize, MoonTheme, ThemeMode},
 };
 
@@ -179,7 +179,8 @@ fn centered_short_value_resets_stale_scroll_before_paint(cx: &mut TestAppContext
         );
         assert_eq!(bounds.left() + layout.alignment_offset(px(14.)), px(23.));
         assert_eq!(cursor.expect("cursor is laid out").left(), px(37.));
-        // Twenty 7px digits still follow the 2px cursor: 140px - 58px = 82px scroll.
+        // Twenty 7px digits still follow the cursor. Right clearance comes from the independent
+        // caret-style constant in blink_cursor, whose width differs between platforms.
         let long_value = "01234567890123456789";
         layout.lines = Rc::new(vec![
             LineLayout::new().lines(smallvec::smallvec![numeric_line(long_value, 140.)]),
@@ -197,10 +198,10 @@ fn centered_short_value_resets_stale_scroll_before_paint(cx: &mut TestAppContext
             window,
             cx,
         );
-        assert_eq!(offset.x, px(-82.));
+        assert_eq!(offset.x, px(-80.) - CURSOR_WIDTH);
         assert_eq!(
             cursor.expect("long value cursor is laid out").left(),
-            px(58.)
+            px(60.) - CURSOR_WIDTH
         );
         // A 93px value fits a 100px box even though the left-aligned scroll extent includes
         // a 10px safety margin. It must keep its first glyph at zero and its cursor at 93.
