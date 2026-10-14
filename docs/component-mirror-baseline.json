@@ -437,7 +437,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "5c656e0ef4caf7de",
+      "local_hash": "f3a029b50a9fa93c",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -496,8 +496,13 @@
         },
         {
           "path": "input/element.rs",
-          "hash": "511c756aa3009759",
-          "bytes": 96171
+          "hash": "a3ec163629b2e82f",
+          "bytes": 97481
+        },
+        {
+          "path": "input/element/regression_tests.rs",
+          "hash": "bec5af9ae7e1324d",
+          "bytes": 9830
         },
         {
           "path": "input/indent.rs",
@@ -809,6 +814,7 @@
         "input/display_map/display_map.rs",
         "input/display_map/text_wrapper.rs",
         "input/element.rs",
+        "input/element/regression_tests.rs",
         "input/input.rs",
         "input/lsp/document_colors.rs",
         "input/lsp/hover.rs",
@@ -1506,7 +1512,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "5c656e0ef4caf7de",
+      "local_hash": "f3a029b50a9fa93c",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -1565,8 +1571,13 @@
         },
         {
           "path": "input/element.rs",
-          "hash": "511c756aa3009759",
-          "bytes": 96171
+          "hash": "a3ec163629b2e82f",
+          "bytes": 97481
+        },
+        {
+          "path": "input/element/regression_tests.rs",
+          "hash": "bec5af9ae7e1324d",
+          "bytes": 9830
         },
         {
           "path": "input/indent.rs",
@@ -1878,6 +1889,7 @@
         "input/display_map/display_map.rs",
         "input/display_map/text_wrapper.rs",
         "input/element.rs",
+        "input/element/regression_tests.rs",
         "input/input.rs",
         "input/lsp/document_colors.rs",
         "input/lsp/hover.rs",
