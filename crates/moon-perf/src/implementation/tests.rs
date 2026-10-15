@@ -279,3 +279,18 @@ fn iters_per_sec_keeps_sub_millisecond_precision() {
         "expected 2000 iterations/sec for both runs, got {fractional} and {sub_ms}"
     );
 }
+
+/// Catches the importance/weight comparison returning `Equal` without falling
+/// through to the name, which `sort`'s doc promises as the last key.
+///
+/// Two rows with the same importance and weight, pushed as `b` then `a`, must
+/// print in name order. Without the tie-break the unstable sort keeps them in
+/// insertion order, so the report lists `b` above `a`.
+#[test]
+fn equal_importance_and_weight_sort_by_name() {
+    let mut output = Output::blank();
+    output.success("b", mdata(Importance::Average, 50), iters(4), timings(100));
+    output.success("a", mdata(Importance::Average, 50), iters(4), timings(100));
+    output.sort();
+    assert_eq!(names_of(&output), ["a", "b"]);
+}

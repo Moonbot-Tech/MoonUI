@@ -214,16 +214,13 @@ impl Output {
             // Tests where we got no metadata go at the end.
             ((_, Some(_), _), (_, None, _)) => std::cmp::Ordering::Less,
             ((_, None, _), (_, Some(_), _)) => std::cmp::Ordering::Greater,
-            // Then sort by importance, then weight. Derived `Ord` is Fluff-first,
-            // so compare it backwards and Critical prints first.
-            ((_, Some(a_mdata), _), (_, Some(b_mdata), _)) => {
-                let c = b_mdata.importance.cmp(&a_mdata.importance);
-                if matches!(c, std::cmp::Ordering::Equal) {
-                    a_mdata.weight.cmp(&b_mdata.weight)
-                } else {
-                    c
-                }
-            }
+            // Then sort by importance, then weight, then name. Derived `Ord` is
+            // Fluff-first, so compare it backwards and Critical prints first.
+            ((a_name, Some(a_mdata), _), (b_name, Some(b_mdata), _)) => b_mdata
+                .importance
+                .cmp(&a_mdata.importance)
+                .then_with(|| a_mdata.weight.cmp(&b_mdata.weight))
+                .then_with(|| a_name.cmp(b_name)),
             // Lastly by name.
             ((a_name, ..), (b_name, ..)) => a_name.cmp(b_name),
         });
