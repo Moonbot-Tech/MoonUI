@@ -57,6 +57,13 @@ cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 
    - regular pointer tooltips require 800 ms of continuous hover, expire after
      five visible seconds, and stay suppressed until pointer re-entry; hoverable
      tooltips remain persistent while either their trigger or content is hovered.
+     A mouse press on the trigger of a regular tooltip hides it, or cancels the
+     pending show, and keeps it suppressed until the pointer leaves the trigger,
+     even with the button still held (`TooltipTrigger` in
+     `moon-gpui/src/elements/div.rs`: `check_can_show` gates showing,
+     `check_is_hovered` clears the suppression). Upstream only clears the
+     tooltip on press; after the release the next pointer move over the
+     trigger schedules it again without the pointer leaving.
    - `UniformList::on_visible_range`: a channel for observing the item range the
      list draws. The renderer closure cannot serve as one — `measure_item` runs
      it on a single item, twice per frame, before the real range exists — so a
