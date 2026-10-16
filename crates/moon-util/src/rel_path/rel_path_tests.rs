@@ -221,3 +221,19 @@ fn from_proto_accepts_only_an_already_normalized_relative_path() {
         "an absolute path is not a relative wire path"
     );
 }
+
+/// Catches `RelPath::new` stripping trailing separators before it checks for an
+/// absolute path, so the Windows drive root `C:\` (absolute by
+/// `paths::is_absolute`: drive letter, colon, separator) loses its separator and
+/// is accepted as the relative path `C:`. `C:\foo` and `C:\.` are rejected, so
+/// the bare root must be too; a caller such as `PathStyle::strip_prefix` would
+/// otherwise hand out a drive root as a path inside the worktree.
+#[test]
+fn new_rejects_a_windows_drive_root() {
+    for root in ["C:\\", "C:/", "d:\\\\"] {
+        assert!(
+            super::RelPath::new(std::path::Path::new(root), PathStyle::Windows).is_err(),
+            "{root:?} is an absolute drive root, not a relative path"
+        );
+    }
+}
