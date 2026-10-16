@@ -52,6 +52,11 @@ impl RelPath {
     #[track_caller]
     pub fn new<'a>(path: &'a Path, path_style: PathStyle) -> Result<Cow<'a, Self>> {
         let mut path = path.to_str().context("non utf-8 path")?;
+        // Check before trimming trailing separators: trimming turns the drive
+        // root `C:\` into `C:`, which no longer reads as absolute.
+        if is_absolute(path, path_style) {
+            return Err(anyhow!("absolute path not allowed: {path:?}"));
+        }
 
         let (prefixes, suffixes): (&[_], &[_]) = match path_style {
             PathStyle::Posix => (&["./"], &['/']),
