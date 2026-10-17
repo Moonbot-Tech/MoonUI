@@ -143,12 +143,32 @@ impl RelPath {
         self.components().next_back()
     }
 
+    /// Returns the file name without its extension, by `std::path::Path::file_stem`'s rules.
+    ///
+    /// Splits the last `/` component by hand: `Path` would split again at a `\` on a Windows host.
     pub fn file_stem(&self) -> Option<&str> {
-        Some(self.as_std_path().file_stem()?.to_str().unwrap())
+        let (before, after) = split_file_at_dot(self.last_named_component()?);
+        before.or(after)
     }
 
+    /// Returns the file name's extension, by `std::path::Path::extension`'s rules.
+    ///
+    /// Splits the last `/` component by hand: `Path` would split again at a `\` on a Windows host.
     pub fn extension(&self) -> Option<&str> {
-        Some(self.as_std_path().extension()?.to_str().unwrap())
+        let (before, after) = split_file_at_dot(self.last_named_component()?);
+        before.and(after)
+    }
+
+    /// Returns the last non-empty `/` component, as `std::path::Path::file_name` would.
+    ///
+    /// Unlike [`Self::file_name`], skips the empty tail that `RelPathBuf::push(RelPath::empty())`
+    /// leaves behind, so `foo.rs/` still names `foo.rs`. Returns `None` for an empty path.
+    fn last_named_component(&self) -> Option<&str> {
+        self.0
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .filter(|name| !name.is_empty())
     }
 
     pub fn parent(&self) -> Option<&Self> {
@@ -259,6 +279,18 @@ impl RelPath {
     /// This should not be shown to the user.
     pub fn as_std_path(&self) -> &Path {
         Path::new(&self.0)
+    }
+}
+
+/// Splits a file name at its last `.` into the parts before and after it.
+///
+/// Mirrors std's private `rsplit_file_at_dot`: a name without a dot, or whose only dot is its
+/// first character (a dot file such as `.gitignore`), returns the whole name as the first part
+/// and no second part.
+fn split_file_at_dot(file_name: &str) -> (Option<&str>, Option<&str>) {
+    match file_name.rsplit_once('.') {
+        Some((before, after)) if !before.is_empty() => (Some(before), Some(after)),
+        _ => (Some(file_name), None),
     }
 }
 

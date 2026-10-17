@@ -237,3 +237,35 @@ fn new_rejects_a_windows_drive_root() {
         );
     }
 }
+
+/// Catches `RelPath::file_stem` splitting the path with the host's separator
+/// rules, so a POSIX file name holding `\` gets the stem `b` on Windows while a
+/// Unix host returns `a\b`. Expected values: std's `file_stem` / `extension`
+/// rules applied to the `file_name()` component `a\b.rs` by hand.
+#[test]
+fn file_stem_uses_the_relative_file_name_on_every_host() {
+    let path = super::RelPath::new(std::path::Path::new(r"dir/a\b.rs"), PathStyle::Posix)
+        .expect("a backslash is a legal POSIX file-name character");
+    assert_eq!(path.file_name(), Some(r"a\b.rs"));
+    assert_eq!(
+        path.file_stem(),
+        Some(r"a\b"),
+        r"stem of the file name a\b.rs"
+    );
+    assert_eq!(path.extension(), Some("rs"));
+}
+
+/// Catches `RelPath::extension` splitting the path with the host's separator
+/// rules, so the POSIX file name `a.d\b` loses its extension `d\b` on Windows.
+/// Expected values: std's rules applied to the file name `a.d\b` by hand.
+#[test]
+fn extension_uses_the_relative_file_name_on_every_host() {
+    let path = super::RelPath::new(std::path::Path::new(r"dir/a.d\b"), PathStyle::Posix)
+        .expect("a backslash is a legal POSIX file-name character");
+    assert_eq!(
+        path.extension(),
+        Some(r"d\b"),
+        r"text after the last dot of a.d\b"
+    );
+    assert_eq!(path.file_stem(), Some("a"));
+}
