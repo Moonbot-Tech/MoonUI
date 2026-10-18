@@ -82,11 +82,23 @@ impl<K: Clone + Ord, V: Clone> TreeMap<K, V> {
             .map(|it| it.value)
     }
 
+    /// Inserts every pair from `iter`, replacing the value of a key the map
+    /// already holds.
+    ///
+    /// When `iter` repeats a key, the last value for it wins, as with
+    /// [`TreeMap::insert`]. Repeats are dropped here because `SumTree::edit`
+    /// keeps every insert of one key from a single batch.
     pub fn extend(&mut self, iter: impl IntoIterator<Item = (K, V)>) {
-        let edits: Vec<_> = iter
+        let mut entries: Vec<_> = iter
             .into_iter()
-            .map(|(key, value)| Edit::Insert(MapEntry { key, value }))
+            .map(|(key, value)| MapEntry { key, value })
             .collect();
+        // Reversed and stably sorted, the first entry of each key is the last
+        // one `iter` yielded, which `dedup_by` keeps.
+        entries.reverse();
+        entries.sort_by(|a, b| a.key.cmp(&b.key));
+        entries.dedup_by(|later, earlier| later.key == earlier.key);
+        let edits = entries.into_iter().map(Edit::Insert).collect();
         self.0.edit(edits, ());
     }
 
