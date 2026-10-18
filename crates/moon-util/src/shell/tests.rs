@@ -45,7 +45,7 @@ fn test_try_quote_powershell_edge_cases() {
     // Empty string
     assert_eq!(
         shell_kind.try_quote("").unwrap().into_owned(),
-        "''".to_string()
+        "'\"\"'".to_string()
     );
 
     // String without special characters (no quoting needed)
@@ -251,11 +251,13 @@ fn test_try_quote_single_quote_paths() {
     }
 }
 
-/// Catches routing empty PowerShell arguments through CRT quoting, which turns
-/// an empty task argument into two literal double quotes instead.
+/// Catches quoting an empty legacy PowerShell argument as a bare `''`, which
+/// Windows PowerShell 5.1 drops when it builds a native command line, so the
+/// executable loses the argument and every later one shifts left. `'""'` is
+/// the form that reaches a native executable as one empty argument.
 #[test]
-fn powershell_empty_argument_is_an_empty_single_quoted_string() {
-    assert_eq!(ShellKind::quote_powershell(""), "''");
-    assert_eq!(ShellKind::PowerShell.try_quote("").unwrap(), "''");
+fn powershell_empty_argument_survives_native_argument_passing() {
+    assert_eq!(ShellKind::quote_powershell(""), "'\"\"'");
+    assert_eq!(ShellKind::PowerShell.try_quote("").unwrap(), "'\"\"'");
     assert_eq!(ShellKind::quote_pwsh(""), "''");
 }
