@@ -551,13 +551,14 @@ impl ShellKind {
         result
     }
 
-    /// Quotes a task argument for legacy PowerShell, preserving an empty argument
-    /// as `''` rather than applying CRT quoting to it.
+    /// Quotes a task argument for legacy PowerShell (Windows PowerShell 5.1).
+    ///
+    /// The argument is CRT-quoted first and then wrapped in single quotes when
+    /// PowerShell would otherwise interpret it. An empty argument therefore
+    /// becomes `'""'`: legacy PowerShell drops a bare `''` when it builds a
+    /// native command line, while `'""'` reaches the executable as one empty
+    /// argument.
     pub fn quote_powershell(arg: &str) -> Cow<'_, str> {
-        if arg.is_empty() {
-            return Cow::Borrowed("''");
-        }
-
         let ps_will_quote = Self::need_quotes_powershell(arg);
         let crt_quoted = Self::quote_windows(arg, !ps_will_quote);
 
