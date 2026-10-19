@@ -207,13 +207,13 @@ shape-ятся заново. Если из тысячи строк поменя�
 У `GpuCanvas` есть два независимых слоя:
 
 ```rust
-gpu_canvas(driver)
-    .under()       // native canvas layer
+gpu_canvas(driver) // native canvas layer: UnderScene by default
     .text_over();  // text layer
 ```
 
 `canvas_layer` отвечает, где рисуется сам native pass. `text_layer` отвечает,
-где композится текст, созданный через `prepare_text()`.
+где композится текст, созданный через `prepare_text()`. По умолчанию оба слоя
+`UnderScene`.
 
 Зачем разделять:
 
@@ -257,8 +257,13 @@ mousemove снова начнет будить весь компонент/ок�
      text rendering mode, поддержка subpixel, background appearance или draw
      order;
    - canvas пропал из сцены (его запись удаляется);
-   - GPU device восстановлен после потери (хранилище очищается целиком).
-   Если `prepare_text()` вернул ошибку, в кадр идёт прошлый frame canvas-а.
+   - GPU device восстановлен после потери (хранилище очищается целиком);
+   - сохранённый frame содержит polychrome (emoji/image) sprites: их atlas
+     tiles могут быть освобождены без dirty окна, поэтому такой canvas готовит
+     текст заново.
+   Если `prepare_text()` вернул ошибку, в кадр идёт прошлый frame canvas-а,
+   только если окружение canvas-а с тех пор не изменилось; иначе подписей
+   этого canvas-а в кадре нет.
 4. Default clip для text sprites равен `canvas.bounds ∩ content_mask`, как и
    scissor native canvas pass-а. Текст не должен вылезать за прямоугольник
    своего `gpu_canvas`.
@@ -342,8 +347,9 @@ all over gpu canvas text
 - вызывает `GpuCanvasDriver::frame()` до present;
 - не dirty-ит GPUI view tree;
 - вызывает `prepare_text()` только когда кадр будет показан;
-- если один canvas попросил present, вызывает `prepare_text()` для всех canvas-ов
-  окна;
+- на GPU-only кадре вызывает `prepare_text()` только у canvas-ов, которые сами
+  попросили present, а остальные повторяют сохранённый text frame (инвариант 3);
+  на UI redraw — у всех canvas-ов;
 - передает в `GpuCanvasTextContext` bounds, effective clip и оба слоя: canvas
   layer и text layer;
 - append-ит text sprites в общий frame только после успешного `prepare_text()`.
