@@ -269,3 +269,16 @@ fn extension_uses_the_relative_file_name_on_every_host() {
     );
     assert_eq!(path.file_stem(), Some("a"));
 }
+
+/// Catches `RelPath::new` checking for an absolute path only before the `./`
+/// prefix is stripped and before `..` is resolved, so a Windows drive path
+/// survives as a "relative" path that displays as absolute.
+#[test]
+fn new_rejects_a_drive_path_reached_through_a_prefix_or_parent() {
+    for path in [r"./C:\", r".\C:\", r"a/../C:\foo", "a/../C:/foo"] {
+        assert!(
+            super::RelPath::new(std::path::Path::new(path), PathStyle::Windows).is_err(),
+            "{path:?} names a Windows drive path, not a relative path"
+        );
+    }
+}

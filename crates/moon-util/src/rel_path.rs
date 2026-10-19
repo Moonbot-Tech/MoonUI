@@ -52,11 +52,6 @@ impl RelPath {
     #[track_caller]
     pub fn new<'a>(path: &'a Path, path_style: PathStyle) -> Result<Cow<'a, Self>> {
         let mut path = path.to_str().context("non utf-8 path")?;
-        // Check before trimming trailing separators: trimming turns the drive
-        // root `C:\` into `C:`, which no longer reads as absolute.
-        if is_absolute(path, path_style) {
-            return Err(anyhow!("absolute path not allowed: {path:?}"));
-        }
 
         let (prefixes, suffixes): (&[_], &[_]) = match path_style {
             PathStyle::Posix => (&["./"], &['/']),
@@ -66,14 +61,16 @@ impl RelPath {
         while prefixes.iter().any(|prefix| path.starts_with(prefix)) {
             path = &path[prefixes[0].len()..];
         }
+        // Check after stripping `./` but before trimming trailing separators:
+        // trimming turns the drive root `C:\` into `C:`, which no longer reads
+        // as absolute, and `./C:\` names that same root.
+        if is_absolute(path, path_style) {
+            return Err(anyhow!("absolute path not allowed: {path:?}"));
+        }
         while let Some(prefix) = path.strip_suffix(suffixes)
             && !prefix.is_empty()
         {
             path = prefix;
-        }
-
-        if is_absolute(&path, path_style) {
-            return Err(anyhow!("absolute path not allowed: {path:?}"));
         }
 
         let mut string = Cow::Borrowed(path);
@@ -102,6 +99,10 @@ impl RelPath {
                     }
                     other => normalized.push(RelPath::new_unchecked(other)),
                 }
+            }
+            // Resolving `..` can expose an absolute path, as in `a/../C:/foo`.
+            if is_absolute(normalized.as_unix_str(), path_style) {
+                return Err(anyhow!("absolute path not allowed: {result:?}"));
             }
             result = Cow::Owned(normalized)
         }
