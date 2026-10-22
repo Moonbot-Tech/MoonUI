@@ -282,3 +282,17 @@ fn new_rejects_a_drive_path_reached_through_a_prefix_or_parent() {
         );
     }
 }
+
+/// Catches `RelPath::new` trimming trailing separators before resolving `..`,
+/// so a Windows drive root reached through a parent segment loses the
+/// separator that marks it absolute and comes out as the relative path `C:`.
+/// Expected: the same error `C:\` and `./C:\` already get.
+#[test]
+fn new_rejects_a_drive_root_reached_through_a_parent() {
+    for path in [r"a/../C:\", r"a\..\C:\", "a/../C:/", r"./a/../d:\\"] {
+        assert!(
+            super::RelPath::new(std::path::Path::new(path), PathStyle::Windows).is_err(),
+            "{path:?} names a Windows drive root, not a relative path"
+        );
+    }
+}

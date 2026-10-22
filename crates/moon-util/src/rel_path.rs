@@ -67,11 +67,13 @@ impl RelPath {
         if is_absolute(path, path_style) {
             return Err(anyhow!("absolute path not allowed: {path:?}"));
         }
+        let untrimmed_len = path.len();
         while let Some(prefix) = path.strip_suffix(suffixes)
             && !prefix.is_empty()
         {
             path = prefix;
         }
+        let trimmed_separator = path.len() != untrimmed_len;
 
         let mut string = Cow::Borrowed(path);
         if path_style == PathStyle::Windows && path.contains('\\') {
@@ -101,7 +103,14 @@ impl RelPath {
                 }
             }
             // Resolving `..` can expose an absolute path, as in `a/../C:/foo`.
-            if is_absolute(normalized.as_unix_str(), path_style) {
+            // A drive root such as `a/../C:\` lost its separator to the trim
+            // above and normalizes to a bare `C:`, so put a trimmed separator
+            // back before asking.
+            if is_absolute(normalized.as_unix_str(), path_style)
+                || (trimmed_separator
+                    && !normalized.is_empty()
+                    && is_absolute(&format!("{}/", normalized.as_unix_str()), path_style))
+            {
                 return Err(anyhow!("absolute path not allowed: {result:?}"));
             }
             result = Cow::Owned(normalized)
