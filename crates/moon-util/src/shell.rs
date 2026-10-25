@@ -235,8 +235,13 @@ impl ShellKind {
     fn to_cmd_variable(input: &str) -> String {
         if let Some(var_str) = input.strip_prefix("${") {
             if var_str.find(':').is_none() {
-                // If the input starts with "${", remove the trailing "}"
-                format!("%{}%", &var_str[..var_str.len() - 1])
+                // If the input is a whole "${NAME}", unwrap the name. Without a
+                // trailing "}" there is no braced name to convert, so the input
+                // is returned as is rather than cut by one character.
+                match var_str.strip_suffix('}') {
+                    Some(name) => format!("%{}%", name),
+                    None => input.into(),
+                }
             } else {
                 // `${SOME_VAR:-SOME_DEFAULT}`, we currently do not handle this situation,
                 // which will result in the task failing to run in such cases.
@@ -254,8 +259,13 @@ impl ShellKind {
     fn to_powershell_variable(input: &str) -> String {
         if let Some(var_str) = input.strip_prefix("${") {
             if var_str.find(':').is_none() {
-                // If the input starts with "${", remove the trailing "}"
-                format!("$env:{}", &var_str[..var_str.len() - 1])
+                // If the input is a whole "${NAME}", unwrap the name. Without a
+                // trailing "}" there is no braced name to convert, so the input
+                // is returned as is rather than cut by one character.
+                match var_str.strip_suffix('}') {
+                    Some(name) => format!("$env:{}", name),
+                    None => input.into(),
+                }
             } else {
                 // `${SOME_VAR:-SOME_DEFAULT}`, we currently do not handle this situation,
                 // which will result in the task failing to run in such cases.
