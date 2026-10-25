@@ -41,6 +41,21 @@ fn powershell_rewrites_variables_onto_the_env_drive() {
     assert_eq!(ShellKind::Pwsh.to_shell_variable("plain"), "plain");
 }
 
+/// Catches `to_cmd_variable` / `to_powershell_variable` cutting the last byte
+/// off a `${...` argument that does not end in `}`: a bare `${` underflows the
+/// slice and `${Aé` cuts inside `é`, so `ShellBuilder::build` panics on such a
+/// task argument, and `${HOME}/bin` reaches the shell as `$env:HOME}/bi`.
+/// Without a trailing `}` there is no `${NAME}` to unwrap, so the argument is
+/// expected back unchanged, as for every other input that names no variable.
+#[test]
+fn cmd_and_powershell_leave_a_dollar_brace_without_closing_brace_alone() {
+    for kind in [ShellKind::Cmd, ShellKind::PowerShell, ShellKind::Pwsh] {
+        assert_eq!(kind.to_shell_variable("${"), "${");
+        assert_eq!(kind.to_shell_variable("${Aé"), "${Aé");
+        assert_eq!(kind.to_shell_variable("${HOME}/bin"), "${HOME}/bin");
+    }
+}
+
 /// Catches `args_for_shell` dropping the quotes around a cmd `/C` payload, so
 /// cmd would split `echo hi` on the space and run a different command.
 #[test]
