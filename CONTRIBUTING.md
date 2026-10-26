@@ -98,6 +98,9 @@ Three kinds of Rust test have three homes:
   3. Startup wiring in the appropriate shared `init` function, when required.
   4. A `component-manifest.json` entry and meaningful contracts.
   5. An interactive gallery example and `COMPONENT_COVERAGE` entry.
+  6. A verifier for each new manifest contract id in `xtask/src/component_audit/contracts.rs`
+     (a `BehavioralTest` contract is a `test_contract(...)` entry naming the exact test function);
+     `component-audit` fails on a manifest contract that has no verifier.
 
 - Intentional API removals, component-class changes, or donor drift are declared before baselines
   are refreshed. Never update a baseline merely to make a regression pass, and always inspect the
