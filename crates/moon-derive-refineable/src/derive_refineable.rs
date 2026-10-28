@@ -487,7 +487,8 @@ pub fn derive_refineable(input: TokenStream) -> TokenStream {
         impl #impl_generics #refinement_ident #ty_generics
             #where_clause
         {
-            /// Returns `true` if all fields are `Some`
+            /// Returns `true` if any field is set: a plain field holds `Some`, or a nested
+            /// refinement field has any field set.
             pub fn is_some(&self) -> bool {
                 #(
                     if self.#field_names.is_some() {
