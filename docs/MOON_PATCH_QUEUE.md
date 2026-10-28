@@ -16,8 +16,11 @@ generated tree.
 Regeneration command:
 
 ```powershell
-cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 --output crates --local
+cargo xtask transform --zed-tag v0.0.0 --zed-path R:\test\_zed_gpui_base_84b753 --output crates
 ```
+
+The generated crates use path dependencies by default; `--versioned-deps`
+switches them to version dependencies for publish-style output.
 
 ## Patch Layers On `master`
 
