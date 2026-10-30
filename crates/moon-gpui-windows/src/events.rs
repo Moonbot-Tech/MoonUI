@@ -108,7 +108,7 @@ impl WindowsWindowInner {
             WM_SETCURSOR => self.handle_set_cursor(handle, lparam),
             WM_SETTINGCHANGE => self.handle_system_settings_changed(handle, wparam, lparam),
             WM_INPUTLANGCHANGE => self.handle_input_language_changed(),
-            WM_SHOWWINDOW => self.handle_window_visibility_changed(handle, wparam),
+            WM_SHOWWINDOW => self.handle_window_visibility_changed(handle, wparam, lparam),
             WM_GPUI_CURSOR_STYLE_CHANGED => self.handle_cursor_changed(lparam),
             WM_GPUI_FORCE_UPDATE_WINDOW => self.draw_window(handle, true),
             WM_GPUI_FRAME_CLOCK => self.handle_frame_clock_msg(handle),
@@ -1200,10 +1200,35 @@ impl WindowsWindowInner {
         Some(0)
     }
 
-    fn handle_window_visibility_changed(&self, handle: HWND, wparam: WPARAM) -> Option<isize> {
-        if wparam.0 == 1 {
-            self.draw_window(handle, false);
+    /// Draw a window that is being shown, and keep an owned window maximized across its owner's
+    /// minimize/restore.
+    ///
+    /// When an owner is minimized, Windows hides its owned windows and, on restore, re-shows them
+    /// with `WM_SHOWWINDOW(TRUE, SW_PARENTOPENING)`. `DefWindowProc` answers that with
+    /// `SW_SHOWNOACTIVATE`, which returns a maximized window to its restore rectangle, so every
+    /// owner restore silently un-maximizes it. `SW_SHOWNA` shows the window in its current state
+    /// instead. Only the maximized case is taken over; every other show keeps the default path.
+    fn handle_window_visibility_changed(
+        &self,
+        handle: HWND,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> Option<isize> {
+        if wparam.0 != 1 {
+            return None;
         }
+        // An owned window the user minimized on its own keeps the default path, which is what
+        // restores it together with its owner.
+        if lparam.0 as u32 == SW_PARENTOPENING.0
+            && self.state.is_maximized()
+            && !unsafe { IsIconic(handle) }.as_bool()
+        {
+            // The return value is the previous visibility, not an error. The nested show sends a
+            // plain `WM_SHOWWINDOW(TRUE, 0)`, which takes the default path below and draws.
+            let _ = unsafe { ShowWindow(handle, SW_SHOWNA) };
+            return Some(0);
+        }
+        self.draw_window(handle, false);
         None
     }
 
