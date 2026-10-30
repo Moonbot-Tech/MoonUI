@@ -118,6 +118,15 @@ switches them to version dependencies for publish-style output.
 
 2. Zed bugfix candidates kept separate from `gpu_canvas` when possible:
    - Windows DPI/restore-bounds behavior
+   - Windows owned windows stay maximized across an owner minimize/restore:
+     Windows re-shows them with `WM_SHOWWINDOW(TRUE, SW_PARENTOPENING)`, and
+     `DefWindowProc` answers with `SW_SHOWNOACTIVATE`, which drops a maximized
+     window to its restore rectangle on every owner restore.
+     `handle_window_visibility_changed` in `moon-gpui-windows/src/events.rs`
+     shows a maximized, non-iconic window with `SW_SHOWNA` instead and returns
+     0; every other show keeps the default path. A re-sync restores the
+     two-argument handler without `lparam`; keep the `SW_PARENTOPENING` branch
+     and the `lparam` passed from the `WM_SHOWWINDOW` arm.
    - Linux/X11 borderless decoration fallback
    - These are useful upstream fixes on their own. Do not hide them inside
      feature work when preparing Zed pull requests.
