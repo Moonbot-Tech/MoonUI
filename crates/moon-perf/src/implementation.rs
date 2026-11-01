@@ -417,7 +417,10 @@ impl std::fmt::Display for PerfReport {
         if self.deltas.is_empty() {
             return write!(f, "(no matching tests)");
         }
-        let sorted = self.deltas.iter().collect::<Vec<_>>();
+        // `deltas` is a hash map, so sort before reversing: derived `Ord` is
+        // Fluff-first, and the reversal then prints Critical at the top.
+        let mut sorted = self.deltas.iter().collect::<Vec<_>>();
+        sorted.sort_unstable_by(|a, b| a.0.cmp(b.0));
         writeln!(f, "| Category | Max | Mean | Min |")?;
         // We don't want to print too many newlines at the end, so handle newlines
         // a little jankily like this.

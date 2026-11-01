@@ -294,3 +294,49 @@ fn equal_importance_and_weight_sort_by_name() {
     output.sort();
     assert_eq!(names_of(&output), ["a", "b"]);
 }
+
+/// Catches `PerfReport`'s table printing categories in hash-map order.
+///
+/// The comparison table reverses its category list so the most relevant
+/// category comes first, as the run table above it does. `Importance`'s
+/// derived order is Fluff (0) up to Critical (4), so the rows must read
+/// critical, important, average, iffy, fluff. Without a sort the reversal
+/// walks `HashMap` buckets and a reader scanning the top row for Critical
+/// regressions reads Average instead.
+///
+/// # Panics
+/// Panics when a table row has no category cell. The assertion message
+/// includes the table.
+#[test]
+fn perf_report_lists_critical_first() {
+    let mut current = Output::blank();
+    let mut baseline = Output::blank();
+    let importances = [
+        Importance::Fluff,
+        Importance::Iffy,
+        Importance::Average,
+        Importance::Important,
+        Importance::Critical,
+    ];
+    for (index, importance) in importances.into_iter().enumerate() {
+        let name = format!("bench-{index}");
+        current.merge(one_success(&name, importance.clone(), 50, 100), None);
+        baseline.merge(one_success(&name, importance, 50, 100), None);
+    }
+    let table = current.compare_perf(baseline).to_string();
+    let categories: Vec<&str> = table
+        .lines()
+        .skip(2)
+        .map(|row| {
+            row.split('|')
+                .nth(1)
+                .expect("row has a category cell")
+                .trim()
+        })
+        .collect();
+    assert_eq!(
+        categories,
+        ["critical", "important", "average", "iffy", "fluff"],
+        "{table}"
+    );
+}
