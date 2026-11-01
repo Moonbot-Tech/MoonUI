@@ -437,7 +437,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "f3a029b50a9fa93c",
+      "local_hash": "52d0cc9943a90f3c",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -621,8 +621,8 @@
         },
         {
           "path": "input/state.rs",
-          "hash": "3e9dfc1007034e55",
-          "bytes": 131678
+          "hash": "dd71e6ca18f229f3",
+          "bytes": 134622
         }
       ],
       "donor_hash": "018ee239acbf3f7c",
@@ -1512,7 +1512,7 @@
       "local_paths": [
         "input"
       ],
-      "local_hash": "f3a029b50a9fa93c",
+      "local_hash": "52d0cc9943a90f3c",
       "local_files": [
         {
           "path": "input/blink_cursor.rs",
@@ -1696,8 +1696,8 @@
         },
         {
           "path": "input/state.rs",
-          "hash": "3e9dfc1007034e55",
-          "bytes": 131678
+          "hash": "dd71e6ca18f229f3",
+          "bytes": 134622
         }
       ],
       "donor_hash": "018ee239acbf3f7c",

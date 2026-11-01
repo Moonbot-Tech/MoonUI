@@ -813,6 +813,21 @@ impl InputState {
         cx.notify();
     }
 
+    /// Set the placeholder only when it differs, so a caller that re-applies the same text on
+    /// every render — a translated hint following a live locale switch — does not schedule a
+    /// redraw each frame. Unlike [`Self::set_placeholder`] it needs no window.
+    pub fn sync_placeholder(
+        &mut self,
+        placeholder: impl Into<SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        let placeholder = placeholder.into();
+        if self.placeholder != placeholder {
+            self.placeholder = placeholder;
+            cx.notify();
+        }
+    }
+
     /// Find which line and sub-line the given offset belongs to, along with the position within that sub-line.
     ///
     /// Returns:
@@ -3190,6 +3205,67 @@ mod tests {
     use super::*;
     use crate::theme::Theme;
     use gpui::{TestAppContext, VisualTestContext};
+
+    /// Hands one input state to `MoonInput` and rebuilds the placeholder on every render, the way a
+    /// caller renders a translated hint.
+    struct PlaceholderHarness {
+        state: Option<Entity<InputState>>,
+        hint: Option<SharedString>,
+    }
+
+    impl Render for PlaceholderHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let state = self
+                .state
+                .get_or_insert_with(|| {
+                    cx.new(|cx| InputState::new(window, cx).placeholder("from state"))
+                })
+                .clone();
+            let input = crate::moon::MoonInput::new("probe").state(&state);
+            div().child(match &self.hint {
+                Some(hint) => input.placeholder(hint.clone()),
+                None => input,
+            })
+        }
+    }
+
+    /// Catches `MoonInput::placeholder` being dropped for an external state (it used to reach only
+    /// a state the element created itself, so a translated hint stayed in the language the field
+    /// was built in), and catches an unset builder placeholder wiping the state's own.
+    #[gpui::test]
+    fn test_moon_input_placeholder_reaches_an_external_state(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let window = cx.add_window(|_, _| PlaceholderHarness {
+            state: None,
+            hint: None,
+        });
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        let placeholder = |cx: &mut VisualTestContext| {
+            window
+                .update(cx, |view, _, cx| {
+                    view.state
+                        .as_ref()
+                        .expect("rendered")
+                        .read(cx)
+                        .placeholder
+                        .clone()
+                })
+                .expect("window must stay open")
+        };
+        assert_eq!(placeholder(&mut cx), "from state");
+
+        for hint in ["Coin", "Монета"] {
+            window
+                .update(&mut cx, |view, _, cx| {
+                    view.hint = Some(hint.into());
+                    cx.notify();
+                })
+                .expect("window must stay open");
+            cx.run_until_parked();
+            assert_eq!(placeholder(&mut cx), hint);
+        }
+    }
 
     struct InputView {
         input: Entity<InputState>,

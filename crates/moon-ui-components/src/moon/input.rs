@@ -39,7 +39,8 @@ pub struct MoonInput {
     id: SharedString,
     bounds: Option<MoonRect>,
     state: Option<Entity<MoonInputState>>,
-    placeholder: SharedString,
+    /// `None` leaves an external state's own placeholder alone; `Some` is applied on every render.
+    placeholder: Option<SharedString>,
     default_value: SharedString,
     size: Option<MoonInputSize>,
     disabled: bool,
@@ -63,7 +64,7 @@ impl MoonInput {
             id: id.into(),
             bounds: None,
             state: None,
-            placeholder: SharedString::from(""),
+            placeholder: None,
             default_value: SharedString::from(""),
             size: None,
             disabled: false,
@@ -92,8 +93,10 @@ impl MoonInput {
         self
     }
 
+    /// Placeholder text, applied on every render — to an external [`Self::state`] as well, so a
+    /// caller that builds it from a translated string follows a live locale switch.
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
-        self.placeholder = placeholder.into();
+        self.placeholder = Some(placeholder.into());
         self
     }
 
@@ -198,13 +201,14 @@ impl RenderOnce for MoonInput {
         let pattern = self.pattern;
         let validate = self.validate.clone();
         let placeholder = self.placeholder.clone();
+        let initial_placeholder = placeholder.clone().unwrap_or_default();
         let default_value = self.default_value.clone();
 
         let state = self.state.unwrap_or_else(|| {
             let id = ElementId::from(self.id.clone());
             window.use_keyed_state(id, cx, move |window, cx| {
                 let mut state = MoonInputState::new(window, cx)
-                    .placeholder(placeholder.clone())
+                    .placeholder(initial_placeholder.clone())
                     .default_value(default_value.clone());
                 if clean_on_escape.unwrap_or(false) {
                     state = state.clean_on_escape();
@@ -219,8 +223,15 @@ impl RenderOnce for MoonInput {
             })
         });
 
-        if clean_on_escape.is_some() || loading.is_some() || text_align.is_some() {
+        if clean_on_escape.is_some()
+            || loading.is_some()
+            || text_align.is_some()
+            || placeholder.is_some()
+        {
             state.update(cx, |state, cx| {
+                if let Some(placeholder) = &placeholder {
+                    state.sync_placeholder(placeholder.clone(), cx);
+                }
                 if let Some(clean_on_escape) = clean_on_escape {
                     state.set_clean_on_escape(clean_on_escape, cx);
                 }
