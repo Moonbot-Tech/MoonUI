@@ -114,10 +114,9 @@ Three kinds of Rust test have three homes:
 
 - Commit format: `<type>(<scope>): <subject>` with `feat`, `fix`, `refactor`, `docs`, `test`, or
   `chore`. Example: `fix(popover): preserve fitted content width`.
-- Changes to code, APIs, assets, manifests, baselines, tests, CI, or build configuration go through
-  a pull request. Maintainers may update the root `README.md` and ordinary prose under `docs/`
-  directly; baseline and escape-hatch JSON files are not prose. A mixed change follows the pull
-  request route as a whole.
+- Every change reaches `master` through a pull request, including the root `README.md` and
+  ordinary prose under `docs/`: the branch ruleset accepts no direct push and requires the
+  `alena-review` status.
 - Keep `master` linear and start from a fresh `origin/master`. Never force-push or reset shared
   history; fix forward or revert.
 
