@@ -125,12 +125,10 @@ fn scan_raw_hex_in_moon(root: &Path) -> Result<Vec<SourceHit>> {
         if trimmed.starts_with("//") {
             return false;
         }
-        let is_token_file = trimmed.contains("MoonPalette") || trimmed.contains("MoonTone");
-        !is_token_file
-            && (trimmed.contains("rgb(0x")
-                || trimmed.contains("rgba(0x")
-                || trimmed.contains("rgba_from(0x")
-                || trimmed.contains("hsla(0x"))
+        (trimmed.contains("rgb(0x")
+            || trimmed.contains("rgba(0x")
+            || trimmed.contains("rgba_from(0x")
+            || trimmed.contains("hsla(0x"))
             && !trimmed.contains("MOON-ONEOFF")
     })?;
     hits.retain(|hit| !token_sources.contains(&hit.file));

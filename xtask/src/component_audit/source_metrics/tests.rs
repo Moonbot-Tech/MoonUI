@@ -69,3 +69,28 @@ fn raw_hex_scan_skips_only_the_top_level_primitive_scales() -> anyhow::Result<()
     assert_eq!(flagged, ["button.rs", "dock/primitives.rs"]);
     Ok(())
 }
+
+/// Catches `source_metrics.rs:scan_raw_hex_in_moon` exempting any line that merely names
+/// `MoonTone` or `MoonPalette`, which lets a component paint a raw hex colour inside a tone branch
+/// without moving the `raw_hex_in_moon_runtime` metric. Only the token-source paths and a
+/// `MOON-ONEOFF` tag approve a literal, so each of the two component lines below is one hit.
+#[test]
+fn raw_hex_scan_flags_a_literal_on_a_line_naming_a_tone_or_palette() -> anyhow::Result<()> {
+    let moon = tempfile::tempdir()?;
+    fs::write(
+        moon.path().join("badge.rs"),
+        concat!(
+            "    .bg(if tone == MoonTone::Danger { rgb(0xFF0000) } else { p.shell })\n",
+            "    let fill = if palette == MoonPalette::LIGHT { rgba(0xFFFFFF80) } else { base };\n",
+            "    .border_color(rgb(0x00FF00)) // MOON-ONEOFF: reviewed brand outline\n",
+        ),
+    )?;
+
+    let lines: Vec<usize> = scan_raw_hex_in_moon(moon.path())?
+        .into_iter()
+        .map(|hit| hit.line)
+        .collect();
+
+    assert_eq!(lines, [1, 2]);
+    Ok(())
+}
