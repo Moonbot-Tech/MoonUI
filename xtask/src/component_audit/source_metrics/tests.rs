@@ -36,6 +36,18 @@ fn function_body_usage_distinguishes_real_noop_from_used_arg() {
     assert!(!function_body_uses_param(&unused, 0, "_id"));
 }
 
+/// Catches matching a builder parameter as a substring, which hides a no-op builder whose body
+/// mentions a longer identifier that starts with the parameter's name.
+#[test]
+fn function_body_usage_matches_whole_identifiers_only() {
+    let unused = [
+        "pub fn id(self, _id: usize) -> Self {",
+        "    self.with_identity()",
+        "}",
+    ];
+    assert!(!function_body_uses_param(&unused, 0, "_id"));
+}
+
 /// Catches `source_metrics.rs:scan_raw_hex_in_moon` exempting token sources by file name instead
 /// of by path, which would let any component module named `primitives.rs` paint raw hex without
 /// moving the `raw_hex_in_moon_runtime` metric, or dropping the exemption, which fails the audit
