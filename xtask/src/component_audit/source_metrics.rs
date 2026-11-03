@@ -242,12 +242,12 @@ fn underscore_self_param(signature: &str) -> Option<String> {
 fn function_body_uses_param(lines: &[&str], signature_ix: usize, param: &str) -> bool {
     let mut depth = brace_delta(lines[signature_ix]);
     let after_open = lines[signature_ix].split_once('{').map(|(_, body)| body);
-    if after_open.is_some_and(|body| body.contains(param)) {
+    if after_open.is_some_and(|body| contains_identifier(body, param)) {
         return true;
     }
 
     for line in lines.iter().skip(signature_ix + 1) {
-        if line.contains(param) {
+        if contains_identifier(line, param) {
             return true;
         }
         depth += brace_delta(line);
@@ -257,6 +257,18 @@ fn function_body_uses_param(lines: &[&str], signature_ix: usize, param: &str) ->
     }
 
     false
+}
+
+/// Return whether `text` mentions `ident` as a whole identifier, so `_id` is not found inside
+/// `with_identity`: a match counts only when neither neighbouring character is `_` or ASCII
+/// alphanumeric.
+fn contains_identifier(text: &str, ident: &str) -> bool {
+    let is_ident_char = |ch: char| ch == '_' || ch.is_ascii_alphanumeric();
+    text.match_indices(ident).any(|(start, _)| {
+        let before = text[..start].chars().next_back();
+        let after = text[start + ident.len()..].chars().next();
+        !before.is_some_and(is_ident_char) && !after.is_some_and(is_ident_char)
+    })
 }
 
 /// Return the net curly-brace depth change contributed by one source line.
