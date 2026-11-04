@@ -3,7 +3,9 @@ use std::rc::Rc;
 use crate::theme::ActiveTheme;
 use gpui::Corners;
 use gpui::Window;
-use gpui::{AnyElement, App, Context, Edges, Entity, EventEmitter, FocusHandle, Focusable};
+use gpui::{
+    AnyElement, App, Context, Edges, ElementId, Entity, EventEmitter, FocusHandle, Focusable,
+};
 use gpui::{
     InteractiveElement, IntoElement, KeyBinding, ParentElement, RenderOnce, SharedString,
     StyleRefinement, Styled, TextAlign, actions, prelude::FluentBuilder as _,
@@ -27,6 +29,8 @@ pub fn init(cx: &mut App) {
 #[derive(IntoElement)]
 pub struct NumberInput {
     state: Entity<InputState>,
+    /// The caller's name for the root element; `None` keys it by the state entity.
+    id: Option<ElementId>,
     placeholder: SharedString,
     size: Size,
     prefix: Option<AnyElement>,
@@ -41,6 +45,7 @@ impl NumberInput {
     pub fn new(state: &Entity<InputState>) -> Self {
         Self {
             state: state.clone(),
+            id: None,
             size: Size::default(),
             placeholder: SharedString::default(),
             prefix: None,
@@ -49,6 +54,13 @@ impl NumberInput {
             disabled: false,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Name the number input's root element, for the same reason as [`Input::id`]: the default is
+    /// keyed by the state entity, which an element path cannot tell apart between launches.
+    pub fn id(mut self, id: impl Into<ElementId>) -> Self {
+        self.id = Some(id.into());
+        self
     }
 
     /// Set the placeholder text of the number input.
@@ -292,8 +304,12 @@ impl RenderOnce for NumberInput {
             });
         }
 
+        let root_id = self
+            .id
+            .clone()
+            .unwrap_or_else(|| ("number-input", self.state.entity_id()).into());
         h_flex()
-            .id(("number-input", self.state.entity_id()))
+            .id(root_id)
             .key_context(CONTEXT)
             .on_action(window.listener_for(&self.state, InputState::on_action_increment))
             .on_action(window.listener_for(&self.state, InputState::on_action_decrement))

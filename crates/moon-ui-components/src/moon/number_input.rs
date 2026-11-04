@@ -364,7 +364,9 @@ impl RenderOnce for MoonNumberInput {
             tokens.ui(metrics.pad_x),
             tokens.ui(4.0),
         );
+        // The caller's id names the element too, as `MoonInput` does: see `NumberInput::id`.
         let mut input = NumberInput::new(&state)
+            .id(self.id.clone())
             .with_size(base_size_for(tier))
             .disabled(self.disabled)
             .min_w(px(min_w));
