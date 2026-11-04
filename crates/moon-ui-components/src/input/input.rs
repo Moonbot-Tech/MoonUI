@@ -2,9 +2,9 @@ use std::rc::Rc;
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, App, DefiniteLength, Edges, EdgesRefinement, Entity, Hsla, InteractiveElement as _,
-    IntoElement, MouseButton, ParentElement as _, Pixels, RenderOnce, StyleRefinement, Styled,
-    TextAlign, Window, div, px, relative,
+    AnyElement, App, DefiniteLength, Edges, EdgesRefinement, ElementId, Entity, Hsla,
+    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, RenderOnce,
+    StyleRefinement, Styled, TextAlign, Window, div, px, relative,
 };
 
 use crate::Sizable;
@@ -104,6 +104,8 @@ impl MoonInputMetrics {
 #[derive(IntoElement)]
 pub struct Input {
     state: Entity<InputState>,
+    /// The caller's name for the root element; `None` keys it by the state entity.
+    id: Option<ElementId>,
     style: StyleRefinement,
     size: Size,
     prefix: Option<AnyElement>,
@@ -148,6 +150,7 @@ impl Input {
     pub fn new(state: &Entity<InputState>) -> Self {
         Self {
             state: state.clone(),
+            id: None,
             size: Size::default(),
             style: StyleRefinement::default(),
             prefix: None,
@@ -164,6 +167,17 @@ impl Input {
             tone: None,
             context_menu_builder: None,
         }
+    }
+
+    /// Name the input's root element.
+    ///
+    /// Without it the root is keyed by the state entity, a number that differs between launches,
+    /// so anything that addresses controls by their element path — an inspector, a scripted
+    /// test — cannot tell one field from another. The caller's id must be unique among the
+    /// input's siblings: two siblings with one id share their hover and scroll state.
+    pub fn id(mut self, id: impl Into<ElementId>) -> Self {
+        self.id = Some(id.into());
+        self
     }
 
     pub fn prefix(mut self, prefix: impl IntoElement) -> Self {
@@ -357,8 +371,11 @@ impl RenderOnce for Input {
             && state.mode.is_single_line();
         let has_suffix = suffix.is_some() || state.loading || self.mask_toggle || show_clear_button;
 
+        let root_id = self
+            .id
+            .unwrap_or_else(|| ("input", self.state.entity_id()).into());
         div()
-            .id(("input", self.state.entity_id()))
+            .id(root_id)
             .flex()
             .key_context(crate::input::CONTEXT)
             .track_focus(&state.focus_handle.clone())

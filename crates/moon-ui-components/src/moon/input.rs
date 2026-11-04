@@ -251,7 +251,10 @@ impl RenderOnce for MoonInput {
                 MoonInputSize::Normal
             }
         });
+        // The caller's id names the element as well as the state: kept only as a state key, it left
+        // every field of a form under the input's own internal ids, indistinguishable by path.
         let mut input = Input::new(&state)
+            .id(self.id.clone())
             .with_size(size_for(size))
             .disabled(self.disabled)
             .cleanable(self.cleanable)
