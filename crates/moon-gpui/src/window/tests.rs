@@ -702,3 +702,72 @@ fn explicit_present_prepares_text_even_if_canvases_skip() {
 fn any_canvas_present_request_prepares_the_window_text_frame() {
     assert!(gpu_canvas_prepare_text(false, true));
 }
+
+/// A container with one smaller child at a known offset, for the inspector's element map.
+struct PickableView;
+
+impl Render for PickableView {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().id("outer").size(px(200.0)).child(
+            div()
+                .id("inner")
+                .ml(px(10.0))
+                .mt(px(20.0))
+                .w(px(40.0))
+                .h(px(30.0)),
+        )
+    }
+}
+
+/// The last named segment of every element in `any`'s inspector map, with its bounds, in the
+/// order the map lists them.
+fn inspector_map(app: &mut TestAppContext, any: AnyWindowHandle) -> Vec<(String, Bounds<Pixels>)> {
+    app.update_window(any, |_, window, _| {
+        window
+            .inspector_hitboxes()
+            .into_iter()
+            .filter_map(|hitbox| {
+                let name = hitbox.id.path.global_id.0.last()?.to_string();
+                Some((name, hitbox.bounds))
+            })
+            .collect()
+    })
+    .unwrap()
+}
+
+/// Catches `inspector_hitboxes` reading `next_frame` instead of the frame just drawn: `next_frame`
+/// is cleared when a draw begins, so every tool would read an empty map. Also catches the list
+/// losing paint order, which makes a tool take the container for what sits on top of it, and the
+/// map filling outside picking mode, which tools rely on to know picking must be turned on first.
+#[test]
+fn the_inspector_map_lists_every_div_of_a_picking_frame_in_paint_order() {
+    let (mut app, any) = open_window(|_, _| PickableView);
+    assert!(
+        inspector_map(&mut app, any).is_empty(),
+        "nothing registers while the inspector is not picking"
+    );
+
+    app.update_window(any, |_, window, cx| {
+        window.toggle_inspector(cx);
+        if let Some(inspector) = window.inspector.clone() {
+            inspector.update(cx, |inspector, _| inspector.start_picking());
+        }
+    })
+    .unwrap();
+    draw(&mut app, any);
+
+    let map = inspector_map(&mut app, any);
+    let position = |name: &str| map.iter().position(|(seen, _)| seen == name);
+    let (Some(outer), Some(inner)) = (position("outer"), position("inner")) else {
+        panic!("both divs must be in the map, got {map:?}");
+    };
+    assert!(
+        outer < inner,
+        "the child is drawn above its parent: {map:?}"
+    );
+    assert_eq!(
+        map[inner].1,
+        Bounds::new(point(px(10.0), px(20.0)), size(px(40.0), px(30.0))),
+        "the child's bounds are where the layout put it"
+    );
+}
