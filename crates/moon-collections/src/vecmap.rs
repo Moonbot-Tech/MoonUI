@@ -157,8 +157,13 @@ where
         match self {
             EntryRef::Occupied(entry) => entry.value,
             EntryRef::Vacant(entry) => {
-                entry.map.values.push(default(entry.key));
-                entry.map.keys.push(entry.key.clone());
+                // Build both halves before pushing either: a panic in `default` or in the key's
+                // `Clone` must leave `keys` and `values` the same length, or every later key
+                // pairs with its predecessor's value.
+                let value = default(entry.key);
+                let key = entry.key.clone();
+                entry.map.values.push(value);
+                entry.map.keys.push(key);
                 match entry.map.values.last_mut() {
                     Some(value) => value,
                     None => unreachable!("vec empty after pushing to it"),
