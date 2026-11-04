@@ -724,6 +724,22 @@ impl HitboxId {
     }
 }
 
+/// One element the inspector could pick, as the last rendered frame laid it out.
+///
+/// Returned by [`Window::inspector_hitboxes`].
+#[cfg(debug_assertions)]
+#[derive(Clone, Debug)]
+pub struct InspectorHitbox {
+    /// The element's inspector id: its global id path and the source location that built it.
+    pub id: crate::InspectorElementId,
+    /// The element's bounds, in window-relative logical pixels.
+    pub bounds: Bounds<Pixels>,
+    /// The content mask in force when the element registered. What is visible of the element is
+    /// `bounds` intersected with this; an element scrolled out of its container intersects it in
+    /// nothing.
+    pub content_mask: Bounds<Pixels>,
+}
+
 /// A rectangular region that potentially blocks hitboxes inserted prior.
 /// See [Window::insert_hitbox] for more details.
 #[derive(Clone, Debug, Deref)]
@@ -6234,6 +6250,33 @@ impl Window {
                 .inspector_hitboxes
                 .insert(hitbox_id, inspector_id.clone());
         }
+    }
+
+    /// Every element the inspector could pick in the last rendered frame, in paint order: an entry
+    /// later in the list is drawn above the ones before it, the order hit testing walks backwards.
+    ///
+    /// Picking mode gives every non-transparent div a hitbox, so while picking is on this is the
+    /// whole frame's element map — id, source location and bounds for each element at once. A tool
+    /// that needs the map otherwise has to hover each element in turn and wait for the inspector to
+    /// name it, one frame per element. Outside picking mode nothing registers and the list is
+    /// empty.
+    #[cfg(debug_assertions)]
+    pub fn inspector_hitboxes(&self) -> Vec<InspectorHitbox> {
+        let frame = &self.rendered_frame;
+        frame
+            .hitboxes
+            .iter()
+            .filter_map(|hitbox| {
+                frame
+                    .inspector_hitboxes
+                    .get(&hitbox.id)
+                    .map(|id| InspectorHitbox {
+                        id: id.clone(),
+                        bounds: hitbox.bounds,
+                        content_mask: hitbox.content_mask.bounds,
+                    })
+            })
+            .collect()
     }
 
     #[cfg(debug_assertions)]
