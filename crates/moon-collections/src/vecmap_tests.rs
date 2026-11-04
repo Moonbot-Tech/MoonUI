@@ -209,3 +209,32 @@ fn test_entry_ref_mut_ref_can_be_updated() {
     *value = 5;
     assert_eq!(map.iter().collect::<Vec<_>>(), vec![(&key, &5)]);
 }
+
+/// A key whose `Clone` panics, standing in for any fallible clone (an allocation, a refcount).
+#[derive(PartialEq, Eq, Debug)]
+struct PanickingCloneKey(u32);
+
+impl Clone for PanickingCloneKey {
+    fn clone(&self) -> Self {
+        panic!("clone of key {} failed", self.0);
+    }
+}
+
+/// Catches `EntryRef::or_insert_with_key` pushing the value before cloning the key: a clone that
+/// panics then leaves one value with no key, so every key inserted afterwards reads the value
+/// stored beside the one before it. Like `HashMap`, a panic in caller code must leave the map as
+/// it was: after the failed insert, key 2 maps to "two", exactly as if the insert never ran.
+#[test]
+fn test_entry_ref_panicking_key_clone_leaves_map_unchanged() {
+    let mut map: VecMap<PanickingCloneKey, &str> = VecMap::new();
+    map.entry(PanickingCloneKey(1)).or_insert("one");
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        map.entry_ref(&PanickingCloneKey(99)).or_insert("lost");
+    }));
+    assert!(result.is_err());
+
+    map.entry(PanickingCloneKey(2)).or_insert("two");
+    let pairs: Vec<_> = map.iter().map(|(key, value)| (key.0, *value)).collect();
+    assert_eq!(pairs, vec![(1, "one"), (2, "two")]);
+}
