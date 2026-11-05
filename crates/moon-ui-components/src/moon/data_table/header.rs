@@ -74,6 +74,15 @@ pub(super) fn render_header(
             style.header_separator_alpha,
         ));
 
+    // Which column's resize strip the pointer is over. GPUI applies hover styles at paint time
+    // only, so the mark's hover form (taller and wider) cannot come from `hover`/`group_hover`;
+    // the strip's `on_hover` writes this flag and the re-render lays the mark out anew.
+    let resize_hover = window.use_keyed_state(
+        ElementId::from(SharedString::from(format!("{id}:resize-hover"))),
+        cx,
+        |_, _| None::<String>,
+    );
+    let hovered_resize_key = resize_hover.read(cx).clone();
     let sort_column = state.read(cx).sort_column.clone();
     let sort_ascending = state.read(cx).sort_ascending;
     let all_keys = columns
@@ -123,7 +132,14 @@ pub(super) fn render_header(
                 },
                 1.0,
             ))
-            .child(label)
+            .child(
+                div()
+                    .debug_selector({
+                        let selector = format!("{id}:header-title:{key_string}");
+                        move || selector
+                    })
+                    .child(label),
+            )
             .when_some(column.tooltip.clone(), |cell, tooltip| {
                 cell.tooltip(move |_window, cx| {
                     cx.new(|_| MoonTooltipView::new(tooltip.clone())).into()
@@ -242,16 +258,61 @@ pub(super) fn render_header(
             let state_for_move = state.clone();
             let state_for_reset = state.clone();
             let reset_key = key_string.clone();
+            let strip_id = SharedString::from(format!("{id}:resize:{key_string}"));
+            let strip_hovered = hovered_resize_key.as_ref() == Some(&key_string);
+            let hover_flag = resize_hover.clone();
+            let hover_key = key_string.clone();
+            // The resting mark tells the user where the divider is before they find it by hover:
+            // a short hairline in the header's own muted ink, centred in the hit strip. Hovering
+            // the strip grows it into a full-height accent bar.
+            let mark = div()
+                .debug_selector({
+                    let selector = format!("{id}:resize-mark:{key_string}");
+                    move || selector
+                })
+                .map(|mark| {
+                    if strip_hovered {
+                        mark.w(px(tokens.ui(2.0)))
+                            .h_full()
+                            .bg(rgba_from(p.accent, 1.0))
+                    } else {
+                        mark.w(px(tokens.ui(1.0))).h(relative(0.5)).bg(rgba_from(
+                            style.header_text,
+                            resize_mark_alpha(style.header_bg),
+                        ))
+                    }
+                });
             cell = cell.child(
                 div()
-                    .id(ElementId::from(SharedString::from(format!(
-                        "{id}:resize:{key_string}"
-                    ))))
+                    .id(ElementId::from(strip_id))
+                    .debug_selector({
+                        let selector = format!("{id}:resize:{key_string}");
+                        move || selector
+                    })
                     .absolute()
                     .right(px(0.0))
                     .top(px(0.0))
                     .bottom(px(0.0))
                     .w(px(tokens.ui(6.0)))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(mark)
+                    .on_hover(move |hovered, _, cx| {
+                        hover_flag.update(cx, |current, cx| {
+                            let next = if *hovered {
+                                Some(hover_key.clone())
+                            } else if current.as_ref() == Some(&hover_key) {
+                                None
+                            } else {
+                                return;
+                            };
+                            if *current != next {
+                                *current = next;
+                                cx.notify();
+                            }
+                        });
+                    })
                     .cursor(CursorStyle::ResizeColumn)
                     .hover(|this| this.bg(rgba_from(p.accent, 0.14)))
                     // Double-clicking a divider restores automatic width. A plain double-click
@@ -313,4 +374,23 @@ pub(super) fn render_header(
     }
 
     header
+}
+
+/// Opacity of the resting resize mark over a header of the given background.
+///
+/// The mark is painted in the header's muted text ink. On a near-black header that ink is dim,
+/// so it needs more opacity to be found at a glance; on mid-grey (Graphite) and light headers the
+/// same ink already contrasts well and a lighter mark keeps it quieter than the column titles.
+///
+/// Args:
+///     header_bg: Header background as `0xRRGGBB`.
+///
+/// Returns:
+///     The alpha applied to the muted ink for the resting mark.
+pub(super) fn resize_mark_alpha(header_bg: u32) -> f32 {
+    let r = ((header_bg >> 16) & 0xFF) as f32;
+    let g = ((header_bg >> 8) & 0xFF) as f32;
+    let b = (header_bg & 0xFF) as f32;
+    let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    if luma < 48.0 { 0.75 } else { 0.55 }
 }

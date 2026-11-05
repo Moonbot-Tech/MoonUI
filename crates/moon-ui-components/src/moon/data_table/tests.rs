@@ -481,3 +481,140 @@ fn tables_without_a_drawn_horizontal_track_keep_rows_flush_in_both_themes(
         }
     }
 }
+
+/// Stable identity of the header-edge probe table.
+const HEADER_EDGE_TABLE_ID: &str = "data-table-header-edge";
+
+/// Keys of the header-edge probe columns, in visual order.
+const HEADER_EDGE_KEYS: [&str; 3] = ["first", "second", "last"];
+
+/// Render a three-column table whose every column keeps the default resizable flag.
+struct HeaderEdgeHarness;
+
+impl gpui::Render for HeaderEdgeHarness {
+    /// Render the header-edge probe table.
+    ///
+    /// Args:
+    ///     _window: Test window hosting the table.
+    ///     _cx: Test view context.
+    ///
+    /// Returns:
+    ///     A fixed-size table with three resizable columns.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{ParentElement as _, Styled as _};
+
+        gpui::div().size_full().child(
+            MoonDataTable::new(HEADER_EDGE_TABLE_ID, 2, |ix, _, _| {
+                MoonDataRow::new([
+                    MoonDataCell::text(format!("a-{ix}")),
+                    MoonDataCell::text(format!("b-{ix}")),
+                    MoonDataCell::text(format!("c-{ix}")),
+                ])
+            })
+            .bounds(MoonRect::new(0.0, 0.0, 300.0, 120.0))
+            .columns(HEADER_EDGE_KEYS.iter().map(|key| col(key, 100.0)))
+            .width_policy(MoonDataTableWidthPolicy::Preserve),
+        )
+    }
+}
+
+/// Read one header probe's laid-out bounds.
+///
+/// Args:
+///     visual: Test window context after layout.
+///     part: Probe part name (`resize`, `resize-mark` or `header-title`).
+///     key: Column key.
+///
+/// Returns:
+///     The probe's bounds; panics when it was not painted.
+fn header_probe(
+    visual: &mut gpui::VisualTestContext,
+    part: &str,
+    key: &str,
+) -> gpui::Bounds<gpui::Pixels> {
+    let selector = Box::leak(format!("{HEADER_EDGE_TABLE_ID}:{part}:{key}").into_boxed_str());
+    visual
+        .debug_bounds(selector)
+        .unwrap_or_else(|| panic!("{selector} must be painted"))
+}
+
+/// Drive a few frames so hover and layout settle.
+fn settle(visual: &mut gpui::VisualTestContext) {
+    for _ in 0..4 {
+        visual.update(|window, _| window.refresh());
+        visual.run_until_parked();
+    }
+}
+
+/// Catches dropping the resting resize mark from `data_table/header.rs:render_header` (issue
+/// #1144: traders could not find a column divider without hunting for it blind), letting it
+/// cover the column title, or losing its full-height hover form. Runs in dark, light and
+/// Graphite.
+#[gpui::test]
+fn every_resizable_column_shows_a_resting_mark_that_grows_on_hover(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for palette in [
+        MoonPalette::TERMINAL,
+        MoonPalette::LIGHT,
+        MoonPalette::GRAPHITE,
+    ] {
+        cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+        let (rest_w, hover_w) = cx.update(|cx| {
+            let tokens = MoonTheme::active_tokens(cx);
+            (gpui::px(tokens.ui(1.0)), gpui::px(tokens.ui(2.0)))
+        });
+        let window = cx.add_window(|_, _| HeaderEdgeHarness);
+        let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+        settle(&mut visual);
+
+        for key in HEADER_EDGE_KEYS {
+            let strip = header_probe(&mut visual, "resize", key);
+            let mark = header_probe(&mut visual, "resize-mark", key);
+            let title = header_probe(&mut visual, "header-title", key);
+
+            assert_eq!(
+                mark.size.width, rest_w,
+                "{key} resting width in {palette:?}"
+            );
+            assert!(
+                (mark.size.height - strip.size.height * 0.5).abs() < gpui::px(0.5),
+                "{key} resting mark must be half the header height in {palette:?}: {mark:?} in {strip:?}"
+            );
+            assert!(
+                (mark.center().x - strip.center().x).abs() < gpui::px(0.5)
+                    && (mark.center().y - strip.center().y).abs() < gpui::px(0.5),
+                "{key} resting mark must be centred in its strip in {palette:?}"
+            );
+            assert!(
+                mark.left() >= title.right(),
+                "{key} mark must not overlap the title in {palette:?}: {mark:?} vs {title:?}"
+            );
+        }
+
+        let last = HEADER_EDGE_KEYS[2];
+        let strip = header_probe(&mut visual, "resize", last);
+        visual.simulate_mouse_move(strip.center(), None, Modifiers::none());
+        settle(&mut visual);
+        let hovered = header_probe(&mut visual, "resize-mark", last);
+        assert_eq!(hovered.size.width, hover_w, "hover width in {palette:?}");
+        assert_eq!(
+            hovered.size.height, strip.size.height,
+            "hovered mark must span the full header in {palette:?}"
+        );
+    }
+}
+
+/// Catches a single opacity for the resting mark: the muted ink must be denser on the near-black
+/// dark header to read at all, and lighter on Graphite and light headers so it stays quieter than
+/// the titles.
+#[test]
+fn resize_mark_alpha_is_denser_only_on_the_near_black_header() {
+    use super::header::resize_mark_alpha;
+    assert_eq!(resize_mark_alpha(MoonPalette::TERMINAL.table_head), 0.75);
+    assert_eq!(resize_mark_alpha(MoonPalette::GRAPHITE.table_head), 0.55);
+    assert_eq!(resize_mark_alpha(MoonPalette::LIGHT.table_head), 0.55);
+}
