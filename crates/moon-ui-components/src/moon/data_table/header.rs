@@ -138,6 +138,12 @@ pub(super) fn render_header(
                         let selector = format!("{id}:header-title:{key_string}");
                         move || selector
                     })
+                    // A narrowed column clips its title before the right padding, so the
+                    // resize mark in that padding never paints over the text.
+                    .min_w(px(0.0))
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
                     .child(label),
             )
             .when_some(column.tooltip.clone(), |cell, tooltip| {

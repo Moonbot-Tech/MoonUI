@@ -488,7 +488,8 @@ const HEADER_EDGE_TABLE_ID: &str = "data-table-header-edge";
 /// Keys of the header-edge probe columns, in visual order.
 const HEADER_EDGE_KEYS: [&str; 3] = ["first", "second", "last"];
 
-/// Render a three-column table whose every column keeps the default resizable flag.
+/// Render a three-column table whose every column keeps the default resizable flag; the last one
+/// is narrowed to the minimum under a long title.
 struct HeaderEdgeHarness;
 
 impl gpui::Render for HeaderEdgeHarness {
@@ -516,7 +517,12 @@ impl gpui::Render for HeaderEdgeHarness {
                 ])
             })
             .bounds(MoonRect::new(0.0, 0.0, 300.0, 120.0))
-            .columns(HEADER_EDGE_KEYS.iter().map(|key| col(key, 100.0)))
+            .columns([
+                col(HEADER_EDGE_KEYS[0], 100.0),
+                col(HEADER_EDGE_KEYS[1], 100.0),
+                // The narrowest width a drag allows, with a title far wider than it.
+                MoonDataTableColumn::new(HEADER_EDGE_KEYS[2], "PROFIT USDT TOTAL", 40.0),
+            ])
             .width_policy(MoonDataTableWidthPolicy::Preserve),
         )
     }
@@ -552,8 +558,8 @@ fn settle(visual: &mut gpui::VisualTestContext) {
 
 /// Catches dropping the resting resize mark from `data_table/header.rs:render_header` (issue
 /// #1144: traders could not find a column divider without hunting for it blind), letting it
-/// cover the column title, or losing its full-height hover form. Runs in dark, light and
-/// Graphite.
+/// cover the column title (also when a long title sits in a minimum-width column), or losing its
+/// full-height hover form. Runs in dark, light and Graphite.
 #[gpui::test]
 fn every_resizable_column_shows_a_resting_mark_that_grows_on_hover(cx: &mut gpui::TestAppContext) {
     cx.update(crate::init);
