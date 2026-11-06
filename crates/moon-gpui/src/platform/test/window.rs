@@ -114,7 +114,7 @@ impl TestWindow {
     }
 
     /// Deliver the actual frame callback after releasing the platform-state lock.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn simulate_frame(&self) {
         let callback = self.0.lock().request_frame_callback.take();
         if let Some(mut callback) = callback {
