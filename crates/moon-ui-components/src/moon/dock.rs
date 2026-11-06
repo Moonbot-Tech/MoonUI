@@ -1484,17 +1484,19 @@ impl DockArea {
         Some(canonical)
     }
 
+    /// Change a side root's visibility and synchronize panel activity before the hidden tree stops rendering.
     pub fn set_dock_open(
         &mut self,
         placement: DockPlacement,
         open: bool,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        let slot = match placement {
+        let (root, slot) = match placement {
             DockPlacement::Center => return false,
-            DockPlacement::Left => self.left.as_mut(),
-            DockPlacement::Right => self.right.as_mut(),
-            DockPlacement::Bottom => self.bottom.as_mut(),
+            DockPlacement::Left => (DockRoot::Left, self.left.as_mut()),
+            DockPlacement::Right => (DockRoot::Right, self.right.as_mut()),
+            DockPlacement::Bottom => (DockRoot::Bottom, self.bottom.as_mut()),
         };
         let Some((_, _, current_open)) = slot else {
             return false;
@@ -1503,19 +1505,39 @@ impl DockArea {
             return false;
         }
         *current_open = open;
+        // A zoomed panel remains the sole visible surface regardless of normal side-root flags.
+        if self
+            .zoomed_panel
+            .as_ref()
+            .and_then(|name| self.find_panel_named(name.as_ref(), cx))
+            .is_none()
+            && let Some(item) = self.root_item(root)
+        {
+            if open {
+                self.sync_item_active(root, &[], item, window, cx);
+            } else {
+                self.sync_item_inactive(root, &[], item, window, cx);
+            }
+        }
         cx.emit(DockEvent::LayoutChanged);
         cx.notify();
         true
     }
 
-    pub fn toggle_dock(&mut self, placement: DockPlacement, cx: &mut Context<Self>) -> bool {
+    /// Toggle a side root through the same visibility and activity transition as an explicit change.
+    pub fn toggle_dock(
+        &mut self,
+        placement: DockPlacement,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         let open = match placement {
             DockPlacement::Center => return false,
             DockPlacement::Left => self.left.as_ref().map(|(_, _, open)| !*open),
             DockPlacement::Right => self.right.as_ref().map(|(_, _, open)| !*open),
             DockPlacement::Bottom => self.bottom.as_ref().map(|(_, _, open)| !*open),
         };
-        open.map(|open| self.set_dock_open(placement, open, cx))
+        open.map(|open| self.set_dock_open(placement, open, window, cx))
             .unwrap_or(false)
     }
 

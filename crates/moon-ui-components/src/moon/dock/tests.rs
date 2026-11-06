@@ -710,6 +710,77 @@ fn layout_replacement_clears_zoom_before_removing_the_panel(cx: &mut gpui::TestA
     .unwrap();
 }
 
+/// Closing a side root must stop its selected panel without waiting for another hidden render.
+#[gpui::test]
+fn side_root_open_state_drives_activity_and_preserves_zoom(cx: &mut gpui::TestAppContext) {
+    let window = cx.add_window(|_, _| DockTestHarness);
+    cx.update_window(window.into(), |_, window, cx| {
+        let assets = Rc::new(PanelProbe::default());
+        let log = Rc::new(PanelProbe::default());
+        let chart = Rc::new(PanelProbe::default());
+        let items = vec![
+            tracking_panel("assets", assets.clone(), cx),
+            tracking_panel("log", log.clone(), cx),
+        ];
+        let runtime = cx.new(|_| MoonTabPanelRuntimeState::default());
+        let center = tracking_panel("chart", chart.clone(), cx);
+        let dock = cx.new(|_| DockArea::test_with_center(DockItem::Panel(center)));
+        dock.update(cx, |dock, cx| {
+            dock.right = Some((
+                DockItem::Tabs {
+                    items,
+                    active_ix: 1,
+                },
+                240.,
+                true,
+            ));
+            dock.tab_runtime_states
+                .insert("test-dock:right".into(), runtime.downgrade());
+            dock.sync_layout_active(window, cx);
+            assert!(!assets.active.get());
+            assert!(log.active.get());
+
+            assert!(dock.set_dock_open(super::DockPlacement::Right, false, window, cx));
+            assert!(
+                !log.active.get(),
+                "a closed side root cannot keep its panel active"
+            );
+            assert_eq!(runtime.read(cx).notified_active, Some((None, 2)));
+            let calls = log.active_calls.get();
+            assert!(!dock.set_dock_open(super::DockPlacement::Right, false, window, cx));
+            assert_eq!(
+                log.active_calls.get(),
+                calls,
+                "unchanged state has no lifecycle edge"
+            );
+
+            assert!(dock.toggle_dock(super::DockPlacement::Right, window, cx));
+            assert!(log.active.get());
+            assert!(!assets.active.get());
+            assert_eq!(runtime.read(cx).active_ix, 1);
+
+            dock.toggle_zoom_panel("chart", window, cx);
+            assert!(!log.active.get());
+            let chart_calls = chart.active_calls.get();
+            assert!(dock.set_dock_open(super::DockPlacement::Right, false, window, cx));
+            assert!(dock.toggle_dock(super::DockPlacement::Right, window, cx));
+            assert_eq!(
+                chart.active_calls.get(),
+                chart_calls,
+                "unchanged zoom has no activity edges"
+            );
+            assert!(
+                !log.active.get(),
+                "reopening must not activate behind another panel's zoom"
+            );
+            dock.clear_zoom(window, cx);
+            assert!(log.active.get());
+            assert!(!assets.active.get());
+        });
+    })
+    .unwrap();
+}
+
 /// Catches making `dock.rs:DockArea::sync_layout_active` ignore `zoomed_panel`, which would keep
 /// the hidden normal tab active while the visible zoom surface reports no active panel.
 #[gpui::test]

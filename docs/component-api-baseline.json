@@ -1499,7 +1499,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
-      "signature": "pub fn set_dock_open( &mut self, placement: DockPlacement, open: bool, cx: &mut Context<Self>, ) -> bool"
+      "signature": "pub fn set_dock_open( &mut self, placement: DockPlacement, open: bool, window: &mut Window, cx: &mut Context<Self>, ) -> bool"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1575,7 +1575,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
-      "signature": "pub fn toggle_dock(&mut self, placement: DockPlacement, cx: &mut Context<Self>) -> bool"
+      "signature": "pub fn toggle_dock( &mut self, placement: DockPlacement, window: &mut Window, cx: &mut Context<Self>, ) -> bool"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
