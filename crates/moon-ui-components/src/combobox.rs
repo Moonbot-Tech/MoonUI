@@ -14,7 +14,7 @@ use crate::{
     actions::{Cancel, Confirm, SelectDown, SelectUp},
     button::{ButtonVariant, MoonButtonMetrics, MoonButtonStyle},
     h_flex,
-    input::{clear_button, input_style},
+    input::{clear_button, input_style, trigger_facets},
     list::{List, ListState},
     moon::{
         MoonButtonSize, MoonPalette, MoonSize, MoonTheme, resolve_button_size, rgba_from,
@@ -711,6 +711,7 @@ where
                 bg,
                 fg,
                 trigger_style,
+                self.trigger_variant,
                 trigger_metrics,
                 outline_visible,
                 allow_open,
@@ -1018,6 +1019,7 @@ fn render_trigger_container(
     bg: Hsla,
     fg: Hsla,
     trigger_style: Option<MoonButtonStyle>,
+    trigger_variant: Option<ButtonVariant>,
     trigger_metrics: Option<MoonButtonMetrics>,
     outline_visible: bool,
     allow_open: bool,
@@ -1031,6 +1033,16 @@ fn render_trigger_container(
         || cx.theme().input,
         |style| rgba_from(style.border, style.border_alpha),
     );
+    // Under the Facet skin the trigger is a surface of its own, with its own hover and press
+    // ramp. A caller that set a background on it keeps that background.
+    let trigger_facet = trigger_facets(
+        &MoonTheme::active_tokens(cx),
+        trigger_variant,
+        outline_visible,
+        disabled,
+    )
+    .filter(|_| appearance && style.background.is_none());
+    let flat_ramp = !disabled && trigger_facet.is_none();
     div()
         .id("input")
         .relative()
@@ -1061,7 +1073,7 @@ fn render_trigger_container(
                 .line_height(metrics.line_height)
         })
         .refine_style(style)
-        .when(!disabled, |this| {
+        .when(flat_ramp, |this| {
             this.when_some(trigger_style, |this, style| {
                 this.hover(move |this| {
                     this.bg(rgba_from(style.bg, style.hover_bg_alpha))
@@ -1072,6 +1084,11 @@ fn render_trigger_container(
                         .border_color(rgba_from(style.border, style.active_border_alpha))
                 })
             })
+        })
+        .when_some(trigger_facet, |this, [rest, hovered, pressed]| {
+            rest.paint(this)
+                .hover(move |this| hovered.paint(this))
+                .active(move |this| pressed.paint(this))
         })
         .when(outline_visible, |this| this.focused_border(cx))
         .when(allow_open, |this| {

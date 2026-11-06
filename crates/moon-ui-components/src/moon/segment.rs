@@ -2,8 +2,11 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 use std::rc::Rc;
 
+use crate::button::raised_pressed_facet;
+
 use super::{
     foundation::{MoonIndexedClickHandler, MoonSize, accent_underline_colored},
+    skin::{MoonFacet, MoonFacetKind, MoonFacetTint, facet, facet_tinted},
     tag::tone_wash,
     text::{MoonText, fit_text_to_width, measure_text_width},
     theme::{MoonTheme, MoonThemeTokens},
@@ -692,6 +695,9 @@ impl MoonSegmentedControl {
         let mut replacements = self.replacements;
         let density = self.density;
         let (label_size, label_line, hotkey_size, hotkey_line) = segment_text_metrics(&tokens);
+        let facets = SegmentFacets::resolve(&tokens, frame, fill);
+        // Cells that stand apart under the Facet skin carry their own hover and press ramp.
+        let raised_cells = facets.as_ref().is_some_and(|facets| facets.cell.is_some());
 
         let mut root = div()
             .id(self.id)
@@ -709,7 +715,11 @@ impl MoonSegmentedControl {
                     .border_color(rgba_from(p.border, 1.0))
                     .rounded(fill_radius)
                     .overflow_hidden()
-            });
+            })
+            .when_some(
+                facets.as_ref().and_then(|f| f.strip.clone()),
+                |this, strip| strip.paint(this),
+            );
 
         if let Some(bounds) = self.bounds {
             root = root
@@ -728,18 +738,22 @@ impl MoonSegmentedControl {
                 .position(|(index, _)| *index == ix)
                 .map(|position| replacements.swap_remove(position).1);
             let replaced = replacement.is_some();
-            let selected_text = if filled { fill_label } else { accent.text };
-            let key_color = if selected {
-                selected_text
+            // A faceted selected cell is a wash of the accent over the panel, not the accent
+            // itself, so its label keeps the ink measured against the panel.
+            let selected_text = if filled && facets.is_none() {
+                fill_label
             } else {
-                p.text_muted
+                accent.text
             };
+            // A cell that stands apart is a raised chip, lighter than the panel: the muted ink
+            // falls short on it, so it takes the soft one.
+            let rest_text = match &facets {
+                Some(facets) if facets.cell.is_some() && !disabled => p.text_soft,
+                _ => p.text_muted,
+            };
+            let key_color = if selected { selected_text } else { rest_text };
             let key_alpha = if selected { 0.60 } else { 0.667 };
-            let label_color = if selected {
-                selected_text
-            } else {
-                p.text_muted
-            };
+            let label_color = if selected { selected_text } else { rest_text };
             let item_click = on_click.clone();
             let item_scroll = on_scroll.clone();
             let interaction = segment_cell_interaction(
@@ -768,10 +782,13 @@ impl MoonSegmentedControl {
                 .when(!interaction.click && !interaction.scroll, |this| {
                     this.cursor_default()
                 })
-                .when(!selected && !disabled && !replaced, |this| {
-                    this.hover(move |this| this.bg(rgba_from(p.overlay, 0.025)))
-                        .active(move |this| this.bg(rgba_from(p.overlay, 0.016)))
-                })
+                .when(
+                    !selected && !disabled && !replaced && !raised_cells,
+                    |this| {
+                        this.hover(move |this| this.bg(rgba_from(p.overlay, 0.025)))
+                            .active(move |this| this.bg(rgba_from(p.overlay, 0.016)))
+                    },
+                )
                 .when(filled && selected, |this| this.bg(rgba_from(fill, 1.0)))
                 .when(frame == SegmentFillFrame::JoinedStrip && ix > 0, |this| {
                     this.border_l(hairline)
@@ -781,6 +798,24 @@ impl MoonSegmentedControl {
                     this.border(hairline)
                         .border_color(rgba_from(if selected { fill } else { p.border }, 1.0))
                         .rounded(fill_radius)
+                })
+                .when_some(facets.as_ref(), |this, facets| {
+                    if filled && selected {
+                        // The selected cell is a lit chip of its own, edged all round.
+                        facets
+                            .selected
+                            .clone()
+                            .paint(this.border(hairline).rounded(fill_radius))
+                    } else if let (Some([rest, hovered, pressed]), false) =
+                        (facets.cell.clone(), disabled)
+                    {
+                        rest.paint(this).when(!replaced, |this| {
+                            this.hover(move |this| hovered.paint(this))
+                                .active(move |this| pressed.paint(this))
+                        })
+                    } else {
+                        this
+                    }
                 });
 
             if let Some(replacement) = replacement {
@@ -881,6 +916,52 @@ impl MoonSegmentedControl {
         }
 
         root
+    }
+}
+
+/// The surfaces a [`MoonSegmentSelection::Filled`] control paints under the Facet skin.
+///
+/// Touching items sit in one well and the selected one stands in it as a lit chip; items that
+/// stand apart are raised chips of their own. The underline style has no surfaces, so it
+/// resolves none.
+#[derive(Clone, Debug, PartialEq)]
+struct SegmentFacets {
+    /// The well a strip of touching items is sunk into; `None` for items that stand apart.
+    strip: Option<MoonFacet>,
+    /// An unselected item that stands apart — at rest, under the pointer and pressed; `None`
+    /// inside a strip, where items are bare.
+    cell: Option<[MoonFacet; 3]>,
+    /// The selected item: a wash of the accent, edged and glowing in it.
+    selected: MoonFacet,
+}
+
+impl SegmentFacets {
+    /// Resolve the faceted surfaces of a segmented control.
+    ///
+    /// Args:
+    ///     tokens: The theme side; supplies the skin, the palette and the UI scale.
+    ///     frame: The outline policy of the control, from [`segment_fill_frame`].
+    ///     accent: The accent hue of the selected item as `0xRRGGBB`.
+    ///
+    /// Returns:
+    ///     The surfaces to paint, or `None` where the flat colours stand: under the Flat skin
+    ///     and for the underline style.
+    fn resolve(tokens: &MoonThemeTokens, frame: SegmentFillFrame, accent: u32) -> Option<Self> {
+        if !tokens.skin.is_facet() || frame == SegmentFillFrame::None {
+            return None;
+        }
+        let apart = frame == SegmentFillFrame::SeparateCells;
+        Some(Self {
+            strip: (!apart).then(|| facet(MoonFacetKind::Well, tokens)),
+            cell: apart.then(|| {
+                [
+                    facet(MoonFacetKind::Raised, tokens),
+                    facet(MoonFacetKind::RaisedHover, tokens),
+                    raised_pressed_facet(tokens),
+                ]
+            }),
+            selected: facet_tinted(accent, MoonFacetTint::Selected, tokens),
+        })
     }
 }
 

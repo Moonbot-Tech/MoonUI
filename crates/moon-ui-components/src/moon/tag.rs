@@ -31,6 +31,13 @@ const DIMMED_OPACITY: f32 = 0.65;
 /// Design-reference width of the accent ring around a selected clickable tag.
 const SELECTED_RING_WIDTH: f32 = 2.0;
 
+/// Opacity of the tone at the top edge of the wash an outline tag or badge carries under the
+/// Facet skin.
+const FACET_WASH_TOP_ALPHA: f32 = 0.14;
+
+/// Opacity of the tone at the bottom edge of that wash.
+const FACET_WASH_BOTTOM_ALPHA: f32 = 0.04;
+
 /// How a [`MoonTag`] paints its tone.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MoonTagVariant {
@@ -309,6 +316,46 @@ pub(super) fn tone_wash(tone: MoonTone, p: MoonPalette) -> (u32, u32) {
     (fill, soft_label(tone, color, fill, p))
 }
 
+/// Build the faint vertical wash of a tone that lights an outlined chip from above.
+///
+/// Shared by the outline tag and the outline badge, which carry it under the Facet skin only.
+///
+/// Args:
+///     color: The tone as `0xRRGGBB`.
+///     strength: A share from 0.0 to 1.0 that both ends of the wash are scaled by, for a chip
+///         that fades its paint, such as a disabled badge.
+///
+/// Returns:
+///     A gradient running from the tone at [`FACET_WASH_TOP_ALPHA`] along the top edge down to
+///     the tone at [`FACET_WASH_BOTTOM_ALPHA`] along the bottom edge.
+pub(super) fn facet_outline_wash(color: u32, strength: f32) -> Background {
+    linear_gradient(
+        180.0,
+        linear_color_stop(rgba_from(color, FACET_WASH_TOP_ALPHA * strength), 0.0),
+        linear_color_stop(rgba_from(color, FACET_WASH_BOTTOM_ALPHA * strength), 1.0),
+    )
+}
+
+/// Resolve the wash a tag paints over its flat background.
+///
+/// Args:
+///     tokens: Active theme tokens (skin and palette).
+///     tone: The tag's tone.
+///     variant: How the tone is painted.
+///
+/// Returns:
+///     The tone wash for an outline tag under the Facet skin. `None` under the Flat skin and
+///     for the soft, filled and tinted variants, which keep the flat background of
+///     [`tag_chrome`].
+fn tag_wash(
+    tokens: &MoonThemeTokens,
+    tone: MoonTone,
+    variant: MoonTagVariant,
+) -> Option<Background> {
+    (tokens.skin.is_facet() && variant == MoonTagVariant::Outline)
+        .then(|| facet_outline_wash(tone.color(tokens.palette), 1.0))
+}
+
 /// Resolve a tag's paint and geometry.
 ///
 /// The outline variant reproduces the original tag exactly; the label contrast of the soft and
@@ -412,10 +459,13 @@ fn count_color(tone: MoonTone, variant: MoonTagVariant, p: MoonPalette) -> u32 {
 }
 
 impl RenderOnce for MoonTag {
+    /// Render the tag with its flat chrome and, for an outline tag under the Facet skin, the
+    /// tone wash of [`tag_wash`] over its transparent fill.
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let text = tokens.text(11.0, 14.0);
         let chrome = tag_chrome(&tokens, self.tone, self.variant, self.radius, self.compact);
+        let wash = tag_wash(&tokens, self.tone, self.variant);
         let p = tokens.palette;
         let count_color = count_color(self.tone, self.variant, p);
 
@@ -429,6 +479,7 @@ impl RenderOnce for MoonTag {
             .border_1()
             .border_color(chrome.border)
             .bg(chrome.background)
+            .when_some(wash, |this, wash| this.bg(wash))
             .text_color(rgba_from(
                 if self.dimmed { p.text } else { chrome.text },
                 1.0,

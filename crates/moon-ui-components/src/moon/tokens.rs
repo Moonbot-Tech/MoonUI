@@ -278,6 +278,82 @@ impl MoonPalette {
         yellow: 0xFFD93D,
     };
 
+    /// The palette of the faceted "Obsidian" theme: near-black surfaces that the
+    /// [`MoonSkin::Facet`] skin lights from above, darker than [`Self::TERMINAL`].
+    ///
+    /// It is a DARK palette by measurement, not by declaration — `shell` has a luma of 5.9, so
+    /// [`Self::is_light`] answers `false` and every consumer that branches on it takes the dark
+    /// arm with no new code, exactly as [`Self::GRAPHITE`] does. What makes Obsidian look
+    /// different is the skin its theme file selects, never a third colour table.
+    ///
+    /// The surface steps are wider apart than `TERMINAL`'s, and the skin depends on that: a
+    /// facet's fill is a gradient between two palette entries, so it reads as depth only where
+    /// those entries differ. `panel_high` and `panel`, the two ends of a raised control, are 11
+    /// to 14 levels apart per channel here and 1 to 2 in `TERMINAL`; `shell` has about a
+    /// quarter of `TERMINAL`'s relative luminance, and `gutter` stays below `panel` so a well
+    /// reads as sunk. Moving those entries toward each other flattens every facet at once.
+    ///
+    /// Measured with [`contrast_ratio`] against the WCAG floor of 4.5:1 — `text` 15.99 / 15.99 /
+    /// 13.76 and `text_muted` 5.31 / 5.31 / 4.57 on `shell` / `window` / `panel`. `text_muted`
+    /// is NOT the dark palette's `0x7D7669`, which measures 3.88 on this `panel`. Even the
+    /// lifted ink misses the floor on `panel_high` (3.98), the lit top of a raised facet: muted
+    /// ink belongs on `panel` and below, and `text_soft` (5.91) is the quiet ink for a raised
+    /// control.
+    ///
+    /// `green` and `red` are lighter than `TERMINAL`'s at nearly the same hue, because on a
+    /// near-black surface they are inks as often as fills: `red` measures 6.80 / 5.85 / 6.12 on
+    /// `shell` / `panel` / `card`, where `TERMINAL`'s `0xE5484D` would fall to 4.46 on `panel`
+    /// (see `GRAPHITE` on the outline danger button). The accent hues are carried over from
+    /// `TERMINAL` unchanged.
+    ///
+    /// [`MoonSkin::Facet`]: super::MoonSkin::Facet
+    pub const OBSIDIAN: Self = Self {
+        shell: 0x050608,
+        shell_high: 0x0D0F12,
+        window: 0x050608,
+        surface: 0x0A0B0E,
+        panel: 0x171A1F,
+        panel_high: 0x22262D,
+        chrome: 0x0D0F12,
+        tabbar: 0x0D0F12,
+        panel_head: 0x1A1D22,
+        gutter: 0x08090B,
+        chart_bg: 0x08090B,
+        card: 0x13151A,
+        row_alt: 0x0D0F12,
+        head_row: 0x101216,
+        border: 0x1F2227,
+        border_soft: 0x1A1D21,
+        border_card: 0x1F2227,
+        border_hover: 0x3A3F47,
+        row_line: 0x1A1D21,
+        shadow: 0x000000,
+        overlay: 0xFFFFFF,
+        on_accent: 0xFFFFFF,
+        text: 0xE8E4DC,
+        text_soft: 0xA6A198,
+        text_dim: 0xE8E4DC,
+        text_muted: 0x878279,
+        text_faint: 0x878279,
+        table_head: 0x101216,
+        table_body: 0x0D0F12,
+        table_selected: 0xFFB347,
+        table_hover: 0x171A1F,
+        green: 0x34C07A,
+        green_btn: 0x1E8C5B,
+        green_text: 0x34C07A,
+        red: 0xF26A69,
+        red_text: 0xF26A69,
+        red_soft_bd: 0xF26A69,
+        orange: 0xFF8E5A,
+        amber: 0xFFB347,
+        blue: 0x7FC9FF,
+        accent: 0xFFB347,
+        accent_fg: 0xFFCF94,
+        accent_tint_a: 0.11,
+        yellow: 0xFFD93D,
+    };
+
     pub fn with_legacy_defaults(mut self) -> Self {
         if self.window == 0 {
             self.window = self.shell;

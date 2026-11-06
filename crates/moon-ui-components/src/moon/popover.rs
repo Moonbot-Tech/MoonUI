@@ -3,7 +3,8 @@ use gpui::{prelude::FluentBuilder as _, *};
 
 use super::{
     background::MoonBackgroundPolicy,
-    theme::MoonTheme,
+    skin::{MoonFacetKind, facet},
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, rgba_from},
 };
 
@@ -41,6 +42,54 @@ impl MoonPopoverWidth {
             Self::Intrinsic => None,
         }
     }
+}
+
+/// Design-reference corner radius of the Moon chrome under the Facet skin.
+const FACET_POPOVER_RADIUS: f32 = 8.0;
+
+/// What the Moon chrome of a popup box paints under the Facet skin.
+#[derive(Clone, Debug, PartialEq)]
+struct PopoverFacet {
+    /// Corner radius of the box, in rendered pixels.
+    radius: f32,
+    /// Fill of the box; `None` leaves it as its background policy left it.
+    fill: Option<Background>,
+    /// Colour of the box's one-pixel edge.
+    edge: Hsla,
+    /// Shadows of the box.
+    shadows: Vec<BoxShadow>,
+}
+
+/// Resolve the popup surface the Moon chrome paints under the Facet skin.
+///
+/// A popup that paints its own fill is a popup surface: gradient fill, lit edge and the deep
+/// shadow of something floating above the window. A popup whose policy leaves it see-through
+/// keeps the edge and the highlight along its top only — GPUI paints a shadow that falls
+/// outside an element under the whole of it, so the deep shadow would show through the box.
+///
+/// Args:
+///     tokens: Active theme tokens; supply the skin, the palette and the UI scale.
+///     policy: Background policy of the popup box.
+///
+/// Returns:
+///     The faceted look, or `None` under the Flat skin, where the box keeps its flat fill, its
+///     palette border and its single soft shadow.
+fn popover_facet(tokens: &MoonThemeTokens, policy: MoonBackgroundPolicy) -> Option<PopoverFacet> {
+    if !tokens.skin.is_facet() {
+        return None;
+    }
+    let popup = facet(MoonFacetKind::Popup, tokens);
+    let opaque = matches!(policy, MoonBackgroundPolicy::Opaque);
+    Some(PopoverFacet {
+        radius: tokens.ui(FACET_POPOVER_RADIUS),
+        fill: opaque.then_some(popup.fill),
+        edge: popup.edge,
+        shadows: popup
+            .shadows
+            .into_iter()
+            .filter(|shadow| opaque || shadow.inset)
+            .collect(),
+    })
 }
 
 /// Which surface the popup box paints.
@@ -361,6 +410,17 @@ impl RenderOnce for MoonPopover {
 
         if matches!(chrome, MoonPopoverChrome::Moon) {
             popup = self.background_policy.apply(popup, p.shell_high, 0.98);
+            // `None` is the Flat skin, and the Picker chrome is never faceted: it exists to
+            // match the popup a Longbridge picker draws next to it.
+            if let Some(surface) = popover_facet(&tokens, self.background_policy) {
+                popup = popup
+                    .rounded(px(surface.radius))
+                    .border_color(surface.edge)
+                    .shadow(surface.shadows);
+                if let Some(fill) = surface.fill {
+                    popup = popup.bg(fill);
+                }
+            }
         }
 
         let mut popover = CorePopover::new(ElementId::from(self.id.clone()))

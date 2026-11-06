@@ -28,6 +28,7 @@ fn selection_inks_are_readable_on_the_surface_each_one_lands_on() {
     for (name, palette) in [
         ("dark", MoonPalette::TERMINAL),
         ("graphite", MoonPalette::GRAPHITE),
+        ("obsidian", MoonPalette::OBSIDIAN),
         ("light", MoonPalette::LIGHT),
         ("dark colour mode", MoonColors::DARK.to_palette()),
         ("light colour mode", MoonColors::LIGHT.to_palette()),
@@ -288,4 +289,118 @@ zoom = -2.0
     let theme = MoonTheme::from_config(config);
     assert_eq!(theme.scale.zoom, 1.0);
     assert_eq!(theme.config.light.zoom(), 1.0);
+}
+
+/// Catches a bundled theme other than Obsidian gaining a skin, or a `MoonThemeTokens::default`
+/// that is not flat: components would start drawing facets on themes whose every pixel is
+/// meant to stay as it was before skins existed.
+#[test]
+fn every_bundled_theme_but_obsidian_is_flat_on_both_sides() {
+    use super::{MoonSkin, ThemeMode};
+
+    for (name, config) in [
+        ("terminal", MoonThemeConfig::moon_terminal()),
+        ("light", MoonThemeConfig::moon_light()),
+        ("graphite", MoonThemeConfig::moon_graphite()),
+        ("colour modes", MoonThemeConfig::moon_color_modes()),
+        ("default", MoonThemeConfig::default()),
+    ] {
+        assert_eq!(config.dark.skin, MoonSkin::Flat, "{name}: dark side");
+        assert_eq!(config.light.skin, MoonSkin::Flat, "{name}: light side");
+        for mode in [ThemeMode::Dark, ThemeMode::Light, ThemeMode::System] {
+            let mut config = config.clone();
+            config.mode = mode;
+            let theme = MoonTheme::from_config(config);
+            assert_eq!(theme.skin, MoonSkin::Flat, "{name}: installed in {mode:?}");
+            assert_eq!(
+                theme.tokens().skin,
+                MoonSkin::Flat,
+                "{name}: tokens in {mode:?}"
+            );
+        }
+    }
+    assert_eq!(MoonThemeTokens::default().skin, MoonSkin::Flat);
+}
+
+/// Catches `themes/moon-obsidian.toml` drifting from `MoonPalette::OBSIDIAN`, losing its skin
+/// line, or putting the skin on the light side: Obsidian would paint another palette, come up
+/// flat, or facet a light side that is meant to be the plain light theme.
+#[test]
+fn obsidian_theme_config_is_the_obsidian_palette_faceted_on_the_dark_side_only() {
+    use super::{MoonSkin, ThemeMode};
+
+    let config = MoonThemeConfig::moon_obsidian();
+    assert_eq!(config.mode, ThemeMode::Dark);
+    assert_eq!(config.dark.palette, MoonPalette::OBSIDIAN);
+    assert_eq!(config.dark.skin, MoonSkin::Facet);
+    assert_eq!(config.light.palette, MoonPalette::LIGHT);
+    assert_eq!(config.light.skin, MoonSkin::Flat);
+
+    // The light side is Graphite's light side in every field, not only in its palette.
+    let written = |tokens: &MoonThemeTokens| toml::to_string(tokens).unwrap();
+    assert_eq!(
+        written(&config.light),
+        written(&MoonThemeConfig::moon_graphite().light)
+    );
+}
+
+/// Catches `theme.rs:MoonTheme::from_config` or `MoonTheme::tokens` dropping the skin, or
+/// taking it from the dark side in light mode: `MoonSkin::active` and `active_tokens` would
+/// report a flat Obsidian, or a faceted light theme.
+#[test]
+fn the_installed_theme_carries_the_skin_of_its_active_side() {
+    use super::{MoonSkin, ThemeMode};
+
+    let dark = MoonTheme::from_config(MoonThemeConfig::moon_obsidian());
+    assert_eq!(dark.skin, MoonSkin::Facet);
+    assert_eq!(dark.tokens().skin, MoonSkin::Facet);
+
+    let mut config = MoonThemeConfig::moon_obsidian();
+    config.mode = ThemeMode::Light;
+    let light = MoonTheme::from_config(config);
+    assert_eq!(light.skin, MoonSkin::Flat);
+    assert_eq!(light.tokens().skin, MoonSkin::Flat);
+}
+
+/// Catches removing the serde default from `MoonThemeTokens::skin`, which would reject every
+/// theme file written before skins existed, and catches a renamed variant, which would reject
+/// the one file that names a skin.
+#[test]
+fn a_theme_toml_without_a_skin_is_flat_and_one_naming_facet_is_faceted() {
+    use super::MoonSkin;
+
+    let legacy: MoonThemeConfig = toml::from_str(
+        "[dark.scale]
+ui = 1.2
+[light.scale]
+font = 1.1
+",
+    )
+    .unwrap();
+    assert_eq!(legacy.dark.skin, MoonSkin::Flat);
+    assert_eq!(legacy.light.skin, MoonSkin::Flat);
+
+    let faceted: MoonThemeConfig = toml::from_str(
+        "[dark]
+skin = \"Facet\"
+[light.scale]
+font = 1.1
+",
+    )
+    .unwrap();
+    assert_eq!(faceted.dark.skin, MoonSkin::Facet);
+    assert_eq!(faceted.light.skin, MoonSkin::Flat);
+}
+
+/// Catches a `#[serde(skip)]` on `MoonThemeTokens::skin`: a host that saves the theme it
+/// installed would write Obsidian back as a flat theme and lose the facets on the next start.
+#[test]
+fn a_written_theme_keeps_the_skin_of_each_side() {
+    use super::MoonSkin;
+
+    let text = toml::to_string(&MoonThemeConfig::moon_obsidian()).unwrap();
+    let read: MoonThemeConfig = toml::from_str(&text).unwrap();
+    assert_eq!(read.dark.skin, MoonSkin::Facet);
+    assert_eq!(read.light.skin, MoonSkin::Flat);
+    assert_eq!(read.dark.palette, MoonPalette::OBSIDIAN);
 }

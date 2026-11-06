@@ -67,12 +67,20 @@ pub(super) fn render_header(
         .h(px(height))
         .flex()
         .items_center()
-        .bg(rgba_from(style.header_bg, 1.0))
-        .border_b(px(1.0))
-        .border_color(rgba_from(
-            style.header_separator,
-            style.header_separator_alpha,
-        ));
+        // `None` is the Flat skin; see `MoonTableStyle::header_facet` for the faceted header.
+        .map(|this| match style.header_facet(p, &tokens) {
+            Some(facet) => this
+                .when_some(facet.fill, |this, fill| this.bg(fill))
+                .border_b(px(1.0))
+                .border_color(facet.separator),
+            None => this
+                .bg(rgba_from(style.header_bg, 1.0))
+                .border_b(px(1.0))
+                .border_color(rgba_from(
+                    style.header_separator,
+                    style.header_separator_alpha,
+                )),
+        });
 
     // Which column's resize strip the pointer is over. GPUI applies hover styles at paint time
     // only, so the mark's hover form (taller and wider) cannot come from `hover`/`group_hover`;

@@ -401,6 +401,9 @@ impl<E: SidebarItem> RenderOnce for Sidebar<E> {
         let layout =
             SidebarLayout::new(self.collapsible, self.collapsed, expanded_width, self.side);
 
+        let facet_edge_rule =
+            menu::sidebar_facet_edge_rule(&crate::moon::MoonTheme::active_tokens(cx));
+
         // Sidebar content renders at its target width immediately. A wrapper
         // div animates clip-width for smooth transitions without re-laying out
         // sidebar content each animation frame.
@@ -413,6 +416,12 @@ impl<E: SidebarItem> RenderOnce for Sidebar<E> {
             .bg(cx.theme().sidebar)
             .text_color(cx.theme().sidebar_foreground)
             .border_color(cx.theme().sidebar_border)
+            // Moon Facet skin: no fill, and the border keeps its pixel of width but stops
+            // painting; the fading rule added below takes its place.
+            .when(facet_edge_rule.is_some(), |this| {
+                this.bg(gpui::transparent_black())
+                    .border_color(gpui::transparent_black())
+            })
             .map(|this| match self.side {
                 Side::Left => this.border_r_1(),
                 Side::Right => this.border_l_1(),
@@ -479,6 +488,22 @@ impl<E: SidebarItem> RenderOnce for Sidebar<E> {
                         .gap_2()
                         .when(layout.icon_collapsed, |this| this.pt_2().px_2())
                         .child(footer),
+                )
+            })
+            // An absolute child is placed inside its parent's border, hence the negative inset
+            // that puts the rule on the border's own pixel.
+            .when_some(facet_edge_rule, |this, color| {
+                this.child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .bottom_0()
+                        .w(px(1.))
+                        .map(|rule| match self.side {
+                            Side::Left => rule.right(px(-1.)),
+                            Side::Right => rule.left(px(-1.)),
+                        })
+                        .child(crate::moon::fading_rule_v(color)),
                 )
             });
 

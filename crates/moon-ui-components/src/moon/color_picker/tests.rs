@@ -1,10 +1,10 @@
 //! Regression coverage for the Moon colour-picker hex field and reuse palette.
 
 use super::{
-    MAX_CUSTOM_COLORS, MoonColorPickerTrigger, TriggerChrome, hex_label, parse_hex_rgb,
-    push_all_custom, push_custom, rgb8_of, trigger_chrome,
+    MAX_CUSTOM_COLORS, MoonColorPickerTrigger, TriggerChrome, field_facet, hex_label,
+    parse_hex_rgb, push_all_custom, push_custom, rgb8_of, trigger_chrome,
 };
-use crate::moon::{MoonScale, MoonThemeTokens};
+use crate::moon::{MoonFacetKind, MoonScale, MoonThemeConfig, MoonThemeTokens, facet, rgba_from};
 use gpui::{Hsla, hsla, rgb};
 
 /// Builds an opaque colour from its independently chosen six-digit RGB value.
@@ -176,4 +176,41 @@ fn swatch_trigger_follows_the_ui_scale() {
     };
     let swatch = trigger_chrome(&tokens, MoonColorPickerTrigger::Swatch, None);
     assert_eq!((swatch.swatch_w, swatch.swatch_h), (42.0, 30.0));
+}
+
+/// Catches `color_picker.rs:field_facet` ignoring the skin or the disabled flag: the field of
+/// every flat theme's picker would be repainted as a well, or a disabled field on the faceted
+/// theme would lose its dimmed flat frame. With nothing resolved, the field paints the flat
+/// border and fill it always had.
+#[test]
+fn flat_themes_and_disabled_fields_resolve_no_well() {
+    for tokens in [
+        MoonThemeConfig::moon_terminal().dark,
+        MoonThemeConfig::moon_terminal().light,
+        MoonThemeConfig::moon_obsidian().light,
+        MoonThemeTokens::default(),
+    ] {
+        for disabled in [false, true] {
+            assert_eq!(field_facet(&tokens, disabled), None);
+        }
+    }
+    assert_eq!(
+        field_facet(&MoonThemeConfig::moon_obsidian().dark, true),
+        None,
+        "a disabled field keeps the flat frame"
+    );
+}
+
+/// Catches the faceted field drifting from the text input it sits beside: enabled, it is the
+/// skin's well — edged in the highlight ink at 6%, not the 9% of a raised control — and its edge
+/// rises to that ink at 20% under the pointer.
+#[test]
+fn a_faceted_field_is_a_well_that_lights_its_edge_under_the_pointer() {
+    let tokens = MoonThemeConfig::moon_obsidian().dark;
+    let p = tokens.palette;
+
+    let (well, hover_edge) = field_facet(&tokens, false).expect("faceted");
+    assert_eq!(well, facet(MoonFacetKind::Well, &tokens));
+    assert_eq!(well.edge, rgba_from(p.overlay, 0.06));
+    assert_eq!(hover_edge, rgba_from(p.overlay, 0.2));
 }

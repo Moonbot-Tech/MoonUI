@@ -34,16 +34,17 @@ use moon_ui::{
     MoonSelectItem, MoonSelectState, MoonSelectableCard, MoonSelectorPill, MoonSelectorSegment,
     MoonSeparator, MoonSettingField, MoonSettingGroup, MoonSettingItem, MoonSettingPage,
     MoonSettings, MoonSidebar, MoonSidebarGroup, MoonSidebarMenu, MoonSidebarMenuItem,
-    MoonSidebarToggleButton, MoonSize, MoonSkeleton, MoonSlider, MoonSliderState, MoonSpinner,
-    MoonSpinnerSize, MoonStackedBar, MoonStatusBar, MoonStatusIndicator, MoonStatusItem,
-    MoonStepper, MoonSteps, MoonSurface, MoonSurfaceVariant, MoonTabItem, MoonTabStrip,
-    MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle, MoonTag, MoonTagRadius,
-    MoonTagVariant, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig, MoonTimePicker,
-    MoonTimePickerState, MoonToggle, MoonToggleLabelSide, MoonToggleVariant, MoonTone, MoonTooltip,
-    MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree, MoonTreeItem,
-    MoonTreeSelectionMode, MoonTreeState, MoonVirtualList, MoonVirtualListScrollHandle,
-    MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand, MoonWindowFrameControls, PanelView,
-    Root, TabPanel, ThemeMode, h_flex, moon_h_resizable, moon_resizable_panel, rgba_from, v_flex,
+    MoonSidebarToggleButton, MoonSize, MoonSkeleton, MoonSkin, MoonSlider, MoonSliderState,
+    MoonSpinner, MoonSpinnerSize, MoonStackedBar, MoonStatusBar, MoonStatusIndicator,
+    MoonStatusItem, MoonStepper, MoonSteps, MoonSurface, MoonSurfaceVariant, MoonTabItem,
+    MoonTabStrip, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle, MoonTag,
+    MoonTagRadius, MoonTagVariant, MoonText, MoonTextArea, MoonTheme, MoonThemeConfig,
+    MoonTimePicker, MoonTimePickerState, MoonToggle, MoonToggleLabelSide, MoonToggleVariant,
+    MoonTone, MoonTooltip, MoonTooltipPlacement, MoonTooltipSize, MoonTooltipView, MoonTree,
+    MoonTreeItem, MoonTreeSelectionMode, MoonTreeState, MoonVirtualList,
+    MoonVirtualListScrollHandle, MoonWindowExt as _, MoonWindowFrame, MoonWindowFrameBrand,
+    MoonWindowFrameControls, PanelView, Root, TabPanel, ThemeMode, h_flex, moon_h_resizable,
+    moon_resizable_panel, rgba_from, v_flex,
 };
 
 mod gallery;
@@ -181,7 +182,53 @@ struct GalleryArgs {
     snapshot_dir: Option<PathBuf>,
     case_snapshot_dir: Option<PathBuf>,
     snapshot_case_ids: Vec<String>,
-    theme_mode: ThemeMode,
+    theme: GalleryTheme,
+}
+
+/// What a `--theme` value opens the gallery in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GalleryTheme {
+    /// `dark`, `light` or `system`: the terminal theme in that mode.
+    Mode(ThemeMode),
+    /// `obsidian`: the faceted dark theme, `MoonThemeConfig::moon_obsidian()`.
+    Obsidian,
+    /// `light-facet`: the terminal's light theme drawn with the Facet skin.
+    LightFacet,
+}
+
+impl GalleryTheme {
+    /// What the gallery opens in when `--theme` is absent or names nothing known.
+    const DEFAULT: Self = Self::Mode(ThemeMode::Dark);
+
+    /// Keep snapshot directories distinct even when two themes share the same dark/light mode.
+    #[cfg(any(feature = "snapshot", test))]
+    fn snapshot_name(self) -> &'static str {
+        match self {
+            Self::Mode(ThemeMode::Dark) => "dark",
+            Self::Mode(ThemeMode::Light) => "light",
+            Self::Mode(ThemeMode::System) => "system",
+            Self::Obsidian => "obsidian",
+            Self::LightFacet => "light-facet",
+        }
+    }
+
+    /// Returns the theme configuration to install for this choice.
+    fn config(self) -> MoonThemeConfig {
+        match self {
+            Self::Mode(mode) => {
+                let mut config = MoonThemeConfig::moon_terminal();
+                config.mode = mode;
+                config
+            }
+            Self::Obsidian => MoonThemeConfig::moon_obsidian(),
+            Self::LightFacet => {
+                let mut config = MoonThemeConfig::moon_terminal();
+                config.mode = ThemeMode::Light;
+                config.light.skin = moon_ui::MoonSkin::Facet;
+                config
+            }
+        }
+    }
 }
 
 fn gallery_args_from_cli() -> GalleryArgs {
@@ -190,7 +237,7 @@ fn gallery_args_from_cli() -> GalleryArgs {
     let mut snapshot_dir = None;
     let mut case_snapshot_dir = None;
     let mut snapshot_case_ids = Vec::new();
-    let mut theme_mode = ThemeMode::Dark;
+    let mut theme = GalleryTheme::DEFAULT;
     while let Some(arg) = args.next() {
         if arg == "--page" {
             if let Some(page_name) = args.next() {
@@ -217,11 +264,11 @@ fn gallery_args_from_cli() -> GalleryArgs {
         } else if let Some(cases) = arg.strip_prefix("--snapshot-cases=") {
             snapshot_case_ids.extend(parse_snapshot_case_ids(cases));
         } else if arg == "--theme" {
-            if let Some(mode) = args.next() {
-                theme_mode = parse_theme_mode(&mode).unwrap_or(ThemeMode::Dark);
+            if let Some(name) = args.next() {
+                theme = parse_gallery_theme(&name).unwrap_or(GalleryTheme::DEFAULT);
             }
-        } else if let Some(mode) = arg.strip_prefix("--theme=") {
-            theme_mode = parse_theme_mode(mode).unwrap_or(ThemeMode::Dark);
+        } else if let Some(name) = arg.strip_prefix("--theme=") {
+            theme = parse_gallery_theme(name).unwrap_or(GalleryTheme::DEFAULT);
         }
     }
     if snapshot_dir.is_some() {
@@ -232,7 +279,7 @@ fn gallery_args_from_cli() -> GalleryArgs {
         snapshot_dir,
         case_snapshot_dir,
         snapshot_case_ids,
-        theme_mode,
+        theme,
     }
 }
 
@@ -250,23 +297,23 @@ fn page_index(page: &str) -> Option<usize> {
         .position(|candidate| candidate.eq_ignore_ascii_case(page))
 }
 
+/// Parses a `--theme` value, in any letter case: `obsidian` names that bundled theme, and
+/// anything else is read as a theme mode by [`parse_theme_mode`].
+fn parse_gallery_theme(name: &str) -> Option<GalleryTheme> {
+    if name.eq_ignore_ascii_case("obsidian") {
+        Some(GalleryTheme::Obsidian)
+    } else if name.eq_ignore_ascii_case("light-facet") {
+        Some(GalleryTheme::LightFacet)
+    } else {
+        parse_theme_mode(name).map(GalleryTheme::Mode)
+    }
+}
+
 fn parse_theme_mode(mode: &str) -> Option<ThemeMode> {
     match mode.to_ascii_lowercase().as_str() {
         "light" => Some(ThemeMode::Light),
         "dark" => Some(ThemeMode::Dark),
         "system" => Some(ThemeMode::System),
         _ => None,
-    }
-}
-
-/// Returns the display name of a theme mode, which the handoff snapshot run also uses for its
-/// per-theme directory. Only that snapshot build reads it outside tests since the gallery header
-/// switched to named styles.
-#[cfg_attr(not(feature = "snapshot"), allow(dead_code))]
-fn theme_mode_name(mode: ThemeMode) -> &'static str {
-    match mode {
-        ThemeMode::Light => "Light",
-        ThemeMode::Dark => "Dark",
-        ThemeMode::System => "System",
     }
 }

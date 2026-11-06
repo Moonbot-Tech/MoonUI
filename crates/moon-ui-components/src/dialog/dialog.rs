@@ -14,6 +14,7 @@ use crate::{
     animation::cubic_bezier,
     button::{Button, ButtonVariant, ButtonVariants as _},
     dialog::{DialogContent, DialogTitle},
+    moon::{MoonFacetKind, MoonTheme, facet},
     scroll::ScrollableElement as _,
     v_flex,
 };
@@ -480,6 +481,18 @@ impl RenderOnce for Dialog {
         let animation =
             Animation::new(*ANIMATION_DURATION).with_easing(cubic_bezier(0.32, 0.72, 0., 1.));
 
+        // Under the Facet skin the dialog box is a popup surface: gradient fill, lit edge and
+        // the popup shadow stack. `None` is the Flat skin, which keeps the theme background,
+        // the theme border and the `shadow_xl` pair below.
+        let tokens = MoonTheme::active_tokens(cx);
+        let facet_surface = tokens
+            .skin
+            .is_facet()
+            .then(|| facet(MoonFacetKind::Popup, &tokens));
+        let facet_shadows = facet_surface
+            .as_ref()
+            .map(|surface| surface.shadows.clone());
+
         anchored()
             .position(point(window_paddings.left, window_paddings.top))
             .snap_to_window()
@@ -528,6 +541,10 @@ impl RenderOnce for Dialog {
                             .border_1()
                             .border_color(cx.theme().border)
                             .rounded(cx.theme().radius_lg)
+                            // Ahead of `refine_style`, so a caller's own fill still wins.
+                            .when_some(facet_surface, |this, surface| {
+                                this.bg(surface.fill).border_color(surface.edge)
+                            })
                             .min_h_24()
                             .pt(paddings.top)
                             .pb(paddings.bottom)
@@ -645,6 +662,17 @@ impl RenderOnce for Dialog {
                                 }
                             })
                             .with_animation("slide-down", animation.clone(), move |this, delta| {
+                                // A faceted dialog fades its popup shadows in the same way.
+                                if let Some(shadows) = &facet_shadows {
+                                    let shadow = shadows
+                                        .iter()
+                                        .map(|shadow| BoxShadow {
+                                            color: shadow.color.opacity(delta),
+                                            ..shadow.clone()
+                                        })
+                                        .collect();
+                                    return this.top(y * delta).shadow(shadow);
+                                }
                                 // This is equivalent to `shadow_xl` with an extra opacity.
                                 let shadow = vec![
                                     BoxShadow {

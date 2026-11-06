@@ -2,9 +2,10 @@
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    App, AppContext as _, ElementId, InteractiveElement as _, IntoElement, MouseButton,
-    MouseDownEvent, ParentElement as _, RenderOnce, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, WeakEntity, Window, div, px,
+    App, AppContext as _, Background, BoxShadow, ElementId, Hsla, InteractiveElement as _,
+    IntoElement, MouseButton, MouseDownEvent, ParentElement as _, RenderOnce, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled as _, WeakEntity, Window, div,
+    linear_color_stop, linear_gradient, px, transparent_black,
 };
 
 use super::{
@@ -18,11 +19,18 @@ use crate::{
         background::MoonBackgroundPolicy,
         button::{MoonButton, MoonButtonSize, MoonButtonVariant},
         h_flex,
+        skin::{MoonFacetKind, facet, fading_rule_h},
         text::MoonText,
         theme::{MoonTheme, MoonThemeTokens},
         tokens::{MoonPalette, rgba_from},
     },
 };
+
+/// Alpha of the `overlay` ink at the top of a faceted header's sheen; it fades to nothing at the
+/// header's bottom edge.
+const FACET_HEADER_SHEEN_ALPHA: f32 = 0.05;
+/// Alpha of the `overlay` ink at the middle of the fading rule under a faceted header.
+const FACET_HEADER_RULE_ALPHA: f32 = 0.11;
 
 /// Height of a dock tab header at the active token scale.
 ///
@@ -33,6 +41,135 @@ use crate::{
 ///     The fitted header height used by both the tab strip and the split-drop inset.
 pub(super) fn tab_header_height(tokens: &MoonThemeTokens) -> f32 {
     tokens.fit_band(tokens.tier_band_base(29.0, |m| m.line_height), 13.0)
+}
+
+/// Where a tab panel sits, which decides how much of a surface it paints under the Facet skin.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PanelPlacement {
+    /// On its own, outside any dock: the whole slab, the shadows it casts included.
+    Standalone,
+    /// In a slot of a dock, beside other panels: the slab without the shadows that fall outside
+    /// it. A neighbouring slot may hold a see-through panel, and a shadow cast over that slot
+    /// would darken the canvas it shows.
+    Docked,
+    /// Inside a floating tile, which draws the surface around the panel.
+    Floating,
+}
+
+/// What a tab panel paints under the Facet skin, in place of its flat fills and solid borders.
+///
+/// A panel whose body is opaque is one slab: the root takes the slab fill and edge, the header
+/// adds a sheen and the body paints nothing, so the slab shows through it.
+///
+/// A panel whose body is see-through — neither the root nor the content paints a fill, which is
+/// how a chart host lets the GPU canvas under the scene show — keeps that body untouched. Only
+/// its header takes the slab fill, and the root gets no shadow that falls outside itself: GPUI
+/// paints such a shadow under the whole element, so it would darken the canvas through the
+/// unfilled body.
+///
+/// A floating tile draws the surface itself, around the panel, so the panel inside paints
+/// neither a fill nor an edge of its own.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct PanelFacet {
+    /// Corner radius of the panel's edge, in rendered pixels.
+    pub(super) radius: f32,
+    /// Fill of the panel root; `None` leaves the root unpainted.
+    pub(super) root_fill: Option<Background>,
+    /// Colour of the root's one-pixel edge; transparent when the host tile draws the edge.
+    pub(super) edge: Hsla,
+    /// Shadows of the panel root.
+    pub(super) root_shadows: Vec<BoxShadow>,
+    /// Background of the header; `None` leaves the header unpainted.
+    pub(super) header_fill: Option<Background>,
+    /// A layer painted over `header_fill`: the sheen of a header that spends its own background
+    /// on the surface fill.
+    pub(super) header_overlay: Option<Background>,
+    /// Radius of the header's top corners, which keeps its paint inside the rounded edge.
+    pub(super) header_radius: f32,
+    /// Colour at the middle of the fading rule under the header.
+    pub(super) header_rule: Hsla,
+    /// Whether the body keeps the fill its background policy asks for.
+    pub(super) body_keeps_policy_fill: bool,
+}
+
+impl PanelFacet {
+    /// Resolve the faceted look of a tab panel.
+    ///
+    /// Args:
+    ///     tokens: Active theme tokens; supply the skin, the palette and the UI scale.
+    ///     placement: Where the panel sits: on its own, in a dock slot or in a floating tile.
+    ///     root: Background policy of the panel root.
+    ///     header: Background policy of the header.
+    ///     content: Background policy of the body, as resolved for the active panel.
+    ///
+    /// Returns:
+    ///     The faceted look, or `None` under the Flat skin, where the panel renders as it
+    ///     always has.
+    pub(super) fn resolve(
+        tokens: &MoonThemeTokens,
+        placement: PanelPlacement,
+        root: MoonBackgroundPolicy,
+        header: MoonBackgroundPolicy,
+        content: MoonBackgroundPolicy,
+    ) -> Option<Self> {
+        if !tokens.skin.is_facet() {
+            return None;
+        }
+        let p = tokens.palette;
+        let floating = placement == PanelPlacement::Floating;
+        let surface = facet(
+            if floating {
+                MoonFacetKind::Popup
+            } else {
+                MoonFacetKind::Slab
+            },
+            tokens,
+        );
+        let opaque = |policy| matches!(policy, MoonBackgroundPolicy::Opaque);
+        // `Transparent` paints a fill of zero alpha, so it shows what lies behind exactly as
+        // `NoFill` does.
+        let see_through = !opaque(root) && !opaque(content);
+        let sheen = linear_gradient(
+            180.0,
+            linear_color_stop(rgba_from(p.overlay, FACET_HEADER_SHEEN_ALPHA), 0.0),
+            linear_color_stop(rgba_from(p.overlay, 0.0), 1.0),
+        );
+        let radius = tokens.ui(tokens.metrics.container_radius);
+
+        let (header_fill, header_overlay) = if !see_through {
+            (Some(sheen), None)
+        } else if opaque(header) {
+            (Some(surface.fill), Some(sheen))
+        } else {
+            (None, None)
+        };
+        let (root_fill, edge, root_shadows) = if floating {
+            (None, transparent_black(), Vec::new())
+        } else {
+            // Only a panel on its own, with an opaque body, keeps the shadows it casts.
+            let casts = placement == PanelPlacement::Standalone && !see_through;
+            let shadows = surface.shadows.into_iter();
+            (
+                (!see_through).then_some(surface.fill),
+                surface.edge,
+                shadows.filter(|shadow| casts || shadow.inset).collect(),
+            )
+        };
+
+        Some(Self {
+            radius,
+            root_fill,
+            edge,
+            root_shadows,
+            header_fill,
+            header_overlay,
+            // The header starts inside the root's one-pixel border, and a floating tile adds
+            // its own border outside that.
+            header_radius: (radius - if floating { 2.0 } else { 1.0 }).max(0.0),
+            header_rule: rgba_from(p.overlay, FACET_HEADER_RULE_ALPHA),
+            body_keeps_policy_fill: see_through,
+        })
+    }
 }
 
 /// Glyph and matching host tooltip for the dock zoom control.
@@ -59,6 +196,9 @@ pub(super) fn zoom_control(
 
 impl RenderOnce for TabPanel {
     /// Render the tab group and synchronize edge-triggered panel activation notifications.
+    ///
+    /// Under the Flat skin the group is a bordered box with a filled header and a filled body.
+    /// Under the Facet skin it is drawn as [`PanelFacet`] resolves it.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let tokens = MoonTheme::active_tokens(cx);
@@ -128,6 +268,30 @@ impl RenderOnce for TabPanel {
             .border(px(1.0))
             .border_color(rgba_from(p.border, 1.0));
         root = self.background_policy.apply(root, p.shell_high, 0.98);
+        // `None` under the Flat skin: every faceted override below is skipped and the panel
+        // renders exactly what the lines around them describe.
+        let panel_facet = PanelFacet::resolve(
+            &tokens,
+            if self.floating {
+                PanelPlacement::Floating
+            } else if self.dock_area.is_some() {
+                PanelPlacement::Docked
+            } else {
+                PanelPlacement::Standalone
+            },
+            self.background_policy,
+            self.header_background_policy,
+            content_policy,
+        );
+        if let Some(panel_facet) = &panel_facet {
+            root = root
+                .rounded(px(panel_facet.radius))
+                .border_color(panel_facet.edge)
+                .shadow(panel_facet.root_shadows.clone());
+            if let Some(fill) = panel_facet.root_fill {
+                root = root.bg(fill);
+            }
+        }
 
         if self.show_header {
             let mut header = div()
@@ -144,6 +308,42 @@ impl RenderOnce for TabPanel {
                 .border_b(px(1.0))
                 .border_color(rgba_from(p.border, 1.0));
             header = self.header_background_policy.apply(header, p.panel, 1.0);
+            if let Some(panel_facet) = &panel_facet {
+                // The bottom border keeps its pixel of height, so the tabs sit where they do
+                // under the Flat skin; it only stops painting, and the fading rule takes the row
+                // it occupied. An absolute child is placed inside its parent's border, hence the
+                // negative inset.
+                let header_radius = px(panel_facet.header_radius);
+                header = header
+                    .border_color(transparent_black())
+                    .rounded_t(header_radius);
+                if let Some(fill) = panel_facet.header_fill {
+                    header = header.bg(fill);
+                }
+                // Both layers go in ahead of the tabs, so a tab's hover fill and the active
+                // underline paint over them.
+                if let Some(overlay) = panel_facet.header_overlay {
+                    header = header.child(
+                        div()
+                            .absolute()
+                            .top_0()
+                            .right_0()
+                            .bottom_0()
+                            .left_0()
+                            .rounded_t(header_radius)
+                            .bg(overlay),
+                    );
+                }
+                header = header.child(
+                    div()
+                        .absolute()
+                        .left_0()
+                        .right_0()
+                        .bottom(px(-1.0))
+                        .h(px(1.0))
+                        .child(fading_rule_h(panel_facet.header_rule)),
+                );
+            }
 
             let tabs_scroll_handle = window
                 .use_keyed_state(
@@ -549,11 +749,20 @@ impl RenderOnce for TabPanel {
             .w_full()
             .min_h(px(0.0))
             .overflow_hidden();
-        content = content_policy.apply(content, p.shell, 1.0);
+        // A faceted slab shows through its body, so the body drops its own fill there. A
+        // see-through body is left to its policy, which paints nothing over the canvas behind.
+        let body_keeps_policy_fill = panel_facet
+            .as_ref()
+            .is_none_or(|panel_facet| panel_facet.body_keeps_policy_fill);
+        if body_keeps_policy_fill {
+            content = content_policy.apply(content, p.shell, 1.0);
+        }
 
         if let Some(panel) = active_panel {
             let mut panel_host = div().absolute().top_0().right_0().bottom_0().left_0();
-            panel_host = content_policy.apply(panel_host, p.shell, 1.0);
+            if body_keeps_policy_fill {
+                panel_host = content_policy.apply(panel_host, p.shell, 1.0);
+            }
             content = content.child(panel_host.child(panel.render_panel(window, cx)));
         }
 

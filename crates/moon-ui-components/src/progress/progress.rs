@@ -17,6 +17,7 @@ pub struct Progress {
     value: f32,
     size: Size,
     loading: bool,
+    surface_styles: Option<(StyleRefinement, StyleRefinement)>,
 }
 
 impl Progress {
@@ -29,6 +30,7 @@ impl Progress {
             style: StyleRefinement::default(),
             size: Size::default(),
             loading: false,
+            surface_styles: None,
         }
     }
 
@@ -52,6 +54,12 @@ impl Progress {
     /// The value should be between 0.0 and 100.0.
     pub fn value(mut self, value: f32) -> Self {
         self.value = value.clamp(0., 100.);
+        self
+    }
+
+    /// Let the Moon wrapper change track/fill paint while retaining this bar's animation state.
+    pub(crate) fn surface_styles(mut self, track: StyleRefinement, fill: StyleRefinement) -> Self {
+        self.surface_styles = Some((track, fill));
         self
     }
 }
@@ -99,6 +107,9 @@ impl RenderOnce for Progress {
             .rounded(radius)
             .refine_style(&self.style)
             .bg(color.opacity(0.2))
+            .when_some(self.surface_styles.as_ref(), |this, (track, _)| {
+                this.refine_style(track)
+            })
             .child(
                 div()
                     .absolute()
@@ -108,6 +119,9 @@ impl RenderOnce for Progress {
                     .bg(color)
                     .rounded(radius)
                     .refine_style(&inner_style)
+                    .when_some(self.surface_styles.as_ref(), |this, (_, fill)| {
+                        this.refine_style(fill)
+                    })
                     .map(|this| match value {
                         v if v >= 100. || loading => this,
                         _ => this.rounded_r_none(),

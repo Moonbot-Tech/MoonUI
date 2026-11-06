@@ -16,6 +16,7 @@ fn selected_row_ink_stays_readable_on_the_panel_it_is_tinted_over() {
     for (name, p) in [
         ("dark", MoonPalette::TERMINAL),
         ("graphite", MoonPalette::GRAPHITE),
+        ("obsidian", MoonPalette::OBSIDIAN),
         ("light", MoonPalette::LIGHT),
     ] {
         let ratio = contrast_ratio(p.selected_fg(), p.panel);
@@ -36,6 +37,7 @@ fn ink_on_a_solid_fill_is_readable_in_both_palettes() {
     for (name, p) in [
         ("dark", MoonPalette::TERMINAL),
         ("graphite", MoonPalette::GRAPHITE),
+        ("obsidian", MoonPalette::OBSIDIAN),
         ("light", MoonPalette::LIGHT),
     ] {
         for (fill_name, fill) in [("accent", p.accent), ("panel", p.panel)] {
@@ -91,6 +93,48 @@ fn graphite_text_and_muted_text_clear_the_surface_contrast_floor() {
             );
         }
     }
+}
+
+/// Catches raising `tokens.rs:MoonPalette::OBSIDIAN.shell` above the dark luma threshold.
+/// A light classification flips every `is_light()` consumer to the light branch at once, and
+/// hands the Facet skin its light-palette strengths on a near-black theme.
+#[test]
+fn obsidian_palette_is_a_dark_palette_by_measured_shell_luma() {
+    assert!(!MoonPalette::OBSIDIAN.is_light());
+}
+
+/// Catches darkening Obsidian's `text_muted` back toward the dark palette's value, which
+/// measures 3.88:1 on this panel. Text and muted text on Obsidian's shell, window, or panel
+/// must remain readable at the WCAG floor.
+#[test]
+fn obsidian_text_and_muted_text_clear_the_surface_contrast_floor() {
+    let palette = MoonPalette::OBSIDIAN;
+    for (ink_name, ink) in [("text", palette.text), ("text_muted", palette.text_muted)] {
+        for (surface_name, surface) in [
+            ("shell", palette.shell),
+            ("window", palette.window),
+            ("panel", palette.panel),
+        ] {
+            let ratio = contrast_ratio(ink, surface);
+            assert!(
+                ratio >= SELECTED_TEXT_CONTRAST_FLOOR,
+                "Obsidian {ink_name} on {surface_name} is {ratio:.2}:1, below {SELECTED_TEXT_CONTRAST_FLOOR}:1"
+            );
+        }
+    }
+}
+
+/// Catches flattening Obsidian's surface steps: the Facet skin fills a raised control from
+/// `panel_high` down to `panel`, a popup from `panel_high` down to `card` and a well with
+/// `gutter`, so a `panel_high` no lighter than the other two draws those facets flat or lit
+/// from below, and a `gutter` no darker than `panel` makes a well stand out instead of in.
+#[test]
+fn obsidian_surface_steps_keep_the_order_the_facet_skin_lights() {
+    let luminance = super::relative_luminance;
+    let p = MoonPalette::OBSIDIAN;
+    assert!(luminance(p.panel) < luminance(p.panel_high));
+    assert!(luminance(p.card) < luminance(p.panel_high));
+    assert!(luminance(p.gutter) < luminance(p.panel));
 }
 
 /// Catches changing `tokens.rs:MoonPalette::LIGHT` away from the neutral-terminal design

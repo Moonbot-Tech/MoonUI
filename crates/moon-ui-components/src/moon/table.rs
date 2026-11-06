@@ -301,6 +301,52 @@ impl MoonTableStyle {
             selection_bar_width: self.selection_bar_width,
         }
     }
+
+    /// Resolve what a table header paints under the Facet skin.
+    ///
+    /// A faceted table sits on a lit surface, so the header drops the palette's own header fill
+    /// and takes a quieter rule under it. A colour the caller chose — one that differs from the
+    /// palette's own table style — is kept as given.
+    ///
+    /// Args:
+    ///     p: Palette this style was themed for.
+    ///     tokens: Active theme tokens; supply the skin.
+    ///
+    /// Returns:
+    ///     The header's faceted look, or `None` under the Flat skin, where the header paints
+    ///     `header_bg` and `header_separator` as it always has.
+    pub(crate) fn header_facet(
+        &self,
+        p: MoonPalette,
+        tokens: &MoonThemeTokens,
+    ) -> Option<TableHeaderFacet> {
+        if !tokens.skin.is_facet() {
+            return None;
+        }
+        let own = Self::for_palette(p);
+        let own_separator = self.header_separator == own.header_separator
+            && self.header_separator_alpha == own.header_separator_alpha;
+        Some(TableHeaderFacet {
+            fill: (self.header_bg != own.header_bg).then(|| rgba_from(self.header_bg, 1.0)),
+            separator: if own_separator {
+                rgba_from(p.overlay, FACET_HEADER_SEPARATOR_ALPHA)
+            } else {
+                rgba_from(self.header_separator, self.header_separator_alpha)
+            },
+        })
+    }
+}
+
+/// Alpha of the `overlay` ink a faceted table header draws its separators with.
+const FACET_HEADER_SEPARATOR_ALPHA: f32 = 0.07;
+
+/// What a table header paints under the Facet skin.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct TableHeaderFacet {
+    /// Fill of the header; `None` leaves it unpainted, so the surface under the table shows.
+    pub(crate) fill: Option<Hsla>,
+    /// Colour of the rule under the header and of the row-header gutter's edge.
+    pub(crate) separator: Hsla,
 }
 
 pub(crate) struct MoonTable;

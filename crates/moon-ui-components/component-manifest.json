@@ -533,8 +533,8 @@
       "theme_source": "MoonTheme bridge through MoonSidebar facade",
       "public_path": "moon_ui::MoonSidebar",
       "upstream_ref": "Longbridge::sidebar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon footer/header/menu styling hooks live in base sidebar; contiguous hit rows (group/menu + menu tests) live there too; Longbridge sidebar behavior remains source-owned",
-      "donor_drift_budget": 5,
+      "fork_reason": "Reviewed TrackedFork drift: Moon footer/header/menu styling hooks live in base sidebar; contiguous hit rows (group/menu + menu tests) live there too; the faceted skin's unfilled sidebar surface and fading edge are resolved in sidebar/mod.rs; Longbridge sidebar behavior remains source-owned",
+      "donor_drift_budget": 6,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -619,8 +619,8 @@
       "theme_source": "MoonTheme tokens through MoonProgress wrapper",
       "public_path": "moon_ui::MoonProgress",
       "upstream_ref": "Longbridge::progress@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon progress circle style hook shares the base progress module; Longbridge progress behavior remains source-owned",
-      "donor_drift_budget": 1,
+      "fork_reason": "Moon progress circle and linear track/fill style hooks share the donor animation engines without duplicating their lifecycle",
+      "donor_drift_budget": 2,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -640,8 +640,8 @@
       "theme_source": "MoonTheme bridge through MoonProgressCircle wrapper",
       "public_path": "moon_ui::MoonProgressCircle",
       "upstream_ref": "Longbridge::progress::ProgressCircle@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon progress circle style hook lives in base progress module; Longbridge progress circle behavior remains source-owned",
-      "donor_drift_budget": 1,
+      "fork_reason": "The shared progress module contains circle and linear track/fill style hooks; both keep the donor animation engines",
+      "donor_drift_budget": 2,
       "contracts": ["gallery.visual_coverage"]
     },
     {

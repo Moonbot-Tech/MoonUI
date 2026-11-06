@@ -4,7 +4,10 @@ use crate::{
     Disableable, Selectable, Sizable, Size, StyledExt as _,
     moon::MoonTone,
     moon::foundation::{snap_border, snap_centered},
-    moon::{MoonColors, MoonPalette, MoonTheme, MoonThemeTokens, rgba_from, svg::moon_svg},
+    moon::{
+        MoonColors, MoonFacet, MoonFacetKind, MoonFacetTint, MoonPalette, MoonTheme,
+        MoonThemeTokens, facet, facet_tinted, rgba_from, svg::moon_svg,
+    },
     text::Text,
     tooltip::ComponentTooltip,
     v_flex,
@@ -515,6 +518,41 @@ impl ChoiceColors {
             },
         }
     }
+
+    /// Resolves the faceted surface of a checkbox box or a radio circle.
+    ///
+    /// Only the Facet skin paints one. An unchecked box is a socket sunk into its surface; a checked
+    /// or indeterminate one is its tone lit from above — the control's `tone`, or the palette
+    /// accent that `bg_brand_solid` stands for. The mark keeps the ink [`Self::resolve`] gives it,
+    /// which is the ink that reads on that same tone. A disabled box keeps the flat colours at
+    /// half opacity, so it resolves no facet.
+    ///
+    /// Args:
+    ///     tokens: The active theme side; supplies the skin, the palette and the UI scale.
+    ///     tone: The tone set on the control, or `None` for the accent.
+    ///     checked: Whether the box is checked or indeterminate.
+    ///     disabled: Whether the control is disabled.
+    ///
+    /// Returns:
+    ///     The facet to paint over the box's flat fill and border, or `None` where the flat
+    ///     colours stand: under the Flat skin and on a disabled control.
+    pub(crate) fn box_facet(
+        tokens: &MoonThemeTokens,
+        tone: Option<MoonTone>,
+        checked: bool,
+        disabled: bool,
+    ) -> Option<MoonFacet> {
+        if !tokens.skin.is_facet() || disabled {
+            return None;
+        }
+        let p = tokens.palette;
+        Some(if checked {
+            let tone = tone.map_or(p.accent, |tone| tone.color(p));
+            facet_tinted(tone, MoonFacetTint::Solid, tokens)
+        } else {
+            facet(MoonFacetKind::Socket, tokens)
+        })
+    }
 }
 
 /// Returns the focus ring for a checkbox or radio box whose corners have `box_radius`, to add as
@@ -701,6 +739,16 @@ impl RenderOnce for Checkbox {
                         .rounded(metrics.radius)
                         .bg(colors.fill)
                         .opacity(colors.box_opacity)
+                        // Under the Facet skin an enabled box takes a faceted surface in place of
+                        // the flat fill and border above; the border keeps its width.
+                        .when_some(
+                            ChoiceColors::box_facet(&tokens, self.tone, checked, self.disabled),
+                            |this, facet| {
+                                this.bg(facet.fill)
+                                    .border_color(facet.edge)
+                                    .shadow(facet.shadows)
+                            },
+                        )
                         .when(is_focused, |this| {
                             this.child(choice_focus_ring(
                                 &self.id,

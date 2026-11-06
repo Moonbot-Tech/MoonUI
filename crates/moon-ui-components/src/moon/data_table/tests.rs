@@ -624,3 +624,87 @@ fn resize_mark_alpha_is_denser_only_on_the_near_black_header() {
     assert_eq!(resize_mark_alpha(MoonPalette::GRAPHITE.table_head), 0.55);
     assert_eq!(resize_mark_alpha(MoonPalette::LIGHT.table_head), 0.55);
 }
+
+// ---- Theme skin: what the header and a hovered row paint ----
+
+use super::facet_row_hover;
+use crate::moon::{MoonSkin, MoonTableStyle, MoonThemeTokens, rgba_from};
+
+/// Theme tokens for `palette` drawn with `skin`, at the default scale.
+fn skin_tokens(palette: MoonPalette, skin: MoonSkin) -> MoonThemeTokens {
+    MoonThemeTokens {
+        palette,
+        skin,
+        ..MoonThemeTokens::default()
+    }
+}
+
+/// Catches `table.rs:MoonTableStyle::header_facet` or `data_table.rs:facet_row_hover` ignoring
+/// the skin: every flat theme's table would lose its header fill and its opaque `table_hover`
+/// row, which the render keeps only while these answer `None`.
+#[test]
+fn a_flat_table_keeps_its_header_fill_and_theme_row_hover() {
+    for palette in [
+        MoonPalette::TERMINAL,
+        MoonPalette::LIGHT,
+        MoonPalette::GRAPHITE,
+        MoonPalette::OBSIDIAN,
+    ] {
+        let tokens = skin_tokens(palette, MoonSkin::Flat);
+        assert_eq!(
+            MoonTableStyle::for_palette(palette).header_facet(palette, &tokens),
+            None
+        );
+        assert_eq!(facet_row_hover(&tokens), None);
+    }
+}
+
+/// Catches `table.rs:MoonTableStyle::header_facet` keeping the palette's header fill or its
+/// solid separator under the Facet skin, and `data_table.rs:facet_row_hover` keeping an opaque
+/// hover: the table would sit on its panel as a flat block that hides the slab under it.
+#[test]
+fn a_faceted_table_drops_the_header_fill_and_hovers_with_a_wash() {
+    let p = MoonPalette::OBSIDIAN;
+    let tokens = skin_tokens(p, MoonSkin::Facet);
+
+    // The route `MoonDataTable::render` takes: a style built for the terminal palette, themed.
+    let style = MoonTableStyle::default().themed(p);
+    let header = style
+        .header_facet(p, &tokens)
+        .expect("the Facet skin resolves a header facet");
+    assert_eq!(header.fill, None, "the header paints no fill of its own");
+    assert_eq!(header.separator, rgba_from(p.overlay, 0.07));
+
+    assert_eq!(facet_row_hover(&tokens), Some(rgba_from(p.overlay, 0.04)));
+}
+
+/// Catches `table.rs:MoonTableStyle::header_facet` discarding a colour the caller chose: a
+/// table styled with its own header fill or separator would silently lose it under one theme.
+#[test]
+fn a_faceted_table_keeps_a_header_colour_the_caller_chose() {
+    let p = MoonPalette::OBSIDIAN;
+    let tokens = skin_tokens(p, MoonSkin::Facet);
+    const OWN_FILL: u32 = 0x123456;
+    const OWN_SEPARATOR: u32 = 0x654321;
+
+    let own_fill = MoonTableStyle {
+        header_bg: OWN_FILL,
+        ..MoonTableStyle::for_palette(p)
+    };
+    let header = own_fill
+        .header_facet(p, &tokens)
+        .expect("the Facet skin resolves a header facet");
+    assert_eq!(header.fill, Some(rgba_from(OWN_FILL, 1.0)));
+    assert_eq!(header.separator, rgba_from(p.overlay, 0.07));
+
+    let own_separator = MoonTableStyle {
+        header_separator: OWN_SEPARATOR,
+        header_separator_alpha: 0.5,
+        ..MoonTableStyle::for_palette(p)
+    };
+    let header = own_separator
+        .header_facet(p, &tokens)
+        .expect("the Facet skin resolves a header facet");
+    assert_eq!(header.fill, None);
+    assert_eq!(header.separator, rgba_from(OWN_SEPARATOR, 0.5));
+}

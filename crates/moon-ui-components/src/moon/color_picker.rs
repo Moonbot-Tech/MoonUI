@@ -10,6 +10,7 @@ use super::{
         MOON_SCROLLBAR_TRACK, MoonScrollAxis, MoonScrollbarVisibility,
         moon_scrollbar_overlay_with_palette,
     },
+    skin::{MoonFacet, MoonFacetKind, facet},
     text::MoonText,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonTone, rgba_from},
@@ -345,6 +346,29 @@ impl MoonColorPicker {
     }
 }
 
+/// Resolves the faceted frame of the [`MoonColorPickerTrigger::Field`] trigger.
+///
+/// Under the Facet skin an enabled field is the skin's well, as a text input is, and its edge
+/// takes the skin's hover edge under the pointer. A disabled field keeps the flat frame, dimmed
+/// as before, so it resolves nothing.
+///
+/// Args:
+///     tokens: The active theme side; supplies the skin, the palette and the UI scale.
+///     disabled: Whether the picker is disabled.
+///
+/// Returns:
+///     The well to paint and the colour of its edge under the pointer, or `None` where the flat
+///     frame stands: under the Flat skin and on a disabled picker.
+fn field_facet(tokens: &MoonThemeTokens, disabled: bool) -> Option<(MoonFacet, Hsla)> {
+    if !tokens.skin.is_facet() || disabled {
+        return None;
+    }
+    Some((
+        facet(MoonFacetKind::Well, tokens),
+        facet(MoonFacetKind::RaisedHover, tokens).edge,
+    ))
+}
+
 /// Render a colour as the `#RRGGBB` text the hex field shows and [`parse_hex_rgb`] accepts back.
 fn hex_label(color: Hsla) -> SharedString {
     let [r, g, b] = rgb8_of(color);
@@ -408,6 +432,7 @@ impl RenderOnce for MoonColorPicker {
             .uppercase(false)
             .render();
         let trigger_id = ElementId::from(SharedString::from(format!("{}:trigger", self.id)));
+        let field_well = field_facet(&tokens, self.disabled);
         let trigger = match chrome.field_height {
             Some(height) => div()
                 .id(trigger_id)
@@ -425,8 +450,16 @@ impl RenderOnce for MoonColorPicker {
                 .gap(px(tokens.ui(8.0)))
                 .px(px(tokens.ui(7.0)))
                 .cursor_default()
-                .when(!self.disabled, |this| {
+                .when(!self.disabled && field_well.is_none(), |this| {
                     this.hover(move |this| this.border_color(rgba_from(p.border_hover, 1.0)))
+                })
+                // Under the Facet skin an enabled field is a well in place of the flat frame
+                // above; the swatch inside it is left as it is.
+                .when_some(field_well, |this, (well, hover_edge)| {
+                    this.bg(well.fill)
+                        .border_color(well.edge)
+                        .shadow(well.shadows)
+                        .hover(move |this| this.border_color(hover_edge))
                 })
                 .child(
                     div()

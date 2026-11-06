@@ -6,6 +6,7 @@ use gpui::*;
 use super::{
     foundation::MoonSize,
     icons::moon_icon,
+    tag::facet_outline_wash,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
@@ -236,11 +237,15 @@ impl MoonBadge {
     }
 
     /// Render with the supplied palette and tokens, scaling text and chrome exactly once.
+    ///
+    /// Under the Facet skin of `tokens`, an outline badge carries the tone wash of
+    /// [`Self::outline_wash`] in place of its flat fill.
     pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
         let metrics = self.metrics(&tokens);
         let style = self.style(p);
         let disabled_scale = if self.disabled { 0.5 } else { 1.0 };
         let border_alpha = style.border_alpha * disabled_scale;
+        let wash = self.outline_wash(style, disabled_scale, &tokens);
 
         let is_dot = matches!(self.content, MoonBadgeContent::Dot);
         let mut badge = div()
@@ -258,6 +263,7 @@ impl MoonBadge {
             .justify_center()
             .rounded(px(metrics.radius))
             .bg(rgba_from(style.bg, style.bg_alpha * disabled_scale))
+            .when_some(wash, |this, wash| this.bg(wash))
             .whitespace_nowrap()
             .when(border_alpha > 0.0, |this| {
                 this.border(px(1.0))
@@ -351,6 +357,32 @@ impl MoonBadge {
             }
             .scaled(tokens),
         }
+    }
+
+    /// Resolve the wash an outline badge paints in place of its flat fill.
+    ///
+    /// The wash takes the colour of the resolved fill, so a caller's fill colour still tints
+    /// it. A caller who set the fill opacity asked for that exact fill and gets no wash.
+    ///
+    /// Args:
+    ///     style: This badge's resolved style.
+    ///     strength: The share both ends of the wash are scaled by: the same factor a disabled
+    ///         badge fades its flat fill by, 1.0 otherwise.
+    ///     tokens: The theme side to resolve for; supplies the skin.
+    ///
+    /// Returns:
+    ///     The wash for an outline badge under the Facet skin. `None` under the Flat skin, for
+    ///     the solid and soft variants, and when the fill opacity was set explicitly.
+    fn outline_wash(
+        &self,
+        style: BadgeStyle,
+        strength: f32,
+        tokens: &MoonThemeTokens,
+    ) -> Option<Background> {
+        let washed = tokens.skin.is_facet()
+            && self.variant == MoonBadgeVariant::Outline
+            && self.bg_alpha.is_none();
+        washed.then(|| facet_outline_wash(style.bg, strength))
     }
 
     fn style(&self, p: MoonPalette) -> BadgeStyle {

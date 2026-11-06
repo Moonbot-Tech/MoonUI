@@ -14,8 +14,8 @@ use super::{
     LABEL_CONTRAST_FLOOR, MoonAccent, MoonPalette, MoonSegmentDensity, MoonSegmentItem,
     MoonSegmentSelection, MoonSegmentedControl, SEGMENT_COUNT_GAP, SEGMENT_COUNT_PAD_X,
     SEGMENT_GAP, SEGMENT_LABEL_SIZE, SEGMENT_PAD_X, SegmentCellChrome, SegmentCellInteraction,
-    SegmentFillFrame, contrast_ratio, count_pill_colors, fit_segment_item, segment_cell_chrome,
-    segment_cell_interaction, segment_fill_frame,
+    SegmentFacets, SegmentFillFrame, contrast_ratio, count_pill_colors, fit_segment_item,
+    segment_cell_chrome, segment_cell_interaction, segment_fill_frame,
 };
 use crate::moon::{MoonScale, MoonTheme, MoonThemeTokens, MoonTone};
 
@@ -721,4 +721,66 @@ fn counted_item_reserves_its_pill_and_renders_it_inside_the_cell(cx: &mut gpui::
     // Fitting ceils the whole cell to a pixel, so the reserve may exceed the pill by under 1px.
     let slack = pill_room - SEGMENT_COUNT_GAP - f32::from(pill.size.width);
     assert!((0.0..1.0).contains(&slack), "pill reserve slack {slack}");
+}
+
+/// Catches `segment.rs:SegmentFacets::resolve` ignoring the skin or the selection style: every
+/// flat theme's filled strip would be repainted as a well, or an underline strip — which has no
+/// surfaces at all — would grow a frame under the faceted theme.
+#[test]
+fn flat_themes_and_underline_strips_resolve_no_segment_facets() {
+    use crate::moon::MoonThemeConfig;
+
+    let accent = MoonPalette::OBSIDIAN.blue;
+    for tokens in [
+        MoonThemeConfig::moon_terminal().dark,
+        MoonThemeConfig::moon_terminal().light,
+        MoonThemeConfig::moon_graphite().dark,
+        MoonThemeTokens::default(),
+    ] {
+        for frame in [
+            SegmentFillFrame::None,
+            SegmentFillFrame::JoinedStrip,
+            SegmentFillFrame::SeparateCells,
+        ] {
+            assert_eq!(SegmentFacets::resolve(&tokens, frame, accent), None);
+        }
+    }
+    let faceted = MoonThemeConfig::moon_obsidian().dark;
+    assert_eq!(
+        SegmentFacets::resolve(&faceted, SegmentFillFrame::None, accent),
+        None
+    );
+}
+
+/// Catches a faceted filled strip drifting from its spec. Touching items share one well and are
+/// bare inside it; items that stand apart are raised chips with the button's hover and press
+/// ramp and no well behind them. Either way the selected item is the accent washed over the
+/// panel — not the accent itself, which would bury its label — edged and glowing in that accent.
+#[test]
+fn a_faceted_filled_strip_is_a_well_or_raised_chips_around_a_lit_selection() {
+    use crate::button::raised_pressed_facet;
+    use crate::moon::{MoonFacetKind, MoonFacetTint, MoonThemeConfig, facet, facet_tinted};
+
+    let tokens = MoonThemeConfig::moon_obsidian().dark;
+    let accent = tokens.palette.blue;
+    let selected = facet_tinted(accent, MoonFacetTint::Selected, &tokens);
+
+    let joined =
+        SegmentFacets::resolve(&tokens, SegmentFillFrame::JoinedStrip, accent).expect("faceted");
+    assert_eq!(joined.strip, Some(facet(MoonFacetKind::Well, &tokens)));
+    assert_eq!(joined.cell, None);
+    assert_eq!(joined.selected, selected);
+
+    let apart =
+        SegmentFacets::resolve(&tokens, SegmentFillFrame::SeparateCells, accent).expect("faceted");
+    assert_eq!(apart.strip, None);
+    assert_eq!(
+        apart.cell,
+        Some([
+            facet(MoonFacetKind::Raised, &tokens),
+            facet(MoonFacetKind::RaisedHover, &tokens),
+            raised_pressed_facet(&tokens),
+        ])
+    );
+    assert_eq!(apart.selected, selected);
 }

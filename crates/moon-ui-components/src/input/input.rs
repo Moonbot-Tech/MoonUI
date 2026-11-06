@@ -2,15 +2,18 @@ use std::rc::Rc;
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, App, DefiniteLength, Edges, EdgesRefinement, ElementId, Entity, Hsla,
-    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, RenderOnce,
-    StyleRefinement, Styled, TextAlign, Window, div, px, relative,
+    AnyElement, App, Background, BoxShadow, DefiniteLength, Edges, EdgesRefinement, ElementId,
+    Entity, Hsla, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels,
+    RenderOnce, StyleRefinement, Styled, TextAlign, Window, div, px, relative,
 };
 
 use crate::Sizable;
 use crate::button::{Button, ButtonVariants as _};
 use crate::input::clear_button;
-use crate::moon::{MoonPalette, MoonTheme, MoonTone, rgba_from};
+use crate::moon::{
+    MoonFacet, MoonFacetKind, MoonPalette, MoonTheme, MoonThemeTokens, MoonTone, facet, facet_glow,
+    rgba_from,
+};
 use crate::native_menu::NativeMenu;
 use crate::spinner::Spinner;
 use crate::{ActiveTheme, v_flex};
@@ -20,13 +23,140 @@ use crate::{Selectable, StyledExt, h_flex};
 use super::{InputState, element::EditorScrollbar};
 
 /// Returns `(background, foreground)` colors for input-like components.
+///
+/// Under the Facet skin an enabled field is sunk into its surface, so its background is the
+/// floor of the skin's well, the palette's `gutter`. A field that can paint the whole well — an
+/// input, a select — lays it over this colour. One drawn by mirrored donor code, such as the
+/// date field, has only this pair to go by, and still reads as sunk beside them.
 pub(crate) fn input_style(disabled: bool, cx: &App) -> (Hsla, Hsla) {
-    let p = MoonPalette::active(cx);
+    input_style_for(disabled, &MoonTheme::active_tokens(cx))
+}
+
+/// Resolves [`input_style`] for the theme side `tokens`.
+pub(crate) fn input_style_for(disabled: bool, tokens: &MoonThemeTokens) -> (Hsla, Hsla) {
+    let p = tokens.palette;
     if disabled {
         (rgba_from(p.panel, 0.55), rgba_from(p.text_muted, 0.45))
+    } else if tokens.skin.is_facet() {
+        (rgba_from(p.gutter, 1.0), rgba_from(p.text_soft, 1.0))
     } else {
         (rgba_from(p.shell_high, 1.0), rgba_from(p.text_soft, 1.0))
     }
+}
+
+/// The frame an enabled input paints under the Facet skin, in place of its flat fill and border:
+/// the skin's well, sunk into the surface the input sits on.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct InputFacet {
+    /// The well's fill, which the input keeps at rest, under the pointer and in focus.
+    pub(crate) fill: Background,
+    /// The colour of the one-pixel edge.
+    pub(crate) edge: Hsla,
+    /// The colour of that edge under the pointer.
+    pub(crate) hover_edge: Hsla,
+    /// The well's shadows, followed by the focus glow while the input shows its focus.
+    pub(crate) shadows: Vec<BoxShadow>,
+}
+
+impl InputFacet {
+    /// Resolves the frame of an input under the Facet skin.
+    ///
+    /// At rest the frame is the skin's well. The edge keeps the colours the flat input gives it
+    /// where they carry meaning: `accent` at 78% on a selected input, 82% under the pointer, and
+    /// 92% in focus, where a glow in the same colour joins the well's shadows. An input with
+    /// neither takes the well's own edge, lit to the skin's hover edge under the pointer. An
+    /// input in focus keeps its focus edge under the pointer, so the edge never contradicts the
+    /// glow around it.
+    ///
+    /// A disabled input keeps the flat disabled look, so it resolves no frame.
+    ///
+    /// Args:
+    ///     tokens: The active theme side; supplies the skin, the palette and the UI scale.
+    ///     accent: The input's tone as `0xRRGGBB`: the selected and focused edge colour.
+    ///     selected: Whether the input is marked selected.
+    ///     focused: Whether the input shows its focus: it has focus and draws a focus edge.
+    ///     disabled: Whether the input is disabled.
+    ///
+    /// Returns:
+    ///     The frame to paint, or `None` where the flat frame stands: under the Flat skin and on
+    ///     a disabled input.
+    pub(crate) fn resolve(
+        tokens: &MoonThemeTokens,
+        accent: u32,
+        selected: bool,
+        focused: bool,
+        disabled: bool,
+    ) -> Option<Self> {
+        if !tokens.skin.is_facet() || disabled {
+            return None;
+        }
+        let well = facet(MoonFacetKind::Well, tokens);
+        let mut shadows = well.shadows;
+        let (edge, hover_edge) = if focused {
+            shadows.push(facet_glow(accent, 0.28, 8.0, tokens));
+            let focus = rgba_from(accent, 0.92);
+            (focus, focus)
+        } else if selected {
+            (rgba_from(accent, 0.78), rgba_from(accent, 0.82))
+        } else {
+            // The skin's hover edge is the highlight ink at 20% on a dark palette and the
+            // palette's own hover border on a light one.
+            (well.edge, facet(MoonFacetKind::RaisedHover, tokens).edge)
+        };
+        Some(Self {
+            fill: well.fill,
+            edge,
+            hover_edge,
+            shadows,
+        })
+    }
+}
+
+/// Resolves the frame of a select-like trigger under the Facet skin: at rest, under the
+/// pointer and pressed.
+///
+/// A trigger styled as a button is a raised control, as the button beside it is. One left with
+/// the input look is a well, as the input beside it is, lit along its edge under the pointer
+/// and glowing in the Info tone while it shows its focus or holds its menu open.
+///
+/// Args:
+///     tokens: The active theme side; supplies the skin, the palette and the UI scale.
+///     variant: The button variant to preserve, or `None` for the input look.
+///     focused: Whether the trigger shows its focus or holds its menu open.
+///     disabled: Whether the trigger is disabled.
+///
+/// Returns:
+///     The three surfaces, or `None` where the flat frame stands: under the Flat skin and on a
+///     disabled trigger.
+pub(crate) fn trigger_facets(
+    tokens: &MoonThemeTokens,
+    variant: Option<crate::button::ButtonVariant>,
+    focused: bool,
+    disabled: bool,
+) -> Option<[MoonFacet; 3]> {
+    if !tokens.skin.is_facet() || disabled {
+        return None;
+    }
+    if let Some(variant) = variant {
+        use crate::button::ButtonVisualState::{Active, Hovered, Normal};
+        return Some([
+            variant.resolve_facet(tokens, false, Normal)?,
+            variant.resolve_facet(tokens, false, Hovered)?,
+            variant.resolve_facet(tokens, false, Active)?,
+        ]);
+    }
+    let accent = MoonTone::Info.color(tokens.palette);
+    let frame = InputFacet::resolve(tokens, accent, false, focused, disabled)?;
+    let surface = |edge: Hsla| MoonFacet {
+        fill: frame.fill,
+        edge,
+        shadows: frame.shadows.clone(),
+    };
+    Some([
+        surface(frame.edge),
+        surface(frame.hover_edge),
+        surface(frame.hover_edge),
+    ])
 }
 
 #[derive(Clone, Copy)]
@@ -361,6 +491,16 @@ impl RenderOnce for Input {
         } else {
             bg
         };
+        // Under the Facet skin an enabled input is a well. A code editor keeps the flat frame:
+        // its background is the editor's own colour, which a well's fill would replace.
+        let frame = InputFacet::resolve(
+            &MoonTheme::active_tokens(cx),
+            accent,
+            self.selected,
+            focused && self.focus_bordered && self.bordered,
+            state.disabled,
+        )
+        .filter(|_| self.appearance && !state.mode.is_code_editor());
 
         let prefix = self.prefix;
         let suffix = self.suffix;
@@ -477,7 +617,7 @@ impl RenderOnce for Input {
             .items_center()
             .when(state.mode.is_multi_line(), |this| this.h_auto())
             .when_some(self.height, |this, height| this.h(height))
-            .when(self.appearance, |this| {
+            .when(self.appearance && frame.is_none(), |this| {
                 this.bg(bg)
                     .rounded(metrics.radius)
                     .when(self.bordered, |this| {
@@ -502,6 +642,16 @@ impl RenderOnce for Input {
                             ))
                         })
                     })
+            })
+            .when_some(frame, |this, frame| {
+                let hover_edge = frame.hover_edge;
+                this.bg(frame.fill)
+                    .rounded(metrics.radius)
+                    .shadow(frame.shadows)
+                    .when(self.bordered, |this| {
+                        this.border_color(frame.edge).border_1()
+                    })
+                    .hover(move |this| this.border_color(hover_edge))
             })
             .items_center()
             .gap(gap_x)

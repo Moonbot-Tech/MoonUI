@@ -14,9 +14,9 @@ use crate::{
     actions::{Cancel, Confirm, SelectDown, SelectUp},
     button::ButtonVariant,
     h_flex,
-    input::{clear_button, input_style},
+    input::{clear_button, input_style, trigger_facets},
     list::List,
-    moon::{MoonPalette, rgba_from},
+    moon::{MoonPalette, MoonTheme, rgba_from},
     searchable_list::{
         SearchableListChange, SearchableListDelegate, SearchableListItem, SearchableListState,
     },
@@ -512,6 +512,17 @@ where
             .map(|style| rgba_from(style.border, style.border_alpha))
             .unwrap_or_else(|| cx.theme().input);
 
+        // Under the Facet skin the trigger is a surface of its own, with its own hover and
+        // press ramp. A caller that set a background on it keeps that background.
+        let trigger_facet = trigger_facets(
+            &MoonTheme::active_tokens(cx),
+            self.trigger_variant,
+            outline_visible,
+            self.state.disabled,
+        )
+        .filter(|_| self.state.appearance && self.state.style.background.is_none());
+        let flat_ramp = !self.state.disabled && trigger_facet.is_none();
+
         self.state.list.update(cx, |list, cx| {
             list.set_searchable(searchable, cx);
             list.delegate_mut().size = self.state.size;
@@ -548,7 +559,7 @@ where
                     .input_size(self.state.size)
                     .input_text_size(self.state.size)
                     .refine_style(&self.state.style)
-                    .when(!self.state.disabled, |this| {
+                    .when(flat_ramp, |this| {
                         this.when_some(trigger_style, |this, style| {
                             this.hover(move |this| {
                                 this.bg(rgba_from(style.bg, style.hover_bg_alpha))
@@ -562,6 +573,11 @@ where
                                     ))
                             })
                         })
+                    })
+                    .when_some(trigger_facet, |this, [rest, hovered, pressed]| {
+                        rest.paint(this)
+                            .hover(move |this| hovered.paint(this))
+                            .active(move |this| pressed.paint(this))
                     })
                     .when(outline_visible, |this| this.focused_border(cx))
                     .when(allow_open, |this| {

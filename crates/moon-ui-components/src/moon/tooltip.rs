@@ -1,7 +1,9 @@
+use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 use super::{
     icons::{MOON_ICON_TOOLTIP_ARROW, moon_icon},
+    skin::{MoonFacet, MoonFacetKind, facet},
     text::MoonText,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
@@ -254,6 +256,17 @@ impl ParentElement for MoonTooltip {
 }
 
 impl RenderOnce for MoonTooltip {
+    /// Render the tooltip box, its text or custom children, an optional shortcut and the arrow.
+    ///
+    /// The box is the solid Moon surface under the Flat skin and a popup surface under the
+    /// Facet skin; see [`tooltip_facet`].
+    ///
+    /// Args:
+    ///     _window: Window the tooltip renders in; unused.
+    ///     cx: Application context used to resolve the active palette and theme tokens.
+    ///
+    /// Returns:
+    ///     The rendered tooltip.
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = MoonPalette::active(cx);
         let tokens = MoonTheme::active_tokens(cx);
@@ -274,11 +287,22 @@ impl RenderOnce for MoonTooltip {
             .id(ElementId::from(self.id.clone()))
             .relative()
             .min_h(px(metrics.min_height))
-            .rounded(px(metrics.radius))
-            .border(px(1.0))
-            .border_color(rgba_from(p.border, 1.0))
-            .bg(rgba_from(p.shell_high, 0.98))
-            .shadow(vec![shadow])
+            // `None` is the Flat skin. A faceted tooltip is a popup surface: gradient fill, lit
+            // edge and the deeper shadow of something floating above the window.
+            .map(|this| match tooltip_facet(&tokens, self.size) {
+                Some((surface, radius)) => this
+                    .rounded(px(radius))
+                    .border(px(1.0))
+                    .border_color(surface.edge)
+                    .bg(surface.fill)
+                    .shadow(surface.shadows),
+                None => this
+                    .rounded(px(metrics.radius))
+                    .border(px(1.0))
+                    .border_color(rgba_from(p.border, 1.0))
+                    .bg(rgba_from(p.shell_high, 0.98))
+                    .shadow(vec![shadow]),
+            })
             .occlude()
             .flex()
             .items_center()
@@ -375,7 +399,74 @@ impl RenderOnce for MoonTooltip {
     }
 }
 
+/// Design-reference corner radius of a normal tooltip under the Facet skin.
+const FACET_TOOLTIP_RADIUS: f32 = 8.0;
+/// Design-reference corner radius of a compact tooltip under the Facet skin.
+const FACET_TOOLTIP_COMPACT_RADIUS: f32 = 6.0;
+
+/// Resolve the surface a tooltip paints under the Facet skin.
+///
+/// Args:
+///     tokens: Active theme tokens; supply the skin, the palette and the UI scale.
+///     size: The tooltip's size; a custom size keeps the radius its caller chose.
+///
+/// Returns:
+///     The popup surface and the corner radius in rendered pixels, or `None` under the Flat
+///     skin, where the tooltip keeps its solid fill, its palette border and its soft shadow.
+fn tooltip_facet(tokens: &MoonThemeTokens, size: MoonTooltipSize) -> Option<(MoonFacet, f32)> {
+    if !tokens.skin.is_facet() {
+        return None;
+    }
+    let radius = match size {
+        MoonTooltipSize::Compact => FACET_TOOLTIP_COMPACT_RADIUS,
+        MoonTooltipSize::Normal => FACET_TOOLTIP_RADIUS,
+        MoonTooltipSize::Custom { radius, .. } => radius,
+    };
+    Some((facet(MoonFacetKind::Popup, tokens), tokens.ui(radius)))
+}
+
+/// Resolve the colour of the tooltip arrow, as `0xRRGGBB` and alpha.
+///
+/// The arrow continues the tooltip's fill past one of its edges. Under the Flat skin that fill
+/// is one colour. A faceted tooltip is lit from above — its fill runs from `panel_high` at the
+/// top down to `card` — so the arrow takes the colour of the edge it hangs from: `card` below
+/// a tooltip placed above its target, `panel_high` on the top edge and near the top of a side.
+///
+/// Args:
+///     p: Palette the tooltip paints with.
+///     tokens: Active theme tokens; supply the skin.
+///     placement: Where the tooltip sits relative to its target.
+///
+/// Returns:
+///     The arrow's colour and alpha.
+fn tooltip_arrow_color(
+    p: MoonPalette,
+    tokens: &MoonThemeTokens,
+    placement: MoonTooltipPlacement,
+) -> (u32, f32) {
+    if !tokens.skin.is_facet() {
+        return (p.shell_high, 0.98);
+    }
+    match placement {
+        MoonTooltipPlacement::Top => (p.card, 1.0),
+        MoonTooltipPlacement::Bottom | MoonTooltipPlacement::Left | MoonTooltipPlacement::Right => {
+            (p.panel_high, 1.0)
+        }
+    }
+}
+
 impl MoonTooltip {
+    /// Render the arrow that points from the tooltip to its target.
+    ///
+    /// Args:
+    ///     p: Palette the tooltip paints with.
+    ///     metrics: Scaled tooltip metrics; supply the arrow size.
+    ///     placement: Where the tooltip sits relative to its target, which picks the edge the
+    ///         arrow hangs from and its rotation.
+    ///     tokens: Active theme tokens; supply the UI scale and the skin.
+    ///
+    /// Returns:
+    ///     The absolutely positioned arrow, coloured to continue the tooltip's fill.
     fn render_arrow(
         p: MoonPalette,
         metrics: TooltipMetrics,
@@ -384,11 +475,12 @@ impl MoonTooltip {
     ) -> Svg {
         let half = metrics.arrow_size * 0.5;
         let offset = tokens.ui(18.0);
+        let (arrow_color, arrow_alpha) = tooltip_arrow_color(p, tokens, placement);
         let mut arrow = moon_icon(
             MOON_ICON_TOOLTIP_ARROW,
             metrics.arrow_size,
-            p.shell_high,
-            0.98,
+            arrow_color,
+            arrow_alpha,
         )
         .absolute();
 
@@ -419,3 +511,6 @@ impl MoonTooltip {
         arrow
     }
 }
+
+#[cfg(test)]
+mod tests;

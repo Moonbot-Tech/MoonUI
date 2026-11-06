@@ -1,11 +1,15 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 
+use crate::button::raised_pressed_facet;
+
 use super::{
+    button::raised_ink,
     disclosure::{MoonDisclosure, MoonDisclosureDirection},
     foundation::box_shadow,
+    skin::{MoonFacet, MoonFacetKind, MoonSkin, facet},
     text::MoonText,
-    theme::MoonTheme,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, rgba_from},
 };
 
@@ -184,6 +188,11 @@ impl MoonSelectorPill {
 impl RenderOnce for MoonSelectorPill {
     /// Render the selector pill and its optional decorative caret.
     ///
+    /// Under the Facet skin an enabled pill is a raised control: lit from above at rest, relit
+    /// under the pointer and lit from below while pressed, with muted segment ink lifted to
+    /// `text_soft`. A disabled pill keeps the flat disabled look on every skin, and the shape
+    /// and sizes are the same on both.
+    ///
     /// Args:
     ///     _window: Window context unused by this renderer.
     ///     cx: Application context used to resolve active theme tokens.
@@ -195,6 +204,7 @@ impl RenderOnce for MoonSelectorPill {
         let p = tokens.palette;
         let disabled = self.disabled;
         let text_alpha = if disabled { 0.45 } else { 1.0 };
+        let raised = pill_is_raised(tokens.skin, disabled);
 
         let mut root = div()
             .id(self.id)
@@ -210,12 +220,18 @@ impl RenderOnce for MoonSelectorPill {
             .pr(px(tokens.ui(self.pad_right)))
             .gap(px(tokens.ui(self.gap)))
             .cursor_default()
-            .when(!disabled, |this| {
+            .when(!disabled && !raised, |this| {
                 this.hover(|this| {
                     this.bg(rgba_from(p.panel_high, 1.0))
                         .border_color(rgba_from(p.border_hover, 1.0))
                 })
                 .active(|this| this.bg(rgba_from(p.shell_high, 1.0)))
+            })
+            .when(raised, |this| {
+                let [rest, hover, pressed] = pill_facets(&tokens);
+                with_facet(this, rest)
+                    .hover(|this| with_facet(this, hover))
+                    .active(|this| with_facet(this, pressed))
             });
 
         if let Some(bounds) = self.bounds {
@@ -246,6 +262,11 @@ impl RenderOnce for MoonSelectorPill {
 
         for segment in self.segments {
             let color = segment.color.unwrap_or(p.text_soft);
+            let color = if raised {
+                raised_ink(color, &tokens)
+            } else {
+                color
+            };
             root = root.child(
                 div().mt(px(tokens.ui(segment.margin_top))).child(
                     MoonText::new(segment.text)
@@ -265,20 +286,56 @@ impl RenderOnce for MoonSelectorPill {
             // The pill's caret is decorative and permanently collapsed, so `DownUp` selects the
             // unrotated down-pointing pose. The absolute offsets belong to the pill's geometry,
             // not the caret's, and therefore stay on this wrapper.
+            let caret = MoonDisclosure::glyph(false)
+                .direction(MoonDisclosureDirection::DownUp)
+                .size(8.0)
+                .disabled(disabled);
+            // The caret's own default ink is `text_muted`; on a raised pill it takes the quiet
+            // ink of a raised control instead, like the muted segments above.
+            let caret = if raised {
+                caret.color(raised_ink(p.text_muted, &tokens))
+            } else {
+                caret
+            };
             root = root.child(
                 div()
                     .absolute()
                     .right(px(tokens.ui(self.caret_right)))
                     .top(px(tokens.ui(self.caret_top)))
-                    .child(
-                        MoonDisclosure::glyph(false)
-                            .direction(MoonDisclosureDirection::DownUp)
-                            .size(8.0)
-                            .disabled(disabled),
-                    ),
+                    .child(caret),
             );
         }
 
         root
     }
 }
+
+/// Return whether a pill is painted as a raised facet: under the Facet skin, unless it is
+/// disabled.
+fn pill_is_raised(skin: MoonSkin, disabled: bool) -> bool {
+    skin.is_facet() && !disabled
+}
+
+/// Resolve the faceted surfaces of a raised pill.
+///
+/// Args:
+///     tokens: The theme side to resolve them for; supplies the palette and the UI scale.
+///
+/// Returns:
+///     The surface at rest, under the pointer and while pressed, in that order.
+fn pill_facets(tokens: &MoonThemeTokens) -> [MoonFacet; 3] {
+    [
+        facet(MoonFacetKind::Raised, tokens),
+        facet(MoonFacetKind::RaisedHover, tokens),
+        raised_pressed_facet(tokens),
+    ]
+}
+
+/// Paint a faceted surface over the style already set on `this`: its fill as the background,
+/// its edge as the border colour and its shadow stack as the shadows.
+fn with_facet<S: Styled>(this: S, surface: MoonFacet) -> S {
+    surface.paint(this)
+}
+
+#[cfg(test)]
+mod tests;

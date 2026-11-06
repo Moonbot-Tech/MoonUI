@@ -199,3 +199,50 @@ fn submenu_flips_left_and_caps_height_at_viewport_edges(cx: &mut gpui::TestAppCo
         }
     }
 }
+
+// ---- Theme skin: the surface a menu level paints ----
+
+use super::menu_facet;
+use crate::moon::{MoonFacetKind, MoonPalette, MoonSkin, MoonThemeTokens, facet};
+
+/// Theme tokens for `palette` drawn with `skin`, at the default scale.
+fn skin_tokens(palette: MoonPalette, skin: MoonSkin) -> MoonThemeTokens {
+    MoonThemeTokens {
+        palette,
+        skin,
+        ..MoonThemeTokens::default()
+    }
+}
+
+/// Catches `popup.rs:menu_facet` ignoring the skin: every flat theme's menus, dropdowns and
+/// context menus would trade their solid fill and palette border for a gradient popup, which
+/// `render_with_metrics` keeps only while this answers `None`.
+#[test]
+fn a_flat_menu_keeps_its_solid_surface() {
+    for palette in [
+        MoonPalette::TERMINAL,
+        MoonPalette::LIGHT,
+        MoonPalette::GRAPHITE,
+        MoonPalette::OBSIDIAN,
+    ] {
+        assert_eq!(menu_facet(&skin_tokens(palette, MoonSkin::Flat)), None);
+    }
+}
+
+/// Catches `popup.rs:menu_facet` resolving a surface that rests on a panel instead of one that
+/// floats above the window: a faceted menu would lose the deep shadow that lifts it off the
+/// panels it opens over.
+#[test]
+fn a_faceted_menu_is_a_popup_surface() {
+    let tokens = skin_tokens(MoonPalette::OBSIDIAN, MoonSkin::Facet);
+
+    assert_eq!(
+        menu_facet(&tokens),
+        Some(facet(MoonFacetKind::Popup, &tokens))
+    );
+    assert_ne!(
+        menu_facet(&tokens),
+        Some(facet(MoonFacetKind::Card, &tokens)),
+        "a card is not a popup"
+    );
+}

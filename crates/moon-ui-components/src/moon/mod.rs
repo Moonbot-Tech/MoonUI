@@ -58,6 +58,7 @@ mod setting;
 mod sheet;
 mod sidebar;
 mod skeleton;
+mod skin;
 mod slider;
 mod spinner;
 mod stacked_bar;
@@ -195,6 +196,10 @@ pub use sidebar::{
     MoonSidebarItem, MoonSidebarMenu, MoonSidebarMenuItem, MoonSidebarToggleButton,
 };
 pub use skeleton::MoonSkeleton;
+pub use skin::{
+    MoonFacet, MoonFacetKind, MoonFacetTint, MoonSkin, facet, facet_glow, facet_tinted,
+    fading_rule_h, fading_rule_v, moon_ambient_light, moon_backdrop,
+};
 pub use slider::{MoonSlider, MoonSliderEvent, MoonSliderState};
 pub use spinner::{MoonSpinner, MoonSpinnerSize};
 pub use stacked_bar::{MoonBarSegment, MoonStackedBar};
