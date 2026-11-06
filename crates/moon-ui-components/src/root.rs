@@ -3,7 +3,7 @@ use crate::{
     dialog::{ANIMATION_DURATION, Dialog},
     focus_trap::FocusTrapManager,
     input::{Copy, InputState},
-    moon::{MoonDialog, MoonTheme},
+    moon::{MoonDialog, MoonSkin, MoonTheme, moon_backdrop},
     native_menu::FallbackMenuOverlay,
     notification::{Notification, NotificationList},
     sheet::Sheet,
@@ -182,12 +182,19 @@ impl MoonRoot {
     }
 
     /// Set whether the root paints its background.
+    ///
+    /// Under the Facet skin a [`BackgroundPolicy::Opaque`] root also paints the theme's window
+    /// backdrop behind its content. The other policies never do: they exist to show what lies
+    /// behind the scene, and the backdrop is opaque.
     pub fn background_policy(mut self, policy: BackgroundPolicy) -> Self {
         self.background_policy = policy;
         self
     }
 
     /// Override root background with a packed RGB value.
+    ///
+    /// Under the Facet skin an opaque root covers this fill with the theme's window backdrop,
+    /// which is derived from the palette's `shell`.
     pub fn background(mut self, rgb_hex: u32) -> Self {
         self.background = Some(rgb(rgb_hex).into());
         self
@@ -750,6 +757,14 @@ impl Render for MoonRoot {
         let dialog_layer = self.render_dialog_layer_inline(window, cx);
         let context_menu_layer = self.render_context_menu_layer_inline(window, cx);
         let notification_layer = self.render_notification_layer_inline(cx);
+        // Only a root that owns an opaque window fill paints the Facet backdrop: the backdrop is
+        // opaque, and a transparent or unfilled root exists to show what lies behind the scene.
+        // The skin is read from the theme global before any tokens are built, so under the Flat
+        // skin this costs one comparison and adds no element.
+        let backdrop = (self.background_policy == BackgroundPolicy::Opaque
+            && MoonSkin::active(cx).is_facet())
+        .then(|| moon_backdrop(&MoonTheme::active_tokens(cx)))
+        .flatten();
 
         let inner = div()
             .id("root")
@@ -773,6 +788,7 @@ impl Render for MoonRoot {
             })
             .text_color(self.text_color.unwrap_or(cx.theme().foreground))
             .refine_style(&self.style)
+            .when_some(backdrop, |this, backdrop| this.child(backdrop))
             .child(TextSelectionController)
             .child(self.view.clone())
             .when_some(sheet_layer, |this, layer| this.child(layer))

@@ -1,12 +1,16 @@
 //! Regression coverage for Moon button sizing and icon-slot rendering.
 
-use super::super::{MoonDisclosureDirection, MoonPalette, MoonSize};
+use super::super::{
+    MoonDisclosureDirection, MoonFacetKind, MoonFacetTint, MoonPalette, MoonSize, MoonSkin,
+    MoonThemeConfig, facet, facet_tinted, rgba_from,
+};
+use super::scene_probe::{Painted, Pointer, painted};
 use super::{
     MoonButton, MoonButtonIconSlot, MoonButtonSize, MoonButtonVariant, MoonTheme, MoonThemeTokens,
-    SOLID_LABEL_CONTRAST_FLOOR, button_text_metrics, contrast_ratio, solid_colors,
-    tier_button_metrics,
+    SOLID_LABEL_CONTRAST_FLOOR, button_text_metrics, contrast_ratio, native_variant, raised_ink,
+    solid_colors, tier_button_metrics,
 };
-use crate::button::ButtonVariant;
+use crate::button::{ButtonVariant, ButtonVisualState};
 
 /// Catches ignoring `button.rs:MoonButton::width` or `full_width` during rendering, which would
 /// make fixed controls use content width or prevent full-row actions from filling their parent.
@@ -545,4 +549,364 @@ fn existing_variants_keep_their_native_mapping() {
         ButtonVariant::from(MoonButtonVariant::Solid),
         ButtonVariant::Primary
     );
+}
+
+// --- Facet skin -----------------------------------------------------------------------------
+
+/// The Obsidian theme with its dark side drawn in `skin`: the same palette and scale on both
+/// skins, so two renders differ by the skin alone.
+fn obsidian_with(skin: MoonSkin) -> MoonThemeConfig {
+    let mut config = MoonThemeConfig::moon_obsidian();
+    config.dark.skin = skin;
+    config
+}
+
+/// Catches `button.rs:solid_variant` dropping its facet tone, which would leave the primary
+/// button a flat accent slab among the lit controls of the faceted theme, and catches that
+/// tone being honoured on a flat theme, where the solid button must not change.
+#[gpui::test]
+fn solid_button_is_a_solid_accent_facet_on_the_faceted_theme_only(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+
+    cx.update(|cx| MoonTheme::install_config(MoonThemeConfig::moon_obsidian(), cx));
+    cx.update(|cx| {
+        let tokens = MoonTheme::active_tokens(cx);
+        let variant = native_variant(MoonButtonVariant::Solid, cx);
+        assert_eq!(
+            variant.resolve_facet(&tokens, false, ButtonVisualState::Normal),
+            Some(facet_tinted(
+                tokens.palette.accent,
+                MoonFacetTint::Solid,
+                &tokens
+            ))
+        );
+    });
+
+    for flat in [
+        MoonThemeConfig::moon_terminal(),
+        MoonThemeConfig::moon_light(),
+        obsidian_with(MoonSkin::Flat),
+    ] {
+        cx.update(|cx| MoonTheme::install_config(flat, cx));
+        cx.update(|cx| {
+            let tokens = MoonTheme::active_tokens(cx);
+            let variant = native_variant(MoonButtonVariant::Solid, cx);
+            assert_eq!(
+                variant.resolve_facet(&tokens, false, ButtonVisualState::Normal),
+                None
+            );
+        });
+    }
+}
+
+/// Catches the solid label, which is the same ink under both skins, dropping under the AA
+/// floor on the faceted fill. That fill runs from the accent lifted a quarter of the way to
+/// white down to the accent sunk by 6%; both ends are recomposited here.
+#[test]
+fn solid_label_clears_the_contrast_floor_on_both_ends_of_the_faceted_fill() {
+    let palette = MoonPalette::OBSIDIAN;
+    let solid = solid_colors(palette);
+    let top = blend(0xFFFFFF, palette.accent, 0.25);
+    let bottom = blend(0x000000, palette.accent, 0.06);
+
+    for fill in [top, bottom] {
+        let ratio = contrast_ratio(solid.label, fill);
+        assert!(
+            ratio >= SOLID_LABEL_CONTRAST_FLOOR,
+            "solid label {:06X} on faceted {fill:06X}: {ratio:.2}",
+            solid.label
+        );
+    }
+}
+
+/// Catches `button.rs:raised_ink` keeping muted ink on a raised facet, where it falls under
+/// the AA floor on the lit top of the control, and catches it rewriting any other colour or
+/// touching a flat theme, where callers must get exactly the colour they passed.
+#[test]
+fn muted_ink_on_a_raised_facet_is_lifted_to_the_soft_ink() {
+    let palette = MoonPalette::OBSIDIAN;
+    let tokens = |skin: MoonSkin| MoonThemeTokens {
+        skin,
+        palette,
+        ..MoonThemeTokens::default()
+    };
+    let faceted = tokens(MoonSkin::Facet);
+
+    let lifted = raised_ink(palette.text_muted, &faceted);
+    assert_eq!(lifted, palette.text_soft);
+    // The reason for the rule, measured on the lit top of a raised facet.
+    assert!(contrast_ratio(palette.text_muted, palette.panel_high) < 4.5);
+    assert!(contrast_ratio(lifted, palette.panel_high) >= 4.5);
+
+    for color in [palette.text, palette.text_soft, palette.accent, palette.red] {
+        assert_eq!(raised_ink(color, &faceted), color);
+    }
+    assert_eq!(
+        raised_ink(palette.text_muted, &tokens(MoonSkin::Flat)),
+        palette.text_muted
+    );
+}
+
+/// Builds one button for a probe or a layout harness.
+type Build = fn() -> MoonButton;
+
+/// The neutral button every skin test starts from.
+fn neutral() -> MoonButton {
+    MoonButton::new("b").label("Order")
+}
+
+/// Catches `button.rs:Button::render` painting anything new on a flat theme: a facet fill, a
+/// facet edge or a shadow where the flat button has none. The Obsidian palette is drawn here
+/// with the Flat skin, and every colour is the flat design's own: the dark neutral fill, the
+/// palette roles and the alphas, written out rather than read back from the button.
+#[test]
+fn a_flat_theme_paints_every_button_state_as_it_did_before_the_facet_skin() {
+    /// The neutral button's flat fill on a dark palette, which is not a palette entry.
+    const NEUTRAL_DARK_FILL: u32 = 0x1F2126;
+    let p = MoonPalette::OBSIDIAN;
+    let solid = solid_colors(p);
+    let flat = |fill: (u32, f32), border: (u32, f32)| {
+        Painted::flat(rgba_from(fill.0, fill.1), rgba_from(border.0, border.1))
+    };
+    let cases: [(&str, Pointer, Build, Painted); 9] = [
+        (
+            "resting neutral",
+            Pointer::Away,
+            neutral,
+            flat((NEUTRAL_DARK_FILL, 1.0), (p.border, 1.0)),
+        ),
+        (
+            "hovered neutral",
+            Pointer::Over,
+            neutral,
+            flat((p.overlay, 0.10), (p.border_hover, 1.0)),
+        ),
+        (
+            "pressed neutral",
+            Pointer::Pressed,
+            neutral,
+            flat((p.overlay, 0.06), (p.border_hover, 1.0)),
+        ),
+        (
+            "selected neutral",
+            Pointer::Away,
+            || neutral().selected(true),
+            flat((p.accent, p.accent_tint_a), (p.accent, 1.0)),
+        ),
+        (
+            "disabled neutral",
+            Pointer::Away,
+            || neutral().disabled(true),
+            flat((p.panel, 0.32), (p.border, 0.42)),
+        ),
+        (
+            "resting blue",
+            Pointer::Away,
+            || neutral().primary(),
+            flat((p.blue, 0.10), (p.blue, 0.22)),
+        ),
+        (
+            "hovered blue",
+            Pointer::Over,
+            || neutral().primary(),
+            flat((p.blue, 0.18), (p.blue, 0.42)),
+        ),
+        (
+            "resting solid",
+            Pointer::Away,
+            || neutral().variant(MoonButtonVariant::Solid),
+            flat((solid.fill, 1.0), (solid.fill, 1.0)),
+        ),
+        (
+            "hovered solid",
+            Pointer::Over,
+            || neutral().variant(MoonButtonVariant::Solid),
+            flat((solid.fill, solid.hover_alpha), (solid.fill, 1.0)),
+        ),
+    ];
+
+    let mismatches = paint_mismatches(MoonSkin::Flat, cases);
+    assert!(
+        mismatches.is_empty(),
+        "under the Flat skin:\n{}",
+        mismatches.join("\n")
+    );
+}
+
+/// Draw each case's button under the Obsidian palette with `skin` and describe every one that
+/// did not paint what was expected, so one run names all the states that drifted.
+fn paint_mismatches<const N: usize>(
+    skin: MoonSkin,
+    cases: [(&str, Pointer, Build, Painted); N],
+) -> Vec<String> {
+    cases
+        .into_iter()
+        .filter_map(|(name, pointer, build, expected)| {
+            let got = painted(obsidian_with(skin), pointer, build);
+            (got != expected)
+                .then(|| format!("the {name} button painted {got:?}, not {expected:?}"))
+        })
+        .collect()
+}
+
+/// Catches `button.rs:Button::render` resolving a state's facet and then not painting it, or
+/// painting the facet of another state: a faceted button that stays flat at rest, does not
+/// relight under the pointer, or keeps its drop shadow while pressed. Also catches a disabled
+/// or ghost button picking up a surface, and a loading one losing its fade.
+#[test]
+fn the_faceted_theme_paints_each_button_state_with_its_own_facet() {
+    let p = MoonPalette::OBSIDIAN;
+    let tokens = MoonThemeTokens {
+        skin: MoonSkin::Facet,
+        palette: p,
+        ..MoonThemeTokens::default()
+    };
+    let raised = facet(MoonFacetKind::Raised, &tokens);
+    let top_to_bottom = |top: u32, bottom: u32| {
+        gpui::linear_gradient(
+            180.0,
+            gpui::linear_color_stop(rgba_from(top, 1.0), 0.0),
+            gpui::linear_color_stop(rgba_from(bottom, 1.0), 1.0),
+        )
+    };
+    assert_eq!(
+        raised.fill,
+        top_to_bottom(p.panel_high, p.panel),
+        "the resting surface the cases below start from is a gradient"
+    );
+    let soft_blue = facet_tinted(p.blue, MoonFacetTint::Soft, &tokens);
+
+    let cases: [(&str, Pointer, Build, Painted); 11] = [
+        (
+            "resting neutral",
+            Pointer::Away,
+            neutral,
+            Painted::facet(raised.clone()),
+        ),
+        (
+            "hovered neutral",
+            Pointer::Over,
+            neutral,
+            Painted::facet(facet(MoonFacetKind::RaisedHover, &tokens)),
+        ),
+        (
+            "pressed neutral",
+            Pointer::Pressed,
+            neutral,
+            Painted {
+                fill: Some(top_to_bottom(p.panel, p.panel_high)),
+                border: Some(raised.edge),
+                shadows: raised
+                    .shadows
+                    .iter()
+                    .filter(|shadow| shadow.inset)
+                    .cloned()
+                    .collect(),
+            },
+        ),
+        (
+            "selected neutral",
+            Pointer::Away,
+            || neutral().selected(true),
+            Painted::facet(facet_tinted(p.accent, MoonFacetTint::Selected, &tokens)),
+        ),
+        (
+            "disabled neutral",
+            Pointer::Away,
+            || neutral().disabled(true),
+            Painted::flat(rgba_from(p.panel, 0.32), rgba_from(p.border, 0.42)),
+        ),
+        (
+            "resting blue",
+            Pointer::Away,
+            || neutral().primary(),
+            Painted::facet(soft_blue.clone()),
+        ),
+        (
+            "hovered blue",
+            Pointer::Over,
+            || neutral().primary(),
+            Painted::facet(facet_tinted(p.blue, MoonFacetTint::Selected, &tokens)),
+        ),
+        (
+            "loading blue",
+            Pointer::Away,
+            || neutral().primary().loading(true),
+            Painted {
+                fill: Some(soft_blue.fill.opacity(0.8)),
+                border: Some(soft_blue.edge.opacity(0.8)),
+                shadows: soft_blue.shadows.clone(),
+            },
+        ),
+        (
+            "resting danger",
+            Pointer::Away,
+            || neutral().danger(),
+            Painted::facet(facet_tinted(p.red, MoonFacetTint::Soft, &tokens)),
+        ),
+        (
+            "resting solid",
+            Pointer::Away,
+            || neutral().variant(MoonButtonVariant::Solid),
+            Painted::facet(facet_tinted(p.accent, MoonFacetTint::Solid, &tokens)),
+        ),
+        (
+            "hovered ghost",
+            Pointer::Over,
+            || neutral().ghost(),
+            Painted::flat(rgba_from(p.overlay, 0.10), rgba_from(p.border_hover, 1.0)),
+        ),
+    ];
+
+    let mismatches = paint_mismatches(MoonSkin::Facet, cases);
+    assert!(
+        mismatches.is_empty(),
+        "under the Facet skin:\n{}",
+        mismatches.join("\n")
+    );
+}
+
+/// Catches the Facet skin changing a button's box, by adding a border, padding or a second
+/// element, and catches a render path that only the faceted theme takes panicking: the same
+/// button must occupy the same pixels on a flat theme and on the faceted one.
+#[gpui::test]
+fn the_facet_skin_leaves_every_button_box_unchanged(cx: &mut gpui::TestAppContext) {
+    let builds: [(&str, Build); 9] = [
+        ("neutral", || MoonButton::new("b").label("Order")),
+        ("panel", || {
+            MoonButton::new("b")
+                .label("Order")
+                .variant(MoonButtonVariant::Panel)
+        }),
+        ("blue", || MoonButton::new("b").label("Order").primary()),
+        ("danger", || MoonButton::new("b").label("Order").danger()),
+        ("solid", || {
+            MoonButton::new("b")
+                .label("Order")
+                .variant(MoonButtonVariant::Solid)
+        }),
+        ("ghost", || MoonButton::new("b").label("Order").ghost()),
+        ("selected neutral", || {
+            MoonButton::new("b").label("Order").selected(true)
+        }),
+        ("disabled neutral", || {
+            MoonButton::new("b").label("Order").disabled(true)
+        }),
+        ("loading blue", || {
+            MoonButton::new("b").label("Order").primary().loading(true)
+        }),
+    ];
+
+    cx.update(crate::init);
+    for (name, build) in builds {
+        cx.update(|cx| MoonTheme::install_config(obsidian_with(MoonSkin::Flat), cx));
+        let flat = laid_out_bounds(cx, build);
+        cx.update(|cx| MoonTheme::install_config(obsidian_with(MoonSkin::Facet), cx));
+        let faceted = laid_out_bounds(cx, build);
+
+        assert_eq!(
+            faceted, flat,
+            "the {name} button moved under the Facet skin"
+        );
+    }
 }

@@ -564,7 +564,7 @@ pub(super) fn contract_checks(root: &Path) -> Result<Vec<ContractCheck>> {
             ContractVerifier::VisualGolden,
             gallery.contains("--snapshot-dir")
                 && gallery.contains("--theme")
-                && gallery.contains("theme_mode_name")
+                && gallery.contains("snapshot_name")
                 && snapshot_tool.contains("$Themes = @(\"Dark\", \"Light\")")
                 && gallery.contains("snapshot_window_image(")
                 && gallery.contains("clear_snapshot_dir")

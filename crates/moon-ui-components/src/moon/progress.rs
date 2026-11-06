@@ -1,9 +1,11 @@
+use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 use crate::progress::Progress;
 
 use super::{
-    theme::MoonTheme,
+    skin::{MoonFacet, MoonFacetKind, facet, facet_glow},
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonTone, rgba_from},
 };
 
@@ -76,6 +78,8 @@ impl MoonProgress {
 }
 
 impl RenderOnce for MoonProgress {
+    /// Renders the bar: the base progress bar in the tone's colour under the Flat skin, and
+    /// [`ProgressFacet`]'s groove and lit fill under the Facet skin, at the same height.
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
@@ -92,5 +96,76 @@ impl RenderOnce for MoonProgress {
             .color(rgba_from(color, 1.0))
             .h(px(height))
             .rounded(px(radius))
+            .when_some(ProgressFacet::resolve(&tokens, color), |bar, facet| {
+                facet.apply(bar)
+            })
+            .into_any_element()
     }
 }
+
+/// How far the top edge of a faceted bar's fill is mixed toward white.
+const FACET_FILL_LIFT: f32 = 0.2;
+/// Opacity of the glow a faceted bar's fill casts in its own colour.
+const FACET_FILL_GLOW_ALPHA: f32 = 0.4;
+/// Blur of that glow as the design gives it, in design-reference pixels.
+const FACET_FILL_GLOW_BLUR: f32 = 8.0;
+
+/// What a progress bar paints under the Facet skin.
+///
+/// The shared progress engine owns motion and keyed state; the skin supplies only paint.
+#[derive(Clone, Debug, PartialEq)]
+struct ProgressFacet {
+    /// The groove the bar runs in: the skin's well, painted without its edge.
+    track: MoonFacet,
+    /// The fill: the colour at its top edge, then the one at its bottom edge.
+    fill: [Hsla; 2],
+    /// The glow the fill casts in its own colour.
+    glow: BoxShadow,
+}
+
+impl ProgressFacet {
+    /// Resolves a progress bar's faceted surfaces.
+    ///
+    /// Args:
+    ///     tokens: The active theme side; supplies the skin, the palette and the UI scale.
+    ///     color: The bar's colour as `0xRRGGBB`: its tone, or the colour set on it.
+    ///
+    /// Returns:
+    ///     The surfaces to paint, or `None` under the Flat skin, where the base bar stands.
+    fn resolve(tokens: &MoonThemeTokens, color: u32) -> Option<Self> {
+        if !tokens.skin.is_facet() {
+            return None;
+        }
+        let tone = rgba_from(color, 1.0);
+        Some(Self {
+            track: facet(MoonFacetKind::Well, tokens),
+            fill: [tone.blend(white().opacity(FACET_FILL_LIFT)), tone],
+            glow: facet_glow(color, FACET_FILL_GLOW_ALPHA, FACET_FILL_GLOW_BLUR, tokens),
+        })
+    }
+
+    /// Apply the groove and lit fill without replacing the donor's motion or geometry.
+    fn apply(self, bar: Progress) -> Progress {
+        let track = StyleRefinement {
+            background: Some(Fill::Color(self.track.fill)),
+            box_shadow: Some(self.track.shadows),
+            ..Default::default()
+        };
+        let fill = StyleRefinement {
+            background: Some(
+                linear_gradient(
+                    180.0,
+                    linear_color_stop(self.fill[0], 0.0),
+                    linear_color_stop(self.fill[1], 1.0),
+                )
+                .into(),
+            ),
+            box_shadow: Some(vec![self.glow]),
+            ..Default::default()
+        };
+        bar.surface_styles(track, fill)
+    }
+}
+
+#[cfg(test)]
+mod tests;

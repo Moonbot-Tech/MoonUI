@@ -1,6 +1,6 @@
 use crate::{
     AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTile, Bounds, DevicePixels,
-    DispatchEventResult, GpuSpecs, Pixels, PlatformAtlas, PlatformDisplay,
+    DispatchEventResult, GpuSpecs, Pixels, PlatformAtlas, PlatformDisplay, PlatformFrameRequester,
     PlatformHeadlessRenderer, PlatformInput, PlatformInputHandler, PlatformWindow, Point,
     PromptButton, RequestFrameOptions, Rgba, Scene, Size, TestPlatform, TileId, WindowAppearance,
     WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowParams,
@@ -12,7 +12,10 @@ use parking_lot::Mutex;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::{
     rc::{Rc, Weak},
-    sync::{self, Arc},
+    sync::{
+        self, Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 pub(crate) struct TestWindowState {
@@ -35,6 +38,21 @@ pub(crate) struct TestWindowState {
     moved_callback: Option<Box<dyn FnMut()>>,
     input_handler: Option<PlatformInputHandler>,
     is_fullscreen: bool,
+    request_frame_callback: Option<Box<dyn FnMut(RequestFrameOptions)>>,
+    pub(crate) frame_requests: Arc<TestFrameRequests>,
+    pub(crate) deferred_presents: usize,
+    pub(crate) draw_attempts: usize,
+    pub(crate) presentable: bool,
+}
+
+/// Count requests without scheduling a timer; tests explicitly deliver the next platform tick.
+#[derive(Default)]
+pub(crate) struct TestFrameRequests(pub(crate) AtomicUsize);
+
+impl PlatformFrameRequester for TestFrameRequests {
+    fn request_frame(&self) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 #[derive(Clone)]
@@ -87,7 +105,22 @@ impl TestWindow {
             moved_callback: None,
             input_handler: None,
             is_fullscreen: false,
+            request_frame_callback: None,
+            frame_requests: Arc::new(TestFrameRequests::default()),
+            deferred_presents: 0,
+            draw_attempts: 0,
+            presentable: true,
         })))
+    }
+
+    /// Deliver the actual frame callback after releasing the platform-state lock.
+    #[cfg(any(test, feature = "test-support"))]
+    pub(crate) fn simulate_frame(&self) {
+        let callback = self.0.lock().request_frame_callback.take();
+        if let Some(mut callback) = callback {
+            callback(RequestFrameOptions::default());
+            self.0.lock().request_frame_callback = Some(callback);
+        }
     }
 
     pub fn simulate_resize(&mut self, size: Size<Pixels>) {
@@ -260,7 +293,17 @@ impl PlatformWindow for TestWindow {
         self.0.lock().is_fullscreen
     }
 
-    fn on_request_frame(&self, _callback: Box<dyn FnMut(RequestFrameOptions)>) {}
+    fn on_request_frame(&self, callback: Box<dyn FnMut(RequestFrameOptions)>) {
+        self.0.lock().request_frame_callback = Some(callback);
+    }
+
+    fn can_present(&self) -> bool {
+        self.0.lock().presentable
+    }
+
+    fn frame_requester(&self) -> Option<Arc<dyn PlatformFrameRequester>> {
+        Some(self.0.lock().frame_requests.clone())
+    }
 
     fn on_input(&self, callback: Box<dyn FnMut(crate::PlatformInput) -> DispatchEventResult>) {
         self.0.lock().input_callback = Some(callback)
@@ -294,13 +337,24 @@ impl PlatformWindow for TestWindow {
 
     fn on_appearance_changed(&self, _callback: Box<dyn FnMut()>) {}
 
-    fn draw(&self, scene: &Scene) {
+    fn draw(&self, scene: &Scene) -> bool {
         let scale_factor = self.scale_factor();
         let mut state = self.0.lock();
-        let device_size: Size<DevicePixels> = state.bounds.size.to_device_pixels(scale_factor);
-        if let Some(renderer) = &mut state.renderer {
-            renderer.render_scene(scene, device_size).warn_on_err();
+        state.draw_attempts += 1;
+        if !state.presentable {
+            return false;
         }
+        if state.deferred_presents > 0 {
+            state.deferred_presents -= 1;
+            return false;
+        }
+        let device_size: Size<DevicePixels> = state.bounds.size.to_device_pixels(scale_factor);
+        state.renderer.as_mut().is_none_or(|renderer| {
+            renderer
+                .render_scene(scene, device_size)
+                .warn_on_err()
+                .is_some()
+        })
     }
 
     fn sprite_atlas(&self) -> sync::Arc<dyn crate::PlatformAtlas> {

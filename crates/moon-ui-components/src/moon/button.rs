@@ -123,6 +123,10 @@ pub(super) fn native_variant(variant: MoonButtonVariant, cx: &App) -> ButtonVari
 
 /// Build the native custom variant that paints a [`MoonButtonVariant::Solid`] button.
 ///
+/// The variant also names the fill as its facet tone, so under the Facet skin the native button
+/// paints it as a solid facet of the accent instead of the flat colours; the label is the same
+/// under both skins.
+///
 /// Args:
 ///     p: Palette the button paints with.
 ///     cx: Application context the native custom variant is seeded from.
@@ -136,7 +140,38 @@ fn solid_variant(p: MoonPalette, cx: &App) -> ButtonVariant {
             .color(rgba_from(colors.fill, 1.0))
             .hover(rgba_from(colors.fill, colors.hover_alpha))
             .active(rgba_from(colors.fill, colors.active_alpha))
-            .foreground(rgba_from(colors.label, 1.0)),
+            .foreground(rgba_from(colors.label, 1.0))
+            .facet_solid(colors.fill),
+    )
+}
+
+/// Resolve the ink for text or a glyph a caller coloured `color`, on a raised faceted control.
+///
+/// A raised facet is lit to `panel_high` along its top, where `text_muted` falls under the AA
+/// contrast floor; `text_soft` is the quiet ink of a raised control. Under the Flat skin, and
+/// for every other colour, the caller's colour is kept.
+///
+/// Args:
+///     color: The caller's colour as `0xRRGGBB`.
+///     tokens: The active theme side; supplies the skin and the palette.
+///
+/// Returns:
+///     `text_soft` in place of `text_muted` under the Facet skin, `color` otherwise.
+pub(super) fn raised_ink(color: u32, tokens: &MoonThemeTokens) -> u32 {
+    let p = tokens.palette;
+    if tokens.skin.is_facet() && color == p.text_muted {
+        p.text_soft
+    } else {
+        color
+    }
+}
+
+/// Return whether `variant` is painted as a raised facet under the Facet skin, the surface
+/// [`raised_ink`] applies to.
+fn is_raised_variant(variant: MoonButtonVariant) -> bool {
+    matches!(
+        variant,
+        MoonButtonVariant::Neutral | MoonButtonVariant::Panel | MoonButtonVariant::Soft
     )
 }
 
@@ -377,15 +412,22 @@ impl MoonButtonIconSlot {
     /// Args:
     ///     cx: Application context used to resolve the active Moon scale.
     ///     fallback: Unscaled glyph edge used when [`Self::size`] was not set.
+    ///     raised: Whether the glyph sits on a raised faceted button, where [`raised_ink`]
+    ///         picks the ink for the slot's colour; `false` keeps the colour as given.
     ///
     /// Returns:
     ///     The configured icon with scaling, colour, alpha, and any non-zero rotation applied.
-    fn icon(self, cx: &App, fallback: f32) -> Icon {
+    fn icon(self, cx: &App, fallback: f32, raised: bool) -> Icon {
         let tokens = MoonTheme::active_tokens(cx);
         let mut icon = Icon::default()
             .path(self.path)
             .size(px(tokens.ui(self.size.unwrap_or(fallback))));
         if let Some(color) = self.color {
+            let color = if raised {
+                raised_ink(color, &tokens)
+            } else {
+                color
+            };
             icon = icon.text_color(rgba_from_u32(color, self.alpha));
         }
         if self.rotation != 0.0 {
@@ -676,6 +718,9 @@ impl RenderOnce for MoonButton {
             MoonButtonSize::Tier(tier) => MoonButtonSize::tier_icon_size(tier),
             MoonButtonSize::Custom { .. } => 12.0,
         };
+        // Whether caller-coloured segments and icons go through `raised_ink`: a disabled button
+        // keeps the flat disabled look on every skin, and with it the caller's colours.
+        let raised = is_raised_variant(self.variant) && !self.disabled;
         let mut button = Button::new(self.id)
             .with_variant(native_variant(self.variant, cx))
             .selected(self.selected)
@@ -730,10 +775,10 @@ impl RenderOnce for MoonButton {
             pair => pair,
         };
         if let Some(icon) = leading_icon {
-            button = button.icon(icon.icon(cx, icon_fallback));
+            button = button.icon(icon.icon(cx, icon_fallback, raised));
         }
         if let Some(icon) = self.loading_icon {
-            button = button.loading_icon(icon.icon(cx, icon_fallback));
+            button = button.loading_icon(icon.icon(cx, icon_fallback, raised));
         }
         if let Some(tooltip) = self.tooltip {
             button = button.tooltip(tooltip);
@@ -791,6 +836,11 @@ impl RenderOnce for MoonButton {
                             .when(mono, |this| this.font_family(tokens.font_family(true)))
                             .child(segment.text);
                         if let Some(color) = segment.color {
+                            let color = if raised {
+                                raised_ink(color, &tokens)
+                            } else {
+                                color
+                            };
                             text = text.text_color(rgba_from_u32(color, segment.alpha));
                         }
                         text.into_any_element()
@@ -801,7 +851,7 @@ impl RenderOnce for MoonButton {
         // segments, or a leading icon beside it. Only the trailing-ONLY case is absent here,
         // because the promotion above moved that icon into the leading slot.
         .when_some(trailing_icon, |this, icon| {
-            this.child(icon.icon(cx, icon_fallback))
+            this.child(icon.icon(cx, icon_fallback, raised))
         })
     }
 }
@@ -929,5 +979,9 @@ fn rgba_from_u32(color: u32, alpha: f32) -> Hsla {
     color
 }
 
+// Test support shared with the other controls the Facet skin restyles (selector pill, tag,
+// badge, kbd): it reads what a control painted, which their sibling tests need as well.
+#[cfg(test)]
+pub(super) mod scene_probe;
 #[cfg(test)]
 mod tests;

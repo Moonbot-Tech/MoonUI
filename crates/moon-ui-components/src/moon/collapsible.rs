@@ -3,8 +3,9 @@ use gpui::*;
 
 use super::{
     disclosure::MoonDisclosure,
+    skin::{MoonFacet, MoonFacetKind, facet},
     text::MoonText,
-    theme::MoonTheme,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, rgba_from},
 };
 
@@ -23,6 +24,26 @@ fn moon_collapsible_header_click_next(
     } else {
         Some(!open)
     }
+}
+
+/// Resolve the surfaces a collapsible header paints under the Facet skin.
+///
+/// A faceted header is a raised control whether the section is closed or open: the caret alone
+/// says which. Under the pointer it relights as any raised control does.
+///
+/// Args:
+///     tokens: Active theme tokens; supply the skin, the palette and the UI scale.
+///
+/// Returns:
+///     The header's surface at rest and under the pointer, or `None` under the Flat skin, where
+///     the header keeps its flat fill and its open-dependent border.
+fn collapsible_header_facet(tokens: &MoonThemeTokens) -> Option<(MoonFacet, MoonFacet)> {
+    tokens.skin.is_facet().then(|| {
+        (
+            facet(MoonFacetKind::Raised, tokens),
+            facet(MoonFacetKind::RaisedHover, tokens),
+        )
+    })
 }
 
 #[derive(IntoElement)]
@@ -156,16 +177,28 @@ impl RenderOnce for MoonCollapsible {
             .h(px(tokens.ui(self.header_height)))
             .rounded(px(tokens.ui(4.0)))
             .border(px(tokens.ui(1.0)))
-            .border_color(rgba_from(p.border, if open { 1.0 } else { 0.74 }))
-            .bg(rgba_from(p.shell_high, if open { 0.98 } else { 0.72 }))
             .flex()
             .items_center()
             .gap(px(tokens.ui(8.0)))
             .px(px(tokens.ui(8.0)))
             .cursor_default()
-            .when(!disabled, |this| {
-                this.hover(|this| this.bg(rgba_from(p.overlay, 0.055)))
-                    .active(|this| this.bg(rgba_from(p.overlay, 0.035)))
+            // `None` is the Flat skin. A faceted header is a raised control in both states.
+            .map(|this| match collapsible_header_facet(&tokens) {
+                Some((raised, hover)) => this
+                    .border_color(raised.edge)
+                    .bg(raised.fill)
+                    .shadow(raised.shadows)
+                    .when(!disabled, |this| {
+                        this.hover(move |this| this.bg(hover.fill).border_color(hover.edge))
+                            .active(move |this| this.bg(raised.fill).border_color(raised.edge))
+                    }),
+                None => this
+                    .border_color(rgba_from(p.border, if open { 1.0 } else { 0.74 }))
+                    .bg(rgba_from(p.shell_high, if open { 0.98 } else { 0.72 }))
+                    .when(!disabled, |this| {
+                        this.hover(|this| this.bg(rgba_from(p.overlay, 0.055)))
+                            .active(|this| this.bg(rgba_from(p.overlay, 0.035)))
+                    }),
             })
             .on_mouse_down(MouseButton::Left, {
                 let state = state.clone();

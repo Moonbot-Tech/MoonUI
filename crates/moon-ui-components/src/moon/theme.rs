@@ -7,6 +7,7 @@ use super::{
     colors::MoonColors,
     foundation::selected_flat,
     foundation::{MoonControlMetrics, MoonSize, ThemeMode},
+    skin::MoonSkin,
     tokens::{MoonMetrics, MoonPalette, rgba_from},
 };
 use crate::theme::{Theme as BaseTheme, ThemeColor, ThemeMode as BaseThemeMode};
@@ -75,6 +76,12 @@ impl Default for MoonTypography {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MoonThemeTokens {
+    /// The manner in which this side draws depth; [`MoonSkin::Flat`] unless the theme names one.
+    ///
+    /// Declared ahead of the tables below: in TOML a table's plain values come before its
+    /// sub-tables, and some serializers write fields in declaration order and reject a plain
+    /// value that follows a table.
+    pub skin: MoonSkin,
     pub palette: MoonPalette,
     pub scale: MoonScale,
     pub metrics: MoonMetrics,
@@ -92,6 +99,7 @@ pub struct MoonThemeTokens {
 impl Default for MoonThemeTokens {
     fn default() -> Self {
         Self {
+            skin: MoonSkin::Flat,
             palette: MoonPalette::TERMINAL,
             scale: MoonScale::default(),
             metrics: MoonMetrics::TERMINAL,
@@ -383,6 +391,7 @@ impl Default for MoonThemeConfig {
             mode: ThemeMode::Dark,
             dark: MoonThemeTokens::default(),
             light: MoonThemeTokens {
+                skin: MoonSkin::Flat,
                 palette: MoonPalette::LIGHT,
                 scale: MoonScale::default(),
                 metrics: MoonMetrics::TERMINAL,
@@ -425,6 +434,18 @@ impl MoonThemeConfig {
     pub fn moon_graphite() -> Self {
         toml::from_str(include_str!("../../themes/moon-graphite.toml"))
             .expect("bundled moon-graphite theme must parse")
+    }
+
+    /// The faceted theme — [`MoonPalette::OBSIDIAN`] drawn with [`MoonSkin::Facet`] on the DARK
+    /// side, `LIGHT` with the flat skin on the light side.
+    ///
+    /// `mode` is `Dark`, for the reason [`Self::moon_graphite`] gives: Obsidian is a dark theme
+    /// by its own colours. It is the only bundled theme whose file names a skin, so it is the
+    /// only one a component draws faceted; the skin is per side, and switching this theme to
+    /// its light side returns to the flat look.
+    pub fn moon_obsidian() -> Self {
+        toml::from_str(include_str!("../../themes/moon-obsidian.toml"))
+            .expect("bundled moon-obsidian theme must parse")
     }
 
     /// The colour modes: [`MoonColors::DARK`] on the dark side and [`MoonColors::LIGHT`] on the
@@ -535,6 +556,8 @@ fn normalized_zoom(zoom: f32) -> f32 {
 #[derive(Clone, Debug)]
 pub struct MoonTheme {
     pub mode: ThemeMode,
+    /// The active side's skin; see [`MoonThemeTokens::skin`].
+    pub skin: MoonSkin,
     pub palette: MoonPalette,
     pub scale: MoonScale,
     pub metrics: MoonMetrics,
@@ -567,6 +590,7 @@ impl MoonTheme {
         };
         Self {
             mode: config.mode,
+            skin: tokens.skin,
             palette: tokens.palette,
             scale: tokens.scale,
             metrics: tokens.metrics,
@@ -647,6 +671,7 @@ impl MoonTheme {
 
     fn tokens(&self) -> MoonThemeTokens {
         MoonThemeTokens {
+            skin: self.skin,
             palette: self.palette,
             scale: self.scale,
             metrics: self.metrics,

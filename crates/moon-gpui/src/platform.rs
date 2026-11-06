@@ -703,7 +703,9 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn frame_diagnostics(&self) -> Option<FrameDiagnostics> {
         None
     }
-    fn draw(&self, scene: &Scene);
+    /// Submit the scene and return whether the backend accepted its presentation.
+    /// A false result leaves the frame owed until a later native tick can accept it.
+    fn draw(&self, scene: &Scene) -> bool;
     fn completed_frame(&self) {}
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas>;
     fn is_subpixel_rendering_supported(&self) -> bool;
@@ -757,6 +759,12 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     }
     fn set_client_inset(&self, _inset: Pixels) {}
     fn gpu_specs(&self) -> Option<GpuSpecs>;
+
+    /// Request the normal device-recovery path for diagnostics, without resetting the OS GPU.
+    /// Returns false when the platform has no such recovery path.
+    fn request_gpu_device_reset(&self) -> bool {
+        false
+    }
 
     fn update_ime_position(&self, _bounds: Bounds<Pixels>);
 

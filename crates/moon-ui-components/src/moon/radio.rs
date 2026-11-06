@@ -234,6 +234,16 @@ impl RenderOnce for MoonRadio {
             .border_color(colors.border)
             .bg(colors.fill)
             .opacity(colors.box_opacity)
+            // Under the Facet skin an enabled circle takes the checkbox box's faceted surface in
+            // place of the flat fill and border above; the dot is left as it is.
+            .when_some(
+                ChoiceColors::box_facet(&tokens, self.tone, checked, disabled),
+                |this, facet| {
+                    this.bg(facet.fill)
+                        .border_color(facet.edge)
+                        .shadow(facet.shadows)
+                },
+            )
             .when(is_focused, |this| {
                 this.child(choice_focus_ring(
                     &self.id,

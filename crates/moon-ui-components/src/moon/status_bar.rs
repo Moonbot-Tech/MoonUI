@@ -3,10 +3,12 @@
 use std::fmt;
 
 use crate::status_bar::StatusBar as CoreStatusBar;
+use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 use super::{
     foundation::MoonClickHandler,
+    skin::fading_rule_h,
     text::MoonText,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
@@ -317,6 +319,18 @@ impl MoonStatusBar {
         self.render_with_theme(p, MoonThemeTokens::default())
     }
 
+    /// Render the bar with an explicit palette and theme tokens.
+    ///
+    /// Under the Flat skin the bar paints its fill and a solid top border. Under the Facet skin
+    /// it paints no fill and a rule along its top that fades out toward both ends; see
+    /// [`status_bar_facet_rule`].
+    ///
+    /// Args:
+    ///     p: Palette used for the bar and its items.
+    ///     tokens: Tokens used for the bar's geometry, its text and the theme skin.
+    ///
+    /// Returns:
+    ///     The rendered status bar.
     pub fn render_with_theme(self, p: MoonPalette, tokens: MoonThemeTokens) -> impl IntoElement {
         let Self {
             id,
@@ -401,6 +415,10 @@ impl MoonStatusBar {
             &tokens,
         );
 
+        // `None` is the Flat skin. Under the Facet skin the bar paints no fill, and its top
+        // border keeps its pixel of height but stops painting: the fading rule added below
+        // takes that row.
+        let facet_rule = status_bar_facet_rule(p, &tokens);
         let mut status = CoreStatusBar::new()
             .left(left_row)
             .h(px(height))
@@ -408,8 +426,14 @@ impl MoonStatusBar {
             .py(px(0.0))
             .px(px(0.0))
             .gap(px(0.0))
-            .bg(rgba_from(bg, 1.0))
-            .border_color(rgba_from(border, 1.0));
+            .map(|this| match facet_rule {
+                Some(_) => this
+                    .bg(transparent_black())
+                    .border_color(transparent_black()),
+                None => this
+                    .bg(rgba_from(bg, 1.0))
+                    .border_color(rgba_from(border, 1.0)),
+            });
 
         if !right_items.is_empty() {
             let right_row = Self::render_items(
@@ -426,7 +450,19 @@ impl MoonStatusBar {
             status = status.right(right_row);
         }
 
-        root.child(status)
+        let root = root.child(status);
+        match facet_rule {
+            Some(color) => root.child(
+                div()
+                    .absolute()
+                    .left_0()
+                    .right_0()
+                    .top_0()
+                    .h(px(1.0))
+                    .child(fading_rule_h(color)),
+            ),
+            None => root,
+        }
     }
 
     /// Render ordered text and separator items into one edge region.
@@ -543,6 +579,25 @@ impl MoonStatusBar {
         }
         row
     }
+}
+
+/// Alpha of the `overlay` ink at the middle of a faceted status bar's top rule.
+const FACET_STATUS_RULE_ALPHA: f32 = 0.09;
+
+/// Resolve the colour of the fading rule a status bar draws along its top under the Facet skin.
+///
+/// Args:
+///     p: Palette the bar paints with.
+///     tokens: Tokens the bar renders with; supply the skin.
+///
+/// Returns:
+///     The colour at the middle of the rule, or `None` under the Flat skin, where the bar keeps
+///     its solid fill and its solid top border.
+fn status_bar_facet_rule(p: MoonPalette, tokens: &MoonThemeTokens) -> Option<Hsla> {
+    tokens
+        .skin
+        .is_facet()
+        .then(|| rgba_from(p.overlay, FACET_STATUS_RULE_ALPHA))
 }
 
 impl RenderOnce for MoonStatusBar {

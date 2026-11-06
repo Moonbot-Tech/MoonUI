@@ -21,6 +21,171 @@ use crate::{
     TestAppContext, TouchPhase, UTF16Selection, Window, div, gpu_canvas, point, px, size,
 };
 
+/// A view that invalidates once from prepaint or paint after its first stable frame.
+struct MidDrawNotification {
+    armed: Rc<Cell<bool>>,
+    renders: Rc<Cell<usize>>,
+    during_paint: bool,
+}
+
+impl Render for MidDrawNotification {
+    /// Register the one-shot mutation in the selected draw phase.
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.renders.set(self.renders.get() + 1);
+        let entity = cx.entity_id();
+        let prepaint = self.armed.clone();
+        let paint = self.armed.clone();
+        let during_paint = self.during_paint;
+        crate::canvas(
+            move |_, _, cx| {
+                if !during_paint && prepaint.replace(false) {
+                    cx.notify(entity);
+                }
+            },
+            move |_, _, _, cx| {
+                if during_paint && paint.replace(false) {
+                    cx.notify(entity);
+                }
+            },
+        )
+        .size(px(40.))
+    }
+}
+
+/// Catches ignoring the queued views in the frame-entry predicate: a measured layout change
+/// would remain invisible until unrelated input, even though the frame clock was woken for it.
+#[test]
+fn mid_draw_notification_is_drawn_without_another_event() {
+    for during_paint in [false, true] {
+        let armed = Rc::new(Cell::new(false));
+        let renders = Rc::new(Cell::new(0));
+        let (mut app, any) = open_window({
+            let armed = armed.clone();
+            let renders = renders.clone();
+            move |_, _| MidDrawNotification {
+                armed,
+                renders,
+                during_paint,
+            }
+        });
+        app.update_window(any, |_, window, cx| {
+            let before = renders.get();
+            armed.set(true);
+            window.draw(cx).clear();
+            assert!(
+                window.invalidator.is_dirty(),
+                "a mid-draw change still owes a frame"
+            );
+            // The platform's next tick must take the UI branch without another input event.
+            if window.invalidator.is_dirty() {
+                window.draw(cx).clear();
+            }
+            assert_eq!(
+                renders.get() - before,
+                2,
+                "one applying frame follows the mutation"
+            );
+            assert!(
+                !window.invalidator.is_dirty(),
+                "the consumed debt must settle"
+            );
+        })
+        .unwrap();
+    }
+}
+
+/// A cached consumer observes a separate model, as table hosts observe their layout state.
+struct MidDrawModelConsumer {
+    model: crate::Entity<usize>,
+    armed: Rc<Cell<bool>>,
+    seen: Rc<Cell<usize>>,
+    during_paint: bool,
+}
+
+impl Render for MidDrawModelConsumer {
+    /// Publish one layout measurement while recording the model value actually rendered.
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.seen.set(*self.model.read(cx));
+        let prepaint_model = self.model.clone();
+        let paint_model = self.model.clone();
+        let prepaint = self.armed.clone();
+        let paint = self.armed.clone();
+        let during_paint = self.during_paint;
+        crate::canvas(
+            move |_, _, cx| {
+                if !during_paint && prepaint.replace(false) {
+                    prepaint_model.update(cx, |value, cx| {
+                        *value += 1;
+                        cx.notify();
+                    });
+                }
+            },
+            move |_, _, _, cx| {
+                if during_paint && paint.replace(false) {
+                    paint_model.update(cx, |value, cx| {
+                        *value += 1;
+                        cx.notify();
+                    });
+                }
+            },
+        )
+        .size(px(40.))
+    }
+}
+
+/// The model itself has no view path, so only its observer can invalidate this cached child.
+struct CachedModelHost(crate::Entity<MidDrawModelConsumer>);
+
+impl Render for CachedModelHost {
+    /// Use the production view cache rather than repainting every consumer unconditionally.
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().child(crate::AnyView::from(self.0.clone()).cached(crate::StyleRefinement::default()))
+    }
+}
+
+/// Queuing a frame alone cannot deliver a model notification: the observer must also run.
+#[test]
+fn mid_draw_model_notification_reaches_its_cached_observer() {
+    for during_paint in [false, true] {
+        let armed = Rc::new(Cell::new(false));
+        let seen = Rc::new(Cell::new(0));
+        let (mut app, window) = open_window({
+            let armed = armed.clone();
+            let seen = seen.clone();
+            move |_, cx| {
+                let model = cx.new(|_| 0_usize);
+                CachedModelHost(cx.new(|cx| {
+                    cx.observe(&model, |_, _, cx| cx.notify()).detach();
+                    MidDrawModelConsumer {
+                        model,
+                        armed,
+                        seen,
+                        during_paint,
+                    }
+                }))
+            }
+        });
+        app.update_window(window, |_, window, cx| {
+            armed.set(true);
+            window.refresh();
+            window.draw(cx).clear();
+        })
+        .unwrap();
+        assert_eq!(
+            seen.get(),
+            1,
+            "the cached consumer must draw the measured value without input"
+        );
+        app.update_window(window, |_, window, _| {
+            assert!(
+                !window.invalidator.is_dirty(),
+                "the observer and frame debt must settle"
+            );
+        })
+        .unwrap();
+    }
+}
+
 /// A root view that draws nothing; the window's own state is what these tests read.
 struct EmptyView;
 
@@ -39,6 +204,210 @@ fn open_window<V: Render>(
     let any: AnyWindowHandle = window.into();
     draw(&mut app, any);
     (app, any)
+}
+
+/// Native and client-drawn close use one replaceable policy; a veto keeps the real window alive.
+#[test]
+fn user_close_respects_and_replaces_the_native_policy() {
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    let calls = Rc::new(Cell::new(0));
+    app.update_window(any, |_, window, cx| {
+        let calls = calls.clone();
+        window.on_window_should_close(cx, move |_, _| {
+            calls.set(calls.get() + 1);
+            false
+        });
+    })
+    .unwrap();
+    let platform = app.test_window(any);
+    let mut native = platform.0.lock().should_close_handler.take().unwrap();
+    assert!(!native());
+    app.update_window(any, |_, window, cx| window.request_close(cx))
+        .unwrap();
+    assert_eq!(calls.get(), 2);
+    app.update_window(any, |_, window, cx| {
+        assert!(!window.removed);
+        window.on_window_should_close(cx, |_, _| true);
+        window.request_close(cx);
+    })
+    .unwrap();
+    assert!(
+        app.update_window(any, |_, _, _| ()).is_err(),
+        "accepted close must release the window"
+    );
+    assert_eq!(calls.get(), 2, "the superseded veto must not run");
+}
+
+/// Teardown is unconditional; a window without a policy still accepts an ordinary user close.
+#[test]
+fn forced_close_bypasses_policy_and_default_user_close_succeeds() {
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    app.update_window(any, |_, window, cx| {
+        window.on_window_should_close(cx, |_, _| {
+            panic!("forced close must not ask the user policy")
+        });
+        window.remove_window();
+    })
+    .unwrap();
+    assert!(app.update_window(any, |_, _, _| ()).is_err());
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    app.update_window(any, |_, window, cx| window.request_close(cx))
+        .unwrap();
+    assert!(app.update_window(any, |_, _, _| ()).is_err());
+}
+
+/// A static scene still owes its last frame after a transient backend refusal, without new input.
+#[test]
+fn deferred_idle_present_retries_then_settles() {
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    let platform = app.test_window(any);
+    platform.0.lock().deferred_presents = 2;
+    let requests = platform.0.lock().frame_requests.clone();
+    for _ in 0..2 {
+        let before = requests.0.load(std::sync::atomic::Ordering::SeqCst);
+        platform.simulate_frame();
+        assert_eq!(
+            requests.0.load(std::sync::atomic::Ordering::SeqCst) - before,
+            1,
+            "one next native tick is requested"
+        );
+        app.update_window(any, |_, window, _| {
+            assert!(
+                window.needs_present.get(),
+                "the rejected idle frame remains owed"
+            );
+            assert!(
+                !window.invalidator.is_dirty(),
+                "retry must not rebuild the UI"
+            );
+        })
+        .unwrap();
+    }
+    platform.simulate_frame();
+    app.update_window(any, |_, window, _| assert!(!window.needs_present.get()))
+        .unwrap();
+    assert_eq!(platform.0.lock().draw_attempts, 3);
+    platform.simulate_frame();
+    assert_eq!(
+        platform.0.lock().draw_attempts,
+        3,
+        "a successful present settles"
+    );
+}
+
+/// Request one GPU-only frame, consuming the local request just as a retained chart does.
+struct OneShotPresent {
+    request: Rc<Cell<bool>>,
+    text_prepares: Rc<Cell<usize>>,
+}
+
+impl GpuCanvasDriver for OneShotPresent {
+    fn frame(&mut self, info: GpuFrameInfo) -> GpuFrameDecision {
+        if info.presentable && self.request.replace(false) {
+            GpuFrameDecision::RequestPresent
+        } else {
+            GpuFrameDecision::Skip
+        }
+    }
+
+    fn prepare_text(&mut self, _: &mut GpuCanvasTextContext<'_>) -> anyhow::Result<()> {
+        self.text_prepares.set(self.text_prepares.get() + 1);
+        Ok(())
+    }
+
+    fn draw(&mut self, _: &mut GpuCanvasDrawContext<'_>) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+/// Open the production canvas path with a retained request and count actual text preparations.
+fn one_shot_present_window() -> (
+    TestAppContext,
+    AnyWindowHandle,
+    Rc<Cell<bool>>,
+    Rc<Cell<usize>>,
+) {
+    let request = Rc::new(Cell::new(false));
+    let prepares = Rc::new(Cell::new(0));
+    let handles = vec![GpuCanvasHandle::new(OneShotPresent {
+        request: request.clone(),
+        text_prepares: prepares.clone(),
+    })];
+    let (app, any) = open_window(move |_, _| CanvasesView { handles });
+    (app, any, request, prepares)
+}
+
+/// A failed GPU-only request must CREATE window debt even when its initial window debt was false.
+#[test]
+fn deferred_gpu_only_present_creates_and_consumes_window_debt() {
+    let (mut app, any, request, _) = one_shot_present_window();
+    let platform = app.test_window(any);
+    platform.simulate_frame();
+    app.update_window(any, |_, window, _| assert!(!window.needs_present.get()))
+        .unwrap();
+    let initial_attempts = platform.0.lock().draw_attempts;
+    platform.0.lock().deferred_presents = 2;
+    request.set(true);
+    let requests = platform.0.lock().frame_requests.clone();
+    for _ in 0..2 {
+        let before = requests.0.load(std::sync::atomic::Ordering::SeqCst);
+        platform.simulate_frame();
+        assert_eq!(
+            requests.0.load(std::sync::atomic::Ordering::SeqCst) - before,
+            1
+        );
+        app.update_window(any, |_, window, _| assert!(window.needs_present.get()))
+            .unwrap();
+    }
+    assert!(
+        !request.get(),
+        "the producer already consumed its sole change"
+    );
+    platform.simulate_frame();
+    app.update_window(any, |_, window, _| assert!(!window.needs_present.get()))
+        .unwrap();
+    assert_eq!(platform.0.lock().draw_attempts - initial_attempts, 3);
+    platform.simulate_frame();
+    assert_eq!(platform.0.lock().draw_attempts - initial_attempts, 3);
+}
+
+/// An occluded window retains debt but must not repeatedly shape the same pending text.
+#[test]
+fn deferred_present_skips_text_while_unpresentable_and_finishes_on_restore() {
+    let (mut app, any, _, prepares) = one_shot_present_window();
+    let platform = app.test_window(any);
+    let before = prepares.get();
+    platform.0.lock().presentable = false;
+    for _ in 0..3 {
+        platform.simulate_frame();
+    }
+    assert_eq!(
+        prepares.get(),
+        before,
+        "no text preparation while the backend cannot present"
+    );
+    app.update_window(any, |_, window, _| assert!(window.needs_present.get()))
+        .unwrap();
+    platform.0.lock().presentable = true;
+    platform.simulate_frame();
+    assert_eq!(prepares.get(), before + 1);
+    app.update_window(any, |_, window, _| assert!(!window.needs_present.get()))
+        .unwrap();
+}
+
+/// A late native tick after close must not keep requesting work for the removed window.
+#[test]
+fn deferred_present_does_not_rearm_a_closed_window() {
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    let platform = app.test_window(any);
+    platform.0.lock().deferred_presents = 1;
+    platform.simulate_frame();
+    app.update_window(any, |_, window, _| window.remove_window())
+        .unwrap();
+    let requests = platform.0.lock().frame_requests.clone();
+    let before = requests.0.load(std::sync::atomic::Ordering::SeqCst);
+    platform.simulate_frame();
+    assert_eq!(requests.0.load(std::sync::atomic::Ordering::SeqCst), before);
 }
 
 /// Draw one frame of `any`.

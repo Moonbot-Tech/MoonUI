@@ -282,6 +282,38 @@ fn radio_without_text_is_its_circle_with_a_centred_dot(cx: &mut TestAppContext) 
     }
 }
 
+/// Catches the faceted circle changing the radio's geometry — a circle resized when its facet is
+/// applied, or a facet painted in place of the circle's content: under the faceted theme a
+/// checked radio must stay exactly its 16 or 20px circle around a centred 6 or 8px dot, as under
+/// a flat theme, so a radio lines up with the checkbox beside it in either.
+#[gpui::test]
+fn a_faceted_radio_keeps_its_circle_and_centred_dot(cx: &mut TestAppContext) {
+    use super::super::MoonTheme;
+
+    cx.update(crate::init);
+    cx.update(|cx| MoonTheme::install_config(MoonThemeConfig::moon_obsidian(), cx));
+    cx.update(|cx| assert!(MoonTheme::active_tokens(cx).skin.is_facet()));
+
+    for (tier, box_px, dot_px) in [(MoonSize::Sm, 16., 6.), (MoonSize::Md, 20., 8.)] {
+        let window = cx.add_window(move |_, _| ProbedRadioHarness {
+            size: tier,
+            label: None,
+        });
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+
+        let control = cx
+            .debug_bounds("probed-control")
+            .expect("probe must render");
+        let circle = cx.debug_bounds("probed:box").expect("circle must render");
+        let dot = cx.debug_bounds("probed:dot").expect("dot must render");
+        assert_eq!(control.size, size(px(box_px), px(box_px)), "{tier:?}");
+        assert_eq!(circle.size, size(px(box_px), px(box_px)), "{tier:?}");
+        assert_eq!(dot.size, size(px(dot_px), px(dot_px)), "{tier:?}");
+        assert_eq!(dot.center(), circle.center(), "{tier:?}");
+    }
+}
+
 /// Catches `MoonRadio::render` sizing the dot on its own again instead of through
 /// `snap_centered`. Layout rounds the circle and the dot to device pixels separately, so at 110 %
 /// a 16px circle and a 6px dot land as 18 and 7: an odd pixel is left over and the dot sits off

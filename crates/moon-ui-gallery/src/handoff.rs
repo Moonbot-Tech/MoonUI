@@ -56,7 +56,7 @@ struct CaseSnapshotRun {
 pub(super) struct CaseGallery {
     snapshot: Option<CaseSnapshotRun>,
     #[cfg(feature = "snapshot")]
-    theme_mode: ThemeMode,
+    theme: GalleryTheme,
     #[cfg(feature = "snapshot")]
     dialog_case_open: bool,
     slider_58_state: Entity<MoonSliderState>,
@@ -86,10 +86,10 @@ impl CaseGallery {
         cx: &mut Context<Self>,
         snapshot_dir: Option<PathBuf>,
         snapshot_case_ids: Vec<String>,
-        theme_mode: ThemeMode,
+        theme: GalleryTheme,
     ) -> Self {
         #[cfg(not(feature = "snapshot"))]
-        let _ = theme_mode;
+        let _ = theme;
 
         let first_case = HANDOFF_CASES.first().copied().unwrap_or(HandoffCase {
             id: "empty",
@@ -209,7 +209,7 @@ impl CaseGallery {
                 targeted,
             }),
             #[cfg(feature = "snapshot")]
-            theme_mode,
+            theme,
             #[cfg(feature = "snapshot")]
             dialog_case_open: false,
             slider_58_state,
@@ -291,9 +291,7 @@ impl CaseGallery {
             return;
         }
 
-        let theme_dir = snapshot
-            .dir
-            .join(theme_mode_name(self.theme_mode).to_ascii_lowercase());
+        let theme_dir = snapshot.dir.join(self.theme.snapshot_name());
         if !snapshot.targeted && !snapshot.cleaned_dir {
             if let Err(err) = clear_snapshot_dir(&theme_dir) {
                 eprintln!(

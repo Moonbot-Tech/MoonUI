@@ -63,7 +63,13 @@ pub(super) struct Gallery {
 enum GalleryStyle {
     Dark,
     Graphite,
+    /// The faceted dark theme: `MoonPalette::OBSIDIAN` drawn with `MoonSkin::Facet`.
+    Obsidian,
     Light,
+    /// The light palette drawn with `MoonSkin::Facet`: the rules Obsidian is drawn by, on a
+    /// light theme. Not a shipped theme — it is here to show that the skin is not tied to one
+    /// palette.
+    LightFacet,
     /// The dark colour mode, `MoonColors::DARK`.
     DarkNew,
     /// The light colour mode, `MoonColors::LIGHT`.
@@ -72,20 +78,24 @@ enum GalleryStyle {
 
 impl GalleryStyle {
     /// Every style, in menu order.
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 7] = [
         Self::Dark,
         Self::Graphite,
+        Self::Obsidian,
         Self::Light,
+        Self::LightFacet,
         Self::DarkNew,
         Self::LightNew,
     ];
 
-    /// Returns the style a launch mode opens in: `Light` for the light mode, `Dark` otherwise,
-    /// since the system mode renders the dark theme.
-    fn for_mode(mode: ThemeMode) -> Self {
-        match mode {
-            ThemeMode::Light => Self::Light,
-            ThemeMode::Dark | ThemeMode::System => Self::Dark,
+    /// Returns the style a launch theme opens in: `Obsidian` for that theme, otherwise `Light`
+    /// for the light mode and `Dark` for the rest, since the system mode renders the dark theme.
+    fn for_theme(theme: GalleryTheme) -> Self {
+        match theme {
+            GalleryTheme::Obsidian => Self::Obsidian,
+            GalleryTheme::LightFacet => Self::LightFacet,
+            GalleryTheme::Mode(ThemeMode::Light) => Self::Light,
+            GalleryTheme::Mode(ThemeMode::Dark | ThemeMode::System) => Self::Dark,
         }
     }
 
@@ -94,7 +104,9 @@ impl GalleryStyle {
         match self {
             Self::Dark => "Dark",
             Self::Graphite => "Graphite",
+            Self::Obsidian => "Obsidian",
             Self::Light => "Light",
+            Self::LightFacet => "Light (facet)",
             Self::DarkNew => "Dark (new)",
             Self::LightNew => "Light (new)",
         }
@@ -112,10 +124,11 @@ impl GalleryStyle {
 
     /// Returns `current` switched to this style.
     ///
-    /// Only the mode and each side's palette and colour roles change, so the theme's scale,
-    /// metrics and typography carry over. Both sides are set for every style: switching back from
-    /// Graphite or a colour mode must put the legacy palettes back and drop the installed roles,
-    /// or the previous style's colours would stay behind the new label.
+    /// Only the mode and each side's skin, palette and colour roles change, so the theme's
+    /// scale, metrics and typography carry over. Both sides are set for every style: switching
+    /// back from Graphite, Obsidian or a colour mode must put the legacy palettes and the flat
+    /// skin back and drop the installed roles, or the previous style's colours or facets would
+    /// stay behind the new label.
     fn config(self, mut current: MoonThemeConfig) -> MoonThemeConfig {
         if self.is_color_mode() {
             let modes = MoonThemeConfig::moon_color_modes();
@@ -123,18 +136,28 @@ impl GalleryStyle {
             (current.light.palette, current.light.colors) =
                 (modes.light.palette, modes.light.colors);
         } else {
-            current.dark.palette = if self == Self::Graphite {
-                MoonPalette::GRAPHITE
-            } else {
-                MoonPalette::TERMINAL
+            current.dark.palette = match self {
+                Self::Graphite => MoonPalette::GRAPHITE,
+                Self::Obsidian => MoonPalette::OBSIDIAN,
+                _ => MoonPalette::TERMINAL,
             };
             current.light.palette = MoonPalette::LIGHT;
             current.dark.colors = None;
             current.light.colors = None;
         }
+        current.dark.skin = if self == Self::Obsidian {
+            MoonSkin::Facet
+        } else {
+            MoonSkin::Flat
+        };
+        current.light.skin = if self == Self::LightFacet {
+            MoonSkin::Facet
+        } else {
+            MoonSkin::Flat
+        };
         current.mode = match self {
-            Self::Light | Self::LightNew => ThemeMode::Light,
-            Self::Dark | Self::Graphite | Self::DarkNew => ThemeMode::Dark,
+            Self::Light | Self::LightFacet | Self::LightNew => ThemeMode::Light,
+            Self::Dark | Self::Graphite | Self::Obsidian | Self::DarkNew => ThemeMode::Dark,
         };
         current
     }
@@ -172,7 +195,7 @@ impl Gallery {
         cx: &mut Context<Self>,
         active_page: usize,
         snapshot_dir: Option<PathBuf>,
-        theme_mode: ThemeMode,
+        theme: GalleryTheme,
     ) -> Self {
         let select_state = cx.new(|cx| {
             MoonSelectState::new(
@@ -321,7 +344,7 @@ impl Gallery {
 
         Self {
             active_page: active_page.min(GALLERY_PAGES.len().saturating_sub(1)),
-            style: GalleryStyle::for_mode(theme_mode),
+            style: GalleryStyle::for_theme(theme),
             snapshot: snapshot_dir.map(|dir| SnapshotRun {
                 dir,
                 page_ix: active_page.min(GALLERY_PAGES.len().saturating_sub(1)),
@@ -3562,7 +3585,11 @@ impl Render for Gallery {
 
         v_flex()
             .size_full()
-            .bg(rgba_from(p.shell, 1.0))
+            // Under the Facet skin the root paints the window backdrop; an opaque fill here
+            // would cover it.
+            .when(!MoonSkin::active(cx).is_facet(), |this| {
+                this.bg(rgba_from(p.shell, 1.0))
+            })
             .text_color(rgb(p.text))
             .child(self.render_header(cx))
             .child(self.render_page_tabs(cx))

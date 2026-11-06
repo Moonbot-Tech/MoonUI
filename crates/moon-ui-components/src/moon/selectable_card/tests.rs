@@ -107,3 +107,96 @@ fn cards_select_by_click_and_keyboard_but_not_when_disabled(cx: &mut gpui::TestA
         "the clicked card keeps focus and Space selects it again"
     );
 }
+
+// ---- Theme skin: the card surface and how the selected card is told apart ----
+
+use super::card_facet;
+use crate::moon::{MoonFacetKind, MoonSkin, MoonThemeTokens, facet, rgba_from};
+use gpui::{BoxShadow, point, px};
+
+/// Theme tokens for `palette` drawn with `skin`, with every length doubled.
+fn doubled_skin_tokens(palette: MoonPalette, skin: MoonSkin) -> MoonThemeTokens {
+    let mut tokens = MoonThemeTokens {
+        palette,
+        skin,
+        ..MoonThemeTokens::default()
+    };
+    tokens.scale.ui = 2.0;
+    tokens
+}
+
+/// Catches `selectable_card.rs:card_facet` ignoring the skin: every flat theme's cards would
+/// trade the `panel_high` fill and the hard selected ring `card_chrome` gives them for a
+/// gradient card with a glow.
+#[test]
+fn a_flat_card_is_left_to_its_chrome() {
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        let tokens = doubled_skin_tokens(palette, MoonSkin::Flat);
+        for (selected, focused) in [(false, false), (true, false), (false, true), (true, true)] {
+            assert_eq!(card_facet(selected, focused, palette.accent, &tokens), None);
+        }
+    }
+}
+
+/// Catches `selectable_card.rs:card_facet` keeping the Flat skin's hard one-pixel ring on the
+/// selected card, dropping its glow, or leaving its edge on the neutral colour: the chosen
+/// theme card would either look ringed like a flat one or exactly like the cards beside it.
+#[test]
+fn a_faceted_card_marks_selection_with_an_accent_edge_and_a_glow() {
+    let p = MoonPalette::OBSIDIAN;
+    let tokens = doubled_skin_tokens(p, MoonSkin::Facet);
+    let accent = p.blue;
+    let card = facet(MoonFacetKind::Card, &tokens);
+
+    let idle = card_facet(false, false, accent, &tokens).expect("the Facet skin resolves a card");
+    assert_eq!(idle.fill, card.fill);
+    assert_eq!(idle.edge, card.edge);
+    assert_eq!(idle.shadows, card.shadows);
+    assert_eq!(idle.hover_edge, rgba_from(p.overlay, 0.22));
+
+    // The glow written out: centred on the card, no spread, 22 design pixels of blur doubled
+    // with the UI scale and halved into the renderer's blur radius.
+    let glow = BoxShadow {
+        color: rgba_from(accent, 0.2),
+        offset: point(px(0.0), px(0.0)),
+        blur_radius: px(22.0),
+        spread_radius: px(0.0),
+        inset: false,
+    };
+    let mut card_and_glow = card.shadows.clone();
+    card_and_glow.push(glow);
+    for focused in [false, true] {
+        let selected =
+            card_facet(true, focused, accent, &tokens).expect("the Facet skin resolves a card");
+        assert_eq!(selected.fill, card.fill);
+        assert_eq!(selected.edge, rgba_from(accent, 0.75));
+        assert_eq!(selected.shadows, card_and_glow, "focused: {focused}");
+        assert!(
+            selected
+                .shadows
+                .iter()
+                .all(|shadow| shadow.spread_radius == px(0.0)),
+            "no hard spread ring on a selected faceted card"
+        );
+    }
+
+    // The focus ring written out: two design pixels of spread, doubled, and no blur.
+    let ring = BoxShadow {
+        color: rgba_from(accent, 0.55),
+        offset: point(px(0.0), px(0.0)),
+        blur_radius: px(0.0),
+        spread_radius: px(4.0),
+        inset: false,
+    };
+    let mut card_and_ring = card.shadows.clone();
+    card_and_ring.push(ring);
+    let focused = card_facet(false, true, accent, &tokens).expect("the Facet skin resolves a card");
+    assert_eq!(
+        focused.edge, card.edge,
+        "focus alone must not look selected"
+    );
+    assert_eq!(
+        focused.shadows, card_and_ring,
+        "a focused card keeps its focus ring"
+    );
+}

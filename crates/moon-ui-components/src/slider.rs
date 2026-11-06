@@ -2,14 +2,15 @@ use std::ops::Range;
 
 use crate::{
     AxisExt, ElementExt, StyledExt, box_shadow, h_flex,
-    moon::{MoonPalette, rgba_from},
+    moon::{MoonFacetKind, MoonPalette, MoonSkin, MoonTheme, facet, rgba_from},
 };
 use gpui::{
-    Along, App, AppContext as _, Axis, Bounds, Context, Corners, DefiniteLength, DragMoveEvent,
-    ElementId, Empty, Entity, EntityId, EventEmitter, Hsla, InteractiveElement, IntoElement,
-    MouseButton, MouseDownEvent, ParentElement as _, Pixels, Point, Render, RenderOnce,
-    ScrollDelta, ScrollWheelEvent, StatefulInteractiveElement as _, StyleRefinement, Styled,
-    Window, div, linear_color_stop, linear_gradient, prelude::FluentBuilder as _, px, relative,
+    Along, App, AppContext as _, Axis, Background, Bounds, BoxShadow, Context, Corners,
+    DefiniteLength, DragMoveEvent, ElementId, Empty, Entity, EntityId, EventEmitter, Hsla,
+    InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement as _, Pixels,
+    Point, Render, RenderOnce, ScrollDelta, ScrollWheelEvent, StatefulInteractiveElement as _,
+    StyleRefinement, Styled, Window, div, linear_color_stop, linear_gradient,
+    prelude::FluentBuilder as _, px, relative, white,
 };
 
 #[derive(Clone)]
@@ -33,8 +34,116 @@ impl Render for DragSlider {
 const MOON_SLIDER_HEIGHT: Pixels = px(18.);
 const MOON_SLIDER_TRACK_HEIGHT: Pixels = px(2.);
 const MOON_SLIDER_THUMB_SIZE: Pixels = px(7.);
+/// Thickness of the groove the track becomes under the Facet skin.
+const MOON_SLIDER_GROOVE_HEIGHT: Pixels = px(4.);
+/// Diameter of the thumb under the Facet skin.
+const MOON_SLIDER_FACET_THUMB_SIZE: Pixels = px(10.);
 /// Pixel wheel distance (a trackpad's continuous scroll) that counts as one wheel notch.
 const WHEEL_NOTCH_PIXELS: f32 = 20.;
+
+/// The lengths a slider is drawn with, which follow the theme's skin.
+///
+/// The hit area ([`MOON_SLIDER_HEIGHT`]) is the same under every skin and is not part of this.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct SliderMetrics {
+    /// Thickness of the track across the slider's axis.
+    pub(crate) track: Pixels,
+    /// Thickness of the filled part, which runs along the middle of the track.
+    pub(crate) fill: Pixels,
+    /// Diameter of a thumb.
+    pub(crate) thumb: Pixels,
+}
+
+impl SliderMetrics {
+    /// Returns the lengths `skin` draws a slider with.
+    ///
+    /// The Flat skin draws the hairline slider: a 2px track that its fill covers whole, under a
+    /// 7px thumb. The Facet skin sinks the track into a 4px groove, keeps the fill at 2px along
+    /// its middle, and raises a 10px thumb over it.
+    pub(crate) fn for_skin(skin: MoonSkin) -> Self {
+        if skin.is_facet() {
+            Self {
+                track: MOON_SLIDER_GROOVE_HEIGHT,
+                fill: MOON_SLIDER_TRACK_HEIGHT,
+                thumb: MOON_SLIDER_FACET_THUMB_SIZE,
+            }
+        } else {
+            Self {
+                track: MOON_SLIDER_TRACK_HEIGHT,
+                fill: MOON_SLIDER_TRACK_HEIGHT,
+                thumb: MOON_SLIDER_THUMB_SIZE,
+            }
+        }
+    }
+}
+
+/// Returns the glow a thumb casts in its own colour, fainter on a disabled slider.
+fn thumb_glow(thumb_color: Hsla, disabled: bool) -> BoxShadow {
+    box_shadow(
+        px(0.),
+        px(0.),
+        px(14.),
+        px(0.),
+        thumb_color.opacity(if disabled { 0.14 } else { 0.72 }),
+    )
+}
+
+/// What a slider thumb paints under the Facet skin, in place of its flat disc.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SliderThumbFacet {
+    /// The thumb's fill: the colour at its top edge, then the one at its bottom edge.
+    pub(crate) fill: [Hsla; 2],
+    /// The thumb's shadow on the groove, followed by the glow the flat thumb has.
+    pub(crate) shadows: Vec<BoxShadow>,
+}
+
+impl SliderThumbFacet {
+    /// Resolves a slider thumb's faceted surface.
+    ///
+    /// The thumb is lit from above: `thumb_color` mixed halfway toward white at its top edge and
+    /// `thumb_color` itself at the bottom. It casts a short shadow on the groove under the same
+    /// glow the flat thumb has. A disabled thumb fades all three by the flat thumb's factor.
+    ///
+    /// Args:
+    ///     skin: The active theme side's skin.
+    ///     p: The active palette, for the shadow ink.
+    ///     thumb_color: The thumb's colour: the accent, or the text colour set on the slider.
+    ///     disabled: Whether the slider is disabled.
+    ///
+    /// Returns:
+    ///     The surface to paint, or `None` under the Flat skin, where the flat disc stands.
+    pub(crate) fn resolve(
+        skin: MoonSkin,
+        p: MoonPalette,
+        thumb_color: Hsla,
+        disabled: bool,
+    ) -> Option<Self> {
+        if !skin.is_facet() {
+            return None;
+        }
+        let color = thumb_color.opacity(if disabled { 0.42 } else { 1.0 });
+        let drop = box_shadow(
+            px(0.),
+            px(1.),
+            px(2.),
+            px(0.),
+            rgba_from(p.shadow, if disabled { 0.25 } else { 0.6 }),
+        );
+        Some(Self {
+            fill: [color.blend(white().opacity(0.5)), color],
+            shadows: vec![drop, thumb_glow(thumb_color, disabled)],
+        })
+    }
+
+    /// Builds the thumb's background: the gradient from the top edge's colour to the bottom's.
+    fn background(&self) -> Background {
+        linear_gradient(
+            180.0,
+            linear_color_stop(self.fill[0], 0.0),
+            linear_color_stop(self.fill[1], 1.0),
+        )
+    }
+}
 
 /// Translate one wheel event into slider notches, positive meaning "increase".
 ///
@@ -562,39 +671,42 @@ impl Slider {
         radius: Corners<Pixels>,
         disabled: bool,
         window: &mut Window,
-        _cx: &mut App,
+        cx: &mut App,
     ) -> impl gpui::IntoElement {
         let entity_id = self.state.entity_id();
         let axis = self.axis;
         let id = ("slider-thumb", is_start as u32);
+        let skin = MoonSkin::active(cx);
+        let metrics = SliderMetrics::for_skin(skin);
+        let (thumb_size, track_height) = (metrics.thumb, metrics.track);
+        let thumb_facet =
+            SliderThumbFacet::resolve(skin, MoonPalette::active(cx), thumb_color, disabled);
 
         div()
             .id(id)
             .absolute()
             .when(axis.is_horizontal(), |this| {
-                this.top(-(MOON_SLIDER_THUMB_SIZE - MOON_SLIDER_TRACK_HEIGHT) * 0.5)
+                this.top(-(thumb_size - track_height) * 0.5)
                     .left(start)
-                    .ml(-MOON_SLIDER_THUMB_SIZE * 0.5)
+                    .ml(-thumb_size * 0.5)
             })
             .when(axis.is_vertical(), |this| {
                 this.bottom(start)
-                    .left(-(MOON_SLIDER_THUMB_SIZE - MOON_SLIDER_TRACK_HEIGHT) * 0.5)
-                    .mb(-MOON_SLIDER_THUMB_SIZE * 0.5)
+                    .left(-(thumb_size - track_height) * 0.5)
+                    .mb(-thumb_size * 0.5)
             })
             .flex()
             .items_center()
             .justify_center()
             .flex_shrink_0()
             .corner_radii(radius)
-            .size(MOON_SLIDER_THUMB_SIZE)
+            .size(thumb_size)
             .bg(thumb_color.opacity(if disabled { 0.42 } else { 1.0 }))
-            .shadow(vec![box_shadow(
-                px(0.),
-                px(0.),
-                px(14.),
-                px(0.),
-                thumb_color.opacity(if disabled { 0.14 } else { 0.72 }),
-            )])
+            .shadow(vec![thumb_glow(thumb_color, disabled)])
+            // Under the Facet skin the thumb is lit from above and casts a shadow on the groove.
+            .when_some(thumb_facet, |this, thumb| {
+                this.bg(thumb.background()).shadow(thumb.shadows)
+            })
             .on_mouse_down(MouseButton::Left, |_, _, cx| {
                 cx.stop_propagation();
             })
@@ -649,6 +761,13 @@ impl RenderOnce for Slider {
         let p = MoonPalette::active(cx);
         let accent = rgba_from(p.accent, 1.0);
         let fill_alpha = if self.disabled { 0.24 } else { 0.88 };
+        let skin = MoonSkin::active(cx);
+        let metrics = SliderMetrics::for_skin(skin);
+        // Under the Facet skin the track is a groove: the skin's well, without its edge, which a
+        // groove this thin has no room for.
+        let groove = skin
+            .is_facet()
+            .then(|| facet(MoonFacetKind::Well, &MoonTheme::active_tokens(cx)));
 
         let thumb_color = self.style.text.color.unwrap_or(accent);
         let corner_radii = self.style.corner_radii.clone();
@@ -772,17 +891,14 @@ impl RenderOnce for Slider {
                         div()
                             .id("slider-bar")
                             .relative()
-                            .when(axis.is_horizontal(), |this| {
-                                this.w_full().h(MOON_SLIDER_TRACK_HEIGHT)
-                            })
-                            .when(axis.is_vertical(), |this| {
-                                this.h_full().w(MOON_SLIDER_TRACK_HEIGHT)
-                            })
+                            .when(axis.is_horizontal(), |this| this.w_full().h(metrics.track))
+                            .when(axis.is_vertical(), |this| this.h_full().w(metrics.track))
                             .bg(rgba_from(
                                 p.overlay,
                                 if self.disabled { 0.03 } else { 0.05 },
                             ))
                             .corner_radii(radius)
+                            .when_some(groove, |this, well| this.bg(well.fill).shadow(well.shadows))
                             .child(
                                 div()
                                     .absolute()
@@ -791,6 +907,16 @@ impl RenderOnce for Slider {
                                     })
                                     .when(axis.is_vertical(), |this| {
                                         this.w_full().bottom(bar_start).top(bar_end)
+                                    })
+                                    // A groove is thicker than its fill, which then keeps its
+                                    // own thickness and runs along the groove's middle.
+                                    .when(metrics.fill < metrics.track, |this| {
+                                        let inset = (metrics.track - metrics.fill) * 0.5;
+                                        if axis.is_horizontal() {
+                                            this.top(inset).h(metrics.fill)
+                                        } else {
+                                            this.left(inset).w(metrics.fill)
+                                        }
                                     })
                                     .bg(linear_gradient(
                                         if axis.is_horizontal() { 90.0 } else { 0.0 },

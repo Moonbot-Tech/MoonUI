@@ -94,18 +94,52 @@ application panels.
 
 ### Bundled themes
 
-Three palettes ship in the crate, each a `MoonPalette` constant in
+Four palettes ship in the crate, each a `MoonPalette` constant in
 `moon/tokens.rs` paired with a theme file under `crates/moon-ui-components/themes/`:
 
-| theme | file | palette | colour set |
-|---|---|---|---|
-| Terminal | `moon-terminal.toml` | `MoonPalette::TERMINAL` | dark |
-| Light | `moon-light.toml` | `MoonPalette::LIGHT` | light |
-| Graphite | `moon-graphite.toml` | `MoonPalette::GRAPHITE` | dark |
+| theme | file | palette | colour set | skin |
+|---|---|---|---|---|
+| Terminal | `moon-terminal.toml` | `MoonPalette::TERMINAL` | dark | flat |
+| Light | `moon-light.toml` | `MoonPalette::LIGHT` | light | flat |
+| Graphite | `moon-graphite.toml` | `MoonPalette::GRAPHITE` | dark | flat |
+| Obsidian | `moon-obsidian.toml` | `MoonPalette::OBSIDIAN` | dark | facet |
 
 The constant and the file hold the same values on purpose — the constant is what
 code reads, the file is what a host installs — so a change to one is a change to
 both, and a test pins the pair.
+
+The skin is the manner in which a theme side draws depth, `MoonSkin` in
+`moon/skin.rs`, and it is separate from the palette. `Flat` is a solid fill and a
+hairline, and is what a theme file gets when it names no skin. `Facet` lights
+each surface from above — a gradient fill, a one-pixel edge, a highlight and a
+shadow — with every colour derived from the palette by the rules in that module,
+so it needs no palette entries of its own. A component consults the skin only to
+draw the faceted look; under `Flat` it must paint exactly what it painted before
+skins existed. The skin is set per side: Obsidian's light side is the flat light
+theme.
+
+Three rules of the faceted look are easy to break from a component:
+
+- **A blur is written as the design gives it.** The design's shadows and glows
+  are CSS `box-shadow` values, where the gaussian's standard deviation is half
+  the blur; the renderer takes the standard deviation itself as its blur radius.
+  `facet`, `facet_tinted`, `facet_glow` and the backdrop lights convert on the
+  way in, so a component passes the design's number to them. A shadow built
+  directly with `box_shadow(..)` is not converted, and a design blur passed that
+  way renders twice as wide and far fainter than designed.
+- **A small socket is not a well.** A checkbox box, a radio circle and a toggle
+  track take `MoonFacetKind::Socket`: the well's fill and shadows under an edge
+  that still reads at a dozen pixels. The plain `Well` edge is right for an
+  input and disappears on a control that small.
+- **The ambient light belongs to the window, not to a panel.** `MoonRoot` paints
+  `moon_backdrop` when it owns an opaque window fill. A host whose root paints
+  nothing, because something shows through it, lays `moon_ambient_light` inside
+  an opaque band of its own, clipped to that band, and never over what shows
+  through.
+
+The rules hold on a light palette too: the gallery's "Light (facet)" style
+(`--theme light-facet`) draws `MoonPalette::LIGHT` with the Facet skin. It is a
+demonstration, not a bundled theme.
 
 Two rules bind a new bundled palette:
 

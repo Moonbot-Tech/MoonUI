@@ -802,20 +802,19 @@ impl InputState {
         self.mode.diagnostics_mut()
     }
 
-    /// Set placeholder
+    /// Update the placeholder, invalidating only when the visible hint changes.
     pub fn set_placeholder(
         &mut self,
         placeholder: impl Into<SharedString>,
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.placeholder = placeholder.into();
-        cx.notify();
+        self.sync_placeholder(placeholder, cx);
     }
 
     /// Set the placeholder only when it differs, so a caller that re-applies the same text on
     /// every render — a translated hint following a live locale switch — does not schedule a
-    /// redraw each frame. Unlike [`Self::set_placeholder`] it needs no window.
+    /// redraw each frame. This window-free form also backs [`Self::set_placeholder`].
     pub fn sync_placeholder(
         &mut self,
         placeholder: impl Into<SharedString>,
@@ -1243,13 +1242,15 @@ impl InputState {
         self.number_max = max;
     }
 
-    /// Set true to show spinner at the input right.
+    /// Set true to show the spinner at the input right; unchanged values do not invalidate.
     ///
     /// Only for [`InputMode::SingleLine`] mode.
     pub fn set_loading(&mut self, loading: bool, _: &mut Window, cx: &mut Context<Self>) {
         debug_assert!(self.mode.is_single_line());
-        self.loading = loading;
-        cx.notify();
+        if self.loading != loading {
+            self.loading = loading;
+            cx.notify();
+        }
     }
 
     /// Set the default value of the input field.
@@ -1753,7 +1754,8 @@ impl InputState {
         cx.propagate();
     }
 
-    /// Show the right-click context menu as a native OS menu.
+    /// Show the right-click menu for this input. Other open popovers do not own this input's
+    /// menu policy; nested deferred overlays are supported by the window renderer.
     pub(crate) fn handle_right_click_menu(
         &mut self,
         event: &MouseDownEvent,
@@ -1761,10 +1763,6 @@ impl InputState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if crate::global_state::GlobalState::global(cx).is_in_deferred_context() {
-            return;
-        }
-
         if !self.selected_range.contains(offset) {
             self.move_to(offset, None, cx);
         }
@@ -1969,6 +1967,7 @@ impl InputState {
         self.diagnostic_popover = None;
     }
 
+    /// Clamp scrolling to the current content and request a draw only if the offset changes.
     pub(super) fn update_scroll_offset(
         &mut self,
         offset: Option<Point<Pixels>>,
@@ -1993,8 +1992,10 @@ impl InputState {
             offset.y.clamp(safe_y_range.start, safe_y_range.end)
         };
         offset.x = offset.x.clamp(safe_x_range.start, safe_x_range.end);
-        self.scroll_handle.set_offset(offset);
-        cx.notify();
+        if self.scroll_handle.offset() != offset {
+            self.scroll_handle.set_offset(offset);
+            cx.notify();
+        }
     }
 
     /// Scroll to make the given offset visible.

@@ -106,3 +106,47 @@ fn interactive_text_item_dispatches_click_without_external_hitbox(cx: &mut gpui:
         assert_status_item_interactions(cx, palette);
     }
 }
+
+// ---- Theme skin: what the bar paints behind its items ----
+
+use super::status_bar_facet_rule;
+use crate::moon::{MoonSkin, MoonThemeTokens, rgba_from};
+
+/// Theme tokens for `palette` drawn with `skin`, at the default scale.
+fn skin_tokens(palette: MoonPalette, skin: MoonSkin) -> MoonThemeTokens {
+    MoonThemeTokens {
+        palette,
+        skin,
+        ..MoonThemeTokens::default()
+    }
+}
+
+/// Catches `status_bar.rs:status_bar_facet_rule` ignoring the skin: every flat theme's status
+/// bar would lose its `shell_high` fill and its solid top border, which `render_with_theme`
+/// keeps only while this answers `None`.
+#[test]
+fn a_flat_status_bar_keeps_its_fill_and_top_border() {
+    for palette in [
+        MoonPalette::TERMINAL,
+        MoonPalette::LIGHT,
+        MoonPalette::OBSIDIAN,
+    ] {
+        assert_eq!(
+            status_bar_facet_rule(palette, &skin_tokens(palette, MoonSkin::Flat)),
+            None
+        );
+    }
+}
+
+/// Catches `status_bar.rs:status_bar_facet_rule` drawing the rule at the flat border's full
+/// strength, or in another ink: a faceted bar would carry a hard line across the bottom of a
+/// window whose other lines fade at their ends.
+#[test]
+fn a_faceted_status_bar_draws_a_faint_rule_in_the_overlay_ink() {
+    let p = MoonPalette::OBSIDIAN;
+
+    assert_eq!(
+        status_bar_facet_rule(p, &skin_tokens(p, MoonSkin::Facet)),
+        Some(rgba_from(p.overlay, 0.09))
+    );
+}

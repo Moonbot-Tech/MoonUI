@@ -1,9 +1,11 @@
 //! Monospaced shortcut chips sized to the active density tier.
 
+use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 
 use super::{
     foundation::MoonSize,
+    skin::{MoonFacet, MoonFacetKind, facet},
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, rgba_from},
 };
@@ -242,6 +244,19 @@ impl MoonKbd {
             },
         }
     }
+
+    /// Resolve the faceted surface the chip paints over its flat chrome.
+    ///
+    /// Args:
+    ///     tokens: The theme side to resolve for; supplies the skin, the palette and the UI
+    ///         scale.
+    ///
+    /// Returns:
+    ///     The raised surface for a filled chip under the Facet skin. `None` under the Flat
+    ///     skin, and for an outline chip, which has no fill to light and keeps its hairline.
+    fn raised_surface(&self, tokens: &MoonThemeTokens) -> Option<MoonFacet> {
+        (tokens.skin.is_facet() && !self.outline).then(|| facet(MoonFacetKind::Raised, tokens))
+    }
 }
 
 impl From<Keystroke> for MoonKbd {
@@ -251,11 +266,13 @@ impl From<Keystroke> for MoonKbd {
 }
 
 impl RenderOnce for MoonKbd {
-    /// Renders resolved text and chrome without double scaling.
+    /// Renders resolved text and chrome without double scaling, with the surface of
+    /// [`MoonKbd::raised_surface`] painted over the flat chrome where there is one.
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
         let metrics = self.metrics(&tokens);
+        let raised = self.raised_surface(&tokens);
         let mut root = div()
             .relative()
             .h(px(metrics.height))
@@ -267,6 +284,11 @@ impl RenderOnce for MoonKbd {
                 if self.outline { p.shell } else { p.panel },
                 if self.outline { 0.0 } else { 0.92 },
             ))
+            .when_some(raised, |this, raised| {
+                this.bg(raised.fill)
+                    .border_color(raised.edge)
+                    .shadow(raised.shadows)
+            })
             .flex()
             .items_center()
             .justify_center()

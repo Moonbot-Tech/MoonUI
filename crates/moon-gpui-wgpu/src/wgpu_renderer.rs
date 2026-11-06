@@ -19,6 +19,9 @@ use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, Weak};
 
+#[cfg(all(test, any(windows, target_os = "linux")))]
+mod tests;
+
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct GlobalParams {
@@ -514,7 +517,8 @@ impl WgpuRenderer {
         let last_error_clone = Arc::clone(&last_error);
         device.on_uncaptured_error(Arc::new(move |error| {
             let mut guard = last_error_clone.lock().unwrap();
-            *guard = Some(error.to_string());
+            // Preserve the cause: later submissions may only report that its pipeline is invalid.
+            guard.get_or_insert_with(|| error.to_string());
         }));
 
         let resources = WgpuResources {
@@ -1283,6 +1287,8 @@ impl WgpuRenderer {
         self.draw_gpu_canvas_text(text_frame, instance_offset, pass)
     }
 
+    /// Submit scene commands, retaining canvas preparation when instance growth retries it.
+    /// Returns false when the surface cannot accept this frame.
     pub fn draw(&mut self, scene: &Scene) -> bool {
         // Bail out early if the surface has been unconfigured (e.g. during
         // Android background/rotation transitions).  Attempting to acquire
@@ -1461,7 +1467,9 @@ impl WgpuRenderer {
                     }
                 }
                 if overflow {
-                    drop(encoder);
+                    // Canvas prepare already committed its CPU state. Keep those GPU commands;
+                    // the retry clears the partial surface before the only present below.
+                    self.resources().queue.submit([encoder.finish()]);
                     if self.instance_buffer_capacity >= self.max_buffer_size {
                         log::error!(
                             "instance buffer size grew too large: {}",
@@ -1581,7 +1589,7 @@ impl WgpuRenderer {
             }
 
             if overflow {
-                drop(encoder);
+                self.resources().queue.submit([encoder.finish()]);
                 if self.instance_buffer_capacity >= self.max_buffer_size {
                     log::error!(
                         "instance buffer size grew too large: {}",
@@ -1625,7 +1633,7 @@ impl WgpuRenderer {
             }
 
             if overflow {
-                drop(encoder);
+                self.resources().queue.submit([encoder.finish()]);
                 if self.instance_buffer_capacity >= self.max_buffer_size {
                     log::error!(
                         "instance buffer size grew too large: {}",
@@ -2394,6 +2402,17 @@ impl WgpuRenderer {
         self.device_lost.load(std::sync::atomic::Ordering::SeqCst)
     }
 
+    /// Destroy the shared device and explicitly request recovery for diagnostics.
+    /// Ordinary device destruction intentionally does not set the lost callback's flag.
+    pub fn request_device_reset(&self) {
+        if !self
+            .device_lost
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            self.resources().device.destroy();
+        }
+    }
+
     /// Returns true if a redraw is needed because GPU state was cleared.
     /// Calling this method clears the flag.
     pub fn needs_redraw(&mut self) -> bool {
@@ -2435,7 +2454,9 @@ impl WgpuRenderer {
             *gpu_context.borrow_mut() = None;
 
             // Wait briefly for the GPU driver to stabilize, then try to
-            // recreate the context without software renderers. If this fails
+            // recreate the context. A software session must be able to recover on
+            // its existing adapter class; a hardware session must not silently
+            // fall back to software. If this fails
             // the caller should request another frame and retry — the real GPU
             // may need more time to come back (e.g. after suspend/resume).
             std::thread::sleep(std::time::Duration::from_millis(350));
@@ -2443,8 +2464,11 @@ impl WgpuRenderer {
             let instance = WgpuContext::instance(Box::new(window.clone()));
             let surface =
                 create_surface(&instance, display_handle.as_raw(), window_handle.as_raw())?;
-            let new_context =
-                WgpuContext::new_rejecting_software(instance, &surface, self.compositor_gpu)?;
+            let new_context = if self.adapter_info.device_type == wgpu::DeviceType::Cpu {
+                WgpuContext::new(instance, &surface, self.compositor_gpu)?
+            } else {
+                WgpuContext::new_rejecting_software(instance, &surface, self.compositor_gpu)?
+            };
             *gpu_context.borrow_mut() = Some(new_context);
             surface
         } else {

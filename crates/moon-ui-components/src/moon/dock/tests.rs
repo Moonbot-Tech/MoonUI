@@ -710,6 +710,77 @@ fn layout_replacement_clears_zoom_before_removing_the_panel(cx: &mut gpui::TestA
     .unwrap();
 }
 
+/// Closing a side root must stop its selected panel without waiting for another hidden render.
+#[gpui::test]
+fn side_root_open_state_drives_activity_and_preserves_zoom(cx: &mut gpui::TestAppContext) {
+    let window = cx.add_window(|_, _| DockTestHarness);
+    cx.update_window(window.into(), |_, window, cx| {
+        let assets = Rc::new(PanelProbe::default());
+        let log = Rc::new(PanelProbe::default());
+        let chart = Rc::new(PanelProbe::default());
+        let items = vec![
+            tracking_panel("assets", assets.clone(), cx),
+            tracking_panel("log", log.clone(), cx),
+        ];
+        let runtime = cx.new(|_| MoonTabPanelRuntimeState::default());
+        let center = tracking_panel("chart", chart.clone(), cx);
+        let dock = cx.new(|_| DockArea::test_with_center(DockItem::Panel(center)));
+        dock.update(cx, |dock, cx| {
+            dock.right = Some((
+                DockItem::Tabs {
+                    items,
+                    active_ix: 1,
+                },
+                240.,
+                true,
+            ));
+            dock.tab_runtime_states
+                .insert("test-dock:right".into(), runtime.downgrade());
+            dock.sync_layout_active(window, cx);
+            assert!(!assets.active.get());
+            assert!(log.active.get());
+
+            assert!(dock.set_dock_open(super::DockPlacement::Right, false, window, cx));
+            assert!(
+                !log.active.get(),
+                "a closed side root cannot keep its panel active"
+            );
+            assert_eq!(runtime.read(cx).notified_active, Some((None, 2)));
+            let calls = log.active_calls.get();
+            assert!(!dock.set_dock_open(super::DockPlacement::Right, false, window, cx));
+            assert_eq!(
+                log.active_calls.get(),
+                calls,
+                "unchanged state has no lifecycle edge"
+            );
+
+            assert!(dock.toggle_dock(super::DockPlacement::Right, window, cx));
+            assert!(log.active.get());
+            assert!(!assets.active.get());
+            assert_eq!(runtime.read(cx).active_ix, 1);
+
+            dock.toggle_zoom_panel("chart", window, cx);
+            assert!(!log.active.get());
+            let chart_calls = chart.active_calls.get();
+            assert!(dock.set_dock_open(super::DockPlacement::Right, false, window, cx));
+            assert!(dock.toggle_dock(super::DockPlacement::Right, window, cx));
+            assert_eq!(
+                chart.active_calls.get(),
+                chart_calls,
+                "unchanged zoom has no activity edges"
+            );
+            assert!(
+                !log.active.get(),
+                "reopening must not activate behind another panel's zoom"
+            );
+            dock.clear_zoom(window, cx);
+            assert!(log.active.get());
+            assert!(!assets.active.get());
+        });
+    })
+    .unwrap();
+}
+
 /// Catches making `dock.rs:DockArea::sync_layout_active` ignore `zoomed_panel`, which would keep
 /// the hidden normal tab active while the visible zoom surface reports no active panel.
 #[gpui::test]
@@ -1487,4 +1558,577 @@ fn split_drop_header_inset_clears_the_tab_header() {
         tab_header_height(&tokens)
     );
     assert_eq!(DockArea::split_drop_header_inset(false, &tokens), 0.0);
+}
+
+// ---- Theme skin: what a panel, a tile and the gap between panels paint ----
+
+use super::{
+    TileFacet,
+    tab_panel::{PanelFacet, PanelPlacement},
+};
+use crate::{
+    ElementExt as _, Root,
+    moon::{MoonFacetKind, MoonPalette, MoonSkin, MoonTheme, MoonThemeConfig, facet, rgba_from},
+};
+use gpui::{
+    AnyWindowHandle, AtlasKey, AtlasTile, Background, BoxShadow, DevicePixels, HeadlessAppContext,
+    NoopTextSystem, Pixels, PlatformAtlas, PlatformHeadlessRenderer, Point, Quad, ScaledPixels,
+    Scene, Shadow, Size, linear_color_stop, linear_gradient, transparent_black,
+};
+use std::{borrow::Cow, sync::Arc};
+
+const ALL_POLICIES: [MoonBackgroundPolicy; 3] = [
+    MoonBackgroundPolicy::Opaque,
+    MoonBackgroundPolicy::Transparent,
+    MoonBackgroundPolicy::NoFill,
+];
+
+const ALL_PLACEMENTS: [PanelPlacement; 3] = [
+    PanelPlacement::Standalone,
+    PanelPlacement::Docked,
+    PanelPlacement::Floating,
+];
+
+/// The highlight a slab carries along its top edge on a dark palette, written out rather than
+/// taken from `skin.rs`: one pixel down, no blur, inside the slab.
+fn slab_top_highlight(p: MoonPalette) -> BoxShadow {
+    BoxShadow {
+        color: rgba_from(p.overlay, 0.12),
+        offset: point(px(0.0), px(1.0)),
+        blur_radius: px(0.0),
+        spread_radius: px(0.0),
+        inset: true,
+    }
+}
+
+/// Theme tokens for `palette` drawn with `skin`, at the default scale.
+fn skin_tokens(palette: MoonPalette, skin: MoonSkin) -> MoonThemeTokens {
+    MoonThemeTokens {
+        palette,
+        skin,
+        ..MoonThemeTokens::default()
+    }
+}
+
+/// The sheen a faceted header lays over its surface, written out rather than taken from
+/// `tab_panel.rs`.
+fn header_sheen(p: MoonPalette) -> Background {
+    linear_gradient(
+        180.0,
+        linear_color_stop(rgba_from(p.overlay, 0.05), 0.0),
+        linear_color_stop(rgba_from(p.overlay, 0.0), 1.0),
+    )
+}
+
+/// Catches `tab_panel.rs:PanelFacet::resolve` or `dock.rs:TileFacet::resolve` ignoring the skin:
+/// every flat theme would get gradient panels, rounded corners and shadows it never asked for.
+#[test]
+fn the_flat_skin_resolves_no_panel_or_tile_facet() {
+    for palette in [
+        MoonPalette::TERMINAL,
+        MoonPalette::LIGHT,
+        MoonPalette::GRAPHITE,
+        MoonPalette::OBSIDIAN,
+    ] {
+        let tokens = skin_tokens(palette, MoonSkin::Flat);
+        for root in ALL_POLICIES {
+            for content in ALL_POLICIES {
+                for placement in ALL_PLACEMENTS {
+                    assert_eq!(
+                        PanelFacet::resolve(
+                            &tokens,
+                            placement,
+                            root,
+                            MoonBackgroundPolicy::Opaque,
+                            content
+                        ),
+                        None
+                    );
+                }
+            }
+            assert_eq!(TileFacet::resolve(&tokens, root), None);
+        }
+    }
+}
+
+/// Catches `tab_panel.rs:PanelFacet::resolve` keying the slab on the root policy alone. A host
+/// that leaves the dock unfilled so a chart can show — every panel root is `NoFill` there —
+/// would get no slab on its ordinary, opaque panels, which is the whole look of the skin.
+///
+/// Also catches a docked slab keeping the shadows it casts: the slot beside it may hold a
+/// see-through panel, and a shadow cast over that slot would darken the chart it shows.
+#[test]
+fn a_panel_with_an_opaque_body_is_one_slab_and_casts_a_shadow_only_on_its_own() {
+    let p = MoonPalette::OBSIDIAN;
+    let tokens = skin_tokens(p, MoonSkin::Facet);
+    let slab = facet(MoonFacetKind::Slab, &tokens);
+
+    for (root, content) in [
+        (MoonBackgroundPolicy::NoFill, MoonBackgroundPolicy::Opaque),
+        (MoonBackgroundPolicy::Opaque, MoonBackgroundPolicy::Opaque),
+        (MoonBackgroundPolicy::Opaque, MoonBackgroundPolicy::NoFill),
+    ] {
+        let alone = PanelFacet::resolve(
+            &tokens,
+            PanelPlacement::Standalone,
+            root,
+            MoonBackgroundPolicy::Opaque,
+            content,
+        )
+        .expect("the Facet skin resolves a panel facet");
+        assert_eq!(alone.root_fill, Some(slab.fill), "{root:?}/{content:?}");
+        assert_eq!(
+            alone.root_shadows, slab.shadows,
+            "a panel on its own keeps the whole slab"
+        );
+
+        let panel = PanelFacet::resolve(
+            &tokens,
+            PanelPlacement::Docked,
+            root,
+            MoonBackgroundPolicy::Opaque,
+            content,
+        )
+        .expect("the Facet skin resolves a panel facet");
+
+        assert_eq!(panel.root_fill, Some(slab.fill), "{root:?}/{content:?}");
+        assert_eq!(panel.edge, slab.edge);
+        assert_eq!(
+            panel.root_shadows,
+            vec![slab_top_highlight(p)],
+            "a docked slab keeps its top highlight and casts nothing outside itself"
+        );
+        assert_eq!(panel.radius, 8.0, "the container radius of the theme");
+        assert_eq!(
+            panel.header_fill,
+            Some(header_sheen(p)),
+            "the header is a sheen over the slab, not the flat `panel` fill"
+        );
+        assert_eq!(panel.header_overlay, None);
+        assert_eq!(
+            panel.header_radius, 7.0,
+            "the header starts inside the one-pixel edge"
+        );
+        assert_eq!(panel.header_rule, rgba_from(p.overlay, 0.11));
+        assert!(
+            !panel.body_keeps_policy_fill,
+            "the body paints nothing, so the slab shows through it"
+        );
+    }
+}
+
+/// Catches `tab_panel.rs:PanelFacet::resolve` giving a see-through panel the slab fill or the
+/// slab's outer shadows. GPUI paints a shadow under the whole of its element, so either one
+/// would cover the GPU chart canvas that such a panel exists to show.
+#[test]
+fn a_see_through_panel_takes_the_slab_on_its_header_only() {
+    let p = MoonPalette::OBSIDIAN;
+    let tokens = skin_tokens(p, MoonSkin::Facet);
+    let slab = facet(MoonFacetKind::Slab, &tokens);
+
+    for policy in [
+        MoonBackgroundPolicy::NoFill,
+        MoonBackgroundPolicy::Transparent,
+    ] {
+        for placement in [PanelPlacement::Docked, PanelPlacement::Standalone] {
+            let panel = PanelFacet::resolve(
+                &tokens,
+                placement,
+                policy,
+                MoonBackgroundPolicy::Opaque,
+                policy,
+            )
+            .expect("the Facet skin resolves a panel facet");
+
+            assert_eq!(
+                panel.root_fill, None,
+                "{placement:?} {policy:?} body must stay unpainted"
+            );
+            assert!(
+                panel.body_keeps_policy_fill,
+                "the body is left to its policy, which paints nothing"
+            );
+            assert_eq!(
+                panel.root_shadows,
+                vec![slab_top_highlight(p)],
+                "only the inset highlight: no shadow that falls outside the panel"
+            );
+            assert_eq!(panel.edge, slab.edge);
+            assert_eq!(
+                panel.header_fill,
+                Some(slab.fill),
+                "the header alone carries the slab"
+            );
+            assert_eq!(panel.header_overlay, Some(header_sheen(p)));
+        }
+
+        let bare_header = PanelFacet::resolve(
+            &tokens,
+            PanelPlacement::Docked,
+            policy,
+            MoonBackgroundPolicy::NoFill,
+            policy,
+        )
+        .expect("the Facet skin resolves a panel facet");
+        assert_eq!(
+            (bare_header.header_fill, bare_header.header_overlay),
+            (None, None),
+            "a header that asked for no fill gets none"
+        );
+    }
+}
+
+/// Catches `dock.rs:TileFacet::resolve` and `tab_panel.rs:PanelFacet::resolve` both painting a
+/// surface for a floating tile — a slab inside a popup — or neither, and catches a see-through
+/// tile taking the popup's fill or its outer shadows over the canvas behind it.
+#[test]
+fn a_floating_tile_is_a_popup_and_the_panel_inside_paints_no_surface() {
+    let p = MoonPalette::OBSIDIAN;
+    let tokens = skin_tokens(p, MoonSkin::Facet);
+    let popup = facet(MoonFacetKind::Popup, &tokens);
+
+    let tile = TileFacet::resolve(&tokens, MoonBackgroundPolicy::Opaque)
+        .expect("the Facet skin resolves a tile facet");
+    assert_eq!(tile.fill, Some(popup.fill));
+    assert_eq!(tile.edge, popup.edge);
+    assert_eq!(tile.shadows, popup.shadows);
+    assert_eq!(tile.radius, 8.0);
+
+    let inside = PanelFacet::resolve(
+        &tokens,
+        PanelPlacement::Floating,
+        MoonBackgroundPolicy::NoFill,
+        MoonBackgroundPolicy::Opaque,
+        MoonBackgroundPolicy::Opaque,
+    )
+    .expect("the Facet skin resolves a panel facet");
+    assert_eq!(inside.root_fill, None, "the tile carries the fill");
+    assert_eq!(
+        inside.edge,
+        transparent_black(),
+        "the tile carries the edge"
+    );
+    assert_eq!(inside.root_shadows, Vec::new());
+    assert_eq!(inside.header_fill, Some(header_sheen(p)));
+    assert_eq!(
+        inside.header_radius, 6.0,
+        "inside the tile's edge and the panel's own unpainted one"
+    );
+    assert!(!inside.body_keeps_policy_fill);
+
+    for policy in [
+        MoonBackgroundPolicy::NoFill,
+        MoonBackgroundPolicy::Transparent,
+    ] {
+        let tile = TileFacet::resolve(&tokens, policy).expect("the Facet skin resolves a tile");
+        assert_eq!(tile.fill, None, "{policy:?} tile must stay unpainted");
+        assert_eq!(tile.edge, popup.edge);
+        assert!(
+            !tile.shadows.is_empty() && tile.shadows.iter().all(|shadow| shadow.inset),
+            "only the inset highlight: {:?}",
+            tile.shadows
+        );
+
+        let inside = PanelFacet::resolve(
+            &tokens,
+            PanelPlacement::Floating,
+            MoonBackgroundPolicy::NoFill,
+            MoonBackgroundPolicy::Opaque,
+            policy,
+        )
+        .expect("the Facet skin resolves a panel facet");
+        assert_eq!(inside.root_fill, None);
+        assert_eq!(
+            inside.header_fill,
+            Some(popup.fill),
+            "the header of a see-through tile carries the popup surface"
+        );
+        assert!(inside.body_keeps_policy_fill);
+    }
+}
+
+/// The quads and shadows of the last rendered scene.
+#[derive(Default)]
+struct RecordedScene {
+    quads: Vec<Quad>,
+    shadows: Vec<Shadow>,
+}
+
+impl RecordedScene {
+    /// Return the fills painted at `probe`, bottom to top: every quad that covers the point
+    /// with a background that is not fully transparent.
+    fn fills_at(&self, probe: Point<ScaledPixels>) -> Vec<Background> {
+        self.quads
+            .iter()
+            .filter(|quad| {
+                !quad.background.is_transparent()
+                    && quad.bounds.contains(&probe)
+                    && quad.content_mask.bounds.contains(&probe)
+            })
+            .map(|quad| quad.background)
+            .collect()
+    }
+
+    /// Return the shadows that can reach `probe`.
+    ///
+    /// A shadow outside its element reaches three blur radii past its own rectangle and is
+    /// painted under the whole of it. A shadow inside its element covers the element except the
+    /// hole, which is that rectangle shrunk by the same margin.
+    fn shadows_at(&self, probe: Point<ScaledPixels>) -> Vec<&Shadow> {
+        self.shadows
+            .iter()
+            .filter(|shadow| {
+                let reach = 3.0 * shadow.blur_radius.0;
+                shadow.content_mask.bounds.contains(&probe)
+                    && if shadow.inset == 0 {
+                        shadow.bounds.dilate(ScaledPixels(reach)).contains(&probe)
+                    } else {
+                        shadow.element_bounds.contains(&probe)
+                            && !shadow.bounds.dilate(ScaledPixels(-reach)).contains(&probe)
+                    }
+            })
+            .collect()
+    }
+}
+
+/// Records the primitives a headless window submits, without rasterizing them.
+struct SkinSceneRecorder(Rc<RefCell<RecordedScene>>);
+
+impl PlatformHeadlessRenderer for SkinSceneRecorder {
+    /// Record the scene; image output is intentionally unsupported.
+    fn render_scene_to_image(
+        &mut self,
+        scene: &Scene,
+        size: Size<DevicePixels>,
+    ) -> anyhow::Result<image::RgbaImage> {
+        self.render_scene(scene, size)?;
+        anyhow::bail!("scene recorder does not rasterize images")
+    }
+
+    /// Replace the preceding frame, so assertions inspect the final submission only.
+    fn render_scene(&mut self, scene: &Scene, _size: Size<DevicePixels>) -> anyhow::Result<()> {
+        self.0.replace(RecordedScene {
+            quads: scene.quads.clone(),
+            shadows: scene.shadows.clone(),
+        });
+        Ok(())
+    }
+
+    /// Fills and shadows do not depend on glyph or icon textures.
+    fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {
+        Arc::new(NoSpriteAtlas)
+    }
+}
+
+/// Omits sprites from the fill-and-shadow scene probe.
+struct NoSpriteAtlas;
+
+impl PlatformAtlas for NoSpriteAtlas {
+    /// Decline every sprite: the probe reads quads and shadows only.
+    fn get_or_insert_with<'a>(
+        &self,
+        _key: &AtlasKey,
+        _build: &mut dyn FnMut() -> anyhow::Result<Option<(Size<DevicePixels>, Cow<'a, [u8]>)>>,
+    ) -> anyhow::Result<Option<AtlasTile>> {
+        Ok(None)
+    }
+
+    /// Nothing was stored, so there is nothing to remove.
+    fn remove(&self, _key: &AtlasKey) {}
+}
+
+/// Build a headed panel that reports where its body was painted.
+fn probed_panel(
+    name: &'static str,
+    policy: MoonBackgroundPolicy,
+    body: Rc<Cell<Bounds<Pixels>>>,
+) -> Rc<dyn PanelView> {
+    Rc::new(
+        MoonDockPanel::new(name, name, move |_, _| {
+            let body = body.clone();
+            div()
+                .size_full()
+                .on_prepaint(move |bounds, _, _| body.set(bounds))
+                .into_any_element()
+        })
+        .background_policy(policy)
+        .show_dock_header(true),
+    )
+}
+
+/// Draw `frames` frames, so prepaint captures settle before the scene is read.
+fn pump_frames(cx: &mut HeadlessAppContext, window: AnyWindowHandle, frames: usize) {
+    for _ in 0..frames {
+        cx.update_window(window, |_, window, cx| {
+            window.refresh();
+            window.draw(cx).clear();
+        })
+        .expect("headless frame must draw");
+        cx.run_until_parked();
+    }
+}
+
+/// Catches `tab_panel.rs:TabPanel::render` or `dock.rs:DockArea::render_item` painting over the
+/// body of a see-through panel under the Facet skin — a slab fill, a body fill or a shadow —
+/// which would hide the GPU chart canvas a chart host shows through it. Also catches the Flat
+/// skin losing a fill it has always painted: the panel body, the header or the strip between
+/// two panels.
+///
+/// The dock is set up as a chart host sets it up: the window root, the dock and every panel
+/// root are `NoFill`, and only a panel's own policy decides whether its body is painted.
+#[test]
+fn a_see_through_panel_body_stays_unpainted_and_the_gap_opens_only_under_the_facet_skin() {
+    for (name, config) in [
+        ("flat", MoonThemeConfig::moon_terminal()),
+        ("facet", MoonThemeConfig::moon_obsidian()),
+    ] {
+        let scene = Rc::new(RefCell::new(RecordedScene::default()));
+        let recorded = scene.clone();
+        let mut cx = HeadlessAppContext::with_platform(
+            Arc::new(NoopTextSystem::new()),
+            Arc::new(()),
+            move || Some(Box::new(SkinSceneRecorder(recorded.clone()))),
+        );
+        cx.update(crate::init);
+        cx.update(|cx| MoonTheme::install_config(config.clone(), cx));
+        let tokens = cx.update(|cx| MoonTheme::active_tokens(cx));
+        let p = tokens.palette;
+        let faceted = tokens.skin.is_facet();
+        assert_eq!(faceted, name == "facet", "{name}: the theme under test");
+
+        let opaque_body = Rc::new(Cell::new(Bounds::default()));
+        let chart_body = Rc::new(Cell::new(Bounds::default()));
+        let window = cx
+            .open_window(size(px(800.0), px(600.0)), {
+                let opaque_body = opaque_body.clone();
+                let chart_body = chart_body.clone();
+                move |window, cx| {
+                    let dock = cx.new(|cx| {
+                        DockArea::new("skin-dock", None, window, cx)
+                            .background_policy(MoonBackgroundPolicy::NoFill)
+                            .tab_background_policy(MoonBackgroundPolicy::NoFill)
+                    });
+                    dock.update(cx, |dock, cx| {
+                        dock.set_center(
+                            DockItem::Split {
+                                horizontal: true,
+                                items: vec![
+                                    DockItem::Panel(probed_panel(
+                                        "orders",
+                                        MoonBackgroundPolicy::Opaque,
+                                        opaque_body,
+                                    )),
+                                    DockItem::Panel(probed_panel(
+                                        "chart",
+                                        MoonBackgroundPolicy::NoFill,
+                                        chart_body,
+                                    )),
+                                ],
+                                sizes: vec![Some(300.0), None],
+                            },
+                            window,
+                            cx,
+                        );
+                    });
+                    let view = cx.new(|_| DockEntityHarness { dock });
+                    cx.new(|cx| {
+                        Root::new(view, window, cx)
+                            .bordered(false)
+                            .background_policy(MoonBackgroundPolicy::NoFill)
+                    })
+                }
+            })
+            .expect("headless window must open");
+
+        pump_frames(&mut cx, window.into(), 4);
+        let scale = cx
+            .update_window(window.into(), |_, window, _| window.scale_factor())
+            .expect("headless window must report its scale");
+        // The recorder only fires on a render pass; a plain draw never reaches it.
+        let _ = cx.capture_screenshot(window.into());
+        let scene = scene.borrow();
+
+        let opaque = opaque_body.get();
+        let chart = chart_body.get();
+        assert!(
+            opaque.size.width > px(100.0) && chart.size.width > px(100.0),
+            "{name}: both panel bodies must have been painted: {opaque:?} {chart:?}"
+        );
+        assert!(
+            chart.left() > opaque.right(),
+            "{name}: the chart sits right of the gap"
+        );
+        let header_height = px(tab_header_height(&tokens));
+        let chart_center = chart.center().scale(scale);
+        let chart_header = point(chart.center().x, chart.top() - header_height / 2.0).scale(scale);
+        let opaque_center = opaque.center().scale(scale);
+        let gap = point((opaque.right() + chart.left()) / 2.0, opaque.center().y).scale(scale);
+
+        assert_eq!(
+            scene.fills_at(chart_center),
+            Vec::new(),
+            "{name}: nothing may be filled over the body of a see-through panel"
+        );
+        let over_chart = scene.shadows_at(chart_center);
+        assert!(
+            over_chart.is_empty(),
+            "{name}: no shadow may fall over the body of a see-through panel: {over_chart:?}"
+        );
+
+        let slab = facet(MoonFacetKind::Slab, &tokens);
+        let flat = |color: u32, alpha: f32| Background::from(rgba_from(color, alpha));
+        // Shadows cast by something the size of a panel, as (inside, outside) counts. The glow
+        // under an active tab is a shadow too, under either skin, and is not one of these.
+        let panel_side = 100.0 * scale;
+        let panel_shadows = scene.shadows.iter().filter(|shadow| {
+            shadow.element_bounds.size.width.0 > panel_side
+                && shadow.element_bounds.size.height.0 > panel_side
+        });
+        let (inside, outside): (Vec<&Shadow>, Vec<&Shadow>) =
+            panel_shadows.partition(|shadow| shadow.inset != 0);
+        if faceted {
+            assert_eq!(
+                (inside.len(), outside.len()),
+                (2, 0),
+                "{name}: each panel is lit along its top, and a docked panel casts no shadow"
+            );
+            assert_eq!(
+                scene.fills_at(opaque_center),
+                vec![slab.fill],
+                "{name}: an opaque panel is one slab, and its body adds no fill over it"
+            );
+            assert_eq!(
+                scene.fills_at(chart_header).first(),
+                Some(&slab.fill),
+                "{name}: the header of a see-through panel carries the slab"
+            );
+            assert_eq!(
+                scene.fills_at(gap),
+                Vec::new(),
+                "{name}: the gap between two slabs shows what lies behind the dock"
+            );
+        } else {
+            let over_opaque = scene.fills_at(opaque_center);
+            assert_eq!(
+                over_opaque.last(),
+                Some(&flat(p.shell, 1.0)),
+                "{name}: the body paints `shell`: {over_opaque:?}"
+            );
+            assert_eq!(
+                scene.fills_at(chart_header),
+                vec![flat(p.panel, 1.0)],
+                "{name}: the header paints `panel`"
+            );
+            assert_eq!(
+                scene.fills_at(gap).first(),
+                Some(&flat(p.shell, 1.0)),
+                "{name}: the strip between two panels paints `shell`"
+            );
+            assert_eq!(
+                (inside.len(), outside.len()),
+                (0, 0),
+                "{name}: a flat panel casts no shadow"
+            );
+        }
+    }
 }

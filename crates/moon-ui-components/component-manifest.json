@@ -150,7 +150,7 @@
       "theme_source": "MoonTheme bridge through MoonCombobox facade",
       "public_path": "moon_ui::MoonCombobox",
       "upstream_ref": "Longbridge::combobox@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon trigger variant/size and menu-look popup hooks live in the base combobox and searchable-list rows, so a combobox can stand in a row of Moon dropdowns; Longbridge combobox behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon trigger variant/size and menu-look popup hooks live in the base combobox and searchable-list rows; dropdown visibility stays local so other inputs can open nested context menus",
       "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
     },
@@ -176,12 +176,13 @@
     },
     {
       "concept": "calendar",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Calendar",
       "theme_source": "MoonTheme bridge through MoonCalendar facade",
       "public_path": "moon_ui::MoonCalendar",
       "upstream_ref": "Longbridge::time::calendar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed calendar correctness fork: complete five/six-week month grids preserve every selectable date and month boundaries in multi-month views",
+      "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -347,7 +348,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonInput",
       "upstream_ref": "Longbridge::input@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon tone/theme hooks plus UTF-8, mask, number, and search hardening live in base input; Longbridge editor engine remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon tone/theme hooks, UTF-8/mask/number/search hardening, convergent paint/scroll/property invalidation, and nested context-menu support live in base input; Longbridge editor engine remains source-owned",
       "donor_drift_budget": 20,
       "contracts": ["input.utf8_boundary_clamp", "input.mask_contract", "gallery.visual_coverage"]
     },
@@ -408,7 +409,7 @@
       "theme_source": "MoonTheme bridge through MoonList facade",
       "public_path": "moon_ui::MoonList",
       "upstream_ref": "Longbridge::list@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon list item/separator styling and optional per-section virtual chrome geometry/tests live in base list files; remaining Longbridge list behavior stays source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon list styling, optional per-section virtual chrome, and idempotent search-mode invalidation live in base list files; remaining Longbridge list behavior stays source-owned",
       "donor_drift_budget": 6,
       "contracts": ["gallery.visual_coverage"]
     },
@@ -419,7 +420,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonPopover",
       "upstream_ref": "Longbridge::popover@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon placement/style hook lives in base popover; Longbridge popover lifecycle remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon placement/style hooks and local visibility ownership allow nested context menus; Longbridge popover lifecycle remains source-owned",
       "donor_drift_budget": 1,
       "contracts": [
         "popover.open_close_lifecycle",
@@ -490,7 +491,7 @@
       "theme_source": "MoonTheme tokens through theme bridge / Moon wrapper",
       "public_path": "moon_ui::MoonSelect",
       "upstream_ref": "Longbridge::select@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon trigger variant/style and configurable deferred menu layer live in base select; MoonSelect explicitly opts popover-hosted menus above their parent, while ordinary selects retain layer 1 and Longbridge selection behavior",
+      "fork_reason": "Reviewed TrackedFork drift: Moon trigger variant/style, configurable deferred menu layer, and local visibility ownership live in base select; MoonSelect places popover-hosted menus above their parent while ordinary selects retain layer 1",
       "donor_drift_budget": 1,
       "contracts": ["select.open_select_lifecycle", "gallery.visual_coverage"]
     },
@@ -532,8 +533,8 @@
       "theme_source": "MoonTheme bridge through MoonSidebar facade",
       "public_path": "moon_ui::MoonSidebar",
       "upstream_ref": "Longbridge::sidebar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon footer/header/menu styling hooks live in base sidebar; contiguous hit rows (group/menu + menu tests) live there too; Longbridge sidebar behavior remains source-owned",
-      "donor_drift_budget": 5,
+      "fork_reason": "Reviewed TrackedFork drift: Moon footer/header/menu styling hooks live in base sidebar; contiguous hit rows (group/menu + menu tests) live there too; the faceted skin's unfilled sidebar surface and fading edge are resolved in sidebar/mod.rs; Longbridge sidebar behavior remains source-owned",
+      "donor_drift_budget": 6,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -618,8 +619,8 @@
       "theme_source": "MoonTheme tokens through MoonProgress wrapper",
       "public_path": "moon_ui::MoonProgress",
       "upstream_ref": "Longbridge::progress@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon progress circle style hook shares the base progress module; Longbridge progress behavior remains source-owned",
-      "donor_drift_budget": 1,
+      "fork_reason": "Moon progress circle and linear track/fill style hooks share the donor animation engines without duplicating their lifecycle",
+      "donor_drift_budget": 2,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -639,8 +640,8 @@
       "theme_source": "MoonTheme bridge through MoonProgressCircle wrapper",
       "public_path": "moon_ui::MoonProgressCircle",
       "upstream_ref": "Longbridge::progress::ProgressCircle@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon progress circle style hook lives in base progress module; Longbridge progress circle behavior remains source-owned",
-      "donor_drift_budget": 1,
+      "fork_reason": "The shared progress module contains circle and linear track/fill style hooks; both keep the donor animation engines",
+      "donor_drift_budget": 2,
       "contracts": ["gallery.visual_coverage"]
     },
     {
@@ -660,7 +661,7 @@
       "theme_source": "MoonTheme bridge through resize handles",
       "public_path": "moon_ui::MoonResizablePanelGroup",
       "upstream_ref": "Longbridge::resizable@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": "Reviewed TrackedFork drift: Moon resize handle/panel style hooks live in base resizable files; Longbridge resize behavior remains source-owned",
+      "fork_reason": "Reviewed TrackedFork drift: Moon resize handle/panel style hooks and convergent measured-layout invalidation live in base resizable files; Longbridge resize behavior remains source-owned",
       "donor_drift_budget": 3,
       "contracts": ["gallery.visual_coverage"]
     },

@@ -1499,7 +1499,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
-      "signature": "pub fn set_dock_open( &mut self, placement: DockPlacement, open: bool, cx: &mut Context<Self>, ) -> bool"
+      "signature": "pub fn set_dock_open( &mut self, placement: DockPlacement, open: bool, window: &mut Window, cx: &mut Context<Self>, ) -> bool"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -1575,7 +1575,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
-      "signature": "pub fn toggle_dock(&mut self, placement: DockPlacement, cx: &mut Context<Self>) -> bool"
+      "signature": "pub fn toggle_dock( &mut self, placement: DockPlacement, window: &mut Window, cx: &mut Context<Self>, ) -> bool"
     },
     {
       "file": "crates/moon-ui-components/src/moon/dock.rs",
@@ -2779,6 +2779,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
+      "signature": "pub use skin::{ MoonFacet, MoonFacetKind, MoonFacetTint, MoonSkin, facet, facet_glow, facet_tinted, fading_rule_h, fading_rule_v, moon_ambient_light, moon_backdrop, };"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/mod.rs",
       "signature": "pub use slider::{MoonSlider, MoonSliderEvent, MoonSliderState};"
     },
     {
@@ -2827,7 +2831,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use text_area::{MoonTextArea, MoonTextAreaEvent, MoonTextAreaState};"
+      "signature": "pub use text_area::{MoonTextArea, MoonTextAreaEvent, MoonTextAreaSize, MoonTextAreaState};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
@@ -3974,6 +3978,62 @@
       "signature": "pub struct MoonSkeleton"
     },
     {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub enum MoonFacetKind"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub enum MoonFacetTint"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub enum MoonSkin"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn active(cx: &App) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn facet(kind: MoonFacetKind, tokens: &MoonThemeTokens) -> MoonFacet"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn facet_glow(color: u32, alpha: f32, blur: f32, tokens: &MoonThemeTokens) -> BoxShadow"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn facet_tinted(tone: u32, tint: MoonFacetTint, tokens: &MoonThemeTokens) -> MoonFacet"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn fading_rule_h(color: Hsla) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn fading_rule_v(color: Hsla) -> impl IntoElement"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn is_facet(self) -> bool"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn moon_ambient_light(color: u32, alpha: f32, tokens: &MoonThemeTokens) -> Div"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn moon_backdrop(tokens: &MoonThemeTokens) -> Option<AnyElement>"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub fn paint<S: Styled>(self, this: S) -> S"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/skin.rs",
+      "signature": "pub struct MoonFacet"
+    },
+    {
       "file": "crates/moon-ui-components/src/moon/slider.rs",
       "signature": "pub fn bounds(mut self, bounds: MoonRect) -> Self"
     },
@@ -4352,6 +4412,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/tab.rs",
       "signature": "pub fn badge(mut self, badge: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tab.rs",
+      "signature": "pub fn bottom_rule(mut self, bottom_rule: bool) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tab.rs",
@@ -4871,6 +4935,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/theme.rs",
+      "signature": "pub fn moon_obsidian() -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/theme.rs",
       "signature": "pub fn moon_terminal() -> Self"
     },
     {
@@ -5132,6 +5200,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/tokens.rs",
       "signature": "pub const LIGHT: Self = Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/tokens.rs",
+      "signature": "pub const OBSIDIAN: Self = Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/tokens.rs",

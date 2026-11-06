@@ -342,3 +342,56 @@ fn grouped_menus_share_gap_hits_at_multiple_rem_sizes(cx: &mut TestAppContext) {
         assert_eq!(&*clicks.borrow(), &[1, 2]);
     }
 }
+
+// ---- Moon theme skin: the sidebar's edge and the active item's bar ----
+
+use crate::moon::{MoonSkin, MoonThemeTokens};
+
+/// Theme tokens for `palette` drawn with `skin`, with every length doubled.
+fn doubled_skin_tokens(palette: MoonPalette, skin: MoonSkin) -> MoonThemeTokens {
+    let mut tokens = MoonThemeTokens {
+        palette,
+        skin,
+        ..MoonThemeTokens::default()
+    };
+    tokens.scale.ui = 2.0;
+    tokens
+}
+
+/// Catches `menu.rs:sidebar_facet_edge_rule` or `active_bar_facet_glow` ignoring the skin:
+/// every flat theme's sidebar would lose its fill and solid border, and its active item would
+/// grow a glow.
+#[test]
+fn a_flat_sidebar_keeps_its_fill_border_and_plain_active_bar() {
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        let tokens = doubled_skin_tokens(palette, MoonSkin::Flat);
+        assert_eq!(sidebar_facet_edge_rule(&tokens), None);
+        assert_eq!(active_bar_facet_glow(&tokens), None);
+    }
+}
+
+/// Catches `menu.rs:sidebar_facet_edge_rule` drawing the rule at the flat border's strength,
+/// and `active_bar_facet_glow` leaving the blur unscaled or giving the glow an offset: the
+/// active item's bar would cast a lopsided or undersized halo at a larger UI scale.
+#[test]
+fn a_faceted_sidebar_fades_its_edge_and_lights_the_active_bar() {
+    let p = MoonPalette::OBSIDIAN;
+    let tokens = doubled_skin_tokens(p, MoonSkin::Facet);
+
+    assert_eq!(
+        sidebar_facet_edge_rule(&tokens),
+        Some(rgba_from(p.overlay, 0.1))
+    );
+    // The glow written out: centred on the bar, no spread, 8 design pixels of blur doubled with
+    // the UI scale and halved into the renderer's blur radius.
+    assert_eq!(
+        active_bar_facet_glow(&tokens),
+        Some(BoxShadow {
+            color: rgba_from(p.accent, 0.6),
+            offset: point(px(0.0), px(0.0)),
+            blur_radius: px(8.0),
+            spread_radius: px(0.0),
+            inset: false,
+        })
+    );
+}

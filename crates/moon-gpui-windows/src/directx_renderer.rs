@@ -544,7 +544,8 @@ impl DirectXRenderer {
     }
 
     #[inline]
-    fn present(&mut self) -> Result<()> {
+    /// Report occlusion separately from a present accepted by DXGI.
+    fn present(&mut self) -> Result<bool> {
         let result = unsafe {
             self.resources
                 .as_ref()
@@ -554,12 +555,12 @@ impl DirectXRenderer {
         };
         if result == DXGI_STATUS_OCCLUDED {
             self.presentable = false;
-            return Ok(());
+            return Ok(false);
         }
 
         result.ok().context("Presenting swap chain failed")?;
         self.presentable = true;
-        Ok(())
+        Ok(true)
     }
 
     pub(crate) fn handle_device_lost(&mut self, directx_devices: &DirectXDevices) -> Result<()> {
@@ -640,19 +641,20 @@ impl DirectXRenderer {
         Ok(())
     }
 
+    /// Draw only while presentable and return whether DXGI accepted the resulting frame.
     pub(crate) fn draw(
         &mut self,
         scene: &Scene,
         background_appearance: WindowBackgroundAppearance,
         clear_color: Option<Rgba>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         if self.skip_draws {
             // skip drawing this frame, we just recovered from a device lost event
             // and so likely do not have the textures anymore that are required for drawing
-            return Ok(());
+            return Ok(false);
         }
         if !self.can_present() {
-            return Ok(());
+            return Ok(false);
         }
         self.run_gpu_canvas_prepare(&scene.gpu_canvases_under_scene, GpuCanvasLayer::UnderScene);
         self.run_gpu_canvas_prepare(&scene.gpu_canvases_over_scene, GpuCanvasLayer::OverScene);

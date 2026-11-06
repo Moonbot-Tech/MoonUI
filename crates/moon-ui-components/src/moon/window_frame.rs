@@ -69,11 +69,12 @@ impl FrameButton {
         }
     }
 
-    fn invoke(self, window: &mut Window) {
+    /// Client-drawn controls preserve the native distinction between user and forced close.
+    fn invoke(self, window: &mut Window, cx: &mut App) {
         match self {
             Self::Minimize => window.minimize_window(),
             Self::Maximize => window.zoom_window(),
-            Self::Close => window.remove_window(),
+            Self::Close => window.request_close(cx),
         }
     }
 
@@ -325,7 +326,7 @@ impl MoonWindowFrame {
                     .when(cfg!(not(target_os = "windows")), move |this| {
                         this.on_mouse_down(MouseButton::Left, move |_event, window, cx| {
                             cx.stop_propagation();
-                            button.invoke(window);
+                            button.invoke(window, cx);
                         })
                     })
                     .child(button.icon(default_color, hover_color, group)),

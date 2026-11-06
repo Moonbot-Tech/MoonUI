@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     background::MoonBackgroundPolicy,
+    skin::{MoonFacetKind, MoonSkin, facet},
     text::MoonText,
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, rgba_from},
@@ -39,7 +40,56 @@ pub use state::{
 };
 use tab_panel::tab_header_height;
 
+/// What a floating tile paints under the Facet skin: the surface of the tab group inside it.
+///
+/// A tile whose panel is opaque is a popup: gradient fill, edge and the shadow that lifts it off
+/// the dock. A tile whose panel is see-through keeps the edge and the highlight along its top
+/// only — GPUI paints a shadow that falls outside an element under the whole of it, so on an
+/// unfilled tile it would darken the canvas the panel exists to show.
+#[derive(Clone, Debug, PartialEq)]
+struct TileFacet {
+    /// Corner radius of the tile, in rendered pixels.
+    radius: f32,
+    /// Fill of the tile; `None` leaves it unpainted.
+    fill: Option<Background>,
+    /// Colour of the tile's one-pixel edge.
+    edge: Hsla,
+    /// Shadows of the tile.
+    shadows: Vec<BoxShadow>,
+}
+
+impl TileFacet {
+    /// Resolve the faceted look of a floating tile.
+    ///
+    /// Args:
+    ///     tokens: Active theme tokens; supply the skin, the palette and the UI scale.
+    ///     policy: Background policy of the panel the tile hosts.
+    ///
+    /// Returns:
+    ///     The faceted look, or `None` under the Flat skin, where the tile renders as it always
+    ///     has.
+    fn resolve(tokens: &MoonThemeTokens, policy: MoonBackgroundPolicy) -> Option<Self> {
+        if !tokens.skin.is_facet() {
+            return None;
+        }
+        let popup = facet(MoonFacetKind::Popup, tokens);
+        let opaque = matches!(policy, MoonBackgroundPolicy::Opaque);
+        Some(Self {
+            radius: tokens.ui(tokens.metrics.container_radius),
+            fill: opaque.then_some(popup.fill),
+            edge: popup.edge,
+            shadows: popup
+                .shadows
+                .into_iter()
+                .filter(|shadow| opaque || shadow.inset)
+                .collect(),
+        })
+    }
+}
+
 const DOCK_RESIZE_HIT_SIZE: f32 = 6.0;
+/// Alpha of the `overlay` wash a faceted resize strip shows under the pointer.
+const FACET_RESIZE_HOVER_ALPHA: f32 = 0.04;
 
 /// Smallest gap between two repaints while a dock handle is being dragged.
 ///
@@ -183,6 +233,9 @@ pub struct TabPanel {
     close_allowed: bool,
     pinned_leading_panels: Vec<SharedString>,
     panel_control_tooltips: DockPanelControlTooltips,
+    /// Whether a floating tile hosts this tab group and draws its surface. Read only under the
+    /// Facet skin, where the tile carries the fill, the edge and the shadow of the group.
+    floating: bool,
 }
 
 impl TabPanel {
@@ -205,6 +258,7 @@ impl TabPanel {
             close_allowed: true,
             pinned_leading_panels: Vec::new(),
             panel_control_tooltips: DockPanelControlTooltips::default(),
+            floating: false,
         }
     }
 
@@ -265,6 +319,12 @@ impl TabPanel {
     /// Set the host-supplied tooltips for this tab group's built-in header controls.
     pub fn panel_control_tooltips(mut self, tooltips: DockPanelControlTooltips) -> Self {
         self.panel_control_tooltips = tooltips;
+        self
+    }
+
+    /// Mark this tab group as the content of a floating tile, which draws the group's surface.
+    fn floating(mut self, floating: bool) -> Self {
+        self.floating = floating;
         self
     }
 
@@ -1484,17 +1544,19 @@ impl DockArea {
         Some(canonical)
     }
 
+    /// Change a side root's visibility and synchronize panel activity before the hidden tree stops rendering.
     pub fn set_dock_open(
         &mut self,
         placement: DockPlacement,
         open: bool,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        let slot = match placement {
+        let (root, slot) = match placement {
             DockPlacement::Center => return false,
-            DockPlacement::Left => self.left.as_mut(),
-            DockPlacement::Right => self.right.as_mut(),
-            DockPlacement::Bottom => self.bottom.as_mut(),
+            DockPlacement::Left => (DockRoot::Left, self.left.as_mut()),
+            DockPlacement::Right => (DockRoot::Right, self.right.as_mut()),
+            DockPlacement::Bottom => (DockRoot::Bottom, self.bottom.as_mut()),
         };
         let Some((_, _, current_open)) = slot else {
             return false;
@@ -1503,19 +1565,39 @@ impl DockArea {
             return false;
         }
         *current_open = open;
+        // A zoomed panel remains the sole visible surface regardless of normal side-root flags.
+        if self
+            .zoomed_panel
+            .as_ref()
+            .and_then(|name| self.find_panel_named(name.as_ref(), cx))
+            .is_none()
+            && let Some(item) = self.root_item(root)
+        {
+            if open {
+                self.sync_item_active(root, &[], item, window, cx);
+            } else {
+                self.sync_item_inactive(root, &[], item, window, cx);
+            }
+        }
         cx.emit(DockEvent::LayoutChanged);
         cx.notify();
         true
     }
 
-    pub fn toggle_dock(&mut self, placement: DockPlacement, cx: &mut Context<Self>) -> bool {
+    /// Toggle a side root through the same visibility and activity transition as an explicit change.
+    pub fn toggle_dock(
+        &mut self,
+        placement: DockPlacement,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         let open = match placement {
             DockPlacement::Center => return false,
             DockPlacement::Left => self.left.as_ref().map(|(_, _, open)| !*open),
             DockPlacement::Right => self.right.as_ref().map(|(_, _, open)| !*open),
             DockPlacement::Bottom => self.bottom.as_ref().map(|(_, _, open)| !*open),
         };
-        open.map(|open| self.set_dock_open(placement, open, cx))
+        open.map(|open| self.set_dock_open(placement, open, window, cx))
             .unwrap_or(false)
     }
 
@@ -1607,6 +1689,9 @@ impl DockArea {
     }
 
     /// Render a pointer resize handle, or no element while structural editing is locked.
+    ///
+    /// Under the Flat skin the handle is a filled strip with a line along its middle. Under the
+    /// Facet skin it is the unpainted gap between two slabs, of the same size and grab area.
     fn resize_handle(
         &self,
         id: SharedString,
@@ -1618,6 +1703,10 @@ impl DockArea {
             return Empty.into_any_element();
         }
         let p = MoonPalette::active(cx);
+        // Faceted panels are slabs with a gap between them: the strip keeps its size and its
+        // grab area, and paints neither a fill nor a line, so the gap shows what lies behind
+        // the dock. Only a faint wash under the pointer says the gap can be dragged.
+        let faceted = MoonSkin::active(cx).is_facet();
         let grab_cursor = if horizontal_split {
             CursorStyle::ResizeColumn
         } else {
@@ -1628,7 +1717,7 @@ impl DockArea {
             .id(ElementId::from(id))
             .flex_none()
             .relative()
-            .bg(rgba_from(p.shell, 1.0))
+            .when(!faceted, |this| this.bg(rgba_from(p.shell, 1.0)))
             .occlude()
             .cursor(if horizontal_split {
                 CursorStyle::ResizeColumn
@@ -1640,16 +1729,25 @@ impl DockArea {
                     .h_full()
                     .items_center()
                     .justify_center()
-                    .child(div().w(px(1.0)).h_full().bg(rgba_from(p.border, 1.0)))
+                    .when(!faceted, |this| {
+                        this.child(div().w(px(1.0)).h_full().bg(rgba_from(p.border, 1.0)))
+                    })
             })
             .when(!horizontal_split, |this| {
                 this.h(px(DOCK_RESIZE_HIT_SIZE))
                     .w_full()
                     .items_center()
                     .justify_center()
-                    .child(div().h(px(1.0)).w_full().bg(rgba_from(p.border, 1.0)))
+                    .when(!faceted, |this| {
+                        this.child(div().h(px(1.0)).w_full().bg(rgba_from(p.border, 1.0)))
+                    })
             })
-            .hover(|style| style.bg(rgba_from(p.shell_high, 1.0)))
+            .when(!faceted, |this| {
+                this.hover(|style| style.bg(rgba_from(p.shell_high, 1.0)))
+            })
+            .when(faceted, |this| {
+                this.hover(|style| style.bg(rgba_from(p.overlay, FACET_RESIZE_HOVER_ALPHA)))
+            })
             // A press ARMS the gesture; the pointer is then followed by window-level
             // listeners (`resize_pointer_hook`). Deliberately NOT `on_drag`: GPUI's drag
             // machinery exists to float a preview under the cursor, and pays for it with a
@@ -3145,6 +3243,17 @@ impl DockArea {
                         .border(px(1.0))
                         .border_color(rgba_from(p.border, 1.0));
                     tile = panel.background_policy(cx).apply(tile, p.shell_high, 1.0);
+                    if let Some(tile_facet) =
+                        TileFacet::resolve(&tokens, panel.background_policy(cx))
+                    {
+                        tile = tile
+                            .rounded(px(tile_facet.radius))
+                            .border_color(tile_facet.edge)
+                            .shadow(tile_facet.shadows);
+                        if let Some(fill) = tile_facet.fill {
+                            tile = tile.bg(fill);
+                        }
+                    }
                     tiles = tiles.child(
                         tile.child(
                             TabPanel::new(
@@ -3161,6 +3270,7 @@ impl DockArea {
                             .close_allowed(self.close_allowed)
                             .pinned_leading_panels(self.pinned_leading_panels.clone())
                             .panel_control_tooltips(self.panel_control_tooltips.clone())
+                            .floating(true)
                             .background_policy(MoonBackgroundPolicy::NoFill)
                             .content_background_policy(panel.background_policy(cx)),
                         )
@@ -3309,6 +3419,7 @@ impl DockArea {
                 sizes,
             } => {
                 let p = MoonPalette::active(cx);
+                let faceted = MoonSkin::active(cx).is_facet();
                 let id_text = id.to_string();
                 let split_key = Self::split_key(root, &path);
                 let dock = cx.entity();
@@ -3365,7 +3476,11 @@ impl DockArea {
                         .min_h(px(0.0))
                         .when(*horizontal, |this| this.h_full())
                         .when(!*horizontal, |this| this.w_full());
-                    slot = child.background_policy(cx).apply(slot, p.shell, 1.0);
+                    // A faceted slab has rounded corners and a gap beside it; both show what
+                    // lies behind the dock, so the slot does not paint `shell` under them.
+                    if !faceted {
+                        slot = child.background_policy(cx).apply(slot, p.shell, 1.0);
+                    }
                     let slot_size = if first_child_flexes && ix == 0 {
                         None
                     } else {

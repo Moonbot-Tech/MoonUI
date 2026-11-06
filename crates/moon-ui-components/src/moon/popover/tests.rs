@@ -319,3 +319,68 @@ fn popover_hosted_tooltip_paints_above_its_popover() {
         );
     }
 }
+
+// ---- Theme skin: the surface the Moon chrome paints ----
+
+use super::popover_facet;
+use crate::moon::{MoonBackgroundPolicy, MoonFacetKind, MoonSkin, facet};
+
+/// Theme tokens for `palette` drawn with `skin`, with every length doubled.
+fn doubled_skin_tokens(palette: MoonPalette, skin: MoonSkin) -> MoonThemeTokens {
+    let mut tokens = MoonThemeTokens {
+        palette,
+        skin,
+        ..MoonThemeTokens::default()
+    };
+    tokens.scale.ui = 2.0;
+    tokens
+}
+
+/// Catches `popover.rs:popover_facet` ignoring the skin: every flat theme's popover would trade
+/// its `shell_high` fill, palette border and single soft shadow for a gradient popup.
+#[test]
+fn a_flat_popover_keeps_its_moon_chrome() {
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        let tokens = doubled_skin_tokens(palette, MoonSkin::Flat);
+        for policy in [
+            MoonBackgroundPolicy::Opaque,
+            MoonBackgroundPolicy::Transparent,
+            MoonBackgroundPolicy::NoFill,
+        ] {
+            assert_eq!(popover_facet(&tokens, policy), None);
+        }
+    }
+}
+
+/// Catches `popover.rs:popover_facet` leaving the radius unscaled, or filling a popup whose
+/// policy asked for no fill and casting the popup's deep shadow through it.
+#[test]
+fn a_faceted_popover_is_a_popup_and_a_see_through_one_keeps_only_its_edge() {
+    let tokens = doubled_skin_tokens(MoonPalette::OBSIDIAN, MoonSkin::Facet);
+    let popup = facet(MoonFacetKind::Popup, &tokens);
+
+    let filled = popover_facet(&tokens, MoonBackgroundPolicy::Opaque)
+        .expect("the Facet skin resolves a popover facet");
+    assert_eq!(filled.fill, Some(popup.fill));
+    assert_eq!(filled.edge, popup.edge);
+    assert_eq!(filled.shadows, popup.shadows);
+    assert_eq!(
+        filled.radius, 16.0,
+        "eight design pixels at a doubled scale"
+    );
+
+    for policy in [
+        MoonBackgroundPolicy::Transparent,
+        MoonBackgroundPolicy::NoFill,
+    ] {
+        let bare = popover_facet(&tokens, policy).expect("the Facet skin resolves a popover facet");
+        assert_eq!(bare.fill, None, "{policy:?}");
+        assert_eq!(bare.edge, popup.edge);
+        assert_eq!(
+            bare.shadows,
+            vec![popup.shadows[0].clone()],
+            "only the inset highlight along the top edge"
+        );
+        assert!(bare.shadows[0].inset);
+    }
+}

@@ -308,3 +308,6 @@ fn size_for(size: MoonInputSize) -> Size {
         MoonInputSize::Custom { height, .. } => Size::Size(px(height)),
     }
 }
+
+#[cfg(test)]
+mod tests;

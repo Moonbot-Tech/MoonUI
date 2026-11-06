@@ -9,14 +9,12 @@ pub(super) fn run_gallery() {
     let snapshot_dir = args.snapshot_dir;
     let case_snapshot_dir = args.case_snapshot_dir;
     let snapshot_case_ids = args.snapshot_case_ids;
-    let theme_mode = args.theme_mode;
+    let theme = args.theme;
     application()
         .with_assets(moon_ui::MoonAssets)
         .run(move |cx: &mut App| {
             moon_ui::foundation::init(cx);
-            let mut theme_config = MoonThemeConfig::moon_terminal();
-            theme_config.mode = theme_mode;
-            MoonTheme::install_config(theme_config, cx);
+            MoonTheme::install_config(theme.config(), cx);
 
             let p = MoonPalette::active(cx);
             if let Some(case_dir) = case_snapshot_dir.clone() {
@@ -42,7 +40,7 @@ pub(super) fn run_gallery() {
                                 cx,
                                 Some(case_dir.clone()),
                                 snapshot_case_ids.clone(),
-                                theme_mode,
+                                theme,
                             )
                         });
                         cx.new(|cx| {
@@ -75,7 +73,7 @@ pub(super) fn run_gallery() {
                                 cx,
                                 initial_page,
                                 snapshot_dir.clone(),
-                                theme_mode,
+                                theme,
                             )
                         });
                         cx.new(|cx| {

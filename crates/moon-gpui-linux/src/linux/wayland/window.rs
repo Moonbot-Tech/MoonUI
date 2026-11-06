@@ -558,7 +558,7 @@ impl WaylandWindow {
                         WaylandWindow::gpu_canvas_refresh_interval(&state)
                     };
 
-                    window.frame();
+                    window.poll_frame();
 
                     let now = std::time::Instant::now();
                     while instant < now {
@@ -646,9 +646,19 @@ impl WaylandWindowStatePtr {
         !state.children.is_empty()
     }
 
+    /// Start the compositor callback chain on first configure, then replace each completed
+    /// callback once. Timer polls must not extend this chain: every request survives until Done.
     pub fn frame(&self) {
-        let mut state = self.state.borrow_mut();
+        let state = self.state.borrow();
         state.surface.frame(&state.globals.qh, state.surface.id());
+        drop(state);
+        self.poll_frame();
+    }
+
+    /// Poll GPUI and its canvases without registering another Wayland callback. The fallback
+    /// timer keeps Skip-to-Present transitions live even while the compositor withholds Done.
+    fn poll_frame(&self) {
+        let mut state = self.state.borrow_mut();
         state.resize_throttle = false;
         let force_render = state.force_render_after_recovery;
         state.force_render_after_recovery = false;
@@ -1469,7 +1479,7 @@ impl PlatformWindow for WaylandWindow {
         self.0.callbacks.borrow_mut().button_layout_changed = Some(callback);
     }
 
-    fn draw(&self, scene: &Scene) {
+    fn draw(&self, scene: &Scene) -> bool {
         let mut state = self.borrow_mut();
 
         if state.renderer.device_lost() {
@@ -1491,7 +1501,7 @@ impl PlatformWindow for WaylandWindow {
             }
 
             state.force_render_after_recovery = true;
-            return;
+            return false;
         }
 
         state.renderer_presented = state.renderer.draw(scene);
@@ -1499,6 +1509,7 @@ impl PlatformWindow for WaylandWindow {
         if state.renderer.needs_redraw() {
             state.force_render_after_recovery = true;
         }
+        state.renderer_presented
     }
 
     fn set_gpu_canvas_active(&self, active: bool) {
@@ -1603,6 +1614,12 @@ impl PlatformWindow for WaylandWindow {
 
     fn gpu_specs(&self) -> Option<GpuSpecs> {
         self.borrow().renderer.gpu_specs().into()
+    }
+
+    /// Invalidate the shared device; the next native draw runs normal recovery.
+    fn request_gpu_device_reset(&self) -> bool {
+        self.borrow().renderer.request_device_reset();
+        true
     }
 
     fn play_system_bell(&self) {

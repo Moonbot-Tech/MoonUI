@@ -3,16 +3,63 @@ use crate::{
     button::{Button, ButtonVariants as _},
     h_flex,
     menu::{ContextMenuExt, PopupMenu},
-    moon::{MoonPalette, foundation::selected_background},
+    moon::{
+        MoonPalette, MoonTheme, MoonThemeTokens, facet_glow, foundation::selected_background,
+        rgba_from,
+    },
     sidebar::SidebarItem,
     v_flex,
 };
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, InteractiveElement as _, IntoElement,
+    AnyElement, App, BoxShadow, ClickEvent, ElementId, Hsla, InteractiveElement as _, IntoElement,
     ParentElement as _, SharedString, StatefulInteractiveElement as _, StyleRefinement, Styled,
     Window, div, percentage, prelude::FluentBuilder, px,
 };
 use std::rc::Rc;
+
+/// Alpha of the `overlay` ink at the middle of a faceted sidebar's edge rule.
+const FACET_EDGE_RULE_ALPHA: f32 = 0.1;
+/// Alpha of the accent glow around the active item's bar under the Facet skin.
+const FACET_ACTIVE_BAR_GLOW_ALPHA: f32 = 0.6;
+/// Blur of that glow as the design gives it, in design-reference pixels.
+const FACET_ACTIVE_BAR_GLOW_BLUR: f32 = 8.0;
+
+/// Resolve the colour of the fading rule a sidebar draws along its inner edge under the Facet
+/// skin.
+///
+/// A faceted sidebar paints no fill of its own, and the solid border between it and the page
+/// becomes a rule that fades out toward both ends.
+///
+/// Args:
+///     tokens: Active theme tokens; supply the skin and the palette.
+///
+/// Returns:
+///     The colour at the middle of the rule, or `None` under the Flat skin, where the sidebar
+///     keeps its theme fill and its solid border.
+pub(super) fn sidebar_facet_edge_rule(tokens: &MoonThemeTokens) -> Option<Hsla> {
+    tokens
+        .skin
+        .is_facet()
+        .then(|| rgba_from(tokens.palette.overlay, FACET_EDGE_RULE_ALPHA))
+}
+
+/// Resolve the glow the active item's bar casts under the Facet skin.
+///
+/// Args:
+///     tokens: Active theme tokens; supply the skin, the palette and the UI scale.
+///
+/// Returns:
+///     The glow, or `None` under the Flat skin, where the bar casts none.
+fn active_bar_facet_glow(tokens: &MoonThemeTokens) -> Option<BoxShadow> {
+    tokens.skin.is_facet().then(|| {
+        facet_glow(
+            tokens.palette.accent,
+            FACET_ACTIVE_BAR_GLOW_ALPHA,
+            FACET_ACTIVE_BAR_GLOW_BLUR,
+            tokens,
+        )
+    })
+}
 
 /// Menu for the [`super::Sidebar`]
 #[derive(Clone)]
@@ -295,6 +342,8 @@ impl SidebarMenuItem {
             .as_ref()
             .map_or(false, |s| !is_collapsed && *s.read(cx));
         let p = MoonPalette::active(cx);
+        let active_bar_glow = active_bar_facet_glow(&MoonTheme::active_tokens(cx));
+        let faceted = active_bar_glow.is_some();
         let hover_group = SharedString::from(format!("sidebar-row-{id}"));
         let child_count = self.children.len();
         let submenu_half_gap = window.rem_size() * 0.125;
@@ -341,18 +390,26 @@ impl SidebarMenuItem {
                                         .top(px(3.0))
                                         .bottom(px(3.0))
                                         .w(px(3.0))
-                                        .bg(cx.theme().sidebar_primary),
+                                        .bg(cx.theme().sidebar_primary)
+                                        .when_some(active_bar_glow, |bar, glow| {
+                                            bar.shadow(vec![glow])
+                                        }),
                                 )
-                                .child(
-                                    div()
-                                        .absolute()
-                                        .left(px(8.0))
-                                        .top(px(12.0))
-                                        .w(px(4.0))
-                                        .h(px(4.0))
-                                        .rounded_full()
-                                        .bg(cx.theme().sidebar_primary),
-                                )
+                                // The marker dot sits where the label starts. A faceted item
+                                // is already marked by its glowing bar, so it drops the dot
+                                // rather than print it over the first letter.
+                                .when(!faceted, |this| {
+                                    this.child(
+                                        div()
+                                            .absolute()
+                                            .left(px(8.0))
+                                            .top(px(12.0))
+                                            .w(px(4.0))
+                                            .h(px(4.0))
+                                            .rounded_full()
+                                            .bg(cx.theme().sidebar_primary),
+                                    )
+                                })
                             })
                             .when_some(self.icon.clone(), |this, icon| this.child(icon))
                             .when(is_collapsed, |this| {

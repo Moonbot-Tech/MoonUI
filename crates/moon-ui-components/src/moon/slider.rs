@@ -61,3 +61,6 @@ impl RenderOnce for MoonSlider {
         slider
     }
 }
+
+#[cfg(test)]
+mod tests;

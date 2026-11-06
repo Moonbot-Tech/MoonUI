@@ -73,3 +73,50 @@ fn the_header_caret_is_wired_to_the_live_open_value() {
         "the header caret must never be built from a literal pose"
     );
 }
+
+// ---- Theme skin: the surface of the header ----
+
+use super::collapsible_header_facet;
+use crate::moon::{MoonFacetKind, MoonPalette, MoonSkin, MoonThemeTokens, facet};
+
+/// Theme tokens for `palette` drawn with `skin`, at the default scale.
+fn skin_tokens(palette: MoonPalette, skin: MoonSkin) -> MoonThemeTokens {
+    MoonThemeTokens {
+        palette,
+        skin,
+        ..MoonThemeTokens::default()
+    }
+}
+
+/// Catches `collapsible.rs:collapsible_header_facet` ignoring the skin: every flat theme's
+/// section header would trade its `shell_high` fill and open-dependent border for a raised
+/// gradient control.
+#[test]
+fn a_flat_collapsible_header_keeps_its_flat_fill() {
+    for palette in [
+        MoonPalette::TERMINAL,
+        MoonPalette::LIGHT,
+        MoonPalette::OBSIDIAN,
+    ] {
+        assert_eq!(
+            collapsible_header_facet(&skin_tokens(palette, MoonSkin::Flat)),
+            None
+        );
+    }
+}
+
+/// Catches `collapsible.rs:collapsible_header_facet` swapping the two surfaces, or resolving a
+/// sunken one: the header would be lit at rest and go dark under the pointer, or read as an
+/// input field instead of something to click.
+#[test]
+fn a_faceted_collapsible_header_is_raised_and_relights_under_the_pointer() {
+    let tokens = skin_tokens(MoonPalette::OBSIDIAN, MoonSkin::Facet);
+
+    assert_eq!(
+        collapsible_header_facet(&tokens),
+        Some((
+            facet(MoonFacetKind::Raised, &tokens),
+            facet(MoonFacetKind::RaisedHover, &tokens),
+        ))
+    );
+}

@@ -16,6 +16,42 @@ use crate::{
     list::{ListDelegate, ListItem, cache::RowEntry},
 };
 
+/// Reapplying Select/ComboBox search mode must not publish another list change. Switching
+/// the mode must still publish, otherwise the search field remains stale until another event.
+#[gpui::test]
+fn search_mode_publishes_only_transitions(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let slot = Rc::new(RefCell::new(None));
+    cx.add_window({
+        let slot = slot.clone();
+        move |window, cx| {
+            let list = cx.new(|cx| {
+                ListState::new(
+                    OptionalChromeDelegate {
+                        item_renders: Rc::new(Cell::new(0)),
+                    },
+                    window,
+                    cx,
+                )
+            });
+            slot.replace(Some(list.clone()));
+            OptionalChromeHarness { list }
+        }
+    });
+    let list = slot.borrow().clone().expect("list was created");
+    let notifications = Rc::new(Cell::new(0));
+    let _subscription = cx.update(|cx| {
+        cx.observe(&list, {
+            let notifications = notifications.clone();
+            move |_, _| notifications.set(notifications.get() + 1)
+        })
+    });
+    for (searchable, expected) in [(false, 0), (true, 1), (true, 1), (false, 2), (false, 2)] {
+        cx.update(|cx| list.update(cx, |state, cx| state.set_searchable(searchable, cx)));
+        assert_eq!(notifications.get(), expected);
+    }
+}
+
 /// Delegate with a headerless global section, one headed section, and a large trailing section.
 struct OptionalChromeDelegate {
     /// Number of item elements constructed across measurement and visible rendering.

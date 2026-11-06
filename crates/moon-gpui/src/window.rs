@@ -180,28 +180,29 @@ impl WindowInvalidator {
         }
     }
 
+    /// Retain frame debt and notify observers even when the changed entity is a layout model.
     pub fn invalidate_view(&self, entity: EntityId, cx: &mut App) -> bool {
         let mut inner = self.inner.borrow_mut();
         inner.update_count += 1;
         inner.dirty_views.insert(entity);
+        // A model has no dispatch-tree view path; its observers must invalidate their views.
+        // Effects are flushed after the current update, so this does not re-enter the draw.
+        cx.push_effect(Effect::Notify { emitter: entity });
         if inner.draw_phase == DrawPhase::None {
             Self::record_frame_dirty(&mut inner);
             inner.dirty = true;
             Self::request_frame_inner(&inner);
-            cx.push_effect(Effect::Notify { emitter: entity });
             true
         } else {
             false
         }
     }
 
+    /// Whether the UI owes a draw, including views changed during the preceding draw.
+    /// Frame dispatch, keyboard dispatch and test flushing must consume the same debt.
     pub fn is_dirty(&self) -> bool {
-        self.inner.borrow().dirty
-    }
-
-    /// Views invalidated while a draw was in progress; they still owe a frame.
-    pub fn has_dirty_views(&self) -> bool {
-        !self.inner.borrow().dirty_views.is_empty()
+        let inner = self.inner.borrow();
+        inner.dirty || !inner.dirty_views.is_empty()
     }
 
     pub fn set_dirty(&self, dirty: bool) {
@@ -1231,11 +1232,15 @@ mod input_modality_tests {
     }
 }
 
+/// Shared close policy used by both native and client-drawn window controls.
+type WindowCloseCallback = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
+
 /// Holds the state for a specific window.
 pub struct Window {
     pub(crate) handle: AnyWindowHandle,
     pub(crate) invalidator: WindowInvalidator,
     pub(crate) removed: bool,
+    should_close: RefCell<Option<WindowCloseCallback>>,
     pub(crate) platform_window: Box<dyn PlatformWindow>,
     display_id: Option<DisplayId>,
     sprite_atlas: Arc<dyn PlatformAtlas>,
@@ -1727,7 +1732,6 @@ impl Window {
                         // refused mid-draw, a callback queued for the next frame, a present
                         // still owed) must wake the frame clock again.
                         if window.invalidator.is_dirty()
-                            || window.invalidator.has_dirty_views()
                             || !window.next_frame_callbacks.borrow().is_empty()
                             || window.needs_present.get()
                         {
@@ -1888,6 +1892,7 @@ impl Window {
             handle,
             invalidator,
             removed: false,
+            should_close: RefCell::new(None),
             platform_window,
             display_id,
             sprite_atlas,
@@ -2078,9 +2083,22 @@ impl Window {
         }
     }
 
-    /// Close this window.
+    /// Close this window unconditionally, including during owner teardown.
     pub fn remove_window(&mut self) {
         self.removed = true;
+    }
+
+    /// Request a user close, respecting the same veto as the native window controls.
+    pub fn request_close(&mut self, cx: &mut App) {
+        if self.can_close(cx) {
+            self.remove_window();
+        }
+    }
+
+    /// Release the callback borrow before invoking user code, which may replace the policy.
+    fn can_close(&mut self, cx: &mut App) -> bool {
+        let callback = self.should_close.borrow().clone();
+        callback.is_none_or(|callback| callback(self, cx))
     }
 
     /// Whether the focused element is taking typed text on the frame that was drawn last.
@@ -2992,7 +3010,7 @@ impl Window {
         // `force_present` is true on every UI redraw, so the scene's text is rebuilt from
         // scratch then; reuse only happens on GPU-only frames, for canvases that did not
         // ask to present and whose environment is unchanged.
-        if gpu_canvas_prepare_text(force_present, request_present) {
+        if presentable && gpu_canvas_prepare_text(force_present, request_present) {
             let mut seen = FxHashSet::default();
             let mut occurrences: FxHashMap<(usize, bool), usize> = FxHashMap::default();
             for (layer, canvas, bounds, wants_present) in canvases {
@@ -3244,11 +3262,14 @@ impl Window {
     }
 
     #[profiling::function]
+    /// Keep the frame owed until the native backend accepts its presentation.
     fn present(&mut self) {
-        self.platform_window.draw(&self.rendered_frame.scene);
+        let accepted = self.platform_window.draw(&self.rendered_frame.scene);
         #[cfg(feature = "input-latency-histogram")]
-        self.input_latency_tracker.record_frame_presented();
-        self.needs_present.set(false);
+        if accepted {
+            self.input_latency_tracker.record_frame_presented();
+        }
+        self.needs_present.set(!accepted);
         profiling::finish_frame!();
     }
 
@@ -5979,9 +6000,10 @@ impl Window {
         cx: &App,
         f: impl Fn(&mut Window, &mut App) -> bool + 'static,
     ) {
+        *self.should_close.borrow_mut() = Some(Rc::new(f));
         let mut cx = self.to_async(cx);
         self.platform_window.on_should_close(Box::new(move || {
-            cx.update(|window, cx| f(window, cx)).unwrap_or(true)
+            cx.update(|window, cx| window.can_close(cx)).unwrap_or(true)
         }))
     }
 
@@ -6032,6 +6054,17 @@ impl Window {
     /// Currently returns None on Mac and Windows.
     pub fn gpu_specs(&self) -> Option<GpuSpecs> {
         self.platform_window.gpu_specs()
+    }
+
+    /// Exercise native device recovery and wake every window sharing the device.
+    /// This diagnostic request does not simulate a driver hang or an operating-system reset.
+    pub fn request_gpu_device_reset(&mut self, cx: &mut App) -> bool {
+        if !self.platform_window.request_gpu_device_reset() {
+            return false;
+        }
+        self.refresh();
+        cx.refresh_windows();
+        true
     }
 
     /// Perform titlebar double-click action.

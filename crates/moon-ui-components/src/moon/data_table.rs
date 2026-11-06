@@ -15,7 +15,7 @@ use super::{
         moon_horizontal_track_is_drawn, moon_scrollbar_overlay_with_palette,
     },
     table::{MoonTableAlign, MoonTableCell, MoonTableColumn, MoonTableRow, MoonTableStyle},
-    theme::MoonTheme,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
     virtual_list::{MoonVirtualList, MoonVirtualListScrollHandle},
 };
@@ -60,6 +60,29 @@ type MoonDataContextMenuBuilder =
 
 /// Minimum logical column width used by drag resizing and render-time fitting.
 const MIN_COLUMN_WIDTH: f32 = 40.0;
+
+/// Alpha of the `overlay` wash a faceted table row shows under the pointer.
+const FACET_ROW_HOVER_ALPHA: f32 = 0.04;
+
+/// Resolve the fill a table row shows under the pointer under the Facet skin.
+///
+/// A faceted table lets the surface under it show through, so its hover is a translucent wash
+/// over that surface rather than an opaque row colour.
+///
+/// # Arguments
+///
+/// * `tokens` - Active theme tokens; supply the skin and the palette.
+///
+/// # Returns
+///
+/// The hover fill, or `None` under the Flat skin, where the row keeps the theme's `table_hover`
+/// role.
+fn facet_row_hover(tokens: &MoonThemeTokens) -> Option<Hsla> {
+    tokens
+        .skin
+        .is_facet()
+        .then(|| rgba_from(tokens.palette.overlay, FACET_ROW_HOVER_ALPHA))
+}
 
 /// Return whether one keystroke is the platform's exact Select All shortcut.
 ///
@@ -1356,7 +1379,11 @@ impl RenderOnce for MoonDataTable {
                     .w_full()
                     .h(px(row_height))
                     .cursor_pointer()
-                    .hover(|this| this.bg(cx.theme().table_hover))
+                    // `None` is the Flat skin, which keeps the theme's opaque hover role.
+                    .map(|this| match facet_row_hover(&tokens) {
+                        Some(hover) => this.hover(move |this| this.bg(hover)),
+                        None => this.hover(|this| this.bg(cx.theme().table_hover)),
+                    })
                     .on_click({
                         let on_select_row = on_select_row.clone();
                         move |event, window, cx| {
@@ -1432,6 +1459,10 @@ impl RenderOnce for MoonDataTable {
                                 style.header_separator,
                                 style.header_separator_alpha,
                             ))
+                            // The gutter's edge continues the header's rule under the Facet skin.
+                            .when_some(style.header_facet(p, &tokens), |this, facet| {
+                                this.border_color(facet.separator)
+                            })
                             .bg(row_header_bg)
                             .child((ix + 1).to_string())
                             .on_click(move |_, window, cx| {
@@ -1502,13 +1533,22 @@ impl RenderOnce for MoonDataTable {
                     .top(px(0.0))
                     .w(px(row_header_width))
                     .h(px(header_height))
-                    .bg(rgba_from(style.header_bg, 1.0))
-                    .border_b(px(1.0))
-                    .border_r(px(1.0))
-                    .border_color(rgba_from(
-                        style.header_separator,
-                        style.header_separator_alpha,
-                    )),
+                    // The corner is a piece of the header and follows it under the Facet skin.
+                    .map(|this| match style.header_facet(p, &tokens) {
+                        Some(facet) => this
+                            .when_some(facet.fill, |this, fill| this.bg(fill))
+                            .border_b(px(1.0))
+                            .border_r(px(1.0))
+                            .border_color(facet.separator),
+                        None => this
+                            .bg(rgba_from(style.header_bg, 1.0))
+                            .border_b(px(1.0))
+                            .border_r(px(1.0))
+                            .border_color(rgba_from(
+                                style.header_separator,
+                                style.header_separator_alpha,
+                            )),
+                    }),
             );
         }
 

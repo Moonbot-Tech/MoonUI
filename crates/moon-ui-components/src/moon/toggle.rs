@@ -7,7 +7,8 @@ use crate::checkbox::{ChoiceColors, MoonCheckboxMetrics, choice_text_column};
 
 use super::{
     colors::MoonColors,
-    foundation::{MoonSize, moon_cubic_bezier, moon_shadow_sm, snap_centered},
+    foundation::{MoonSize, box_shadow, moon_cubic_bezier, moon_shadow_sm, snap_centered},
+    skin::{MoonFacetKind, facet, facet_glow},
     theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonPalette, MoonRect, MoonTone, rgba_from},
 };
@@ -514,6 +515,9 @@ struct TogglePaint {
     /// How far the track drops to sit on the first line of the text beside it, or `None` where
     /// there is no text.
     box_offset: Option<Pixels>,
+    /// The faceted surfaces that replace `colors` on the track and the thumb, from
+    /// [`ToggleFacet::resolve`]; `None` leaves the flat colours standing.
+    facet: Option<ToggleFacet>,
 }
 
 impl TogglePaint {
@@ -522,6 +526,9 @@ impl TogglePaint {
     /// It is a child of the track rather than the track itself, so that its own border never insets
     /// the layers placed against the track's box, and so that it can give up the cap a settled
     /// thumb draws.
+    ///
+    /// Under the Facet skin the same quad is a well: the facet's fill, a one-pixel edge and its
+    /// shadows, on the geometry the flat rail has.
     fn rail(&self, settled: bool) -> Div {
         let (left, width, left_radius, right_radius) = self.metrics.rail(self.checked, settled);
         let hover_group = self.hover_group.clone();
@@ -536,13 +543,28 @@ impl TogglePaint {
             .rounded_bl(px(left_radius))
             .rounded_tr(px(right_radius))
             .rounded_br(px(right_radius))
-            .bg(self.colors.track.rest)
-            .border(px(self.metrics.border))
-            .border_color(self.colors.border.rest)
-            .when(!self.disabled, |this| {
-                this.group_hover(hover_group, move |this| {
-                    this.bg(track_hover).border_color(border_hover)
-                })
+            .map(|rail| match &self.facet {
+                // A facet is only resolved for an enabled toggle, so its hover needs no gate.
+                Some(facet) => {
+                    let (fill_hover, edge_hover) =
+                        (facet.track_fill_hovered, facet.track_edge.hovered);
+                    rail.bg(facet.track_fill)
+                        .border_1()
+                        .border_color(facet.track_edge.rest)
+                        .shadow(facet.track_shadows.clone())
+                        .group_hover(hover_group, move |this| {
+                            this.bg(fill_hover).border_color(edge_hover)
+                        })
+                }
+                None => rail
+                    .bg(self.colors.track.rest)
+                    .border(px(self.metrics.border))
+                    .border_color(self.colors.border.rest)
+                    .when(!self.disabled, |this| {
+                        this.group_hover(hover_group, move |this| {
+                            this.bg(track_hover).border_color(border_hover)
+                        })
+                    }),
             })
     }
 
@@ -552,6 +574,9 @@ impl TogglePaint {
     /// the outline's width. Drawing the outline as a border instead leaves the disc's own edge and
     /// the stroke on one curve: GPUI's quad shader mixes the fill into a 1px stroke wherever its
     /// inner and outer bands meet, which thins the outline and steps it around the circle.
+    ///
+    /// Under the Facet skin the thumb of either variant is one disc lit from above, with no
+    /// outline to draw and so no face: its gradient and its shadows set it off the track.
     fn thumb(&self, travel: ThumbTravel, shadow: Vec<BoxShadow>) -> AnyElement {
         let m = self.metrics;
         let size = m.thumb_size;
@@ -562,6 +587,8 @@ impl TogglePaint {
         let outline_hover = self.colors.thumb_border.hovered;
         let thumb_selector = format!("{}:thumb", self.id);
         let face_selector = format!("{}:thumb-face", self.id);
+        let facet_fill = self.facet.as_ref().map(|facet| vertical(facet.thumb));
+        let outlined = rides && facet_fill.is_none();
 
         let thumb = div()
             .debug_selector(|| thumb_selector)
@@ -576,11 +603,11 @@ impl TogglePaint {
             } else {
                 face
             })
-            .when(!disabled && rides, |this| {
+            .when(!disabled && outlined, |this| {
                 this.group_hover(hover_group, move |this| this.bg(outline_hover))
             })
             .shadow(shadow)
-            .when(rides, |this| {
+            .when(outlined, |this| {
                 this.child(
                     div()
                         .debug_selector(|| face_selector)
@@ -592,7 +619,8 @@ impl TogglePaint {
                         .rounded(px((size - ring * 2.0) * 0.5))
                         .bg(face),
                 )
-            });
+            })
+            .when_some(facet_fill, |this, fill| this.bg(fill));
 
         let Some(from) = travel.from() else {
             return thumb.into_any_element();
@@ -641,8 +669,11 @@ impl TogglePaint {
                     .bottom_0()
                     .rounded(px(m.radius()))
                     // A thumb that rides the track is not clipped at all: clipping would flatten
-                    // its shadow against the track it sits on.
-                    .when(!self.rides, |this| this.overflow_hidden())
+                    // its shadow against the track it sits on. Neither is a faceted thumb, whose
+                    // glow reaches past the track it sits in.
+                    .when(!self.rides && self.facet.is_none(), |this| {
+                        this.overflow_hidden()
+                    })
                     .child(self.thumb(travel, shadow)),
             )
             .when(self.focused, |this| {
@@ -716,6 +747,12 @@ impl RenderOnce for MoonToggle {
                 layer.color = layer.color.opacity(ToggleColors::DISABLED_ALPHA);
             }
         }
+        // Under the Facet skin an enabled toggle is a well with a lit thumb, which brings its
+        // own shadows; a disabled one keeps the flat colours and the shadow above.
+        let facet = ToggleFacet::resolve(&tokens, roles, self.tone, checked, disabled);
+        if let Some(facet) = &facet {
+            thumb_shadow = facet.thumb_shadows.clone();
+        }
 
         // Empty text counts as no text, so a bare toggle never gains the text column and its gap.
         let label = self.label.filter(|label| !label.is_empty());
@@ -738,6 +775,7 @@ impl RenderOnce for MoonToggle {
             focused: focus_handle.is_focused(window),
             ring_accent: rgba_from(self.tone.unwrap_or(MoonTone::Info).color(p), 1.0),
             box_offset: has_text.then(|| choice.box_offset()),
+            facet,
         };
         let switch = paint.track(settled, current, thumb_shadow);
 
@@ -969,6 +1007,150 @@ impl ToggleColors {
             thumb_border: colors.thumb_border.map(dim),
         }
     }
+}
+
+/// How far an unchecked faceted thumb's top edge is mixed toward white.
+const FACET_THUMB_LIFT: f32 = 0.25;
+/// How far a checked faceted thumb's top edge is mixed toward white.
+const FACET_THUMB_LIFT_ON: f32 = 0.45;
+/// The share of the tone washed over a checked faceted track at its top edge, then its bottom.
+const FACET_TRACK_WASH: [f32; 2] = [0.16, 0.08];
+/// Opacity of the tone in a checked faceted track's edge.
+const FACET_TRACK_EDGE_ALPHA: f32 = 0.45;
+/// Opacity of the glow a checked faceted thumb casts in its tone.
+const FACET_THUMB_GLOW_ALPHA: f32 = 0.75;
+/// Blur of that glow as the design gives it, in design-reference pixels.
+const FACET_THUMB_GLOW_BLUR: f32 = 10.0;
+
+/// The surfaces a toggle paints under the Facet skin, in place of its [`ToggleColors`].
+///
+/// The track is a well sunk into the surface and the thumb a disc lit from above. Both variants
+/// paint the same surfaces; they keep their own geometry.
+#[derive(Clone, Debug, PartialEq)]
+struct ToggleFacet {
+    /// The track's fill at rest.
+    track_fill: Background,
+    /// The track's fill under the pointer, equal to `track_fill` where hovering changes nothing.
+    track_fill_hovered: Background,
+    /// The track's one-pixel edge.
+    track_edge: Hovered,
+    /// The well's shadow stack, which the track keeps whether the toggle is on or off.
+    track_shadows: Vec<BoxShadow>,
+    /// The thumb's fill: the colour at its top edge, then the one at its bottom edge.
+    thumb: [Hsla; 2],
+    /// The thumb's shadow on the track, followed by its glow once the toggle is on.
+    thumb_shadows: Vec<BoxShadow>,
+}
+
+impl ToggleFacet {
+    /// Resolves a toggle's faceted surfaces.
+    ///
+    /// An unchecked toggle is the skin's well under a thumb of the muted text ink. A checked one
+    /// washes the well with its tone, edges it in that tone, and lights the thumb in it with a
+    /// glow. The tone is the one set on the toggle, or the palette accent that `bg_brand_solid`
+    /// stands for.
+    ///
+    /// Hovering follows [`ToggleColors::resolve`]: only a checked track with no tone of its own
+    /// answers to the pointer, by taking `bg_brand_solid_hover` for its tone. A disabled toggle
+    /// keeps the flat colours that function mixes into the surface, so it resolves no facet.
+    ///
+    /// Args:
+    ///     tokens: The active theme side; supplies the skin, the palette and the UI scale.
+    ///     roles: The active colour roles, for the brand's hover colour.
+    ///     tone: The tone set on the toggle, or `None` for the accent.
+    ///     checked: Whether the toggle is on.
+    ///     disabled: Whether the toggle is disabled.
+    ///
+    /// Returns:
+    ///     The surfaces to paint, or `None` where the flat colours stand: under the Flat skin and
+    ///     on a disabled toggle.
+    fn resolve(
+        tokens: &MoonThemeTokens,
+        roles: MoonColors,
+        tone: Option<MoonTone>,
+        checked: bool,
+        disabled: bool,
+    ) -> Option<Self> {
+        if !tokens.skin.is_facet() || disabled {
+            return None;
+        }
+        let p = tokens.palette;
+        let well = facet(MoonFacetKind::Socket, tokens);
+        let drop = box_shadow(
+            px(0.0),
+            px(tokens.ui(1.0)),
+            px(tokens.ui(2.0)),
+            px(0.0),
+            rgba_from(p.shadow, thumb_drop_alpha(p)),
+        );
+        if !checked {
+            return Some(Self {
+                track_fill: well.fill,
+                track_fill_hovered: well.fill,
+                track_edge: Hovered::flat(well.edge),
+                track_shadows: well.shadows,
+                thumb: lit(rgba_from(p.text_muted, 1.0), FACET_THUMB_LIFT),
+                thumb_shadows: vec![drop],
+            });
+        }
+
+        let tone_rgb = tone.map_or(p.accent, |tone| tone.color(p));
+        let rest = rgba_from(tone_rgb, 1.0);
+        let hovered = match tone {
+            Some(_) => rest,
+            None => roles.bg_brand_solid_hover.into(),
+        };
+        Some(Self {
+            track_fill: vertical(washed_well(p, rest)),
+            track_fill_hovered: vertical(washed_well(p, hovered)),
+            track_edge: Hovered {
+                rest: rest.opacity(FACET_TRACK_EDGE_ALPHA),
+                hovered: hovered.opacity(FACET_TRACK_EDGE_ALPHA),
+            },
+            track_shadows: well.shadows,
+            thumb: lit(rest, FACET_THUMB_LIFT_ON),
+            thumb_shadows: vec![
+                drop,
+                facet_glow(
+                    tone_rgb,
+                    FACET_THUMB_GLOW_ALPHA,
+                    FACET_THUMB_GLOW_BLUR,
+                    tokens,
+                ),
+            ],
+        })
+    }
+}
+
+/// Returns the opacity of the shadow a faceted thumb casts on its track: strong on a dark
+/// palette, and far weaker on a light one, where a shadow needs little to show.
+fn thumb_drop_alpha(p: MoonPalette) -> f32 {
+    if p.is_light() { 0.2 } else { 0.6 }
+}
+
+/// Returns the two ends of a checked faceted track's fill: `tone` washed over the palette's
+/// `gutter` by [`FACET_TRACK_WASH`], top edge first.
+///
+/// The tone's own alpha thins the wash, so a translucent hover colour tints the well less than
+/// the opaque colour it stands in for.
+fn washed_well(p: MoonPalette, tone: Hsla) -> [Hsla; 2] {
+    let gutter = rgba_from(p.gutter, 1.0);
+    FACET_TRACK_WASH.map(|share| gutter.blend(tone.opacity(share)))
+}
+
+/// Returns a surface lit from above in `color`: `color` mixed toward white by `lift` for the top
+/// edge, then `color` itself for the bottom edge.
+fn lit(color: Hsla, lift: f32) -> [Hsla; 2] {
+    [color.blend(white().opacity(lift)), color]
+}
+
+/// Builds the gradient running from `stops[0]` at the top edge to `stops[1]` at the bottom edge.
+fn vertical(stops: [Hsla; 2]) -> Background {
+    linear_gradient(
+        180.0,
+        linear_color_stop(stops[0], 0.0),
+        linear_color_stop(stops[1], 1.0),
+    )
 }
 
 #[cfg(test)]

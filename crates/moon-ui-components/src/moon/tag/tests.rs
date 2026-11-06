@@ -5,16 +5,16 @@
 use std::{cell::Cell, rc::Rc};
 
 use gpui::{
-    Context, IntoElement, Modifiers, ParentElement as _, Render, VisualTestContext, Window, point,
-    px,
+    Context, IntoElement, Modifiers, ParentElement as _, Render, VisualTestContext, Window,
+    linear_color_stop, linear_gradient, point, px,
 };
 
 use super::{
     DIMMED_OPACITY, LABEL_CONTRAST_FLOOR, MoonTag, MoonTagRadius, MoonTagVariant, SOFT_FILL_ALPHA,
-    TagChrome, composite, contrast_ratio, count_color, tag_chrome,
+    TagChrome, composite, contrast_ratio, count_color, facet_outline_wash, tag_chrome, tag_wash,
 };
 use crate::h_flex;
-use crate::moon::{MoonPalette, MoonThemeTokens, MoonTone, rgba_from};
+use crate::moon::{MoonPalette, MoonSkin, MoonThemeTokens, MoonTone, rgba_from};
 
 /// The status tones a soft tag is offered in, on both built-in palettes.
 const SOFT_TONES: [MoonTone; 4] = [
@@ -314,5 +314,170 @@ fn dimmed_label_stays_above_the_contrast_floor() {
         let seen = composite(palette.text, palette.panel, DIMMED_OPACITY);
         let ratio = contrast_ratio(seen, palette.panel);
         assert!(ratio >= LABEL_CONTRAST_FLOOR, "dimmed label: {ratio:.2}");
+    }
+}
+
+/// Every way a tag paints its tone.
+const ALL_VARIANTS: [MoonTagVariant; 4] = [
+    MoonTagVariant::Outline,
+    MoonTagVariant::Soft,
+    MoonTagVariant::Filled,
+    MoonTagVariant::Tinted,
+];
+
+/// Theme tokens painting `palette` with the Facet skin at the reference scale.
+fn faceted_tokens_with(palette: MoonPalette) -> MoonThemeTokens {
+    MoonThemeTokens {
+        skin: MoonSkin::Facet,
+        ..tokens_with(palette)
+    }
+}
+
+/// Catches `tag.rs:facet_outline_wash` running the wash upside down or at the wrong strength:
+/// an outline chip lit from below, or a wash as heavy as a soft tag's fill. The oracle is the
+/// depth study's `.d1 .tg` rule: the tone at 14% along the top edge down to 4% at the bottom.
+#[test]
+fn the_facet_outline_wash_fades_the_tone_from_the_top_edge_down() {
+    let tone = MoonPalette::OBSIDIAN.accent;
+
+    assert_eq!(
+        facet_outline_wash(tone, 1.0),
+        linear_gradient(
+            180.0,
+            linear_color_stop(rgba_from(tone, 0.14), 0.0),
+            linear_color_stop(rgba_from(tone, 0.04), 1.0),
+        )
+    );
+    assert_eq!(
+        facet_outline_wash(tone, 0.5),
+        linear_gradient(
+            180.0,
+            linear_color_stop(rgba_from(tone, 0.07), 0.0),
+            linear_color_stop(rgba_from(tone, 0.02), 1.0),
+        ),
+        "a faded chip scales both ends of the wash"
+    );
+}
+
+/// Catches `tag.rs:tag_wash` answering for the Flat skin, which would put a fill behind every
+/// outline tag of every existing theme, or for a soft, filled or tinted tag, whose own fill
+/// the wash would replace.
+#[test]
+fn only_an_outline_tag_under_the_facet_skin_is_washed() {
+    for palette in [MoonPalette::OBSIDIAN, MoonPalette::LIGHT] {
+        let faceted = faceted_tokens_with(palette);
+        let flat = tokens_with(palette);
+
+        for tone in SOFT_TONES {
+            assert_eq!(
+                tag_wash(&faceted, tone, MoonTagVariant::Outline),
+                Some(facet_outline_wash(tone.color(palette), 1.0)),
+                "outline {tone:?} takes the wash of its own tone"
+            );
+            for variant in ALL_VARIANTS {
+                assert_eq!(
+                    tag_wash(&flat, tone, variant),
+                    None,
+                    "{variant:?} {tone:?} is washed under the Flat skin"
+                );
+            }
+            for variant in [
+                MoonTagVariant::Soft,
+                MoonTagVariant::Filled,
+                MoonTagVariant::Tinted,
+            ] {
+                assert_eq!(
+                    tag_wash(&faceted, tone, variant),
+                    None,
+                    "{variant:?} {tone:?} keeps its own fill under the Facet skin"
+                );
+            }
+        }
+    }
+}
+
+/// Catches `tag.rs:MoonTag::render` painting a fill behind an outline tag on a flat theme, not
+/// painting the wash it resolves on the faceted one, or letting the wash replace the fill of a
+/// soft, filled or tinted tag. The flat colours are the flat design's own, written out.
+#[test]
+fn only_the_outline_tag_of_the_faceted_theme_paints_a_wash() {
+    use super::super::button::scene_probe::{Painted, Pointer, painted};
+    use crate::moon::MoonThemeConfig;
+
+    let p = MoonPalette::OBSIDIAN;
+    let tone = MoonTone::Warning.color(p);
+    let obsidian_with = |skin: MoonSkin| {
+        let mut config = MoonThemeConfig::moon_obsidian();
+        config.dark.skin = skin;
+        config
+    };
+    let tag = |skin: MoonSkin, variant: MoonTagVariant| {
+        painted(obsidian_with(skin), Pointer::Away, move || {
+            MoonTag::warning().variant(variant).label("live")
+        })
+    };
+    let flat_outline = Painted::flat(rgba_from(tone, 0.0), rgba_from(tone, 0.48));
+    assert_eq!(flat_outline.fill, None, "a flat outline tag has no fill");
+
+    assert_eq!(tag(MoonSkin::Flat, MoonTagVariant::Outline), flat_outline);
+    assert_eq!(
+        tag(MoonSkin::Facet, MoonTagVariant::Outline),
+        Painted {
+            fill: Some(linear_gradient(
+                180.0,
+                linear_color_stop(rgba_from(tone, 0.14), 0.0),
+                linear_color_stop(rgba_from(tone, 0.04), 1.0),
+            )),
+            ..flat_outline
+        }
+    );
+
+    let unchanged = [
+        (
+            MoonTagVariant::Soft,
+            Painted::flat(rgba_from(tone, 0.14), rgba_from(tone, 0.0)),
+        ),
+        (
+            MoonTagVariant::Filled,
+            Painted::flat(rgba_from(tone, 1.0), rgba_from(tone, 1.0)),
+        ),
+        (
+            MoonTagVariant::Tinted,
+            Painted::flat(rgba_from(tone, 0.14), rgba_from(tone, 0.35)),
+        ),
+    ];
+    for (variant, expected) in unchanged {
+        for skin in [MoonSkin::Flat, MoonSkin::Facet] {
+            assert_eq!(tag(skin, variant), expected, "{variant:?} under {skin:?}");
+        }
+    }
+}
+
+/// Catches `tag.rs:tag_chrome` reading the skin: the border, label, radius, padding and row
+/// height of a tag are the same under both skins, so the Facet skin only ever adds the wash.
+#[test]
+fn the_facet_skin_leaves_the_tag_chrome_unchanged() {
+    for palette in [MoonPalette::OBSIDIAN, MoonPalette::LIGHT] {
+        for tone in SOFT_TONES {
+            for variant in ALL_VARIANTS {
+                assert_eq!(
+                    tag_chrome(
+                        &faceted_tokens_with(palette),
+                        tone,
+                        variant,
+                        MoonTagRadius::Full,
+                        false
+                    ),
+                    tag_chrome(
+                        &tokens_with(palette),
+                        tone,
+                        variant,
+                        MoonTagRadius::Full,
+                        false
+                    ),
+                    "{variant:?} {tone:?}"
+                );
+            }
+        }
     }
 }

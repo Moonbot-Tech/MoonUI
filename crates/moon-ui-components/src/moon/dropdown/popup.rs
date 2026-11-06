@@ -1,5 +1,6 @@
 //! Popup-menu rendering, virtualization state, and nested-menu composition.
 
+use super::super::skin::{MoonFacet, MoonFacetKind, facet};
 use super::super::theme::MoonTextMetrics;
 use super::*;
 
@@ -102,6 +103,24 @@ fn menu_trailing_label(
         .uppercase(false)
         .render()
         .into_any_element()
+}
+
+/// Design-reference corner radius of a menu under the Facet skin.
+const FACET_MENU_RADIUS: f32 = 8.0;
+
+/// Resolve the surface a menu level paints under the Facet skin.
+///
+/// Args:
+///     tokens: Tokens the menu renders with; supply the skin, the palette and the UI scale.
+///
+/// Returns:
+///     The popup surface, or `None` under the Flat skin, where the menu keeps its solid fill,
+///     its palette border and its single soft shadow.
+fn menu_facet(tokens: &MoonThemeTokens) -> Option<MoonFacet> {
+    tokens
+        .skin
+        .is_facet()
+        .then(|| facet(MoonFacetKind::Popup, tokens))
 }
 
 /// Reset and return the last palette shell observed by a probe submenu row.
@@ -544,11 +563,22 @@ impl MoonPopupMenu {
             .relative()
             .w(px(width))
             .p(px(tokens.ui(MENU_PADDING)))
-            .rounded(px(tokens.ui(5.0)))
-            .border(px(1.0))
-            .border_color(rgba_from(p.border, 1.0))
-            .bg(rgba_from(p.shell_high, 0.98))
-            .shadow(vec![shadow])
+            // `None` is the Flat skin. A faceted menu is a popup surface: gradient fill, lit
+            // edge and the deeper shadow of something floating above the window.
+            .map(|this| match menu_facet(&tokens) {
+                Some(surface) => this
+                    .rounded(px(tokens.ui(FACET_MENU_RADIUS)))
+                    .border(px(1.0))
+                    .border_color(surface.edge)
+                    .bg(surface.fill)
+                    .shadow(surface.shadows),
+                None => this
+                    .rounded(px(tokens.ui(5.0)))
+                    .border(px(1.0))
+                    .border_color(rgba_from(p.border, 1.0))
+                    .bg(rgba_from(p.shell_high, 0.98))
+                    .shadow(vec![shadow]),
+            })
             .occlude()
             .flex()
             .flex_col()

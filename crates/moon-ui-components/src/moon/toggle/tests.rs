@@ -2,15 +2,16 @@
 
 use super::{
     MoonToggle, MoonToggleLabelSide, MoonToggleSize, MoonToggleVariant, THUMB_TRAVEL,
-    THUMB_TRAVEL_CURVE, ThumbTravel, ToggleColors, moon_toggle_click_plan,
+    THUMB_TRAVEL_CURVE, ThumbTravel, ToggleColors, ToggleFacet, moon_toggle_click_plan, vertical,
+    washed_well,
 };
 use crate::checkbox::{ChoiceColors, MoonCheckboxMetrics};
 use crate::moon::checkbox::tier_size;
 use crate::moon::{
-    MoonColors, MoonPalette, MoonScale, MoonSize, MoonThemeConfig, MoonThemeTokens, MoonTone,
-    rgba_from,
+    MoonColors, MoonFacetKind, MoonPalette, MoonScale, MoonSize, MoonTheme, MoonThemeConfig,
+    MoonThemeTokens, MoonTone, facet, rgba_from,
 };
-use gpui::{px, size};
+use gpui::{BoxShadow, Hsla, Rgba, point, px, size};
 
 /// Catches changing a tier's unscaled reference geometry in `MoonToggleSize::reference_metrics`
 /// away from the reviewed designer reference (Sm 36x20 track/16 thumb/14px-20 text/8 gap, Md
@@ -381,6 +382,39 @@ fn render_toggle(
 #[gpui::test]
 fn track_and_thumb_render_at_the_reviewed_size(cx: &mut gpui::TestAppContext) {
     cx.update(crate::init);
+    assert_track_and_thumb_at_the_reviewed_size(cx);
+}
+
+/// Catches the Facet skin moving a toggle off its reviewed geometry — a facet edge that insets
+/// the thumb, a thumb resized to the design mock-up's, or a slim thumb pulled inside its track:
+/// under the faceted theme every variant, tier and state must measure exactly as under a flat
+/// one, so switching themes never reflows a toolbar. A faceted slim thumb is one lit disc, so it
+/// draws no face.
+#[gpui::test]
+fn a_faceted_toggle_keeps_the_reviewed_geometry(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    cx.update(|cx| MoonTheme::install_config(MoonThemeConfig::moon_obsidian(), cx));
+    cx.update(|cx| assert!(MoonTheme::active_tokens(cx).skin.is_facet()));
+
+    assert_track_and_thumb_at_the_reviewed_size(cx);
+
+    let mut cx = render_toggle(
+        cx,
+        SizedToggleHarness {
+            variant: MoonToggleVariant::Slim,
+            ..SizedToggleHarness::bare(MoonSize::Sm, true)
+        },
+    );
+    assert!(cx.debug_bounds("sized:thumb").is_some());
+    assert!(
+        cx.debug_bounds("sized:thumb-face").is_none(),
+        "a faceted thumb has no outline, so it needs no face"
+    );
+}
+
+/// Renders every variant, tier and state under the installed theme and asserts the reviewed
+/// track and thumb geometry.
+fn assert_track_and_thumb_at_the_reviewed_size(cx: &mut gpui::TestAppContext) {
     // A default toggle keeps its thumb 2px inside the track; a slim one's thumb is the track's
     // own height, so it sits flush against every edge.
     for (variant, tier, track, thumb, gap) in [
@@ -913,4 +947,204 @@ fn the_thumb_keeps_one_gap_on_every_side_at_any_scale_factor(cx: &mut gpui::Test
             }
         }
     }
+}
+
+/// The sRGB channel levels of `color`, each from 0 to 255 and left unrounded.
+fn levels(color: Hsla) -> [f32; 3] {
+    let color = Rgba::from(color);
+    [color.r * 255.0, color.g * 255.0, color.b * 255.0]
+}
+
+/// Asserts `color` sits at `expected` levels per channel, to within a tenth of a level.
+fn assert_levels(color: Hsla, expected: [f32; 3], what: &str) {
+    let actual = levels(color);
+    for (actual_level, expected_level) in actual.into_iter().zip(expected) {
+        assert!(
+            (actual_level - expected_level).abs() < 0.1,
+            "{what}: {actual:?} is not {expected:?}"
+        );
+    }
+}
+
+/// A shadow straight below its element with no spread, written out rather than taken from
+/// `toggle.rs`. `blur` is the renderer's blur radius, which the thumb's own shadow is built in.
+fn shadow_below(y: f32, blur: f32, color: Hsla) -> BoxShadow {
+    BoxShadow {
+        color,
+        offset: point(px(0.0), px(y)),
+        blur_radius: px(blur),
+        spread_radius: px(0.0),
+        inset: false,
+    }
+}
+
+/// A glow centred on its element with no spread, written out rather than taken from `skin.rs`.
+/// `design_blur` is the blur as the design gives it, a CSS `box-shadow` blur.
+fn glow(design_blur: f32, color: Hsla) -> BoxShadow {
+    // The renderer's blur radius is the gaussian's standard deviation: half a CSS blur.
+    shadow_below(0.0, design_blur / 2.0, color)
+}
+
+/// Catches `toggle.rs:ToggleFacet::resolve` ignoring the skin or the disabled flag: every flat
+/// theme's toggles would be repainted as wells, or a disabled toggle on the faceted theme would
+/// lose the flat colours the design mixes into the surface. With no facet resolved, a toggle
+/// paints `ToggleColors` alone, exactly as it did before skins existed.
+#[test]
+fn flat_themes_and_disabled_toggles_resolve_no_facet() {
+    let flat_sides = [
+        MoonThemeConfig::moon_terminal().dark,
+        MoonThemeConfig::moon_terminal().light,
+        MoonThemeConfig::moon_graphite().dark,
+        MoonThemeConfig::moon_obsidian().light,
+        MoonThemeTokens::default(),
+    ];
+    for tokens in &flat_sides {
+        let roles = MoonColors::from_palette(tokens.palette);
+        for tone in [None, Some(MoonTone::Info)] {
+            for checked in [false, true] {
+                for disabled in [false, true] {
+                    assert_eq!(
+                        ToggleFacet::resolve(tokens, roles, tone, checked, disabled),
+                        None,
+                        "a flat theme never resolves a facet"
+                    );
+                }
+            }
+        }
+    }
+
+    let faceted = MoonThemeConfig::moon_obsidian().dark;
+    let roles = MoonColors::from_palette(faceted.palette);
+    for checked in [false, true] {
+        assert_eq!(
+            ToggleFacet::resolve(&faceted, roles, None, checked, true),
+            None,
+            "a disabled toggle keeps the flat colours"
+        );
+        assert!(ToggleFacet::resolve(&faceted, roles, None, checked, false).is_some());
+    }
+}
+
+/// Catches an unchecked faceted toggle drifting from its spec: the track is the skin's socket —
+/// a well under an edge that reads at the track's size — with the same fill and edge under
+/// the pointer, and the thumb runs from the muted text ink lifted a quarter of the way to white
+/// down to that ink, over a 1px-down, 2px-blur shadow at 60%. A thumb lit from below, or one
+/// carrying the checked glow, would read as switched on.
+#[test]
+fn an_unchecked_faceted_toggle_is_a_well_under_a_muted_thumb() {
+    let tokens = MoonThemeConfig::moon_obsidian().dark;
+    let p = tokens.palette;
+    let roles = MoonColors::from_palette(p);
+    let well = facet(MoonFacetKind::Socket, &tokens);
+
+    let off = ToggleFacet::resolve(&tokens, roles, None, false, false).expect("faceted");
+    assert_eq!(off.track_fill, well.fill);
+    assert_eq!(off.track_fill_hovered, well.fill);
+    assert_eq!(off.track_edge.rest, rgba_from(p.overlay, 0.17));
+    assert_eq!(off.track_edge.hovered, off.track_edge.rest);
+    assert_eq!(off.track_shadows, well.shadows);
+
+    // `text_muted` 0x878279 is (135, 130, 121); a quarter of the way to 255 is +30, +31.25, +33.5.
+    assert_levels(off.thumb[0], [165.0, 161.25, 154.5], "thumb top");
+    assert_eq!(off.thumb[1], rgba_from(p.text_muted, 1.0));
+    assert_eq!(
+        off.thumb_shadows,
+        vec![shadow_below(1.0, 2.0, rgba_from(p.shadow, 0.6))]
+    );
+}
+
+/// Catches a checked faceted toggle drifting from its spec, with the accent and with an explicit
+/// tone: the well is washed with the tone, 16% at the top and 8% at the bottom, and edged in it
+/// at 45%; the thumb runs from the tone lifted 45% toward white down to the tone, and adds a
+/// glow in the tone at 75% to its shadow — 10px of blur in the design, so 5px at the renderer.
+/// Swapping the two washes lights the track from below; dropping the tone repaints every toned
+/// toggle in the accent.
+#[test]
+fn a_checked_faceted_toggle_washes_its_well_and_lights_its_thumb_in_the_tone() {
+    let tokens = MoonThemeConfig::moon_obsidian().dark;
+    let p = tokens.palette;
+    let roles = MoonColors::from_palette(p);
+    let well = facet(MoonFacetKind::Socket, &tokens);
+
+    // `gutter` 0x08090B is (8, 9, 11). The accent 0xFFB347 is (255, 179, 71) and the Info tone,
+    // `blue` 0x7FC9FF, is (127, 201, 255).
+    for (tone, rgb, wash_top, wash_bottom, thumb_top) in [
+        (
+            None,
+            p.accent,
+            [47.52, 36.2, 20.6],
+            [27.76, 22.6, 15.8],
+            [255.0, 213.2, 153.8],
+        ),
+        (
+            Some(MoonTone::Info),
+            p.blue,
+            [27.04, 39.72, 50.04],
+            [17.52, 24.36, 30.52],
+            [184.6, 225.3, 255.0],
+        ),
+    ] {
+        let ink = rgba_from(rgb, 1.0);
+        let on = ToggleFacet::resolve(&tokens, roles, tone, true, false).expect("faceted");
+
+        let [top, bottom] = washed_well(p, ink);
+        assert_levels(top, wash_top, "track top");
+        assert_levels(bottom, wash_bottom, "track bottom");
+        assert_eq!(on.track_fill, vertical([top, bottom]));
+        assert_eq!(on.track_edge.rest, Hsla { a: 0.45, ..ink });
+        assert_eq!(on.track_shadows, well.shadows);
+
+        assert_levels(on.thumb[0], thumb_top, "thumb top");
+        assert_eq!(on.thumb[1], ink);
+        assert_eq!(
+            on.thumb_shadows,
+            vec![
+                shadow_below(1.0, 2.0, rgba_from(p.shadow, 0.6)),
+                glow(10.0, rgba_from(rgb, 0.75)),
+            ]
+        );
+    }
+}
+
+/// Catches the faceted track losing the one hover a flat toggle has, or gaining one it has not:
+/// a checked track with no tone takes `bg_brand_solid_hover` for its tone under the pointer —
+/// on a legacy palette the accent at 82%, which thins the wash and the edge by that much — while
+/// a toned track keeps its fill and edge, as a toned flat track keeps its fill.
+#[test]
+fn only_an_untoned_faceted_track_answers_to_the_pointer() {
+    let tokens = MoonThemeConfig::moon_obsidian().dark;
+    let p = tokens.palette;
+    let roles = MoonColors::from_palette(p);
+
+    let brand = ToggleFacet::resolve(&tokens, roles, None, true, false).expect("faceted");
+    let [top, bottom] = washed_well(p, roles.bg_brand_solid_hover.into());
+    // The accent's wash at 209/255 of its strength: 16% becomes 13.11% and 8% becomes 6.56%.
+    assert_levels(top, [40.39, 31.29, 18.87], "hovered track top");
+    assert_levels(bottom, [24.20, 20.15, 14.93], "hovered track bottom");
+    assert_eq!(brand.track_fill_hovered, vertical([top, bottom]));
+    assert_ne!(brand.track_fill_hovered, brand.track_fill);
+    assert!((brand.track_edge.hovered.a - 0.45 * 209.0 / 255.0).abs() < 1e-4);
+
+    let toned =
+        ToggleFacet::resolve(&tokens, roles, Some(MoonTone::Info), true, false).expect("faceted");
+    assert_eq!(toned.track_fill_hovered, toned.track_fill);
+    assert_eq!(toned.track_edge.hovered, toned.track_edge.rest);
+}
+
+/// Catches a facet shadow built from a raw `px(..)`: at a doubled UI scale the thumb doubles, and
+/// its shadow and glow would stay the size they have at 100%.
+#[test]
+fn faceted_thumb_shadows_follow_the_ui_scale() {
+    let tokens = MoonThemeConfig::moon_obsidian().with_ui_scale(2.0).dark;
+    let p = tokens.palette;
+    let on = ToggleFacet::resolve(&tokens, MoonColors::from_palette(p), None, true, false)
+        .expect("faceted");
+    // The thumb's 1px-down, 2px shadow and its glow's 10 design pixels of blur, each doubled.
+    assert_eq!(
+        on.thumb_shadows,
+        vec![
+            shadow_below(2.0, 4.0, rgba_from(p.shadow, 0.6)),
+            glow(20.0, rgba_from(p.accent, 0.75)),
+        ]
+    );
 }

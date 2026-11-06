@@ -116,6 +116,95 @@ fn kbd_formats_keystrokes_like_longbridge() {
     }
 }
 
+/// Catches `kbd.rs:MoonKbd::raised_surface` answering for the Flat skin, which would restyle
+/// the shortcut chips of every existing theme, losing the raised surface of a filled chip on
+/// the faceted theme, or lighting an outline chip, which has no fill.
+#[test]
+fn only_a_filled_chip_under_the_facet_skin_is_raised() {
+    use crate::moon::{MoonFacetKind, MoonPalette, MoonSkin, MoonThemeTokens, facet, rgba_from};
+    use gpui::{linear_color_stop, linear_gradient};
+
+    for palette in [MoonPalette::OBSIDIAN, MoonPalette::LIGHT] {
+        let tokens = |skin: MoonSkin| MoonThemeTokens {
+            skin,
+            palette,
+            ..MoonThemeTokens::default()
+        };
+        let faceted = tokens(MoonSkin::Facet);
+
+        let raised = MoonKbd::new("Esc")
+            .raised_surface(&faceted)
+            .expect("a filled chip is raised under the Facet skin");
+        assert_eq!(
+            raised.fill,
+            linear_gradient(
+                180.0,
+                linear_color_stop(rgba_from(palette.panel_high, 1.0), 0.0),
+                linear_color_stop(rgba_from(palette.panel, 1.0), 1.0),
+            ),
+            "the chip is lit from above"
+        );
+        assert!(!raised.shadows.is_empty());
+        assert_eq!(raised, facet(MoonFacetKind::Raised, &faceted));
+
+        assert_eq!(
+            MoonKbd::new("Esc").outline(true).raised_surface(&faceted),
+            None,
+            "an outline chip keeps its hairline"
+        );
+        for outline in [false, true] {
+            assert_eq!(
+                MoonKbd::new("Esc")
+                    .outline(outline)
+                    .raised_surface(&tokens(MoonSkin::Flat)),
+                None,
+                "a chip is raised under the Flat skin (outline={outline})"
+            );
+        }
+    }
+}
+
+/// Catches `kbd.rs:MoonKbd::render` painting anything new on a flat theme, not painting the
+/// raised surface it resolves on the faceted one, or lighting an outline chip. The flat colours
+/// are the flat design's own: the panel at 92% under a 72% border, and an unfilled chip with a
+/// solid border for the outline.
+#[test]
+fn a_chip_paints_flat_on_a_flat_theme_and_raised_on_the_faceted_one() {
+    use super::super::button::scene_probe::{Painted, Pointer, painted};
+    use crate::moon::{
+        MoonFacetKind, MoonPalette, MoonSkin, MoonThemeConfig, MoonThemeTokens, facet, rgba_from,
+    };
+
+    let p = MoonPalette::OBSIDIAN;
+    let obsidian_with = |skin: MoonSkin| {
+        let mut config = MoonThemeConfig::moon_obsidian();
+        config.dark.skin = skin;
+        config
+    };
+    let chip = |skin: MoonSkin, outline: bool| {
+        painted(obsidian_with(skin), Pointer::Away, move || {
+            MoonKbd::new("Esc").outline(outline)
+        })
+    };
+    let flat_filled = Painted::flat(rgba_from(p.panel, 0.92), rgba_from(p.border, 0.72));
+    let flat_outline = Painted::flat(rgba_from(p.shell, 0.0), rgba_from(p.border, 1.0));
+    assert_eq!(flat_outline.fill, None, "an outline chip has no fill");
+
+    assert_eq!(chip(MoonSkin::Flat, false), flat_filled);
+    assert_eq!(chip(MoonSkin::Flat, true), flat_outline);
+
+    let tokens = MoonThemeTokens {
+        skin: MoonSkin::Facet,
+        palette: p,
+        ..MoonThemeTokens::default()
+    };
+    assert_eq!(
+        chip(MoonSkin::Facet, false),
+        Painted::facet(facet(MoonFacetKind::Raised, &tokens))
+    );
+    assert_eq!(chip(MoonSkin::Facet, true), flat_outline);
+}
+
 /// Catches dropping the modifier-only and Caps Lock labels from `kbd.rs:MoonKbd::format_keystroke`.
 ///
 /// A shortcut that is one modifier parses back under GPUI's own name for it, so without these the

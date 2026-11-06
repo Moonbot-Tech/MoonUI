@@ -909,6 +909,12 @@ impl VisualTestContext {
         self.background_executor.run_until_parked();
     }
 
+    /// Run one native frame callback, including retained GPU canvas text preparation.
+    pub fn simulate_frame(&mut self) {
+        self.test_window(self.window).simulate_frame();
+        self.run_until_parked();
+    }
+
     /// Simulates the user closing the window.
     /// Returns true if the window was closed.
     pub fn simulate_close(&mut self) -> bool {

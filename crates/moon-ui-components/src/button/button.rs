@@ -5,15 +5,26 @@ use crate::{
     StyledExt,
     button::ButtonIcon,
     h_flex,
-    moon::{MoonPalette, MoonTheme, rgba_from},
+    moon::{
+        MoonFacet, MoonFacetKind, MoonFacetTint, MoonPalette, MoonTheme, MoonThemeTokens, facet,
+        facet_glow, facet_tinted, rgba_from,
+    },
     tooltip::{ManagedTooltipExt as _, Tooltip},
 };
 use gpui::{
     AnyElement, App, ClickEvent, Corners, Div, Edges, ElementId, Hsla, InteractiveElement,
     Interactivity, IntoElement, MouseButton, ParentElement, Pixels, RenderOnce, SharedString,
     Stateful, StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div,
-    prelude::FluentBuilder as _, px, relative,
+    linear_color_stop, linear_gradient, prelude::FluentBuilder as _, px, relative,
 };
+
+/// Opacity of the second glow a solid faceted button gains under the pointer.
+const SOLID_HOVER_GLOW_ALPHA: f32 = 0.26;
+/// Blur of that second glow as the design gives it, in design-reference pixels.
+const SOLID_HOVER_GLOW_BLUR: f32 = 18.0;
+/// Opacity of a loading button's faceted fill and edge relative to its resting ones; the same
+/// share the flat colours of a loading button are faded to.
+const LOADING_FACET_OPACITY: f32 = 0.8;
 
 #[derive(Default, Clone, Copy)]
 pub enum ButtonRounded {
@@ -38,6 +49,9 @@ pub struct ButtonCustomVariant {
     shadow: bool,
     hover: Hsla,
     active: Hsla,
+    /// The tone, as `0xRRGGBB`, this variant is painted in as a solid facet under the Facet
+    /// skin. `None` keeps the flat colours above on every skin.
+    facet_tone: Option<u32>,
 }
 
 pub trait ButtonVariants: Sized {
@@ -147,7 +161,23 @@ impl ButtonCustomVariant {
             hover: cx.theme().transparent,
             active: cx.theme().transparent,
             shadow: false,
+            facet_tone: None,
         }
+    }
+
+    /// Paint this variant as a solid facet of `tone` under the Facet skin.
+    ///
+    /// The flat colours set through the other builders still paint it under the Flat skin, and
+    /// the foreground is the same under both.
+    ///
+    /// Args:
+    ///     tone: The fill tone as `0xRRGGBB`.
+    ///
+    /// Returns:
+    ///     The updated variant.
+    pub(crate) fn facet_solid(mut self, tone: u32) -> Self {
+        self.facet_tone = Some(tone);
+        self
     }
 
     /// Set background color, default is transparent.
@@ -595,6 +625,10 @@ impl RenderOnce for Button {
     ///
     /// The window supplies focus state, the app supplies theme tokens, and the returned element
     /// owns all mouse, focus, tooltip, and click wiring for this one-shot button.
+    ///
+    /// Every state is painted flat first, exactly as a flat theme draws it. Under the Facet skin
+    /// the faceted surface of the same state, where the variant has one, is then painted over
+    /// its background, border colour and shadows; text colours are the flat ones on both skins.
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let style: ButtonVariant = self.variant;
         let clickable = self.clickable();
@@ -606,6 +640,11 @@ impl RenderOnce for Button {
             .unwrap_or_else(|| MoonButtonMetrics::for_size(self.size, cx));
         let normal_style = style.normal(self.outline, cx);
         let icon_size = Size::Size(metrics.icon_size);
+        // Resolved once: the facet of each state is read off these tokens, and is `None` for
+        // every state under the Flat skin.
+        let tokens = MoonTheme::active_tokens(cx);
+        let outline = self.outline;
+        let facet_in = |state: ButtonVisualState| style.resolve_facet(&tokens, outline, state);
 
         let focus_handle = window
             .use_keyed_state(self.id.clone(), cx, |_, cx| cx.focus_handle())
@@ -672,37 +711,51 @@ impl RenderOnce for Button {
                 this.bg(selected_style.bg)
                     .border_color(selected_style.border)
                     .text_color(selected_style.fg)
+                    .map(|this| faceted(this, facet_in(ButtonVisualState::Selected)))
                     .when(pointer_feedback, |this| {
                         this.hover(|this| {
                             let hover_style = style.selected_hovered(self.outline, cx);
-                            this.bg(hover_style.bg)
-                                .border_color(hover_style.border)
-                                .text_color(hover_style.fg)
+                            faceted(
+                                this.bg(hover_style.bg)
+                                    .border_color(hover_style.border)
+                                    .text_color(hover_style.fg),
+                                facet_in(ButtonVisualState::SelectedHovered),
+                            )
                         })
                         .active(|this| {
                             let active_style = style.selected_active(self.outline, cx);
-                            this.bg(active_style.bg)
-                                .border_color(active_style.border)
-                                .text_color(active_style.fg)
+                            faceted(
+                                this.bg(active_style.bg)
+                                    .border_color(active_style.border)
+                                    .text_color(active_style.fg),
+                                facet_in(ButtonVisualState::SelectedActive),
+                            )
                         })
                     })
             })
             .when(!self.disabled && !self.selected, |this| {
                 this.border_color(normal_style.border)
                     .bg(normal_style.bg)
+                    .map(|this| faceted(this, facet_in(ButtonVisualState::Normal)))
                     .when(normal_style.underline, |this| this.text_decoration_1())
                     .when(pointer_feedback, |this| {
                         this.hover(|this| {
                             let hover_style = style.hovered(self.outline, cx);
-                            this.bg(hover_style.bg)
-                                .border_color(hover_style.border)
-                                .text_color(hover_style.fg)
+                            faceted(
+                                this.bg(hover_style.bg)
+                                    .border_color(hover_style.border)
+                                    .text_color(hover_style.fg),
+                                facet_in(ButtonVisualState::Hovered),
+                            )
                         })
                         .active(|this| {
                             let active_style = style.active(self.outline, cx);
-                            this.bg(active_style.bg)
-                                .border_color(active_style.border)
-                                .text_color(active_style.fg)
+                            faceted(
+                                this.bg(active_style.bg)
+                                    .border_color(active_style.border)
+                                    .text_color(active_style.fg),
+                                facet_in(ButtonVisualState::Active),
+                            )
                         })
                     })
             })
@@ -780,6 +833,17 @@ impl RenderOnce for Button {
                 this.bg(normal_style.bg.opacity(0.8))
                     .border_color(normal_style.border.opacity(0.8))
                     .text_color(normal_style.fg.opacity(0.8))
+                    .map(|this| {
+                        let resting = facet_in(ButtonVisualState::Normal);
+                        faceted(
+                            this,
+                            resting.map(|surface| MoonFacet {
+                                fill: surface.fill.opacity(LOADING_FACET_OPACITY),
+                                edge: surface.edge.opacity(LOADING_FACET_OPACITY),
+                                shadows: surface.shadows,
+                            }),
+                        )
+                    })
             })
             .map(|this| {
                 if let Some(builder) = self.tooltip_builder {
@@ -827,8 +891,11 @@ pub(crate) struct MoonButtonStyle {
 }
 
 /// Internal visual states used to resolve one button variant.
-#[derive(Clone, Copy)]
-enum ButtonVisualState {
+///
+/// Crate-visible so a Moon wrapper's tests can ask [`ButtonVariant::resolve_facet`] for the
+/// surface of one state.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ButtonVisualState {
     Normal,
     Hovered,
     Active,
@@ -864,6 +931,107 @@ impl ButtonVisualState {
 /// click handler, so eligibility cannot depend on `Button::on_click` alone.
 fn pointer_feedback_enabled(disabled: bool, loading: bool) -> bool {
     !disabled && !loading
+}
+
+/// Paint a faceted surface over the flat style already set on `this`.
+///
+/// Args:
+///     this: The element or style refinement carrying one state's flat style.
+///     surface: The faceted surface of that state; `None` under the Flat skin and for a variant
+///         with no facet.
+///
+/// Returns:
+///     `this` with the surface's fill, edge colour and shadow stack replacing the flat
+///     background, border colour and shadows, or `this` untouched when there is no surface.
+fn faceted<S: Styled>(this: S, surface: Option<MoonFacet>) -> S {
+    match surface {
+        Some(surface) => surface.paint(this),
+        None => this,
+    }
+}
+
+/// Strip a faceted surface of every shadow cast outside it, its drop shadow and its glow, so
+/// that it reads as pressed flush with the panel. The highlight inside the surface is kept.
+fn flush(mut surface: MoonFacet) -> MoonFacet {
+    surface.shadows.retain(|shadow| shadow.inset);
+    surface
+}
+
+/// Resolve the surface of a pressed raised control under the Facet skin.
+///
+/// It is the [`MoonFacetKind::Raised`] surface lit from below: the two ends of that fill
+/// swapped, so `panel` is on top and `panel_high` at the bottom, with the same edge and no drop
+/// shadow. Crate-visible so every raised control presses the same way.
+///
+/// Args:
+///     tokens: The theme side to resolve it for; supplies the palette and the UI scale.
+///
+/// Returns:
+///     The pressed surface.
+pub(crate) fn raised_pressed_facet(tokens: &MoonThemeTokens) -> MoonFacet {
+    let p = tokens.palette;
+    let raised = facet(MoonFacetKind::Raised, tokens);
+    flush(MoonFacet {
+        fill: linear_gradient(
+            180.0,
+            linear_color_stop(rgba_from(p.panel, 1.0), 0.0),
+            linear_color_stop(rgba_from(p.panel_high, 1.0), 1.0),
+        ),
+        ..raised
+    })
+}
+
+/// Resolve the surface of a neutral raised button in `state`: raised at rest, relit under the
+/// pointer and lit from below while pressed. Selection does not change it.
+fn raised_button_facet(state: ButtonVisualState, tokens: &MoonThemeTokens) -> MoonFacet {
+    if state.is_active() {
+        raised_pressed_facet(tokens)
+    } else if state.is_hovered() {
+        facet(MoonFacetKind::RaisedHover, tokens)
+    } else {
+        facet(MoonFacetKind::Raised, tokens)
+    }
+}
+
+/// Resolve the surface of a button washed with `tone` (`0xRRGGBB`) in `state`.
+///
+/// At rest it is the soft wash. Under the pointer and when selected it is the selected wash,
+/// with its glow. A selected button under the pointer also takes the tone's full edge, and a
+/// pressed one, selected or not, is the selected wash pressed flush.
+fn tinted_button_facet(tone: u32, state: ButtonVisualState, tokens: &MoonThemeTokens) -> MoonFacet {
+    let lit = || facet_tinted(tone, MoonFacetTint::Selected, tokens);
+    if state.is_active() {
+        flush(lit())
+    } else if state.is_hovered() && state.is_selected() {
+        MoonFacet {
+            edge: rgba_from(tone, 1.0),
+            ..lit()
+        }
+    } else if state.is_hovered() || state.is_selected() {
+        lit()
+    } else {
+        facet_tinted(tone, MoonFacetTint::Soft, tokens)
+    }
+}
+
+/// Resolve the surface of a button filled with `tone` (`0xRRGGBB`) in `state`: the solid facet
+/// at rest and when selected, with a second glow under the pointer, and pressed flush while
+/// pressed.
+fn solid_button_facet(tone: u32, state: ButtonVisualState, tokens: &MoonThemeTokens) -> MoonFacet {
+    let mut solid = facet_tinted(tone, MoonFacetTint::Solid, tokens);
+    if state.is_active() {
+        flush(solid)
+    } else if state.is_hovered() {
+        solid.shadows.push(facet_glow(
+            tone,
+            SOLID_HOVER_GLOW_ALPHA,
+            SOLID_HOVER_GLOW_BLUR,
+            tokens,
+        ));
+        solid
+    } else {
+        solid
+    }
 }
 
 impl ButtonVariant {
@@ -1185,6 +1353,82 @@ impl ButtonVariant {
             fg: rgba_from(style.fg, style.fg_alpha),
             underline: matches!(self, Self::Link),
             shadow: style.shadow,
+        }
+    }
+
+    /// Resolve the faceted surface one state is painted with under the Facet skin.
+    ///
+    /// The neutral variants (`Default`, `Panel`, `Secondary`, `Soft`) are raised controls. The
+    /// tone variants (`Primary`/`Blue`/`Info`, `Warning`/`Amber`, `Success`/`Green`,
+    /// `Danger`/`Red`) are a wash of their flat fill's tone, as is a selected `Default`, which
+    /// takes the accent. Where the flat fill of a tone variant is opaque, its ink was chosen
+    /// for a solid fill, so the surface is the solid facet of that tone. A custom variant is a
+    /// solid facet only when it names a tone through [`ButtonCustomVariant::facet_solid`]; like
+    /// its flat colours, it draws every selected state as the pressed one.
+    ///
+    /// Args:
+    ///     tokens: The theme side to resolve for; supplies the skin, the palette and the UI
+    ///         scale.
+    ///     outline: Whether the button is drawn in its outline style.
+    ///     state: The visual state to resolve.
+    ///
+    /// Returns:
+    ///     The surface to paint over the flat style of `state`. `None` under the Flat skin, for
+    ///     a disabled button, for an outlined tone variant, and for the variants that have no
+    ///     surface of their own (`Ghost`, `Bare`, `Link`, `Text`, `OutlineAmber`, `OutlineRed`
+    ///     and a custom variant with no facet tone): all of those keep the flat style.
+    pub(crate) fn resolve_facet(
+        &self,
+        tokens: &MoonThemeTokens,
+        outline: bool,
+        state: ButtonVisualState,
+    ) -> Option<MoonFacet> {
+        if !tokens.skin.is_facet() || matches!(state, ButtonVisualState::Disabled) {
+            return None;
+        }
+        let p = tokens.palette;
+        let selected = state.is_selected();
+
+        match self {
+            Self::Default if selected => Some(tinted_button_facet(p.accent, state, tokens)),
+            Self::Default | Self::Panel | Self::Secondary | Self::Soft => {
+                Some(raised_button_facet(state, tokens))
+            }
+            Self::Primary
+            | Self::Blue
+            | Self::Info
+            | Self::Warning
+            | Self::Amber
+            | Self::Success
+            | Self::Green
+            | Self::Danger
+            | Self::Red => {
+                if outline {
+                    return None;
+                }
+                let flat = self.moon_style(p, outline, selected)?;
+                Some(if flat.bg_alpha >= 1.0 {
+                    solid_button_facet(flat.bg, state, tokens)
+                } else {
+                    tinted_button_facet(flat.bg, state, tokens)
+                })
+            }
+            Self::Custom(colors) => {
+                let state = if selected {
+                    ButtonVisualState::Active
+                } else {
+                    state
+                };
+                colors
+                    .facet_tone
+                    .map(|tone| solid_button_facet(tone, state, tokens))
+            }
+            Self::Ghost
+            | Self::Bare
+            | Self::Link
+            | Self::Text
+            | Self::OutlineAmber
+            | Self::OutlineRed => None,
         }
     }
 

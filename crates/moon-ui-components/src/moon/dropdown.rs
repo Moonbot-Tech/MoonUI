@@ -75,7 +75,6 @@ use selection::{
     MoonDropdownSelectionContext, menu_item_click_handler, moon_menu_item_accepts_click,
 };
 pub use trigger::MoonDropdown;
-use trigger::MoonDropdownState;
 #[cfg(test)]
 use trigger::fit_dropdown_trigger_label;
 

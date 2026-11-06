@@ -2,10 +2,56 @@ use gpui::*;
 
 use super::{
     background::MoonBackgroundPolicy,
+    skin::{MoonFacetKind, facet},
     text::MoonText,
-    theme::MoonTheme,
+    theme::{MoonTheme, MoonThemeTokens},
     tokens::{MoonRect, rgba_from},
 };
+
+/// What a group box paints under the Facet skin.
+#[derive(Clone, Debug, PartialEq)]
+struct GroupBoxFacet {
+    /// Fill of the box; `None` leaves it as its background policy left it.
+    fill: Option<Background>,
+    /// Colour of the box's one-pixel edge.
+    edge: Hsla,
+    /// Shadows of the box.
+    shadows: Vec<BoxShadow>,
+}
+
+/// Resolve the look of a group box under the Facet skin.
+///
+/// A box that paints its own fill is a card resting on its panel. A box whose policy leaves it
+/// see-through keeps the card's edge and the highlight along its top only — GPUI paints a
+/// shadow that falls outside an element under the whole of it, so the card's shadow would show
+/// through the box.
+///
+/// Args:
+///     tokens: Active theme tokens; supply the skin, the palette and the UI scale.
+///     policy: Background policy of the box.
+///
+/// Returns:
+///     The faceted look, or `None` under the Flat skin, where the box keeps its flat fill and
+///     its palette border.
+fn group_box_facet(
+    tokens: &MoonThemeTokens,
+    policy: MoonBackgroundPolicy,
+) -> Option<GroupBoxFacet> {
+    if !tokens.skin.is_facet() {
+        return None;
+    }
+    let card = facet(MoonFacetKind::Card, tokens);
+    let opaque = matches!(policy, MoonBackgroundPolicy::Opaque);
+    Some(GroupBoxFacet {
+        fill: opaque.then_some(card.fill),
+        edge: card.edge,
+        shadows: card
+            .shadows
+            .into_iter()
+            .filter(|shadow| opaque || shadow.inset)
+            .collect(),
+    })
+}
 
 #[derive(IntoElement)]
 pub struct MoonGroupBox {
@@ -69,6 +115,17 @@ impl ParentElement for MoonGroupBox {
 }
 
 impl RenderOnce for MoonGroupBox {
+    /// Render the bordered box, its optional title and its children.
+    ///
+    /// The box paints the flat Moon fill under the Flat skin and a card surface under the Facet
+    /// skin; see [`group_box_facet`].
+    ///
+    /// Args:
+    ///     _: Window the box renders in; unused.
+    ///     cx: Application context used to resolve the active theme tokens.
+    ///
+    /// Returns:
+    ///     The rendered group box.
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = MoonTheme::active_tokens(cx);
         let p = tokens.palette;
@@ -83,6 +140,15 @@ impl RenderOnce for MoonGroupBox {
             .flex_col()
             .gap(px(tokens.ui(self.gap)));
         root = self.background_policy.apply(root, p.shell_high, 0.98);
+        // `None` under the Flat skin, which keeps the fill and the border set above.
+        if let Some(group_facet) = group_box_facet(&tokens, self.background_policy) {
+            root = root
+                .border_color(group_facet.edge)
+                .shadow(group_facet.shadows);
+            if let Some(fill) = group_facet.fill {
+                root = root.bg(fill);
+            }
+        }
 
         if let Some(bounds) = self.bounds {
             root = root
@@ -109,3 +175,6 @@ impl RenderOnce for MoonGroupBox {
         root.children(self.children)
     }
 }
+
+#[cfg(test)]
+mod tests;

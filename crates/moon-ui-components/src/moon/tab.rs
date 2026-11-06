@@ -11,6 +11,7 @@ use super::button::{MoonButtonSize, MoonButtonVariant};
 use super::dropdown::{MoonDropdown, MoonMenuItem};
 use super::foundation::{MoonSize, accent_underline, h_flex};
 use super::icons::MOON_ICON_CARET_DOWN;
+use super::skin::fading_rule_h;
 use super::text::MoonText;
 use super::theme::{MoonTheme, MoonThemeTokens};
 use super::tokens::{MoonPalette, MoonRect, rgba_from};
@@ -73,6 +74,7 @@ pub struct MoonTabStrip {
     padding_left: f32,
     gap: f32,
     overflow_menu: bool,
+    bottom_rule: bool,
     on_click: Option<MoonTabHandler>,
     on_close: Option<MoonTabHandler>,
 }
@@ -86,6 +88,7 @@ impl MoonTabStrip {
             padding_left: 20.0,
             gap: 8.0,
             overflow_menu: false,
+            bottom_rule: true,
             on_click: None,
             on_close: None,
         }
@@ -114,6 +117,16 @@ impl MoonTabStrip {
     /// (same as TabBar::menu). Chart, main-stack, and dock pass `true`.
     pub fn overflow_menu(mut self, overflow_menu: bool) -> Self {
         self.overflow_menu = overflow_menu;
+        self
+    }
+
+    /// Choose whether the strip draws the line along its bottom edge. Default `true`.
+    ///
+    /// A host that seats the strip in a wider row and rules that whole row itself turns the
+    /// strip's own line off, so the row carries one rule rather than two laid over each other
+    /// across the strip's slot.
+    pub fn bottom_rule(mut self, bottom_rule: bool) -> Self {
+        self.bottom_rule = bottom_rule;
         self
     }
 
@@ -171,7 +184,8 @@ impl MoonTabStrip {
     ///     window: Window used to persist the scroll handle and tab bounds.
     ///     cx: App context used to read keyed state.
     ///     p: Palette used for the strip and item states.
-    ///     tokens: Scale tokens used for tab geometry.
+    ///     tokens: Tokens used for tab geometry and for the theme skin: under the Facet skin
+    ///         the strip paints no fill and its bottom line fades out toward both ends.
     ///
     /// Returns:
     ///     The themed tab-strip element.
@@ -222,6 +236,10 @@ impl MoonTabStrip {
             prev_selected.update(cx, |value, _| *value = selected_ix);
         }
 
+        // Under the Facet skin the strip sits on a lit surface: it paints no fill of its own and
+        // its bottom line fades out toward both ends. `None` is the Flat skin, which keeps the
+        // solid fill and the solid line.
+        let facet_rule = strip_facet_rule(p, &tokens);
         let mut root = div()
             .id(self.id)
             .relative()
@@ -231,16 +249,23 @@ impl MoonTabStrip {
             .min_w_0()
             .w_full()
             .h(px(tab_h))
-            .bg(rgba_from(p.shell_high, 1.0))
-            .child(
-                div()
-                    .absolute()
-                    .left(px(0.0))
-                    .bottom(px(0.0))
-                    .w_full()
-                    .h(px(1.0))
-                    .bg(rgba_from(p.border, 0.78)),
-            );
+            .when(facet_rule.is_none(), |this| {
+                this.bg(rgba_from(p.shell_high, 1.0))
+            })
+            .when(self.bottom_rule, |this| {
+                this.child(
+                    div()
+                        .absolute()
+                        .left(px(0.0))
+                        .bottom(px(0.0))
+                        .w_full()
+                        .h(px(1.0))
+                        .map(|line| match facet_rule {
+                            Some(color) => line.child(fading_rule_h(color)),
+                            None => line.bg(rgba_from(p.border, 0.78)),
+                        }),
+                )
+            });
 
         if let Some(bounds) = self.bounds {
             root = root.max_w(px(bounds.w)).max_h(px(bounds.h));
@@ -305,6 +330,26 @@ impl RenderOnce for MoonTabStrip {
         let tokens = MoonTheme::active_tokens(cx);
         self.render_with_theme(window, cx, MoonPalette::active(cx), tokens)
     }
+}
+
+/// Alpha of the `overlay` ink at the middle of a faceted strip's bottom rule.
+const FACET_STRIP_RULE_ALPHA: f32 = 0.07;
+
+/// Resolve the colour of the fading rule a tab strip draws along its bottom under the Facet
+/// skin.
+///
+/// Args:
+///     p: Palette the strip paints with.
+///     tokens: Tokens the strip renders with; supply the skin.
+///
+/// Returns:
+///     The colour at the middle of the rule, or `None` under the Flat skin, where the strip
+///     keeps its solid fill and its solid bottom line.
+fn strip_facet_rule(p: MoonPalette, tokens: &MoonThemeTokens) -> Option<Hsla> {
+    tokens
+        .skin
+        .is_facet()
+        .then(|| rgba_from(p.overlay, FACET_STRIP_RULE_ALPHA))
 }
 
 fn render_moon_tab(
@@ -490,3 +535,6 @@ pub fn moon_active_tab_underline(p: MoonPalette) -> Div {
 pub fn moon_active_tab_underline_scaled(p: MoonPalette, tokens: MoonThemeTokens) -> Div {
     accent_underline(p, &tokens, 5.0, 5.0, 0.0)
 }
+
+#[cfg(test)]
+mod tests;
