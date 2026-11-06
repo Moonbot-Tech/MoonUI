@@ -1136,6 +1136,8 @@ pub struct MetalRawAccess<'a> {
 }
 
 /// Opaque borrowed wgpu handles for a canvas callback.
+/// These point to Rust objects, not a stable C ABI: a consumer casting them must use the
+/// exact same Cargo wgpu package (source and version) as the runtime producer.
 #[derive(Clone, Copy, Debug)]
 pub struct WgpuRawAccess<'a> {
     /// Monotonic generation bumped when GPUI recreates wgpu resources after device loss.
