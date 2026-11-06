@@ -2827,7 +2827,7 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
-      "signature": "pub use text_area::{MoonTextArea, MoonTextAreaEvent, MoonTextAreaState};"
+      "signature": "pub use text_area::{MoonTextArea, MoonTextAreaEvent, MoonTextAreaSize, MoonTextAreaState};"
     },
     {
       "file": "crates/moon-ui-components/src/moon/mod.rs",
