@@ -11,6 +11,30 @@ use std::mem;
 use std::rc::Rc;
 use std::{any::TypeId, fmt, ops::Range};
 
+#[cfg(test)]
+mod tests;
+
+impl App {
+    /// Collect actual `Render::render` calls by concrete view type. Disabled by default;
+    /// the disabled path performs no clock read, allocation, hashing, or synchronization.
+    /// Disabling clears the interval so re-enabling cannot report stale work.
+    pub fn set_view_render_tracking(&mut self, enabled: bool) {
+        if enabled {
+            self.view_render_counts.get_or_insert_default();
+        } else {
+            self.view_render_counts = None;
+        }
+    }
+
+    /// Drain the current render-count interval, retaining capacity for the next interval.
+    /// Cached scene reuse and notifications that never render are not counted.
+    pub fn take_view_render_counts(&mut self) -> Vec<(&'static str, u64)> {
+        self.view_render_counts
+            .as_mut()
+            .map_or_else(Vec::new, |counts| counts.drain().collect())
+    }
+}
+
 struct AnyViewState {
     prepaint_range: Range<PrepaintStateIndex>,
     paint_range: Range<PaintIndex>,
@@ -308,12 +332,16 @@ impl std::fmt::Debug for AnyWeakView {
 mod any_view {
     use crate::{AnyElement, AnyView, App, IntoElement, Render, Window};
 
+    /// Invoke the concrete view at the common dispatch point, excluding cached scene reuse.
     pub(crate) fn render<V: 'static + Render>(
         view: &AnyView,
         window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
         let view = view.clone().downcast::<V>().unwrap();
+        if let Some(counts) = cx.view_render_counts.as_mut() {
+            *counts.entry(std::any::type_name::<V>()).or_default() += 1;
+        }
         view.update(cx, |view, cx| view.render(window, cx).into_any_element())
     }
 }
