@@ -1,5 +1,51 @@
 //! Regression tests for reusable window-frame title behavior.
 
+use gpui::{AppContext as _, Context, IntoElement, Render, TestAppContext, Window, div};
+use std::{cell::Cell, rc::Rc};
+
+/// A real window whose lifetime is controlled through the reusable frame button.
+struct CloseHost;
+
+impl Render for CloseHost {
+    /// No layout is needed to test the button's shared invocation path.
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// Replacing request_close with remove_window would destroy the window despite its veto.
+#[gpui::test]
+fn frame_close_preserves_veto_and_marks_an_accepted_user_close(cx: &mut TestAppContext) {
+    let allow = Rc::new(Cell::new(false));
+    let requests = Rc::new(Cell::new(0));
+    let window = cx.add_window({
+        let allow = allow.clone();
+        let requests = requests.clone();
+        move |window, cx| {
+            window.on_window_should_close(cx, move |_, _| {
+                requests.set(requests.get() + 1);
+                allow.get()
+            });
+            CloseHost
+        }
+    });
+    window
+        .update(cx, |_, window, cx| {
+            super::FrameButton::Close.invoke(window, cx)
+        })
+        .unwrap();
+    assert_eq!(requests.get(), 1);
+    assert!(cx.update_window(window.into(), |_, _, _| ()).is_ok());
+    allow.set(true);
+    window
+        .update(cx, |_, window, cx| {
+            super::FrameButton::Close.invoke(window, cx)
+        })
+        .unwrap();
+    assert_eq!(requests.get(), 2);
+    assert!(cx.update_window(window.into(), |_, _, _| ()).is_err());
+}
+
 /// Removing `.truncate()` from `window_frame.rs:MoonWindowFrame::title_cluster` lets a narrow
 /// window title wrap onto a second line and overrun the fixed-height title bar.
 #[test]

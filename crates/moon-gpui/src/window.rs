@@ -1232,11 +1232,15 @@ mod input_modality_tests {
     }
 }
 
+/// Shared close policy used by both native and client-drawn window controls.
+type WindowCloseCallback = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
+
 /// Holds the state for a specific window.
 pub struct Window {
     pub(crate) handle: AnyWindowHandle,
     pub(crate) invalidator: WindowInvalidator,
     pub(crate) removed: bool,
+    should_close: RefCell<Option<WindowCloseCallback>>,
     pub(crate) platform_window: Box<dyn PlatformWindow>,
     display_id: Option<DisplayId>,
     sprite_atlas: Arc<dyn PlatformAtlas>,
@@ -1888,6 +1892,7 @@ impl Window {
             handle,
             invalidator,
             removed: false,
+            should_close: RefCell::new(None),
             platform_window,
             display_id,
             sprite_atlas,
@@ -2078,9 +2083,22 @@ impl Window {
         }
     }
 
-    /// Close this window.
+    /// Close this window unconditionally, including during owner teardown.
     pub fn remove_window(&mut self) {
         self.removed = true;
+    }
+
+    /// Request a user close, respecting the same veto as the native window controls.
+    pub fn request_close(&mut self, cx: &mut App) {
+        if self.can_close(cx) {
+            self.remove_window();
+        }
+    }
+
+    /// Release the callback borrow before invoking user code, which may replace the policy.
+    fn can_close(&mut self, cx: &mut App) -> bool {
+        let callback = self.should_close.borrow().clone();
+        callback.is_none_or(|callback| callback(self, cx))
     }
 
     /// Whether the focused element is taking typed text on the frame that was drawn last.
@@ -5982,9 +6000,10 @@ impl Window {
         cx: &App,
         f: impl Fn(&mut Window, &mut App) -> bool + 'static,
     ) {
+        *self.should_close.borrow_mut() = Some(Rc::new(f));
         let mut cx = self.to_async(cx);
         self.platform_window.on_should_close(Box::new(move || {
-            cx.update(|window, cx| f(window, cx)).unwrap_or(true)
+            cx.update(|window, cx| window.can_close(cx)).unwrap_or(true)
         }))
     }
 

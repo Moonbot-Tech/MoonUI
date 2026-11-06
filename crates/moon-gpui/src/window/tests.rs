@@ -206,6 +206,56 @@ fn open_window<V: Render>(
     (app, any)
 }
 
+/// Native and client-drawn close use one replaceable policy; a veto keeps the real window alive.
+#[test]
+fn user_close_respects_and_replaces_the_native_policy() {
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    let calls = Rc::new(Cell::new(0));
+    app.update_window(any, |_, window, cx| {
+        let calls = calls.clone();
+        window.on_window_should_close(cx, move |_, _| {
+            calls.set(calls.get() + 1);
+            false
+        });
+    })
+    .unwrap();
+    let platform = app.test_window(any);
+    let mut native = platform.0.lock().should_close_handler.take().unwrap();
+    assert!(!native());
+    app.update_window(any, |_, window, cx| window.request_close(cx))
+        .unwrap();
+    assert_eq!(calls.get(), 2);
+    app.update_window(any, |_, window, cx| {
+        assert!(!window.removed);
+        window.on_window_should_close(cx, |_, _| true);
+        window.request_close(cx);
+    })
+    .unwrap();
+    assert!(
+        app.update_window(any, |_, _, _| ()).is_err(),
+        "accepted close must release the window"
+    );
+    assert_eq!(calls.get(), 2, "the superseded veto must not run");
+}
+
+/// Teardown is unconditional; a window without a policy still accepts an ordinary user close.
+#[test]
+fn forced_close_bypasses_policy_and_default_user_close_succeeds() {
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    app.update_window(any, |_, window, cx| {
+        window.on_window_should_close(cx, |_, _| {
+            panic!("forced close must not ask the user policy")
+        });
+        window.remove_window();
+    })
+    .unwrap();
+    assert!(app.update_window(any, |_, _, _| ()).is_err());
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    app.update_window(any, |_, window, cx| window.request_close(cx))
+        .unwrap();
+    assert!(app.update_window(any, |_, _, _| ()).is_err());
+}
+
 /// A static scene still owes its last frame after a transient backend refusal, without new input.
 #[test]
 fn deferred_idle_present_retries_then_settles() {
