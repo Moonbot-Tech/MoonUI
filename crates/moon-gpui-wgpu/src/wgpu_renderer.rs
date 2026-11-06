@@ -517,7 +517,8 @@ impl WgpuRenderer {
         let last_error_clone = Arc::clone(&last_error);
         device.on_uncaptured_error(Arc::new(move |error| {
             let mut guard = last_error_clone.lock().unwrap();
-            *guard = Some(error.to_string());
+            // Preserve the cause: later submissions may only report that its pipeline is invalid.
+            guard.get_or_insert_with(|| error.to_string());
         }));
 
         let resources = WgpuResources {
