@@ -19,6 +19,9 @@ use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, Weak};
 
+#[cfg(all(test, any(windows, target_os = "linux")))]
+mod tests;
+
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct GlobalParams {
@@ -1283,6 +1286,8 @@ impl WgpuRenderer {
         self.draw_gpu_canvas_text(text_frame, instance_offset, pass)
     }
 
+    /// Submit scene commands, retaining canvas preparation when instance growth retries it.
+    /// Returns false when the surface cannot accept this frame.
     pub fn draw(&mut self, scene: &Scene) -> bool {
         // Bail out early if the surface has been unconfigured (e.g. during
         // Android background/rotation transitions).  Attempting to acquire
@@ -1461,7 +1466,9 @@ impl WgpuRenderer {
                     }
                 }
                 if overflow {
-                    drop(encoder);
+                    // Canvas prepare already committed its CPU state. Keep those GPU commands;
+                    // the retry clears the partial surface before the only present below.
+                    self.resources().queue.submit([encoder.finish()]);
                     if self.instance_buffer_capacity >= self.max_buffer_size {
                         log::error!(
                             "instance buffer size grew too large: {}",
@@ -1581,7 +1588,7 @@ impl WgpuRenderer {
             }
 
             if overflow {
-                drop(encoder);
+                self.resources().queue.submit([encoder.finish()]);
                 if self.instance_buffer_capacity >= self.max_buffer_size {
                     log::error!(
                         "instance buffer size grew too large: {}",
@@ -1625,7 +1632,7 @@ impl WgpuRenderer {
             }
 
             if overflow {
-                drop(encoder);
+                self.resources().queue.submit([encoder.finish()]);
                 if self.instance_buffer_capacity >= self.max_buffer_size {
                     log::error!(
                         "instance buffer size grew too large: {}",

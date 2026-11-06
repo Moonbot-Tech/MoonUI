@@ -1062,6 +1062,7 @@ impl MetalRenderer {
         self.draw_primitives_to_texture(scene, instance_buffer, drawable.texture(), viewport_size)
     }
 
+    /// Record the scene, preserving canvas bakes when an instance-buffer retry is required.
     fn draw_primitives_to_texture(
         &mut self,
         scene: &Scene,
@@ -1107,6 +1108,8 @@ impl MetalRenderer {
                 &mut instance_offset,
             );
             if !ok {
+                self.sync_instance_buffer(instance_buffer, instance_offset);
+                command_buffer.commit();
                 anyhow::bail!(
                     "gpu canvas text too large: {} mono, {} poly",
                     scene.gpu_canvas_text_under_scene.monochrome_sprites.len(),
@@ -1213,6 +1216,8 @@ impl MetalRenderer {
             };
             if !ok {
                 command_encoder.end_encoding();
+                self.sync_instance_buffer(instance_buffer, instance_offset);
+                command_buffer.commit();
                 anyhow::bail!(
                     "scene too large: {} paths, {} shadows, {} quads, {} underlines, {} mono, {} poly, {} surfaces",
                     scene.paths.len(),
@@ -1240,6 +1245,8 @@ impl MetalRenderer {
             &mut instance_offset,
         );
         if !ok {
+            self.sync_instance_buffer(instance_buffer, instance_offset);
+            command_buffer.commit();
             anyhow::bail!(
                 "gpu canvas text too large: {} mono, {} poly",
                 scene.gpu_canvas_text_over_scene.monochrome_sprites.len(),
@@ -1247,15 +1254,19 @@ impl MetalRenderer {
             );
         }
 
+        self.sync_instance_buffer(instance_buffer, instance_offset);
+
+        Ok(command_buffer.to_owned())
+    }
+
+    /// Publish CPU instance writes before submitting either a complete scene or a failed retry.
+    fn sync_instance_buffer(&self, instance_buffer: &InstanceBuffer, instance_offset: usize) {
         if !self.is_unified_memory {
-            // Sync the instance buffer to the GPU
             instance_buffer.metal_buffer.did_modify_range(NSRange {
                 location: 0,
                 length: instance_offset as NSUInteger,
             });
         }
-
-        Ok(command_buffer.to_owned())
     }
 
     fn draw_paths_to_intermediate(
