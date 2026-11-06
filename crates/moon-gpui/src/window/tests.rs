@@ -771,3 +771,58 @@ fn the_inspector_map_lists_every_div_of_a_picking_frame_in_paint_order() {
         "the child's bounds are where the layout put it"
     );
 }
+
+/// A label inside a control, for the inspector's list of painted text.
+struct LabelledView;
+
+impl Render for LabelledView {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .id("panel")
+            .size(px(200.0))
+            .child(div().id("save").ml(px(10.0)).mt(px(20.0)).child("Save"))
+    }
+}
+
+/// Catches `inspector_texts` reading `next_frame`, which a draw clears, and the list filling
+/// outside picking, which would make every debug frame pay for it. The path is what ties a label to
+/// its control: read off the wrong stack, or taken after the element popped, it names the panel
+/// instead, and the bounds without the alignment step put centred text in the wrong column.
+#[test]
+fn the_inspector_lists_painted_text_with_the_elements_around_it() {
+    let (mut app, any) = open_window(|_, _| LabelledView);
+    let texts = |app: &mut TestAppContext| {
+        app.update_window(any, |_, window, _| window.inspector_texts().to_vec())
+            .unwrap()
+    };
+    assert!(
+        texts(&mut app).is_empty(),
+        "nothing registers while the inspector is not picking"
+    );
+
+    app.update_window(any, |_, window, cx| {
+        window.toggle_inspector(cx);
+        if let Some(inspector) = window.inspector.clone() {
+            inspector.update(cx, |inspector, _| inspector.start_picking());
+        }
+    })
+    .unwrap();
+    draw(&mut app, any);
+
+    let texts = texts(&mut app);
+    let save = texts
+        .iter()
+        .find(|text| text.text.as_ref() == "Save")
+        .unwrap_or_else(|| panic!("the label must be listed, got {texts:?}"));
+    let path: Vec<String> = save.path.iter().map(ToString::to_string).collect();
+    assert_eq!(
+        path.iter().rev().take(2).rev().cloned().collect::<Vec<_>>(),
+        ["panel", "save"],
+        "the text sits inside the control that draws it"
+    );
+    assert_eq!(
+        save.bounds.origin,
+        point(px(10.0), px(20.0)),
+        "the text starts where the layout put its control"
+    );
+}

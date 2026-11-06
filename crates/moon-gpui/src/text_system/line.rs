@@ -89,6 +89,19 @@ impl ShapedLine {
         window: &mut Window,
         cx: &mut App,
     ) -> Result<()> {
+        #[cfg(debug_assertions)]
+        note_drawn_text(
+            &self.text,
+            origin,
+            &self.layout,
+            line_height,
+            &align,
+            align_width,
+            0,
+            window,
+            cx,
+        );
+
         paint_line(
             origin,
             &self.layout,
@@ -284,6 +297,19 @@ impl WrappedLine {
             Some(bounds) => Some(bounds.size.width),
             None => self.layout.wrap_width,
         };
+
+        #[cfg(debug_assertions)]
+        note_drawn_text(
+            &self.text,
+            origin,
+            &self.layout.unwrapped_layout,
+            line_height,
+            &align,
+            align_width,
+            self.wrap_boundaries.len(),
+            window,
+            cx,
+        );
 
         paint_line(
             origin,
@@ -747,6 +773,43 @@ fn aligned_origin_x(
         TextAlign::Center => (origin.x * 2.0 + align_width - line_width) / 2.0,
         TextAlign::Right => origin.x + align_width - line_width,
     }
+}
+
+/// Tell the inspector what a line of text says and where it lands, while it is picking.
+///
+/// Both ways of painting text end here, because `paint_line` no longer has the string. A wrapped
+/// line is one entry for its whole block: its lines start at different places when aligned, and
+/// what a reader of the map wants is the text, not its line breaks.
+#[cfg(debug_assertions)]
+#[allow(clippy::too_many_arguments)]
+fn note_drawn_text(
+    text: &SharedString,
+    origin: Point<Pixels>,
+    layout: &LineLayout,
+    line_height: Pixels,
+    align: &TextAlign,
+    align_width: Option<Pixels>,
+    wraps: usize,
+    window: &mut Window,
+    cx: &App,
+) {
+    if !window.is_inspector_picking(cx) {
+        return;
+    }
+    let (x, width) = if wraps == 0 {
+        let box_width = align_width.unwrap_or(layout.width);
+        (
+            aligned_origin_x(origin, box_width, px(0.0), align, layout, None),
+            layout.width,
+        )
+    } else {
+        (origin.x, align_width.unwrap_or(layout.width))
+    };
+    let bounds = Bounds::new(
+        point(x, origin.y),
+        size(width, line_height * (wraps as f32 + 1.0)),
+    );
+    window.note_inspector_text(text.clone(), bounds);
 }
 
 #[cfg(test)]

@@ -740,6 +740,25 @@ pub struct InspectorHitbox {
     pub content_mask: Bounds<Pixels>,
 }
 
+/// One run of text drawn in a frame while the inspector was picking.
+///
+/// Returned by [`Window::inspector_texts`].
+#[cfg(debug_assertions)]
+#[derive(Clone, Debug)]
+pub struct InspectorText {
+    /// The string as it was shaped, in the language the window is drawn in.
+    pub text: SharedString,
+    /// The ids of the elements it was painted inside, outermost first. Text is no element a
+    /// hitbox knows about, so this is what says whose text it is: a label's path starts with the
+    /// path of the control it labels, whatever the two rectangles happen to do.
+    pub path: GlobalElementId,
+    /// Where it landed, in window-relative logical pixels.
+    pub bounds: Bounds<Pixels>,
+    /// The content mask in force when it was painted. As with [`InspectorHitbox::content_mask`],
+    /// what is visible of it is `bounds` intersected with this.
+    pub content_mask: Bounds<Pixels>,
+}
+
 /// A rectangular region that potentially blocks hitboxes inserted prior.
 /// See [Window::insert_hitbox] for more details.
 #[derive(Clone, Debug, Deref)]
@@ -908,6 +927,8 @@ pub(crate) struct Frame {
     pub(crate) next_inspector_instance_ids: FxHashMap<Rc<crate::InspectorElementPath>, usize>,
     #[cfg(debug_assertions)]
     pub(crate) inspector_hitboxes: FxHashMap<HitboxId, crate::InspectorElementId>,
+    #[cfg(debug_assertions)]
+    pub(crate) inspector_texts: Vec<InspectorText>,
     pub(crate) tab_stops: TabStopMap,
 }
 
@@ -957,6 +978,8 @@ impl Frame {
 
             #[cfg(debug_assertions)]
             inspector_hitboxes: FxHashMap::default(),
+            #[cfg(debug_assertions)]
+            inspector_texts: Vec::new(),
             tab_stops: TabStopMap::default(),
         }
     }
@@ -985,6 +1008,7 @@ impl Frame {
         {
             self.next_inspector_instance_ids.clear();
             self.inspector_hitboxes.clear();
+            self.inspector_texts.clear();
         }
     }
 
@@ -6277,6 +6301,32 @@ impl Window {
                     })
             })
             .collect()
+    }
+
+    /// Keep one painted run of text for [`Window::inspector_texts`]. The caller has checked that the
+    /// inspector is picking, so that a frame outside picking pays for nothing.
+    #[cfg(debug_assertions)]
+    pub(crate) fn note_inspector_text(&mut self, text: SharedString, bounds: Bounds<Pixels>) {
+        let path = GlobalElementId(Arc::from(&*self.element_id_stack));
+        let content_mask = self.content_mask().bounds;
+        self.next_frame.inspector_texts.push(InspectorText {
+            text,
+            path,
+            bounds,
+            content_mask,
+        });
+    }
+
+    /// Every run of text painted in the last rendered frame, in paint order.
+    ///
+    /// The other half of [`Window::inspector_hitboxes`]: that map says what is on screen and where,
+    /// this says what it reads, so a tool can name a control by the words a person sees in every
+    /// language the window is drawn in. Filled under the same condition, so outside picking mode
+    /// the list is empty; picking also turns view caching off, so a frame never reuses text it
+    /// did not paint.
+    #[cfg(debug_assertions)]
+    pub fn inspector_texts(&self) -> &[InspectorText] {
+        &self.rendered_frame.inspector_texts
     }
 
     #[cfg(debug_assertions)]
