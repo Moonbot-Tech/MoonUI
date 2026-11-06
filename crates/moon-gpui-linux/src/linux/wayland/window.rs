@@ -558,7 +558,7 @@ impl WaylandWindow {
                         WaylandWindow::gpu_canvas_refresh_interval(&state)
                     };
 
-                    window.frame();
+                    window.poll_frame();
 
                     let now = std::time::Instant::now();
                     while instant < now {
@@ -646,9 +646,19 @@ impl WaylandWindowStatePtr {
         !state.children.is_empty()
     }
 
+    /// Start the compositor callback chain on first configure, then replace each completed
+    /// callback once. Timer polls must not extend this chain: every request survives until Done.
     pub fn frame(&self) {
-        let mut state = self.state.borrow_mut();
+        let state = self.state.borrow();
         state.surface.frame(&state.globals.qh, state.surface.id());
+        drop(state);
+        self.poll_frame();
+    }
+
+    /// Poll GPUI and its canvases without registering another Wayland callback. The fallback
+    /// timer keeps Skip-to-Present transitions live even while the compositor withholds Done.
+    fn poll_frame(&self) {
+        let mut state = self.state.borrow_mut();
         state.resize_throttle = false;
         let force_render = state.force_render_after_recovery;
         state.force_render_after_recovery = false;
