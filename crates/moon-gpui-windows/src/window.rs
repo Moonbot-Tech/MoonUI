@@ -1007,7 +1007,7 @@ impl PlatformWindow for WindowsWindow {
         self.state.renderer.borrow_mut().can_present()
     }
 
-    fn draw(&self, scene: &Scene) {
+    fn draw(&self, scene: &Scene) -> bool {
         self.state
             .renderer
             .borrow_mut()
@@ -1016,7 +1016,8 @@ impl PlatformWindow for WindowsWindow {
                 self.state.background_appearance.get(),
                 self.state.clear_color.get(),
             )
-            .log_err();
+            .log_err()
+            .unwrap_or(false)
     }
 
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {

@@ -2992,7 +2992,7 @@ impl Window {
         // `force_present` is true on every UI redraw, so the scene's text is rebuilt from
         // scratch then; reuse only happens on GPU-only frames, for canvases that did not
         // ask to present and whose environment is unchanged.
-        if gpu_canvas_prepare_text(force_present, request_present) {
+        if presentable && gpu_canvas_prepare_text(force_present, request_present) {
             let mut seen = FxHashSet::default();
             let mut occurrences: FxHashMap<(usize, bool), usize> = FxHashMap::default();
             for (layer, canvas, bounds, wants_present) in canvases {
@@ -3244,11 +3244,14 @@ impl Window {
     }
 
     #[profiling::function]
+    /// Keep the frame owed until the native backend accepts its presentation.
     fn present(&mut self) {
-        self.platform_window.draw(&self.rendered_frame.scene);
+        let accepted = self.platform_window.draw(&self.rendered_frame.scene);
         #[cfg(feature = "input-latency-histogram")]
-        self.input_latency_tracker.record_frame_presented();
-        self.needs_present.set(false);
+        if accepted {
+            self.input_latency_tracker.record_frame_presented();
+        }
+        self.needs_present.set(!accepted);
         profiling::finish_frame!();
     }
 

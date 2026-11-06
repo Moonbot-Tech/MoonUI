@@ -1469,7 +1469,7 @@ impl PlatformWindow for WaylandWindow {
         self.0.callbacks.borrow_mut().button_layout_changed = Some(callback);
     }
 
-    fn draw(&self, scene: &Scene) {
+    fn draw(&self, scene: &Scene) -> bool {
         let mut state = self.borrow_mut();
 
         if state.renderer.device_lost() {
@@ -1491,7 +1491,7 @@ impl PlatformWindow for WaylandWindow {
             }
 
             state.force_render_after_recovery = true;
-            return;
+            return false;
         }
 
         state.renderer_presented = state.renderer.draw(scene);
@@ -1499,6 +1499,7 @@ impl PlatformWindow for WaylandWindow {
         if state.renderer.needs_redraw() {
             state.force_render_after_recovery = true;
         }
+        state.renderer_presented
     }
 
     fn set_gpu_canvas_active(&self, active: bool) {

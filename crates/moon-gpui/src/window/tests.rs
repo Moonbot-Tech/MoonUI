@@ -206,6 +206,160 @@ fn open_window<V: Render>(
     (app, any)
 }
 
+/// A static scene still owes its last frame after a transient backend refusal, without new input.
+#[test]
+fn deferred_idle_present_retries_then_settles() {
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    let platform = app.test_window(any);
+    platform.0.lock().deferred_presents = 2;
+    let requests = platform.0.lock().frame_requests.clone();
+    for _ in 0..2 {
+        let before = requests.0.load(std::sync::atomic::Ordering::SeqCst);
+        platform.simulate_frame();
+        assert_eq!(
+            requests.0.load(std::sync::atomic::Ordering::SeqCst) - before,
+            1,
+            "one next native tick is requested"
+        );
+        app.update_window(any, |_, window, _| {
+            assert!(
+                window.needs_present.get(),
+                "the rejected idle frame remains owed"
+            );
+            assert!(
+                !window.invalidator.is_dirty(),
+                "retry must not rebuild the UI"
+            );
+        })
+        .unwrap();
+    }
+    platform.simulate_frame();
+    app.update_window(any, |_, window, _| assert!(!window.needs_present.get()))
+        .unwrap();
+    assert_eq!(platform.0.lock().draw_attempts, 3);
+    platform.simulate_frame();
+    assert_eq!(
+        platform.0.lock().draw_attempts,
+        3,
+        "a successful present settles"
+    );
+}
+
+/// Request one GPU-only frame, consuming the local request just as a retained chart does.
+struct OneShotPresent {
+    request: Rc<Cell<bool>>,
+    text_prepares: Rc<Cell<usize>>,
+}
+
+impl GpuCanvasDriver for OneShotPresent {
+    fn frame(&mut self, info: GpuFrameInfo) -> GpuFrameDecision {
+        if info.presentable && self.request.replace(false) {
+            GpuFrameDecision::RequestPresent
+        } else {
+            GpuFrameDecision::Skip
+        }
+    }
+
+    fn prepare_text(&mut self, _: &mut GpuCanvasTextContext<'_>) -> anyhow::Result<()> {
+        self.text_prepares.set(self.text_prepares.get() + 1);
+        Ok(())
+    }
+
+    fn draw(&mut self, _: &mut GpuCanvasDrawContext<'_>) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+/// Open the production canvas path with a retained request and count actual text preparations.
+fn one_shot_present_window() -> (
+    TestAppContext,
+    AnyWindowHandle,
+    Rc<Cell<bool>>,
+    Rc<Cell<usize>>,
+) {
+    let request = Rc::new(Cell::new(false));
+    let prepares = Rc::new(Cell::new(0));
+    let handles = vec![GpuCanvasHandle::new(OneShotPresent {
+        request: request.clone(),
+        text_prepares: prepares.clone(),
+    })];
+    let (app, any) = open_window(move |_, _| CanvasesView { handles });
+    (app, any, request, prepares)
+}
+
+/// A failed GPU-only request must CREATE window debt even when its initial window debt was false.
+#[test]
+fn deferred_gpu_only_present_creates_and_consumes_window_debt() {
+    let (mut app, any, request, _) = one_shot_present_window();
+    let platform = app.test_window(any);
+    platform.simulate_frame();
+    app.update_window(any, |_, window, _| assert!(!window.needs_present.get()))
+        .unwrap();
+    let initial_attempts = platform.0.lock().draw_attempts;
+    platform.0.lock().deferred_presents = 2;
+    request.set(true);
+    let requests = platform.0.lock().frame_requests.clone();
+    for _ in 0..2 {
+        let before = requests.0.load(std::sync::atomic::Ordering::SeqCst);
+        platform.simulate_frame();
+        assert_eq!(
+            requests.0.load(std::sync::atomic::Ordering::SeqCst) - before,
+            1
+        );
+        app.update_window(any, |_, window, _| assert!(window.needs_present.get()))
+            .unwrap();
+    }
+    assert!(
+        !request.get(),
+        "the producer already consumed its sole change"
+    );
+    platform.simulate_frame();
+    app.update_window(any, |_, window, _| assert!(!window.needs_present.get()))
+        .unwrap();
+    assert_eq!(platform.0.lock().draw_attempts - initial_attempts, 3);
+    platform.simulate_frame();
+    assert_eq!(platform.0.lock().draw_attempts - initial_attempts, 3);
+}
+
+/// An occluded window retains debt but must not repeatedly shape the same pending text.
+#[test]
+fn deferred_present_skips_text_while_unpresentable_and_finishes_on_restore() {
+    let (mut app, any, _, prepares) = one_shot_present_window();
+    let platform = app.test_window(any);
+    let before = prepares.get();
+    platform.0.lock().presentable = false;
+    for _ in 0..3 {
+        platform.simulate_frame();
+    }
+    assert_eq!(
+        prepares.get(),
+        before,
+        "no text preparation while the backend cannot present"
+    );
+    app.update_window(any, |_, window, _| assert!(window.needs_present.get()))
+        .unwrap();
+    platform.0.lock().presentable = true;
+    platform.simulate_frame();
+    assert_eq!(prepares.get(), before + 1);
+    app.update_window(any, |_, window, _| assert!(!window.needs_present.get()))
+        .unwrap();
+}
+
+/// A late native tick after close must not keep requesting work for the removed window.
+#[test]
+fn deferred_present_does_not_rearm_a_closed_window() {
+    let (mut app, any) = open_window(|_, _| EmptyView);
+    let platform = app.test_window(any);
+    platform.0.lock().deferred_presents = 1;
+    platform.simulate_frame();
+    app.update_window(any, |_, window, _| window.remove_window())
+        .unwrap();
+    let requests = platform.0.lock().frame_requests.clone();
+    let before = requests.0.load(std::sync::atomic::Ordering::SeqCst);
+    platform.simulate_frame();
+    assert_eq!(requests.0.load(std::sync::atomic::Ordering::SeqCst), before);
+}
+
 /// Draw one frame of `any`.
 fn draw(app: &mut TestAppContext, any: AnyWindowHandle) {
     app.update_window(any, |_, window, cx| {

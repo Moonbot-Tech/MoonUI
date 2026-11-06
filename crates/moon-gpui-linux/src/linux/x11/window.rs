@@ -1689,7 +1689,7 @@ impl PlatformWindow for X11Window {
         self.0.callbacks.borrow_mut().button_layout_changed = Some(callback);
     }
 
-    fn draw(&self, scene: &Scene) {
+    fn draw(&self, scene: &Scene) -> bool {
         let mut inner = self.0.state.borrow_mut();
 
         if inner.renderer.device_lost() {
@@ -1709,14 +1709,15 @@ impl PlatformWindow for X11Window {
             }
 
             inner.force_render_after_recovery = true;
-            return;
+            return false;
         }
 
-        inner.renderer.draw(scene);
+        let accepted = inner.renderer.draw(scene);
 
         if inner.renderer.needs_redraw() {
             inner.force_render_after_recovery = true;
         }
+        accepted
     }
 
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {

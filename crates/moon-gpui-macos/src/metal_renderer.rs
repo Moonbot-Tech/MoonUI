@@ -551,14 +551,15 @@ impl MetalRenderer {
         // nothing to do
     }
 
-    pub fn draw(&mut self, scene: &Scene) {
+    /// Return whether a drawable was acquired and its frame submitted for presentation.
+    pub fn draw(&mut self, scene: &Scene) -> bool {
         let layer = match &self.layer {
             Some(l) => l.clone(),
             None => {
                 log::error!(
                     "draw() called on headless renderer - use render_scene_to_image() instead"
                 );
-                return;
+                return false;
             }
         };
         let viewport_size = layer.drawable_size();
@@ -573,7 +574,7 @@ impl MetalRenderer {
                 "failed to retrieve next drawable, drawable size: {:?}",
                 viewport_size
             );
-            return;
+            return false;
         };
 
         loop {
@@ -605,7 +606,7 @@ impl MetalRenderer {
                         command_buffer.present_drawable(drawable);
                         command_buffer.commit();
                     }
-                    return;
+                    return true;
                 }
                 Err(err) => {
                     log::error!(
@@ -626,6 +627,7 @@ impl MetalRenderer {
                 }
             }
         }
+        false
     }
 
     /// Renders the scene to a texture and returns the pixel data as an RGBA image.

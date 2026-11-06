@@ -703,7 +703,9 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn frame_diagnostics(&self) -> Option<FrameDiagnostics> {
         None
     }
-    fn draw(&self, scene: &Scene);
+    /// Submit the scene and return whether the backend accepted its presentation.
+    /// A false result leaves the frame owed until a later native tick can accept it.
+    fn draw(&self, scene: &Scene) -> bool;
     fn completed_frame(&self) {}
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas>;
     fn is_subpixel_rendering_supported(&self) -> bool;
