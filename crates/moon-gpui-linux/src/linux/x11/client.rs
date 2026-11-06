@@ -1577,6 +1577,7 @@ impl LinuxClient for X11Client {
         gpui::scap_screen_capture::scap_screen_sources(&self.0.borrow().common.foreground_executor)
     }
 
+    /// Open a native window and deliver events buffered by its synchronous X11 setup.
     fn open_window(
         &self,
         handle: AnyWindowHandle,
@@ -1656,6 +1657,13 @@ impl LinuxClient for X11Client {
         };
 
         state.windows.insert(x_window, window_ref);
+        // Synchronous setup can buffer X11 events without leaving the socket readable.
+        // Drain after GPUI installs callbacks and maps the window, so the first frame
+        // does not depend on unrelated input. An idle alone does not wake calloop's poll.
+        state.loop_handle.insert_idle(move |client| {
+            client.process_x11_events(&xcb_connection).log_err();
+        });
+        state.common.signal.wakeup();
         Ok(Box::new(window))
     }
 
