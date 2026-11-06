@@ -2,6 +2,12 @@
   "version": 1,
   "migrations": [
     {
+      "concept": "calendar",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "The reviewed calendar correction keeps every selectable date in five/six-week months and preserves separate month grids in multi-month views. The Longbridge lifecycle remains, but these tested base-file changes are intentional donor drift, not a clean Mirror."
+    },
+    {
       "concept": "notification",
       "from": "Pending",
       "to": "Mirror",

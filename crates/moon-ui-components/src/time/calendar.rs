@@ -410,11 +410,12 @@ impl CalendarState {
         (year, month as u32)
     }
 
-    /// Returns the days of the month in a 2D vector to render on calendar.
-    fn days(&self) -> Vec<Vec<NaiveDate>> {
+    /// Return each displayed month as a separate week grid, preserving five/six-row boundaries.
+    fn days(&self) -> Vec<Vec<Vec<NaiveDate>>> {
         (0..self.number_of_months)
-            .flat_map(|offset| {
-                days_in_month(self.current_year, self.current_month as u32 + offset as u32)
+            .map(|offset| {
+                let (year, month) = self.offset_year_month(offset);
+                days_in_month(year, month)
             })
             .collect()
     }
@@ -581,6 +582,11 @@ impl Calendar {
             window,
             cx,
         )
+        .map(|button| {
+            #[cfg(test)]
+            let button = button.debug_selector(move || format!("calendar-day-{date_id}"));
+            button
+        })
         .when(is_today && !is_active, |this| {
             this.border_1().border_color(cx.theme().border)
         }) // Add border for today
@@ -782,6 +788,7 @@ impl Calendar {
             .child(label.into())
     }
 
+    /// Render independent month columns so a sixth week cannot spill into the next month.
     fn render_days(&self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let state = self.state.read(cx);
         let weeks = [
@@ -801,29 +808,23 @@ impl Calendar {
                 _ => this.gap_4().text_sm(),
             })
             .justify_between()
-            .children(
-                state
-                    .days()
-                    .chunks(5)
-                    .enumerate()
-                    .map(|(offset_month, days)| {
-                        v_flex()
-                            .gap_0p5()
-                            .child(
-                                h_flex().gap_0p5().justify_between().children(
-                                    weeks
-                                        .iter()
-                                        .map(|week| self.render_week(week.clone(), window, cx)),
-                                ),
-                            )
-                            .children(days.iter().map(|week| {
-                                h_flex().gap_0p5().justify_between().children(
-                                    week.iter()
-                                        .map(|d| self.render_day(d, offset_month, window, cx)),
-                                )
-                            }))
-                    }),
-            )
+            .children(state.days().iter().enumerate().map(|(offset_month, days)| {
+                v_flex()
+                    .gap_0p5()
+                    .child(
+                        h_flex().gap_0p5().justify_between().children(
+                            weeks
+                                .iter()
+                                .map(|week| self.render_week(week.clone(), window, cx)),
+                        ),
+                    )
+                    .children(days.iter().map(|week| {
+                        h_flex().gap_0p5().justify_between().children(
+                            week.iter()
+                                .map(|d| self.render_day(d, offset_month, window, cx)),
+                        )
+                    }))
+            }))
     }
 
     fn render_week(&self, week: impl Into<SharedString>, _: &mut Window, cx: &mut App) -> Div {
@@ -983,32 +984,4 @@ impl RenderOnce for Calendar {
 }
 
 #[cfg(test)]
-mod tests {
-    use chrono::NaiveDate;
-
-    use super::Date;
-
-    #[test]
-    fn test_date_to_string() {
-        let date = Date::Single(Some(NaiveDate::from_ymd_opt(2024, 8, 3).unwrap()));
-        assert_eq!(date.to_string(), "2024-08-03");
-
-        let date = Date::Single(None);
-        assert_eq!(date.to_string(), "nil");
-
-        let date = Date::Range(
-            Some(NaiveDate::from_ymd_opt(2024, 8, 3).unwrap()),
-            Some(NaiveDate::from_ymd_opt(2024, 8, 5).unwrap()),
-        );
-        assert_eq!(date.to_string(), "2024-08-03 - 2024-08-05");
-
-        let date = Date::Range(Some(NaiveDate::from_ymd_opt(2024, 8, 3).unwrap()), None);
-        assert_eq!(date.to_string(), "2024-08-03 - nil");
-
-        let date = Date::Range(None, Some(NaiveDate::from_ymd_opt(2024, 8, 5).unwrap()));
-        assert_eq!(date.to_string(), "nil - 2024-08-05");
-
-        let date = Date::Range(None, None);
-        assert_eq!(date.to_string(), "nil");
-    }
-}
+mod tests;

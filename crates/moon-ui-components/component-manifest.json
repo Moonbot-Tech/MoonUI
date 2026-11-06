@@ -176,12 +176,13 @@
     },
     {
       "concept": "calendar",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Calendar",
       "theme_source": "MoonTheme bridge through MoonCalendar facade",
       "public_path": "moon_ui::MoonCalendar",
       "upstream_ref": "Longbridge::time::calendar@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "Reviewed calendar correctness fork: complete five/six-week month grids preserve every selectable date and month boundaries in multi-month views",
+      "donor_drift_budget": 1,
       "contracts": ["gallery.visual_coverage"]
     },
     {
