@@ -2402,6 +2402,17 @@ impl WgpuRenderer {
         self.device_lost.load(std::sync::atomic::Ordering::SeqCst)
     }
 
+    /// Destroy the shared device and explicitly request recovery for diagnostics.
+    /// Ordinary device destruction intentionally does not set the lost callback's flag.
+    pub fn request_device_reset(&self) {
+        if !self
+            .device_lost
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            self.resources().device.destroy();
+        }
+    }
+
     /// Returns true if a redraw is needed because GPU state was cleared.
     /// Calling this method clears the flag.
     pub fn needs_redraw(&mut self) -> bool {
@@ -2443,7 +2454,9 @@ impl WgpuRenderer {
             *gpu_context.borrow_mut() = None;
 
             // Wait briefly for the GPU driver to stabilize, then try to
-            // recreate the context without software renderers. If this fails
+            // recreate the context. A software session must be able to recover on
+            // its existing adapter class; a hardware session must not silently
+            // fall back to software. If this fails
             // the caller should request another frame and retry — the real GPU
             // may need more time to come back (e.g. after suspend/resume).
             std::thread::sleep(std::time::Duration::from_millis(350));
@@ -2451,8 +2464,11 @@ impl WgpuRenderer {
             let instance = WgpuContext::instance(Box::new(window.clone()));
             let surface =
                 create_surface(&instance, display_handle.as_raw(), window_handle.as_raw())?;
-            let new_context =
-                WgpuContext::new_rejecting_software(instance, &surface, self.compositor_gpu)?;
+            let new_context = if self.adapter_info.device_type == wgpu::DeviceType::Cpu {
+                WgpuContext::new(instance, &surface, self.compositor_gpu)?
+            } else {
+                WgpuContext::new_rejecting_software(instance, &surface, self.compositor_gpu)?
+            };
             *gpu_context.borrow_mut() = Some(new_context);
             surface
         } else {

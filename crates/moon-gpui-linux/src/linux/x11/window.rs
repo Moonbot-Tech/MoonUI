@@ -1913,6 +1913,12 @@ impl PlatformWindow for X11Window {
         self.0.state.borrow().renderer.gpu_specs().into()
     }
 
+    /// Invalidate the shared device; the next native draw runs normal recovery.
+    fn request_gpu_device_reset(&self) -> bool {
+        self.0.state.borrow().renderer.request_device_reset();
+        true
+    }
+
     fn play_system_bell(&self) {
         // Volume 0% means don't increase or decrease from system volume
         let _ = self.0.xcb.bell(0);

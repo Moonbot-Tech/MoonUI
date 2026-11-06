@@ -760,6 +760,12 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn set_client_inset(&self, _inset: Pixels) {}
     fn gpu_specs(&self) -> Option<GpuSpecs>;
 
+    /// Request the normal device-recovery path for diagnostics, without resetting the OS GPU.
+    /// Returns false when the platform has no such recovery path.
+    fn request_gpu_device_reset(&self) -> bool {
+        false
+    }
+
     fn update_ime_position(&self, _bounds: Bounds<Pixels>);
 
     fn play_system_bell(&self) {}

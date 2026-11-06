@@ -1616,6 +1616,12 @@ impl PlatformWindow for WaylandWindow {
         self.borrow().renderer.gpu_specs().into()
     }
 
+    /// Invalidate the shared device; the next native draw runs normal recovery.
+    fn request_gpu_device_reset(&self) -> bool {
+        self.borrow().renderer.request_device_reset();
+        true
+    }
+
     fn play_system_bell(&self) {
         let state = self.borrow();
         let surface = if state.surface_state.toplevel().is_some() {

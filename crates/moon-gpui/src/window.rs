@@ -6037,6 +6037,17 @@ impl Window {
         self.platform_window.gpu_specs()
     }
 
+    /// Exercise native device recovery and wake every window sharing the device.
+    /// This diagnostic request does not simulate a driver hang or an operating-system reset.
+    pub fn request_gpu_device_reset(&mut self, cx: &mut App) -> bool {
+        if !self.platform_window.request_gpu_device_reset() {
+            return false;
+        }
+        self.refresh();
+        cx.refresh_windows();
+        true
+    }
+
     /// Perform titlebar double-click action.
     /// This is macOS specific.
     pub fn titlebar_double_click(&self) {
