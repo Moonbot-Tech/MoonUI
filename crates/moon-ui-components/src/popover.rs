@@ -272,11 +272,6 @@ impl PopoverState {
         }
     }
 
-    /// Keep visibility local; another popover does not own an input's context menu.
-    fn set_open(&mut self, open: bool, _cx: &mut Context<Self>) {
-        self.open = open;
-    }
-
     /// Remember what had focus before this popover takes it, so closing can hand it back.
     ///
     /// Must run while the popover is still CLOSED and from a synchronous path: reading it later
@@ -286,14 +281,31 @@ impl PopoverState {
         self.previous_focus_handle = window.focused(cx);
     }
 
-    /// Apply the focus and dismiss-subscription work that belongs to the CURRENT value of `open`.
+    /// Capture the current content focus before a close removes its dispatch-tree ancestors.
+    /// Returns no handle when focus has already moved to a dialog or another overlay.
+    fn closing_focus(&self, window: &Window, cx: &App) -> Option<FocusHandle> {
+        window.focused(cx).filter(|focused| {
+            self.focus_handle.contains(focused, window)
+                || self
+                    .tracked_focus_handle
+                    .as_ref()
+                    .is_some_and(|tracked| tracked.contains(focused, window))
+        })
+    }
+
+    /// Apply focus/subscription changes; `closing_focus` is captured before removing the content.
     ///
     /// Split out of `toggle_open` because a CONTROLLED popover (`Popover::open(bool)`, driven by a
-    /// caller-held flag) never went through it: `render` flipped the flag with `set_open` alone,
+    /// caller-held flag) never went through it: `render` flipped the flag alone,
     /// which left focus parked on the popover's about-to-be-removed handle and the dismiss
     /// subscription alive. That emptied the window's focus path, so element-level key handlers fell
     /// off the dispatch tree and application hotkeys stopped arriving until the user clicked.
-    pub(crate) fn sync_open_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn sync_open_focus(
+        &mut self,
+        closing_focus: Option<FocusHandle>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.open {
             let state = cx.entity();
             let focus_handle = if let Some(tracked_focus_handle) = self.tracked_focus_handle.clone()
@@ -315,30 +327,31 @@ impl PopoverState {
                 );
         } else {
             self._dismiss_subscription = None;
-            // Hand focus back. `focus_contains` rather than `contains_focused`: focus may sit on a
-            // DESCENDANT of the popover (an input, a list row) or on a tracked handle, and on the
-            // deferred close path the popover is already gone from the rendered frame.
-            let holds_focus = window
-                .focused(cx)
-                .is_some_and(|focused| focused == self.focus_handle);
-            if let Some(prev) = self.previous_focus_handle.take() {
-                prev.focus(window, cx);
-            } else if holds_focus {
-                // Nothing to restore — the common case for a header or strip gear opened while
-                // nothing was focused. Blur explicitly: leaving focus on the handle that is about
-                // to stop rendering is exactly what strands the dispatch path and kills hotkeys.
-                window.blur();
+            let previous = self.previous_focus_handle.take();
+            // A deferred close must not steal focus transferred after its ownership snapshot.
+            if closing_focus.is_some() && window.focused(cx) == closing_focus {
+                if let Some(previous) = previous {
+                    previous.focus(window, cx);
+                } else {
+                    window.blur();
+                }
             }
         }
     }
 
+    /// Change visibility together with its focus, subscription and caller notification.
     fn toggle_open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let opening = !self.open;
         if opening {
             self.remember_previous_focus(window, cx);
         }
-        self.set_open(opening, cx);
-        self.sync_open_focus(window, cx);
+        let closing_focus = if opening {
+            None
+        } else {
+            self.closing_focus(window, cx)
+        };
+        self.open = opening;
+        self.sync_open_focus(closing_focus, window, cx);
 
         if let Some(callback) = self.on_open_change.as_ref() {
             callback(&self.open, window, cx);
@@ -427,12 +440,17 @@ impl RenderOnce for Popover {
         // deferred below — focusing mid-render is not safe — but skipping it entirely is what used
         // to strand the window's focus (see `sync_open_focus`).
         let open_changed = force_open.is_some_and(|force_open| state.read(cx).open != force_open);
+        let closing_focus = if open_changed && force_open == Some(false) {
+            state.read(cx).closing_focus(window, cx)
+        } else {
+            None
+        };
         if let Some(force_open) = force_open {
             state.update(cx, |state, cx| {
                 if open_changed && force_open {
                     state.remember_previous_focus(window, cx);
                 }
-                state.set_open(force_open, cx);
+                state.open = force_open;
             });
         }
 
@@ -450,7 +468,9 @@ impl RenderOnce for Popover {
         if open_changed {
             let state = state.clone();
             window.defer(cx, move |window, cx| {
-                state.update(cx, |state, cx| state.sync_open_focus(window, cx));
+                state.update(cx, |state, cx| {
+                    state.sync_open_focus(closing_focus, window, cx)
+                });
             });
         }
 
@@ -473,7 +493,7 @@ impl RenderOnce for Popover {
                     state.update(cx, |state, cx| {
                         // We force set open to false to toggle it correctly.
                         // Because if the mouse down out will toggle open first.
-                        state.set_open(open, cx);
+                        state.open = open;
                         state.toggle_open(window, cx);
                     });
                     cx.notify(parent_view_id);
@@ -553,63 +573,4 @@ impl RenderOnce for Popover {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use gpui::MouseButton;
-
-    #[test]
-    fn test_popover_builder_chaining() {
-        let popover = Popover::new("test")
-            .anchor(Anchor::BottomCenter)
-            .mouse_button(MouseButton::Right)
-            .default_open(true)
-            .appearance(false)
-            .overlay_closable(false);
-
-        assert_eq!(popover.anchor, Anchor::BottomCenter);
-        assert_eq!(popover.mouse_button, MouseButton::Right);
-        assert!(popover.default_open);
-        assert!(!popover.appearance);
-        assert!(!popover.overlay_closable);
-    }
-
-    #[test]
-    fn test_resolved_corner_top_positions() {
-        use gpui::px;
-
-        let bounds = Bounds {
-            origin: Point {
-                x: px(100.),
-                y: px(100.),
-            },
-            size: gpui::Size {
-                width: px(200.),
-                height: px(50.),
-            },
-        };
-
-        let pos = Popover::resolved_corner(Anchor::TopLeft, bounds);
-        assert_eq!(pos.x, px(100.));
-        assert_eq!(pos.y, px(100.));
-
-        let pos = Popover::resolved_corner(Anchor::TopCenter, bounds);
-        assert_eq!(pos.x, px(200.));
-        assert_eq!(pos.y, px(100.));
-
-        let pos = Popover::resolved_corner(Anchor::TopRight, bounds);
-        assert_eq!(pos.x, px(300.));
-        assert_eq!(pos.y, px(100.));
-
-        let pos = Popover::resolved_corner(Anchor::BottomLeft, bounds);
-        assert_eq!(pos.x, px(100.));
-        assert_eq!(pos.y, px(50.));
-
-        let pos = Popover::resolved_corner(Anchor::BottomCenter, bounds);
-        assert_eq!(pos.x, px(200.));
-        assert_eq!(pos.y, px(50.));
-
-        let pos = Popover::resolved_corner(Anchor::BottomRight, bounds);
-        assert_eq!(pos.x, px(300.));
-        assert_eq!(pos.y, px(50.));
-    }
-}
+mod tests;

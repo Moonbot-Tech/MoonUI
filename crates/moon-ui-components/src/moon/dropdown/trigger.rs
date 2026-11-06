@@ -663,14 +663,8 @@ impl RenderOnce for MoonDropdown {
         let menu_header = self.menu_header.clone();
         let menu_header_height = self.menu_header_height;
         let popup_level = MoonMenuLevel::from_parts(std::rc::Rc::new(items), menu_layout);
-        let dropdown_selection = std::rc::Rc::new(MoonDropdownSelectionContext::new(
-            self.close_on_select,
-            self.on_select,
-            state.clone(),
-            controlled_open,
-            self.on_open_change.clone(),
-            parent_view,
-        ));
+        let close_on_select = self.close_on_select;
+        let on_select = self.on_select;
 
         let mut popover = CorePopover::new(ElementId::from(self.id.clone()))
             .appearance(false)
@@ -679,6 +673,11 @@ impl RenderOnce for MoonDropdown {
             .open(open)
             .trigger_any(trigger)
             .content(move |_, window, cx| {
+                let dropdown_selection = std::rc::Rc::new(MoonDropdownSelectionContext::new(
+                    close_on_select,
+                    on_select.clone(),
+                    cx.entity(),
+                ));
                 let tokens = MoonTheme::active_tokens(cx);
                 let menu_size = menu_size.unwrap_or_else(|| MoonMenuSize::from_theme(&tokens));
                 let mut menu = MoonPopupMenu::new(menu_id.clone())

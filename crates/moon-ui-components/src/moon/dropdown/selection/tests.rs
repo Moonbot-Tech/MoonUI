@@ -2,8 +2,8 @@
 
 use super::super::{MoonDropdown, MoonMenuItem, MoonMenuItemKind};
 use super::{
-    MENU_DROPDOWN_HANDLER_PROBE_PREFIX, MoonDropdownSelectPlan, moon_dropdown_select_plan,
-    moon_menu_item_accepts_click, take_dropdown_handler_probe_count,
+    MENU_DROPDOWN_HANDLER_PROBE_PREFIX, moon_menu_item_accepts_click,
+    take_dropdown_handler_probe_count,
 };
 use crate::moon::{MoonPalette, MoonTheme};
 use std::{cell::RefCell, rc::Rc};
@@ -168,63 +168,6 @@ fn rendered_action_label_dispatches_while_static_label_stays_inert(cx: &mut gpui
     for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
         assert_rendered_label_interactions(cx, palette);
     }
-}
-
-/// Catches closing keep-open rows or mutating controlled state in
-/// `selection.rs:moon_dropdown_select_plan`, which would dismiss persistent menus or desynchronize
-/// a controlled dropdown from its owner.
-#[test]
-fn dropdown_select_plan_respects_close_and_controlled_state() {
-    assert_eq!(
-        moon_dropdown_select_plan(true, None, None),
-        MoonDropdownSelectPlan {
-            close_menu: true,
-            update_internal_open: true,
-        }
-    );
-    assert_eq!(
-        moon_dropdown_select_plan(true, None, Some(true)),
-        MoonDropdownSelectPlan {
-            close_menu: true,
-            update_internal_open: false,
-        }
-    );
-    assert_eq!(
-        moon_dropdown_select_plan(false, None, None),
-        MoonDropdownSelectPlan {
-            close_menu: false,
-            update_internal_open: false,
-        }
-    );
-}
-
-/// A row's own `closes_menu` override must win over the dropdown's whole-menu `close_on_select`
-/// policy in `selection.rs:moon_dropdown_select_plan`, and `update_internal_open` must follow the
-/// RESOLVED `close_menu` rather than the dropdown's raw policy. Folding the override back down to
-/// `close_on_select` leaves a dialog-opening row unable to force its host menu shut, so the menu
-/// paints over the modal it just opened; deriving `update_internal_open` from `close_on_select`
-/// instead of `close_menu` leaves an uncontrolled dropdown's internal `open` flag out of sync with
-/// a row-forced close, so the menu re-opens on the next repaint.
-#[test]
-fn dropdown_select_plan_row_override_wins_over_dropdown_policy() {
-    // Row forces a close on a dropdown configured to stay open (checkbox-menu policy).
-    assert_eq!(
-        moon_dropdown_select_plan(false, Some(true), None),
-        MoonDropdownSelectPlan {
-            close_menu: true,
-            update_internal_open: true,
-        },
-        "closes_menu(true) must close a close_on_select(false) dropdown and clear its internal open state"
-    );
-    // Row forces staying open on a dropdown configured to close.
-    assert_eq!(
-        moon_dropdown_select_plan(true, Some(false), None),
-        MoonDropdownSelectPlan {
-            close_menu: false,
-            update_internal_open: false,
-        },
-        "closes_menu(false) must keep a close_on_select(true) dropdown open and leave its internal open state untouched"
-    );
 }
 
 /// Open a large dropdown whose per-row dropdown handlers are counted when resolved.
