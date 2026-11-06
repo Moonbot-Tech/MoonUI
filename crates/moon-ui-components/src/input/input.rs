@@ -190,13 +190,13 @@ impl Input {
         self
     }
 
-    /// Set full height of the input (Multi-line only).
+    /// Fill the available height for either single-line or multi-line input.
     pub fn h_full(mut self) -> Self {
         self.height = Some(relative(1.));
         self
     }
 
-    /// Set height of the input (Multi-line only).
+    /// Override the input height, preserving auto-height only when no height is supplied.
     pub fn h(mut self, height: impl Into<DefiniteLength>) -> Self {
         self.height = Some(height.into());
         self
@@ -475,10 +475,8 @@ impl RenderOnce for Input {
             ))
             .when(!self.disabled, |this| this.cursor_text())
             .items_center()
-            .when(state.mode.is_multi_line(), |this| {
-                this.h_auto()
-                    .when_some(self.height, |this, height| this.h(height))
-            })
+            .when(state.mode.is_multi_line(), |this| this.h_auto())
+            .when_some(self.height, |this, height| this.h(height))
             .when(self.appearance, |this| {
                 this.bg(bg)
                     .rounded(metrics.radius)
