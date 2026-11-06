@@ -196,6 +196,8 @@ impl ResizableState {
         }
     }
 
+    /// Retain measured bounds and constraints for dragging. Only a new initial flex basis
+    /// needs another layout; re-recording the geometry just painted must converge to idle.
     pub(crate) fn update_panel_size(
         &mut self,
         panel_ix: usize,
@@ -207,13 +209,13 @@ impl ResizableState {
         // This check is only necessary to stop the very first panel from resizing on its own
         // it needs to be passed when the panel is freshly created so we get the initial size,
         // but its also fine when it sometimes passes later.
-        if self.sizes[panel_ix].as_f32() == PANEL_MIN_SIZE.as_f32() {
+        if self.sizes[panel_ix] == PANEL_MIN_SIZE && self.panels[panel_ix].size != Some(size) {
             self.sizes[panel_ix] = size;
             self.panels[panel_ix].size = Some(size);
+            cx.notify();
         }
         self.panels[panel_ix].bounds = bounds;
         self.panels[panel_ix].size_range = size_range;
-        cx.notify();
     }
 
     pub(crate) fn remove_panel(&mut self, panel_ix: usize, cx: &mut Context<Self>) {

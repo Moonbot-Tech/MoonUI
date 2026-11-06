@@ -180,28 +180,29 @@ impl WindowInvalidator {
         }
     }
 
+    /// Retain frame debt and notify observers even when the changed entity is a layout model.
     pub fn invalidate_view(&self, entity: EntityId, cx: &mut App) -> bool {
         let mut inner = self.inner.borrow_mut();
         inner.update_count += 1;
         inner.dirty_views.insert(entity);
+        // A model has no dispatch-tree view path; its observers must invalidate their views.
+        // Effects are flushed after the current update, so this does not re-enter the draw.
+        cx.push_effect(Effect::Notify { emitter: entity });
         if inner.draw_phase == DrawPhase::None {
             Self::record_frame_dirty(&mut inner);
             inner.dirty = true;
             Self::request_frame_inner(&inner);
-            cx.push_effect(Effect::Notify { emitter: entity });
             true
         } else {
             false
         }
     }
 
+    /// Whether the UI owes a draw, including views changed during the preceding draw.
+    /// Frame dispatch, keyboard dispatch and test flushing must consume the same debt.
     pub fn is_dirty(&self) -> bool {
-        self.inner.borrow().dirty
-    }
-
-    /// Views invalidated while a draw was in progress; they still owe a frame.
-    pub fn has_dirty_views(&self) -> bool {
-        !self.inner.borrow().dirty_views.is_empty()
+        let inner = self.inner.borrow();
+        inner.dirty || !inner.dirty_views.is_empty()
     }
 
     pub fn set_dirty(&self, dirty: bool) {
@@ -1727,7 +1728,6 @@ impl Window {
                         // refused mid-draw, a callback queued for the next frame, a present
                         // still owed) must wake the frame clock again.
                         if window.invalidator.is_dirty()
-                            || window.invalidator.has_dirty_views()
                             || !window.next_frame_callbacks.borrow().is_empty()
                             || window.needs_present.get()
                         {

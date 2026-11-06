@@ -21,6 +21,171 @@ use crate::{
     TestAppContext, TouchPhase, UTF16Selection, Window, div, gpu_canvas, point, px, size,
 };
 
+/// A view that invalidates once from prepaint or paint after its first stable frame.
+struct MidDrawNotification {
+    armed: Rc<Cell<bool>>,
+    renders: Rc<Cell<usize>>,
+    during_paint: bool,
+}
+
+impl Render for MidDrawNotification {
+    /// Register the one-shot mutation in the selected draw phase.
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.renders.set(self.renders.get() + 1);
+        let entity = cx.entity_id();
+        let prepaint = self.armed.clone();
+        let paint = self.armed.clone();
+        let during_paint = self.during_paint;
+        crate::canvas(
+            move |_, _, cx| {
+                if !during_paint && prepaint.replace(false) {
+                    cx.notify(entity);
+                }
+            },
+            move |_, _, _, cx| {
+                if during_paint && paint.replace(false) {
+                    cx.notify(entity);
+                }
+            },
+        )
+        .size(px(40.))
+    }
+}
+
+/// Catches ignoring the queued views in the frame-entry predicate: a measured layout change
+/// would remain invisible until unrelated input, even though the frame clock was woken for it.
+#[test]
+fn mid_draw_notification_is_drawn_without_another_event() {
+    for during_paint in [false, true] {
+        let armed = Rc::new(Cell::new(false));
+        let renders = Rc::new(Cell::new(0));
+        let (mut app, any) = open_window({
+            let armed = armed.clone();
+            let renders = renders.clone();
+            move |_, _| MidDrawNotification {
+                armed,
+                renders,
+                during_paint,
+            }
+        });
+        app.update_window(any, |_, window, cx| {
+            let before = renders.get();
+            armed.set(true);
+            window.draw(cx).clear();
+            assert!(
+                window.invalidator.is_dirty(),
+                "a mid-draw change still owes a frame"
+            );
+            // The platform's next tick must take the UI branch without another input event.
+            if window.invalidator.is_dirty() {
+                window.draw(cx).clear();
+            }
+            assert_eq!(
+                renders.get() - before,
+                2,
+                "one applying frame follows the mutation"
+            );
+            assert!(
+                !window.invalidator.is_dirty(),
+                "the consumed debt must settle"
+            );
+        })
+        .unwrap();
+    }
+}
+
+/// A cached consumer observes a separate model, as table hosts observe their layout state.
+struct MidDrawModelConsumer {
+    model: crate::Entity<usize>,
+    armed: Rc<Cell<bool>>,
+    seen: Rc<Cell<usize>>,
+    during_paint: bool,
+}
+
+impl Render for MidDrawModelConsumer {
+    /// Publish one layout measurement while recording the model value actually rendered.
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.seen.set(*self.model.read(cx));
+        let prepaint_model = self.model.clone();
+        let paint_model = self.model.clone();
+        let prepaint = self.armed.clone();
+        let paint = self.armed.clone();
+        let during_paint = self.during_paint;
+        crate::canvas(
+            move |_, _, cx| {
+                if !during_paint && prepaint.replace(false) {
+                    prepaint_model.update(cx, |value, cx| {
+                        *value += 1;
+                        cx.notify();
+                    });
+                }
+            },
+            move |_, _, _, cx| {
+                if during_paint && paint.replace(false) {
+                    paint_model.update(cx, |value, cx| {
+                        *value += 1;
+                        cx.notify();
+                    });
+                }
+            },
+        )
+        .size(px(40.))
+    }
+}
+
+/// The model itself has no view path, so only its observer can invalidate this cached child.
+struct CachedModelHost(crate::Entity<MidDrawModelConsumer>);
+
+impl Render for CachedModelHost {
+    /// Use the production view cache rather than repainting every consumer unconditionally.
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().child(crate::AnyView::from(self.0.clone()).cached(crate::StyleRefinement::default()))
+    }
+}
+
+/// Queuing a frame alone cannot deliver a model notification: the observer must also run.
+#[test]
+fn mid_draw_model_notification_reaches_its_cached_observer() {
+    for during_paint in [false, true] {
+        let armed = Rc::new(Cell::new(false));
+        let seen = Rc::new(Cell::new(0));
+        let (mut app, window) = open_window({
+            let armed = armed.clone();
+            let seen = seen.clone();
+            move |_, cx| {
+                let model = cx.new(|_| 0_usize);
+                CachedModelHost(cx.new(|cx| {
+                    cx.observe(&model, |_, _, cx| cx.notify()).detach();
+                    MidDrawModelConsumer {
+                        model,
+                        armed,
+                        seen,
+                        during_paint,
+                    }
+                }))
+            }
+        });
+        app.update_window(window, |_, window, cx| {
+            armed.set(true);
+            window.refresh();
+            window.draw(cx).clear();
+        })
+        .unwrap();
+        assert_eq!(
+            seen.get(),
+            1,
+            "the cached consumer must draw the measured value without input"
+        );
+        app.update_window(window, |_, window, _| {
+            assert!(
+                !window.invalidator.is_dirty(),
+                "the observer and frame debt must settle"
+            );
+        })
+        .unwrap();
+    }
+}
+
 /// A root view that draws nothing; the window's own state is what these tests read.
 struct EmptyView;
 

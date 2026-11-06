@@ -1,6 +1,10 @@
 //! Single-line prepaint regressions, including nonzero glyph advances absent from NoopTextSystem.
 
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    sync::Arc,
+};
 
 use gpui::{
     AppContext as _, Bounds, Context, Entity, FontId, GlyphId, InteractiveElement as _,
@@ -12,8 +16,112 @@ use super::TextElement;
 use crate::{
     Root, h_flex,
     input::{InputState, blink_cursor::CURSOR_WIDTH, display_map::LineLayout},
-    moon::{MoonNumberInput, MoonSize, MoonTheme, ThemeMode},
+    moon::{MoonInput, MoonNumberInput, MoonSize, MoonTheme, ThemeMode},
 };
+
+/// A real input in resizable panels, counting the enclosing view's actual renders.
+struct SettlingInputHarness {
+    state: Entity<InputState>,
+    panels: Entity<crate::resizable::ResizableState>,
+    renders: Rc<Cell<usize>>,
+}
+
+impl Render for SettlingInputHarness {
+    /// Reapply unchanged builder properties just as Select and ordinary application views do.
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.renders.set(self.renders.get() + 1);
+        // A regression may loop inside the initial window draw before the test can poll idle.
+        assert!(
+            self.renders.get() < 128,
+            "unchanged layout entered a render loop"
+        );
+        self.state.update(cx, |state, cx| {
+            state.set_placeholder("hint", window, cx);
+            state.set_loading(false, window, cx);
+        });
+        gpui::div().w(px(480.)).h(px(80.)).child(
+            crate::resizable::h_resizable("settling-input-panels")
+                .with_state(&self.panels)
+                .child(
+                    crate::resizable::resizable_panel()
+                        .size(px(240.))
+                        .child(MoonInput::new("settling-input").state(&self.state)),
+                )
+                .child(crate::resizable::resizable_panel().child("neighbor")),
+        )
+    }
+}
+
+/// Catches restoring paint-time Input notifications, unconditional scroll/placeholder/loading
+/// notifications, or unconditional measured-panel notifications: an unchanged form would keep
+/// rebuilding after the frame scheduler starts honoring mid-draw debt. Real edits and resizes
+/// must still update the input and then settle in both themes.
+#[gpui::test]
+fn input_and_resizable_layout_settle_after_edits(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    for theme in [ThemeMode::Dark, ThemeMode::Light] {
+        cx.update(|cx| MoonTheme::set_mode(theme, cx));
+        let renders = Rc::new(Cell::new(0));
+        let slot = Rc::new(RefCell::new(None));
+        let window = cx.add_window({
+            let renders = renders.clone();
+            let slot = slot.clone();
+            move |window, cx| {
+                let state = cx.new(|cx| InputState::new(window, cx).default_value("before"));
+                let panels = cx.new(|_| crate::resizable::ResizableState::default());
+                slot.replace(Some((state.clone(), panels.clone())));
+                let view = cx.new(|_| SettlingInputHarness {
+                    state,
+                    panels,
+                    renders,
+                });
+                Root::new(view, window, cx).bordered(false)
+            }
+        });
+        let (input, panels) = slot.borrow().clone().expect("controls were created");
+        let mut visual = VisualTestContext::from_window(window.into(), cx);
+        assert_form_settles(&mut visual, &renders);
+        let before = renders.get();
+        let width_before = visual.update(|_, cx| input.read(cx).input_bounds.size.width);
+        visual.update(|window, cx| {
+            input.update(cx, |state, cx| state.set_value("after", window, cx));
+            panels.update(cx, |state, cx| state.resize_panel(0, px(160.), window, cx));
+        });
+        assert_form_settles(&mut visual, &renders);
+        assert!(
+            renders.get() > before,
+            "the changed form must actually render"
+        );
+        visual.update(|_, cx| {
+            let state = input.read(cx);
+            assert_eq!(state.value().as_ref(), "after");
+            assert!(
+                state.input_bounds.size.width < width_before,
+                "resize must reach the input layout"
+            );
+            assert!(
+                state.last_layout.is_some(),
+                "input geometry must still be retained"
+            );
+        });
+    }
+}
+
+/// Give genuine one-shot layout corrections a bounded opportunity to finish, then test idle.
+fn assert_form_settles(visual: &mut VisualTestContext, renders: &Cell<usize>) {
+    for _ in 0..8 {
+        visual.update(|_, _| {});
+    }
+    let settled = renders.get();
+    for _ in 0..4 {
+        visual.update(|_, _| {});
+    }
+    assert_eq!(
+        renders.get(),
+        settled,
+        "unchanged layout must not owe another render"
+    );
+}
 
 /// Hosts the actual Xs number builder using caller-owned state and an optional unit.
 struct NumberHarness {
