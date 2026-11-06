@@ -13,7 +13,6 @@ use crate::{
     StyleSized, StyledExt,
     actions::{Cancel, Confirm, SelectDown, SelectUp},
     button::{ButtonVariant, MoonButtonMetrics, MoonButtonStyle},
-    global_state::GlobalState,
     h_flex,
     input::{clear_button, input_style},
     list::{List, ListState},
@@ -529,15 +528,9 @@ where
         cx.notify();
     }
 
+    /// Publish dropdown visibility through its owning view.
     fn set_open(&mut self, open: bool, cx: &mut Context<Self>) {
         self.state.open = open;
-
-        if self.state.open {
-            GlobalState::global_mut(cx).register_deferred_popover(&self.state.focus_handle)
-        } else {
-            GlobalState::global_mut(cx).unregister_deferred_popover(&self.state.focus_handle)
-        }
-
         cx.notify();
     }
 

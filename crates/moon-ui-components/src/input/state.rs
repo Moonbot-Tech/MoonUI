@@ -1754,7 +1754,8 @@ impl InputState {
         cx.propagate();
     }
 
-    /// Show the right-click context menu as a native OS menu.
+    /// Show the right-click menu for this input. Other open popovers do not own this input's
+    /// menu policy; nested deferred overlays are supported by the window renderer.
     pub(crate) fn handle_right_click_menu(
         &mut self,
         event: &MouseDownEvent,
@@ -1762,10 +1763,6 @@ impl InputState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if crate::global_state::GlobalState::global(cx).is_in_deferred_context() {
-            return;
-        }
-
         if !self.selected_range.contains(offset) {
             self.move_to(offset, None, cx);
         }

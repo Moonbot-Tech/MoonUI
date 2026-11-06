@@ -6,9 +6,7 @@ use gpui::{
 };
 use std::{cell::Cell, rc::Rc};
 
-use crate::{
-    ElementExt, Selectable, StyledExt as _, actions::Cancel, global_state::GlobalState, v_flex,
-};
+use crate::{ElementExt, Selectable, StyledExt as _, actions::Cancel, v_flex};
 
 const CONTEXT: &str = "Popover";
 pub(crate) fn init(cx: &mut App) {
@@ -274,20 +272,9 @@ impl PopoverState {
         }
     }
 
-    fn set_open(&mut self, open: bool, cx: &mut Context<Self>) {
-        // Only touch the global registry on an actual transition. A CONTROLLED popover runs this
-        // from `render` on every frame, and `GlobalState::global_mut` schedules a global-observer
-        // notification (plus a key allocation) each time — enough, on a popover living in a
-        // high-frequency host like a chart tab strip, to feed a repaint loop back into itself.
-        if self.open == open {
-            return;
-        }
+    /// Keep visibility local; another popover does not own an input's context menu.
+    fn set_open(&mut self, open: bool, _cx: &mut Context<Self>) {
         self.open = open;
-        if self.open {
-            GlobalState::global_mut(cx).register_deferred_popover(&self.focus_handle);
-        } else {
-            GlobalState::global_mut(cx).unregister_deferred_popover(&self.focus_handle);
-        }
     }
 
     /// Remember what had focus before this popover takes it, so closing can hand it back.

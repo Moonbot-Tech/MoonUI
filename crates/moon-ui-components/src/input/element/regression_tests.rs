@@ -19,6 +19,97 @@ use crate::{
     moon::{MoonInput, MoonNumberInput, MoonSize, MoonTheme, ThemeMode},
 };
 
+/// A real Input whose context-menu hook opens another deferred overlay through Root.
+struct NestedMenuHarness {
+    input: Entity<InputState>,
+    nested: bool,
+    requests: Rc<Cell<usize>>,
+}
+
+impl Render for NestedMenuHarness {
+    /// Keep one popover open while testing both its own input and an input in another window.
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        use crate::moon::MoonContextMenuWindowExt as _;
+        let requests = self.requests.clone();
+        let input = crate::input::Input::new(&self.input).context_menu(move |menu, window, cx| {
+            requests.set(requests.get() + 1);
+            window.open_fitted_moon_context_menu(
+                cx,
+                "nested-input-menu",
+                window.mouse_position(),
+                vec![crate::moon::MoonMenuItem::new("Input command")],
+                120.,
+                300.,
+            );
+            // Empty NativeMenu avoids OS menu handling in the test; Root paints the real overlay.
+            menu
+        });
+        let content = if self.nested {
+            crate::popover::Popover::new("input-parent-popover")
+                .open(true)
+                .trigger_any(gpui::div().w(px(240.)).h(px(30.)).child("Open"))
+                .child(gpui::div().w(px(240.)).child(input))
+                .into_any_element()
+        } else {
+            gpui::div().w(px(240.)).child(input).into_any_element()
+        };
+        gpui::div().size_full().child(content)
+    }
+}
+
+/// Catches the app-global deferred-context ban: an open popover must not disable Input's menu
+/// inside itself or in another window. The nested Root menu must also survive actual prepaint.
+#[gpui::test]
+fn input_context_menu_works_inside_popover_and_in_other_window(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    for theme in [ThemeMode::Dark, ThemeMode::Light] {
+        cx.update(|cx| MoonTheme::set_mode(theme, cx));
+        for nested in [true, false] {
+            let slot = Rc::new(RefCell::new(None));
+            let requests = Rc::new(Cell::new(0));
+            let window = cx.add_window({
+                let slot = slot.clone();
+                let requests = requests.clone();
+                move |window, cx| {
+                    let input = cx.new(|cx| InputState::new(window, cx).default_value("edit me"));
+                    slot.replace(Some(input.clone()));
+                    let view = cx.new(|_| NestedMenuHarness {
+                        input,
+                        nested,
+                        requests,
+                    });
+                    Root::new(view, window, cx).bordered(false)
+                }
+            });
+            let input = slot.borrow().clone().unwrap();
+            let mut visual = VisualTestContext::from_window(window.into(), cx);
+            for _ in 0..4 {
+                visual.update(|window, _| window.refresh());
+            }
+            let bounds = visual.update(|_, cx| input.read(cx).input_bounds);
+            assert!(!bounds.is_empty(), "the input must actually be painted");
+            visual.simulate_mouse_down(
+                bounds.center(),
+                gpui::MouseButton::Right,
+                Modifiers::none(),
+            );
+            visual.simulate_mouse_up(bounds.center(), gpui::MouseButton::Right, Modifiers::none());
+            assert_eq!(
+                requests.get(),
+                1,
+                "right click was blocked (nested={nested})"
+            );
+            for _ in 0..4 {
+                visual.update(|window, _| window.refresh());
+            }
+            let popup = visual
+                .debug_bounds("nested-input-menu:menu:popup")
+                .expect("nested menu must be painted");
+            assert!(!popup.is_empty(), "nested menu must have visible geometry");
+        }
+    }
+}
+
 /// A real input in resizable panels, counting the enclosing view's actual renders.
 struct SettlingInputHarness {
     state: Entity<InputState>,
