@@ -12,13 +12,14 @@ use std::{
 
 use super::{gpu_canvas_frame_plan, gpu_canvas_prepare_text};
 use crate::{
-    AnyWindowHandle, App, AppContext as _, AsyncWindowContext, Bounds, Context, FileDropEvent,
-    GpuCanvasDrawContext, GpuCanvasDriver, GpuCanvasHandle, GpuCanvasPrepareContext,
-    GpuCanvasRetainedTextLayer, GpuCanvasTextContext, GpuCanvasTextTransform, GpuFrameDecision,
-    GpuFrameInfo, InputEvent as _, InputHandler, InteractiveElement as _, IntoElement,
-    MouseMoveEvent, ParentElement as _, Pixels, PlatformInput, PlatformInputHandler, Point, Render,
-    ScrollDelta, ScrollWheelEvent, Size, StatefulInteractiveElement as _, Styled as _,
-    TestAppContext, TouchPhase, UTF16Selection, Window, div, gpu_canvas, point, px, size,
+    AnyWindowHandle, App, AppContext as _, AsyncWindowContext, AtlasTextureId, AtlasTextureKind,
+    AtlasTile, Bounds, ContentMask, Context, Corners, FileDropEvent, GpuCanvasDrawContext,
+    GpuCanvasDriver, GpuCanvasHandle, GpuCanvasPrepareContext, GpuCanvasRetainedTextLayer,
+    GpuCanvasTextContext, GpuCanvasTextTransform, GpuFrameDecision, GpuFrameInfo, InputEvent as _,
+    InputHandler, InteractiveElement as _, IntoElement, MouseMoveEvent, ParentElement as _, Pixels,
+    PlatformInput, PlatformInputHandler, Point, PolychromeSprite, Render, ScrollDelta,
+    ScrollWheelEvent, Size, StatefulInteractiveElement as _, Styled as _, TestAppContext, TileId,
+    TouchPhase, UTF16Selection, Window, div, gpu_canvas, point, px, size,
 };
 
 /// A view that invalidates once from prepaint or paint after its first stable frame.
@@ -1023,6 +1024,68 @@ fn err_with_changed_env_drops_text() {
     zoom(&mut app, any, 2.0);
     draw(&mut app, any);
     assert_eq!(canvas_frame(&mut app, any, true), 0);
+}
+
+/// A GPU canvas whose text is one emoji (a polychrome sprite) until `fail` is set.
+struct EmojiCanvas {
+    fail: Rc<Cell<bool>>,
+}
+
+impl GpuCanvasDriver for EmojiCanvas {
+    fn frame(&mut self, _: GpuFrameInfo) -> GpuFrameDecision {
+        GpuFrameDecision::RequestPresent
+    }
+
+    fn prepare_text(&mut self, ctx: &mut GpuCanvasTextContext<'_>) -> anyhow::Result<()> {
+        if self.fail.get() {
+            anyhow::bail!("synthetic text failure");
+        }
+        ctx.frame.polychrome_sprites.push(PolychromeSprite {
+            order: 1,
+            pad: 0,
+            grayscale: false,
+            opacity: 1.0,
+            bounds: Bounds::default(),
+            content_mask: ContentMask::default(),
+            corner_radii: Corners::default(),
+            tile: AtlasTile {
+                texture_id: AtlasTextureId {
+                    index: 0,
+                    kind: AtlasTextureKind::Polychrome,
+                },
+                tile_id: TileId(0),
+                padding: 0,
+                bounds: Bounds::default(),
+            },
+        });
+        Ok(())
+    }
+
+    fn draw(&mut self, _: &mut GpuCanvasDrawContext<'_>) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+/// Catches `window.rs:frame_gpu_canvases` replaying a cached frame with polychrome sprites
+/// after a failed prepare (issue #129): `Window::drop_image` may have freed those atlas
+/// tiles without dirtying the window, so the emoji would sample a freed or reused tile.
+#[test]
+fn err_never_replays_polychrome_text() {
+    let fail = Rc::new(Cell::new(false));
+    let handles = vec![GpuCanvasHandle::new(EmojiCanvas { fail: fail.clone() })];
+    let (mut app, any) = open_window(move |_, _| CanvasesView { handles });
+    let polychrome = |app: &mut TestAppContext| {
+        app.update_window(any, |_, window, _| {
+            window.frame_gpu_canvases(false);
+            let scene = &window.rendered_frame.scene;
+            scene.gpu_canvas_text_under_scene.polychrome_sprites.len()
+                + scene.gpu_canvas_text_over_scene.polychrome_sprites.len()
+        })
+        .unwrap()
+    };
+    assert_eq!(polychrome(&mut app), 1);
+    fail.set(true);
+    assert_eq!(polychrome(&mut app), 0);
 }
 
 #[test]

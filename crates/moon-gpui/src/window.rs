@@ -3076,8 +3076,9 @@ impl Window {
                             }
                             Err(error) => {
                                 log::error!("failed to prepare gpu canvas text: {error}");
-                                // Text laid out for another geometry is worse than none.
-                                if self.gpu_canvas_text.cached_env(&key) == Some(&env) {
+                                // Text laid out for another geometry is worse than none,
+                                // and polychrome sprites may point at freed atlas tiles.
+                                if self.gpu_canvas_text.reusable_env(&key) == Some(&env) {
                                     self.gpu_canvas_text.cached_frame(&key)
                                 } else {
                                     self.gpu_canvas_text.evict(&key);
