@@ -48,6 +48,20 @@ fn function_body_usage_matches_whole_identifiers_only() {
     assert!(!function_body_uses_param(&unused, 0, "_id"));
 }
 
+/// Catches reading a line comment that names the parameter as a use of it, which hides the very
+/// no-op builder that documents why it ignores its argument from `noop_public_api_markers`. A
+/// comment does not change the component, so the body below still returns `self` untouched.
+#[test]
+fn function_body_usage_ignores_line_comments_naming_the_param() {
+    let unused = [
+        "pub fn tone(self, _tone: MoonTone) -> Self {",
+        "    // `_tone` is accepted for API parity and ignored for now.",
+        "    self",
+        "}",
+    ];
+    assert!(!function_body_uses_param(&unused, 0, "_tone"));
+}
+
 /// Catches `source_metrics.rs:scan_raw_hex_in_moon` exempting token sources by file name instead
 /// of by path, which would let any component module named `primitives.rs` paint raw hex without
 /// moving the `raw_hex_in_moon_runtime` metric, or dropping the exemption, which fails the audit

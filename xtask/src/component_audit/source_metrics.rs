@@ -239,6 +239,9 @@ fn underscore_self_param(signature: &str) -> Option<String> {
 }
 
 /// Return whether a function body refers to the supplied parameter before its closing brace.
+///
+/// Whole-line `//` comments are not code, so naming the parameter there is not a use; this is the
+/// same comment rule the raw-hex scans apply.
 fn function_body_uses_param(lines: &[&str], signature_ix: usize, param: &str) -> bool {
     let mut depth = brace_delta(lines[signature_ix]);
     let after_open = lines[signature_ix].split_once('{').map(|(_, body)| body);
@@ -247,7 +250,7 @@ fn function_body_uses_param(lines: &[&str], signature_ix: usize, param: &str) ->
     }
 
     for line in lines.iter().skip(signature_ix + 1) {
-        if contains_identifier(line, param) {
+        if !line.trim_start().starts_with("//") && contains_identifier(line, param) {
             return true;
         }
         depth += brace_delta(line);
