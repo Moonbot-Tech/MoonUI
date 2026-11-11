@@ -75,6 +75,7 @@ pub(crate) struct GpuCanvasTextRetention {
 }
 
 impl GpuCanvasTextRetention {
+    #[cfg(test)]
     pub(crate) fn cached_env(&self, key: &GpuCanvasTextKey) -> Option<&GpuCanvasTextEnv> {
         self.entries.get(key).map(|(env, _)| env)
     }
