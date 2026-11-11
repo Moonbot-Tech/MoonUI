@@ -245,14 +245,22 @@ mousemove снова начнет будить весь компонент/ок�
 ## Важные инварианты
 
 1. Решение о кадре принимает `GpuCanvasDriver::frame()`.
-2. `prepare_text()` вызывается только для кадра, который будет реально
-   показан.
+2. `prepare_text()` вызывается только для кадра, который окно собирается
+   показать. Backend всё ещё может отклонить сам present (например, DXGI
+   ответил, что окно перекрыто): тогда кадр остаётся в долге и текст готовится
+   заново на первом tick, где окно снова может показать кадр. Пока backend
+   не может показать кадр (`PlatformWindow::can_present()` вернул `false`:
+   окно скрыто, surface восстанавливается или недоступен),
+   `prepare_text()` не вызывается ни у одного canvas-а, даже на UI redraw.
+   Неотданный кадр остаётся в долге (`needs_present`), и первый tick после
+   восстановления готовит текст всех canvas-ов.
 3. Present у окна общий, но текст готовится по canvas-у: если один canvas в
    окне попросил present, `prepare_text()` вызывается только у тех canvas-ов,
    которые сами попросили present. Остальные canvas-ы окна повторяют свой
    text frame из прошлого кадра, поэтому их подписи не пропадают.
    Сохранённый frame canvas-а выбрасывается и готовится заново, если:
-   - кадр перерисовывает UI (каждый UI redraw готовит текст всех canvas-ов);
+   - кадр перерисовывает UI (каждый UI redraw окна, которое может показать
+     кадр, готовит текст всех canvas-ов);
    - у canvas-а изменились bounds, content mask, scale factor, content zoom,
      text rendering mode, поддержка subpixel, background appearance или draw
      order;
@@ -346,7 +354,8 @@ all over gpu canvas text
 - вызывается на platform frame tick;
 - вызывает `GpuCanvasDriver::frame()` до present;
 - не dirty-ит GPUI view tree;
-- вызывает `prepare_text()` только когда кадр будет показан;
+- вызывает `prepare_text()` только когда кадр собираются показать, и ни разу, пока
+  `PlatformWindow::can_present()` возвращает `false` (инвариант 2);
 - на GPU-only кадре вызывает `prepare_text()` только у canvas-ов, которые сами
   попросили present, а остальные повторяют сохранённый text frame (инвариант 3);
   на UI redraw — у всех canvas-ов;
