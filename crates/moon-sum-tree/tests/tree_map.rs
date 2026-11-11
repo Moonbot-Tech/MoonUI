@@ -49,3 +49,22 @@ fn set_extend_stores_a_repeated_element_once() {
             .collect::<Vec<_>>()
     );
 }
+
+/// Catches `TreeMap::remove_range` re-seeking the cursor from the tree start
+/// when `end` precedes `start`, which appends the suffix from `end` after the
+/// slice up to `start` and duplicates every key in between.
+///
+/// A reversed range holds no keys, so the map must stay exactly as it was
+/// (owner decision on #127: empty range, no panic).
+#[test]
+fn remove_range_with_end_before_start_leaves_the_map_unchanged() {
+    let mut map = TreeMap::default();
+    for i in 0..5 {
+        map.insert(i, i);
+    }
+    map.remove_range(&3, &1);
+    assert_eq!(
+        map.iter().map(|(k, _)| *k).collect::<Vec<_>>(),
+        vec![0, 1, 2, 3, 4]
+    );
+}
