@@ -126,7 +126,12 @@ impl<K: Clone + Ord, V: Clone> TreeMap<K, V> {
         let end = MapSeekTargetAdaptor(end);
         let mut cursor = self.0.cursor::<MapKeyRef<'_, K>>(());
         let mut new_tree = cursor.slice(&start, Bias::Left);
-        cursor.seek(&end, Bias::Left);
+        // An `end` behind the cursor means the range is reversed and holds no keys.
+        // `seek` would restart from the tree's first item and re-append the keys
+        // already sliced, so only move forward and otherwise keep the suffix as is.
+        if end.cmp(cursor.start(), ()).is_ge() {
+            cursor.seek_forward(&end, Bias::Left);
+        }
         new_tree.append(cursor.suffix(), ());
         drop(cursor);
         self.0 = new_tree;
