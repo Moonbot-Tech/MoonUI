@@ -115,6 +115,28 @@ switches them to version dependencies for publish-style output.
      `GpuCanvasTextContext` (forwarded by `draw_retained_text_layer`) and the
      `#[cfg(test)] mod tests;` line; restore all of them and keep
      `window/tests.rs`.
+   - Presentation acceptance: `PlatformWindow::draw` returns whether the
+     backend accepted the frame; `Window` keeps `needs_present` set until a
+     present is accepted and records input latency only then, so a frame skipped on
+     an occluded, recovering or unavailable surface stays owed. A re-sync
+     restores the `()`-returning `draw` in every backend; keep the `bool`
+     return through DirectX, Metal, X11, Wayland, web and the test platform.
+   - `Window::request_close`: client-drawn close controls go through the same
+     veto as the native close button. `on_window_should_close` stores its
+     callback in the `should_close` field that `can_close` reads;
+     `remove_window` stays an unconditional teardown.
+   - Diagnostics: `App::set_view_render_tracking` /
+     `take_view_render_counts` count actual `Render::render` calls per view
+     type at the `any_view::render` dispatch point (off by default), and
+     `Window::request_gpu_device_reset` drives the backend's normal
+     device-recovery path through `PlatformWindow::request_gpu_device_reset`
+     (Windows, X11, Wayland; `false` elsewhere).
+   - Inspector maps, behind `debug_assertions`: `Window::inspector_hitboxes`
+     returns every element the picking inspector registered in the last
+     frame (`InspectorHitbox`), and `Window::inspector_texts` every painted
+     text run (`InspectorText`), noted by `note_drawn_text` in
+     `text_system/line.rs`. A frame rendered outside picking mode leaves both
+     lists empty.
 
 2. Zed bugfix candidates kept separate from `gpu_canvas` when possible:
    - Windows DPI/restore-bounds behavior
