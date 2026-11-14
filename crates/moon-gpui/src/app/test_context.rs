@@ -376,6 +376,11 @@ impl TestAppContext {
         self.test_window(window_handle).simulate_resize(size);
     }
 
+    /// Simulates the user dragging the window to a new origin without resizing it.
+    pub fn simulate_window_move(&self, window_handle: AnyWindowHandle, origin: Point<Pixels>) {
+        self.test_window(window_handle).simulate_move(origin);
+    }
+
     /// Returns true if there's an alert dialog open.
     pub fn expect_restart(&self) -> oneshot::Receiver<Option<PathBuf>> {
         let (tx, rx) = futures::channel::oneshot::channel();

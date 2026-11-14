@@ -149,6 +149,17 @@ switches them to version dependencies for publish-style output.
      0; every other show keeps the default path. A re-sync restores the
      two-argument handler without `lparam`; keep the `SW_PARENTOPENING` branch
      and the `lparam` passed from the `WM_SHOWWINDOW` arm.
+   - A window move does not redraw: Zed routes the platform's moved callback
+     through `Window::bounds_changed`, which refreshes unconditionally, so every
+     step of a window drag rebuilt the whole element tree for an unchanged
+     picture. `on_moved` in `moon-gpui/src/window.rs` calls `Window::moved`
+     instead, which refreshes only when the viewport or the scale factor
+     changed and still notifies the bounds observers. The resize callback keeps
+     the unconditional refresh. A re-sync restores `bounds_changed` in the
+     `on_moved` closure; keep the call to `moved`. X11 is not covered:
+     `set_bounds` in `moon-gpui-linux/src/linux/x11/window.rs` fires the resize
+     callback on every `ConfigureNotify`, a pure move included, so a drag there
+     still redraws.
    - Linux/X11 borderless decoration fallback
    - These are useful upstream fixes on their own. Do not hide them inside
      feature work when preparing Zed pull requests.

@@ -1753,7 +1753,7 @@ impl Window {
             let mut cx = cx.to_async();
             move || {
                 handle
-                    .update(&mut cx, |_, window, cx| window.bounds_changed(cx))
+                    .update(&mut cx, |_, window, cx| window.moved(cx))
                     .log_err();
             }
         }));
@@ -2453,10 +2453,38 @@ impl Window {
     /// the platform window, then notifies observers. Normally called automatically
     /// by the platform's resize callback, but exposed publicly for test infrastructure.
     pub fn bounds_changed(&mut self, cx: &mut App) {
+        self.sync_bounds(true, cx);
+    }
+
+    /// Notify the window that the platform moved it on screen.
+    ///
+    /// A move leaves every element where it was inside the window, so the frame already on
+    /// screen is still the right one and only the bounds observers need to hear about it. Going
+    /// through [`Self::bounds_changed`] here rebuilt the whole element tree once per step of a
+    /// window drag, which made the drag run at the pace of the window's own layout. A move that
+    /// did change the viewport or the scale factor (onto a monitor with another DPI, before the
+    /// platform's resize arrives) still redraws.
+    ///
+    /// X11 is not covered: its backend reports every `ConfigureNotify` through the resize
+    /// callback first, a pure move included, so a drag there still redraws.
+    pub(crate) fn moved(&mut self, cx: &mut App) {
+        self.sync_bounds(false, cx);
+    }
+
+    /// Re-read geometry and display from the platform window and notify the bounds observers.
+    ///
+    /// `always_refresh` is the resize contract: a resize redraws even when the numbers came back
+    /// equal, because the platform uses it for more than a size change (a restore from minimized
+    /// reports the old size and still owes a frame). Without it the window redraws only when the
+    /// viewport or the scale factor actually changed.
+    fn sync_bounds(&mut self, always_refresh: bool, cx: &mut App) {
+        let before = (self.scale_factor, self.viewport_size);
         self.sync_platform_geometry();
         self.display_id = self.platform_window.display().map(|display| display.id());
 
-        self.refresh();
+        if always_refresh || before != (self.scale_factor, self.viewport_size) {
+            self.refresh();
+        }
 
         self.bounds_observers
             .clone()

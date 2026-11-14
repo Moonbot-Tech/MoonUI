@@ -478,6 +478,73 @@ fn content_zoom_survives_a_platform_resize() {
     .unwrap();
 }
 
+/// A root view that counts how often it is rebuilt.
+struct RenderCount {
+    renders: Rc<Cell<usize>>,
+}
+
+impl Render for RenderCount {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        self.renders.set(self.renders.get() + 1);
+        div()
+    }
+}
+
+/// Catches the platform's moved callback going back through `window.rs:bounds_changed`: every
+/// step of a window drag would rebuild the whole element tree for a picture that did not change.
+/// The two halves beside it pin what must keep redrawing: a move that arrives with another
+/// viewport, and a resize that reports the size it already had (a restore from minimized).
+#[test]
+fn a_move_redraws_only_when_the_viewport_changed() {
+    let renders = Rc::new(Cell::new(0));
+    let (mut app, any) = open_window({
+        let renders = renders.clone();
+        move |_, _| RenderCount { renders }
+    });
+    let observed = Rc::new(Cell::new(0));
+    app.update_window(any, |_, window, _| {
+        let observed = observed.clone();
+        let (subscription, activate) = window.bounds_observers.insert(
+            (),
+            Box::new(move |_, _| {
+                observed.set(observed.get() + 1);
+                true
+            }),
+        );
+        activate();
+        subscription.detach();
+    })
+    .unwrap();
+    let drawn = renders.get();
+    let viewport = app
+        .update_window(any, |_, window, _| window.viewport_size())
+        .unwrap();
+
+    app.simulate_window_move(any, point(px(300.), px(200.)));
+    assert_eq!(renders.get(), drawn, "an origin-only move keeps the frame");
+    assert_eq!(observed.get(), 1, "the observers still hear about the move");
+    app.update_window(any, |_, window, _| {
+        assert_eq!(window.bounds().origin, point(px(300.), px(200.)));
+        assert!(!window.invalidator.is_dirty(), "no frame is owed");
+    })
+    .unwrap();
+
+    // The platform can deliver the move before the resize that belongs to it.
+    let mut platform = app.test_window(any);
+    platform.0.lock().bounds.size = size(viewport.width + px(40.), viewport.height);
+    platform.simulate_move(point(px(310.), px(200.)));
+    assert_eq!(renders.get(), drawn + 1, "a changed viewport redraws");
+    assert_eq!(observed.get(), 2);
+
+    app.simulate_window_resize(any, size(viewport.width + px(40.), viewport.height));
+    assert_eq!(
+        renders.get(),
+        drawn + 2,
+        "a resize redraws even at an unchanged size"
+    );
+    assert_eq!(observed.get(), 3);
+}
+
 /// Catches an arm of `window.rs:unzoom_input` moved into its pass-through group: a click at zoom
 /// would land on the element twice as far from the origin as the one under the pointer.
 #[test]
