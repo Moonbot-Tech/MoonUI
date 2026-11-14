@@ -477,18 +477,14 @@ impl X11Client {
                 move |event, _, client| match event {
                     XDPEvent::WindowAppearance(appearance) => {
                         client.with_common(|common| common.appearance = appearance);
-                        for window in client.0.borrow_mut().windows.values_mut() {
-                            window.window.set_appearance(appearance);
-                        }
+                        client.for_each_window(|window| window.set_appearance(appearance));
                     }
                     XDPEvent::ButtonLayout(layout_str) => {
                         let layout = WindowButtonLayout::parse(&layout_str)
                             .log_err()
                             .unwrap_or_else(WindowButtonLayout::linux_default);
                         client.with_common(|common| common.button_layout = layout);
-                        for window in client.0.borrow_mut().windows.values_mut() {
-                            window.window.set_button_layout();
-                        }
+                        client.for_each_window(|window| window.set_button_layout());
                     }
                     XDPEvent::CursorTheme(_) | XDPEvent::CursorSize(_) => {
                         // noop, X11 manages this for us.
@@ -773,6 +769,23 @@ impl X11Client {
             .map(|window_reference| window_reference.window.clone())
     }
 
+    /// Runs `f` on every open window while the client state is not borrowed.
+    ///
+    /// The window callbacks reached from `f` run application code, and flush the
+    /// effects the application queued before the event loop started. That code is
+    /// free to call back into the client (`active_window`, `open_window`, ...), so
+    /// holding the client state across it turns the re-entry into a `RefCell`
+    /// double-borrow panic. Each window is therefore looked up on its own turn,
+    /// which also skips one that an earlier callback closed.
+    fn for_each_window(&self, mut f: impl FnMut(&mut X11WindowStatePtr)) {
+        let x_windows: Vec<xproto::Window> = self.0.borrow().windows.keys().copied().collect();
+        for x_window in x_windows {
+            if let Some(mut window) = self.get_window(x_window) {
+                f(&mut window);
+            }
+        }
+    }
+
     fn handle_event(&self, event: Event) -> Option<()> {
         match event {
             Event::UnmapNotify(event) => {
@@ -801,11 +814,16 @@ impl X11Client {
                 let [atom, arg1, arg2, arg3, arg4] = event.data.as_data32();
                 let mut state = self.0.borrow_mut();
 
-                if atom == state.atoms.WM_DELETE_WINDOW && window.should_close() {
+                if atom == state.atoms.WM_DELETE_WINDOW {
                     // window "x" button clicked by user
+                    // `should_close` asks the application, which may call back into the
+                    // client, so the client state is released before the question, not
+                    // only before the close.
                     // Rest of the close logic is handled in drop_window()
                     drop(state);
-                    window.close();
+                    if window.should_close() {
+                        window.close();
+                    }
                     state = self.0.borrow_mut();
                 } else if atom == state.atoms._NET_WM_SYNC_REQUEST {
                     window.state.borrow_mut().last_sync_counter =
