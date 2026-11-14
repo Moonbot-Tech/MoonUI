@@ -161,6 +161,18 @@ switches them to version dependencies for publish-style output.
      callback on every `ConfigureNotify`, a pure move included, so a drag there
      still redraws.
    - Linux/X11 borderless decoration fallback
+   - Linux window callbacks run outside the client state borrow: the XDG
+     desktop portal handlers (`WindowAppearance`, `ButtonLayout`) in
+     `moon-gpui-linux/src/linux/x11/client.rs` and `wayland/client.rs` looped
+     over the windows while holding the client `RefCell` mutably, and the X11
+     `WM_DELETE_WINDOW` branch asked `should_close` under the same borrow.
+     Those callbacks run application code and flush the effects it queued, so
+     a `cx.defer` reading `cx.active_window()` panicked with "RefCell already
+     mutably borrowed" on the first portal event (first launch under KDE
+     Plasma). `for_each_window` in both clients looks each window up on its
+     own turn. A re-sync restores the `borrow_mut()` loops and
+     `WM_DELETE_WINDOW && window.should_close()`; keep `for_each_window` and
+     the `drop(state)` ahead of `should_close`.
    - These are useful upstream fixes on their own. Do not hide them inside
      feature work when preparing Zed pull requests.
 

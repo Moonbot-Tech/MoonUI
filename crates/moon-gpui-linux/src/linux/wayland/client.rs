@@ -420,6 +420,28 @@ impl WaylandClientStatePtr {
         }
     }
 
+    /// Runs `f` on every open window while the client state is not borrowed.
+    ///
+    /// The window callbacks reached from `f` run application code, and flush the
+    /// effects the application queued before the event loop started. That code is
+    /// free to call back into the client (`active_window`, `open_window`, ...), so
+    /// holding the client state across it turns the re-entry into a `RefCell`
+    /// double-borrow panic. Each window is therefore looked up on its own turn,
+    /// which also skips one that an earlier callback closed.
+    fn for_each_window(&self, mut f: impl FnMut(&mut WaylandWindowStatePtr)) {
+        let Some(client) = self.0.upgrade() else {
+            return;
+        };
+        let surface_ids: Vec<ObjectId> = client.borrow().windows.keys().cloned().collect();
+        for surface_id in surface_ids {
+            // A separate statement, so the borrow ends before `f` runs.
+            let window = client.borrow().windows.get(&surface_id).cloned();
+            if let Some(mut window) = window {
+                f(&mut window);
+            }
+        }
+    }
+
     pub fn drop_window(&self, surface_id: &ObjectId) {
         let client = self.get_client();
         let mut state = client.borrow_mut();
@@ -637,27 +659,18 @@ impl WaylandClient {
             .insert_source(XDPEventSource::new(&common.background_executor), {
                 move |event, _, client| match event {
                     XDPEvent::WindowAppearance(appearance) => {
-                        if let Some(client) = client.0.upgrade() {
-                            let mut client = client.borrow_mut();
-
-                            client.common.appearance = appearance;
-
-                            for window in client.windows.values_mut() {
-                                window.set_appearance(appearance);
-                            }
+                        if let Some(state) = client.0.upgrade() {
+                            state.borrow_mut().common.appearance = appearance;
+                            client.for_each_window(|window| window.set_appearance(appearance));
                         }
                     }
                     XDPEvent::ButtonLayout(layout_str) => {
-                        if let Some(client) = client.0.upgrade() {
+                        if let Some(state) = client.0.upgrade() {
                             let layout = WindowButtonLayout::parse(&layout_str)
                                 .log_err()
                                 .unwrap_or_else(WindowButtonLayout::linux_default);
-                            let mut client = client.borrow_mut();
-                            client.common.button_layout = layout;
-
-                            for window in client.windows.values_mut() {
-                                window.set_button_layout();
-                            }
+                            state.borrow_mut().common.button_layout = layout;
+                            client.for_each_window(|window| window.set_button_layout());
                         }
                     }
                     XDPEvent::CursorTheme(theme) => {
