@@ -62,6 +62,20 @@ fn function_body_usage_ignores_line_comments_naming_the_param() {
     assert!(!function_body_uses_param(&unused, 0, "_tone"));
 }
 
+/// Catches counting the braces of a skipped line comment toward the body's depth: the `}` quoted
+/// in the comment would close the body early, so the real use on the next line is never read and
+/// a builder that does use its argument is reported as a no-op.
+#[test]
+fn function_body_usage_ignores_braces_in_line_comments() {
+    let used = [
+        "pub fn tone(self, _tone: MoonTone) -> Self {",
+        "    // `_tone` replaces the old `}` branch.",
+        "    Self { tone: _tone, ..self }",
+        "}",
+    ];
+    assert!(function_body_uses_param(&used, 0, "_tone"));
+}
+
 /// Catches `source_metrics.rs:scan_raw_hex_in_moon` exempting token sources by file name instead
 /// of by path, which would let any component module named `primitives.rs` paint raw hex without
 /// moving the `raw_hex_in_moon_runtime` metric, or dropping the exemption, which fails the audit
