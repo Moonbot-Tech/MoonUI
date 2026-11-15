@@ -55,7 +55,7 @@ impl GpuCanvasDriver for ChartDriver {
 `frame()` принимает решение о кадре. `prepare_text()` только описывает текст,
 который должен попасть в тот же реально рисуемый GPU frame.
 
-## Два режима текста
+## Три режима текста
 
 ### `GpuCanvasTextContext::draw_text`
 
@@ -112,6 +112,40 @@ self.center_label.draw_aligned(
 Если `label` не менялся 2400 кадров, shape будет один раз, draw будет 2400
 раз. Если цена пересекла порог и строка поменялась, shape произойдет один раз
 на новой строке.
+
+### `GpuCanvasTextContext::draw_retained_text_layer`
+
+Путь для большого стабильного набора подписей, который не надо обходить на
+каждом кадре:
+
+```rust
+ctx.draw_retained_text_layer(
+    &mut self.axis_layer,            // GpuCanvasRetainedTextLayer в driver state
+    AXIS_LAYER_KEY,                  // u64
+    self.axis_revision,              // u64: поднять, когда подписи изменились
+    GpuCanvasTextTransform::translate_logical(self.scroll_offset),
+    first_visible..last_visible,     // Range<u32> видимых label id
+    |builder| {
+        for (id, label) in self.axis_labels.iter().enumerate() {
+            builder.set_label_id(id as u32);
+            builder.context().draw_text(label.origin, &label.text, /* ... */)?;
+        }
+        Ok(())
+    },
+)?;
+```
+
+Closure `build` вызывается только когда слоя ещё нет или изменился ключ
+`(key, revision)` либо окружение canvas-а: bounds, content mask, scale factor,
+content zoom, background appearance, поддержка subpixel, text rendering mode.
+Тогда glyph instances запекаются один раз в device-пикселях. На остальных
+кадрах в frame уходит только дешёвая ссылка на запечённые данные плюс
+transform и диапазон видимых label id — без обхода подписей и повторной
+загрузки instance data. Сдвиг уже запечённых глифов — через
+`GpuCanvasTextTransform`, а не пересборку; но глифы, которые при сборке
+лежали вне content mask canvas-а, отброшены, и transform их не вернёт: чтобы
+показать такие подписи, надо поднять `revision`. Метки внутри `build` выдавать по возрастанию label id: renderer
+отсекает невидимые по этому диапазону.
 
 ## Много строк
 
@@ -285,6 +319,8 @@ mousemove снова начнет будить весь компонент/ок�
 9. Position/color/anchor не являются причиной reshaping.
 10. Glyph sprites очищаются каждый frame, потому что frame content новый.
    Shaped text cache не очищается, потому что это retained CPU cache.
+   Запечённые glyph instances retained-слоя тоже не очищаются: каждый кадр
+   заново отправляется только ссылка на них.
 
 ## Как устроено внутри
 
@@ -305,6 +341,8 @@ crates/moon-gpui-wgpu/src/wgpu_renderer.rs
 - `GpuCanvasTextContext`;
 - `GpuCanvasTextRun`;
 - `GpuCanvasTextFrame`;
+- `GpuCanvasRetainedTextLayer`, `GpuCanvasRetainedTextBuilder`,
+  `GpuCanvasTextTransform` (retained-слой);
 - `GpuCanvas::text_under/text_over/text_layer`.
 
 `scene.rs` хранит два text frame-а:
