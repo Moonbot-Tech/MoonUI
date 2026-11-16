@@ -129,7 +129,7 @@ pub async fn get_release_by_tag_name(
         );
     }
 
-    let release = serde_json::from_slice::<GithubRelease>(body.as_slice()).map_err(|err| {
+    let mut release = serde_json::from_slice::<GithubRelease>(body.as_slice()).map_err(|err| {
         log::error!("Error deserializing: {err:?}");
         log::error!(
             "GitHub API response text: {:?}",
@@ -137,6 +137,13 @@ pub async fn get_release_by_tag_name(
         );
         anyhow!("error deserializing GitHub release: {err:?}")
     })?;
+    release.assets.iter_mut().for_each(|asset| {
+        if let Some(digest) = &mut asset.digest
+            && let Some(stripped) = digest.strip_prefix("sha256:")
+        {
+            *digest = stripped.to_owned();
+        }
+    });
 
     Ok(release)
 }
