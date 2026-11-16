@@ -2634,16 +2634,24 @@ fn get_scale_factor(
         .flatten()
     {
         let scale = dpi / 96.0; // base dpi
-        log::info!("Using scale factor from Xft.dpi: {}", scale);
-        return scale;
+        // A resource is user configuration: a zero or negative DPI would divide every size by
+        // nothing. Such a value is treated as not set.
+        if valid_scale_factor(scale) {
+            log::info!("Using scale factor from Xft.dpi: {}", scale);
+            return scale;
+        }
+        log::warn!("Ignoring Xft.dpi {dpi}: it does not give a usable scale factor");
     }
 
-    if let Some(scale) = get_randr_scale_factor(connection, screen_index) {
-        log::info!("Using RandR scale factor: {}", scale);
-        return scale;
-    }
-
-    log::info!("Using default scale factor: 1.0");
+    // No scale configured means the desktop runs at 1, and so does every other application on
+    // it. Guessing a factor from the monitor's physical size here made the window one and a half
+    // times the size of its neighbours on a dense laptop panel whose desktop is set to 100%, and
+    // applied the laptop's factor to an external monitor of ordinary density as well. That guess
+    // is still available, on request: `GPUI_X11_SCALE_FACTOR=randr`.
+    log::info!(
+        "Using default scale factor: 1.0 (no Xft.dpi; set {}=randr to derive it from the monitor)",
+        GPUI_X11_SCALE_FACTOR_ENV
+    );
     1.0
 }
 
