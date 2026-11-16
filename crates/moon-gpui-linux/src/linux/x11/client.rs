@@ -41,11 +41,11 @@ use xkbc::x11::ffi::{XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSIO
 use xkbcommon::xkb::{self as xkbc, STATE_LAYOUT_EFFECTIVE};
 
 use super::{
-    ButtonOrScroll, ScrollDirection, X11Display, X11WindowStatePtr, XcbAtoms, XimCallbackEvent,
-    XimHandler, button_or_scroll_from_event_detail, check_reply,
+    ButtonOrScroll, ScrollDirection, X11Display, X11Displays, X11WindowStatePtr, XcbAtoms,
+    XimCallbackEvent, XimHandler, button_or_scroll_from_event_detail, check_reply,
     clipboard::{self, Clipboard},
     get_reply, get_valuator_axis_index, handle_connection_error, modifiers_from_state,
-    pressed_button_from_mask, xcb_flush,
+    pressed_button_from_mask, watch_monitor_changes, xcb_flush,
 };
 
 use crate::linux::{
@@ -182,6 +182,8 @@ pub struct X11ClientState {
     pub(crate) compositor_gpu: Option<CompositorGpuHint>,
 
     pub(crate) scale_factor: f32,
+    /// The monitors of every X screen, refreshed when RandR reports a change.
+    pub(crate) displays: X11Displays,
 
     xkb_context: xkbc::Context,
     pub(crate) xcb_connection: Rc<XCBConnection>,
@@ -445,6 +447,12 @@ impl X11Client {
 
         let xcb_connection = Rc::new(xcb_connection);
 
+        // Subscribed before the list is read, so a change between the two is reported, not lost.
+        watch_monitor_changes(&xcb_connection)
+            .context("x11: a monitor plugged in or rearranged later will not be noticed")
+            .log_err();
+        let displays = X11Displays::query(&xcb_connection, scale_factor);
+
         let ximc = X11rbClient::init(Rc::clone(&xcb_connection), x_root_index, None).ok();
         let xim_handler = if ximc.is_some() {
             Some(XimHandler::new())
@@ -511,6 +519,7 @@ impl X11Client {
             gpu_context: Rc::new(RefCell::new(None)),
             compositor_gpu,
             scale_factor,
+            displays,
 
             xkb_context,
             xcb_connection,
@@ -939,6 +948,26 @@ impl X11Client {
                     drop(state);
                     window.handle_input(input);
                     self.0.borrow_mut().xdnd_state.retrieved = true;
+                }
+            }
+            // A monitor was plugged in, unplugged, rearranged or changed mode. One change arrives
+            // as several of these; each refresh is three round trips per X screen (version,
+            // monitors, their names) and the event is rare.
+            Event::RandrScreenChangeNotify(_) | Event::RandrNotify(_) => {
+                let windows: Vec<X11WindowStatePtr> = {
+                    let state = self.0.borrow();
+                    state
+                        .displays
+                        .refresh(&state.xcb_connection, state.scale_factor);
+                    state
+                        .windows
+                        .values()
+                        .map(|window_ref| window_ref.window.clone())
+                        .collect()
+                };
+                // Outside the borrow: a window whose monitor changed runs its moved callback.
+                for window in windows {
+                    window.displays_changed();
                 }
             }
             Event::ConfigureNotify(event) => {
@@ -1545,21 +1574,20 @@ impl LinuxClient for X11Client {
 
     fn displays(&self) -> Vec<Rc<dyn PlatformDisplay>> {
         let state = self.0.borrow();
-        let setup = state.xcb_connection.setup();
-        setup
-            .roots
-            .iter()
-            .enumerate()
-            .filter_map(|(root_id, _)| {
-                Some(Rc::new(
-                    X11Display::new(&state.xcb_connection, state.scale_factor, root_id).ok()?,
-                ) as Rc<dyn PlatformDisplay>)
-            })
+        state
+            .displays
+            .all()
+            .into_iter()
+            .map(|display| display as Rc<dyn PlatformDisplay>)
             .collect()
     }
 
     fn primary_display(&self) -> Option<Rc<dyn PlatformDisplay>> {
         let state = self.0.borrow();
+        if let Some(display) = state.displays.primary(state.x_root_index) {
+            return Some(display);
+        }
+        // The list is empty only when the screen itself could not be described at start.
         X11Display::new(
             &state.xcb_connection,
             state.scale_factor,
@@ -1571,15 +1599,10 @@ impl LinuxClient for X11Client {
 
     fn display(&self, id: DisplayId) -> Option<Rc<dyn PlatformDisplay>> {
         let state = self.0.borrow();
-
-        Some(Rc::new(
-            X11Display::new(
-                &state.xcb_connection,
-                state.scale_factor,
-                u64::from(id) as usize,
-            )
-            .ok()?,
-        ))
+        state
+            .displays
+            .find(id)
+            .map(|display| display as Rc<dyn PlatformDisplay>)
     }
 
     #[cfg(feature = "screen-capture")]
@@ -1628,6 +1651,7 @@ impl LinuxClient for X11Client {
         let x_root_index = state.x_root_index;
         let atoms = state.atoms;
         let scale_factor = state.scale_factor;
+        let displays = state.displays.clone();
         let appearance = state.common.appearance;
         let compositor_gpu = state.compositor_gpu.take();
         let supports_xinput_gestures = state.supports_xinput_gestures;
@@ -1652,6 +1676,7 @@ impl LinuxClient for X11Client {
             parent_window,
             supports_xinput_gestures,
             is_bgr,
+            &displays,
         )?;
         check_reply(
             || "Failed to set XdndAware property",

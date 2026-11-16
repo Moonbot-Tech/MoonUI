@@ -173,6 +173,20 @@ switches them to version dependencies for publish-style output.
      own turn. A re-sync restores the `borrow_mut()` loops and
      `WM_DELETE_WINDOW && window.should_close()`; keep `for_each_window` and
      the `drop(state)` ahead of `should_close`.
+   - X11 displays are RandR monitors: Zed reports one display per X screen —
+     the root window, origin (0,0), spanning every monitor — so an application
+     that sizes a window as a share of "the display" opened it across two
+     monitors (2880 px wide on two 1920 px screens side by side). `X11Displays`
+     in `moon-gpui-linux/src/linux/x11/display.rs` lists the active RandR
+     monitors of each screen with their own origin and size, the client
+     refreshes it on RandR notify events, and a window picks its display from
+     it in `set_bounds` and `displays_changed`. A `DisplayId` now carries the X
+     screen index and the monitor's name atom (`display/geometry.rs`): read the
+     screen index through `X11Display::screen_index_of`, never by casting the
+     id. The whole-screen display remains for a server that cannot list
+     monitors. A re-sync restores `X11Display::new` in `displays()`,
+     `primary_display()`, `display()` and `X11WindowState::new`, and the cast
+     of the display id to a screen index; keep the list.
    - These are useful upstream fixes on their own. Do not hide them inside
      feature work when preparing Zed pull requests.
 
