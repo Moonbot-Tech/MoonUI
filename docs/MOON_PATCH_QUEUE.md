@@ -187,6 +187,15 @@ switches them to version dependencies for publish-style output.
      monitors. A re-sync restores `X11Display::new` in `displays()`,
      `primary_display()`, `display()` and `X11WindowState::new`, and the cast
      of the display id to a screen index; keep the list.
+   - X11 scale factor defaults to 1 when the desktop sets none: Zed falls back
+     from a missing `Xft.dpi` to a factor computed from the primary monitor's
+     physical size. A desktop that sets no DPI runs at 100%, so that guess
+     drew the application 1.5 times the size of everything around it on a
+     dense laptop panel, external monitor included. `get_scale_factor` in
+     `moon-gpui-linux/src/linux/x11/client.rs` now returns 1 there, ignores an
+     `Xft.dpi` that gives no usable factor, and keeps the computation behind
+     `GPUI_X11_SCALE_FACTOR=randr`. A re-sync restores the
+     `get_randr_scale_factor` call after the `Xft.dpi` branch; keep it out.
    - These are useful upstream fixes on their own. Do not hide them inside
      feature work when preparing Zed pull requests.
 
