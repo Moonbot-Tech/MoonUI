@@ -32,7 +32,7 @@ use std::{
     cell::RefCell, ffi::c_void, fmt::Display, num::NonZeroU32, ptr::NonNull, rc::Rc, sync::Arc,
 };
 
-use super::{X11Display, XINPUT_ALL_DEVICE_GROUPS, XINPUT_ALL_DEVICES};
+use super::{X11Display, X11Displays, XINPUT_ALL_DEVICE_GROUPS, XINPUT_ALL_DEVICES};
 
 x11rb::atom_manager! {
     pub XcbAtoms: AtomsCookie {
@@ -95,6 +95,27 @@ fn query_render_extent(
     Ok(Size {
         width: DevicePixels(reply.width as i32),
         height: DevicePixels(reply.height as i32),
+    })
+}
+
+/// The window's top-left corner in root coordinates, in logical pixels.
+///
+/// Asked of the server because a ConfigureNotify that the server itself generates carries
+/// coordinates relative to the window manager's frame, not to the root window.
+fn root_origin(
+    xcb: &XCBConnection,
+    x_window: xproto::Window,
+    x_root_window: xproto::Window,
+    scale_factor: f32,
+) -> Option<Point<Pixels>> {
+    let reply = xcb
+        .translate_coordinates(x_window, x_root_window, 0, 0)
+        .ok()?
+        .reply()
+        .ok()?;
+    Some(Point {
+        x: px(reply.dst_x as f32 / scale_factor),
+        y: px(reply.dst_y as f32 / scale_factor),
     })
 }
 
@@ -270,7 +291,10 @@ pub struct X11WindowState {
     bounds: Bounds<Pixels>,
     scale_factor: f32,
     renderer: WgpuRenderer,
+    /// The monitor the window is on, as far as its last trusted position tells.
     display: Rc<dyn PlatformDisplay>,
+    /// The client's monitor list, from which `display` is re-chosen as the window moves.
+    displays: X11Displays,
     input_handler: Option<PlatformInputHandler>,
     appearance: WindowAppearance,
     background_appearance: WindowBackgroundAppearance,
@@ -343,10 +367,8 @@ impl rwh::HasDisplayHandle for X11Window {
         let Some(non_zero) = NonNull::new(connection) else {
             return Err(rwh::HandleError::Unavailable);
         };
-        let screen_id = {
-            let state = self.0.state.borrow();
-            u64::from(state.display.id()) as i32
-        };
+        // The X screen, not the display: a display id names one monitor of a screen.
+        let screen_id = self.0.state.borrow().x_screen_index as i32;
         let handle = rwh::XcbDisplayHandle::new(Some(non_zero), screen_id);
         Ok(unsafe { rwh::DisplayHandle::borrow_raw(handle.into()) })
     }
@@ -428,10 +450,11 @@ impl X11WindowState {
         parent_window: Option<X11WindowStatePtr>,
         supports_xinput_gestures: bool,
         is_bgr: bool,
+        displays: &X11Displays,
     ) -> anyhow::Result<Self> {
-        let x_screen_index = params
-            .display_id
-            .map_or(x_main_screen_index, |did| u64::from(did) as usize);
+        let requested_display = params.display_id;
+        let x_screen_index =
+            requested_display.map_or(x_main_screen_index, X11Display::screen_index_of);
 
         let visual_set = find_visuals(xcb, x_screen_index);
 
@@ -789,7 +812,16 @@ impl X11WindowState {
                 )?;
             }
 
-            let display = Rc::new(X11Display::new(xcb, scale_factor, x_screen_index)?);
+            let logical_bounds = bounds.to_pixels(scale_factor);
+            // The display that was asked for, until the window manager has placed the window:
+            // it may put the window elsewhere, and `set_bounds` then follows the window itself.
+            let display: Rc<dyn PlatformDisplay> = match requested_display
+                .and_then(|id| displays.find(id))
+                .or_else(|| displays.containing(x_screen_index, logical_bounds))
+            {
+                Some(display) => display,
+                None => Rc::new(X11Display::new(xcb, scale_factor, x_screen_index)?),
+            };
 
             Ok(Self {
                 parent,
@@ -797,10 +829,11 @@ impl X11WindowState {
                 client,
                 executor,
                 display,
+                displays: displays.clone(),
                 x_root_window: visual_set.root,
                 x_screen_index,
                 visual_id: visual.id,
-                bounds: bounds.to_pixels(scale_factor),
+                bounds: logical_bounds,
                 scale_factor,
                 renderer,
                 atoms: *atoms,
@@ -839,6 +872,16 @@ impl X11WindowState {
 
     fn content_size(&self) -> Size<Pixels> {
         self.bounds.size
+    }
+
+    /// Re-choose the monitor the window is on from the shared list.
+    ///
+    /// `bounds` is passed in rather than read from `self.bounds`, whose origin is not always
+    /// the window's own: see `X11WindowStatePtr::set_bounds`.
+    fn repick_display(&mut self, bounds: Bounds<Pixels>) {
+        if let Some(display) = self.displays.containing(self.x_screen_index, bounds) {
+            self.display = display;
+        }
     }
 }
 
@@ -907,6 +950,7 @@ impl X11Window {
         parent_window: Option<X11WindowStatePtr>,
         supports_xinput_gestures: bool,
         is_bgr: bool,
+        displays: &X11Displays,
     ) -> anyhow::Result<Self> {
         let ptr = X11WindowStatePtr {
             state: Rc::new(RefCell::new(X11WindowState::new(
@@ -926,6 +970,7 @@ impl X11Window {
                 parent_window,
                 supports_xinput_gestures,
                 is_bgr,
+                displays,
             )?)),
             callbacks: Rc::new(RefCell::new(Callbacks::default())),
             xcb: xcb.clone(),
@@ -1251,6 +1296,48 @@ impl X11WindowStatePtr {
         bounds.map(|b| b.scale(scale_factor))
     }
 
+    /// The window's rectangle with its origin read from the server, one round trip.
+    ///
+    /// The stored origin is only as good as the last move: a size-changing ConfigureNotify does
+    /// not update it. Falls back to the stored origin when the server does not answer, as for a
+    /// window being destroyed.
+    fn bounds_on_root(&self, state: &X11WindowState) -> Bounds<Pixels> {
+        Bounds {
+            origin: root_origin(
+                &self.xcb,
+                self.x_window,
+                state.x_root_window,
+                state.scale_factor,
+            )
+            .unwrap_or(state.bounds.origin),
+            size: state.bounds.size,
+        }
+    }
+
+    /// Re-choose the window's monitor after the monitor list changed.
+    ///
+    /// A window the window manager leaves where it is gets no ConfigureNotify, so without this
+    /// it would go on naming a monitor that was unplugged or rearranged. The toolkit keeps the
+    /// display id as well and re-reads it on a move, which is what this reports when the id
+    /// changed. Must be called with the client state not borrowed, like every callback.
+    pub fn displays_changed(&self) {
+        let changed = {
+            let mut state = self.state.borrow_mut();
+            let before = state.display.id();
+            // From the server, not from the stored origin, which a resize leaves behind: picking
+            // from it here would put a window back on the monitor it was resized away from.
+            let bounds = self.bounds_on_root(&state);
+            state.repick_display(bounds);
+            state.display.id() != before
+        };
+        if changed {
+            let mut callbacks = self.callbacks.borrow_mut();
+            if let Some(ref mut fun) = callbacks.moved {
+                fun();
+            }
+        }
+    }
+
     pub fn set_bounds(&self, bounds: Bounds<i32>) -> anyhow::Result<()> {
         let (is_resize, content_size, scale_factor) = {
             let mut state = self.state.borrow_mut();
@@ -1266,6 +1353,18 @@ impl X11WindowStatePtr {
             } else {
                 state.bounds = bounds;
             }
+
+            // A size-changing event leaves the stored origin as it was (above), so a resize that
+            // also moved the window — an edge drag, a window manager fitting it onto another
+            // monitor — would pick the monitor from where the window used to be. Ask the server
+            // where it is: a resize already costs a round trip for the render extent below. A
+            // move reads the shared list only, because it runs on every pointer motion of a drag.
+            let pick_bounds = if is_resize {
+                self.bounds_on_root(&state)
+            } else {
+                state.bounds
+            };
+            state.repick_display(pick_bounds);
 
             let gpu_size = query_render_extent(&self.xcb, self.x_window)?;
             state.renderer.update_drawable_size(gpu_size);
