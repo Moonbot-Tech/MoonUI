@@ -124,9 +124,17 @@ impl RenderOnce for WindowBorder {
             .bg(gpui::transparent_black())
             .map(|div| match decorations {
                 Decorations::Server => div,
+                // A block, like the server-decorated branch, and the frame below fills it with a
+                // percentage size. This wrapper used to be a flex column with the frame as its
+                // growing item, and under an X11 window manager that left every row of the window
+                // that sizes itself with `w_full` at the width of its own content, in every window
+                // of the application, from the moment a second window opened until the first
+                // resize: a 1198 px root with a 639 px title bar, measured, while a row of
+                // automatic width in the same column kept all 1198 px. Titlebar controls then
+                // sit in the middle of the window, under the drag overlay computed for its full
+                // width, and do not take a click. Why the flex wrapper loses the width is not
+                // established; that it does, and that the block one does not, is.
                 Decorations::Client { tiling, .. } => div
-                    .flex()
-                    .flex_col()
                     .overflow_hidden()
                     .bg(gpui::transparent_black())
                     .when(!(tiling.top || tiling.right), |div| {
@@ -163,9 +171,9 @@ impl RenderOnce for WindowBorder {
                     .map(|div| match decorations {
                         Decorations::Server => div.size_full(),
                         Decorations::Client { tiling } => div
-                            .flex_1()
-                            .min_h_0()
-                            .min_w_0()
+                            // The backdrop's content box, which is the window less the shadow
+                            // padding; the borders below are inside it.
+                            .size_full()
                             .overflow_hidden()
                             .when(!(tiling.top || tiling.right), |div| {
                                 div.rounded_tr(BORDER_RADIUS)
@@ -203,12 +211,23 @@ impl RenderOnce for WindowBorder {
                 let Decorations::Client { tiling, .. } = decorations else {
                     return this;
                 };
-                this.child(div().absolute().size_full().children(resize_hit_zones(
-                    window_size,
-                    platform_inset,
-                    resize_hit_size,
-                    &tiling,
-                )))
+                // Placed explicitly at the frame's corner, which is where `resize_hit_zones`
+                // measures its zones from. In a block an absolute child with no insets is put
+                // where it would have stood in the flow, below the frame, and the zones with it.
+                let insets = client_frame_insets(platform_inset, &tiling);
+                this.child(
+                    div()
+                        .absolute()
+                        .top(insets.top)
+                        .left(insets.left)
+                        .size_full()
+                        .children(resize_hit_zones(
+                            window_size,
+                            platform_inset,
+                            resize_hit_size,
+                            &tiling,
+                        )),
+                )
             })
     }
 }
