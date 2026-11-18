@@ -156,10 +156,13 @@ switches them to version dependencies for publish-style output.
      instead, which refreshes only when the viewport or the scale factor
      changed and still notifies the bounds observers. The resize callback keeps
      the unconditional refresh. A re-sync restores `bounds_changed` in the
-     `on_moved` closure; keep the call to `moved`. X11 is not covered:
-     `set_bounds` in `moon-gpui-linux/src/linux/x11/window.rs` fires the resize
-     callback on every `ConfigureNotify`, a pure move included, so a drag there
-     still redraws.
+     `on_moved` closure; keep the call to `moved`. On X11 `set_bounds` in
+     `moon-gpui-linux/src/linux/x11/window.rs` runs exactly one callback per
+     `ConfigureNotify`: the resize callback when the size changed, the moved
+     callback when only the origin did. Zed fires the resize callback on every
+     `ConfigureNotify`, a pure move included, so a drag there redrew on each
+     step. A re-sync restores the unconditional `callbacks.resize` call ahead
+     of the `!is_resize` moved call; keep the `if is_resize { … } else { … }`.
    - Linux/X11 borderless decoration fallback
    - Linux window callbacks run outside the client state borrow: the XDG
      desktop portal handlers (`WindowAppearance`, `ButtonLayout`) in
