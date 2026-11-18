@@ -117,11 +117,21 @@ pub struct MoonDataTableColumn {
     pub tooltip: Option<SharedString>,
     /// Base column width in logical design pixels.
     ///
-    /// `MoonDataTable` treats this value as both the minimum width and the proportional weight for
-    /// auto-width layout. A wider viewport scales eligible columns up. A narrower viewport follows
-    /// [`MoonDataTableWidthPolicy`]: fit mode shrinks render copies toward [`MIN_COLUMN_WIDTH`],
-    /// while preserve mode leaves the declared or retained widths to horizontal scrolling.
+    /// `MoonDataTable` treats this value as the proportional weight for auto-width layout. A wider viewport scales eligible columns up. A narrower viewport follows
+    /// [`MoonDataTableWidthPolicy`]: fit mode shrinks render copies toward each column's minimum
+    /// ([`Self::min_width`], never below [`MIN_COLUMN_WIDTH`]), while preserve mode leaves the
+    /// declared or retained widths to horizontal scrolling.
     pub width: f32,
+    /// Narrowest width fit mode may shrink this column to, in logical design pixels.
+    ///
+    /// `0.0` (the default) keeps the shared [`MIN_COLUMN_WIDTH`]. A caller that knows how wide its
+    /// content is — the widest figure in a numeric column — sets it so a narrow viewport shrinks
+    /// the column toward that figure and stops there instead of cutting it. Only fit mode's
+    /// shrink reads it: while the columns fit, a declared or dragged width under it is drawn as
+    /// is, and once fit mode has to shrink, such a column is drawn AT the minimum, which can be
+    /// wider than its own width. A drag-resize is still clamped only at [`MIN_COLUMN_WIDTH`].
+    /// Preserve mode does not read it.
+    pub min_width: f32,
     pub fill: bool,
     /// Keep this column at its base width when the viewport is wider than the column sum.
     ///
@@ -164,6 +174,7 @@ impl MoonDataTableColumn {
             title: title.into(),
             tooltip: None,
             width,
+            min_width: 0.0,
             fill: false,
             no_grow: false,
             align: MoonTableAlign::Left,
@@ -214,6 +225,18 @@ impl MoonDataTableColumn {
     pub fn fixed_left(mut self) -> Self {
         self.fixed_left = true;
         self
+    }
+
+    /// Set the narrowest width fit mode may shrink this column to; see [`Self::min_width`].
+    pub fn min_width(mut self, min_width: f32) -> Self {
+        self.min_width = min_width;
+        self
+    }
+
+    /// The column's fit-mode minimum: the caller's [`Self::min_width`], never below
+    /// [`MIN_COLUMN_WIDTH`].
+    fn floor(&self) -> f32 {
+        self.min_width.max(MIN_COLUMN_WIDTH)
     }
 
     fn as_table_column(&self) -> MoonTableColumn {

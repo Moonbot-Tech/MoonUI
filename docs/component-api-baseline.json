@@ -875,6 +875,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn min_width(mut self, min_width: f32) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn move_column_before( &mut self, source: &SharedString, target: &SharedString, all_columns: impl IntoIterator<Item = SharedString>, ) -> bool"
     },
     {
