@@ -199,6 +199,24 @@ switches them to version dependencies for publish-style output.
      `Xft.dpi` that gives no usable factor, and keeps the computation behind
      `GPUI_X11_SCALE_FACTOR=randr`. A re-sync restores the
      `get_randr_scale_factor` call after the `Xft.dpi` branch; keep it out.
+   - X11 resize runs at the pace the window draws: Zed writes the
+     `_NET_WM_SYNC_REQUEST` counter inside `set_bounds`, as soon as the
+     ConfigureNotify arrives. The protocol asks for the write after the
+     repaint; written before it, the window manager sends the next size at
+     once, the frame being drawn is for a size the window no longer has and
+     is dropped, and the window shows nothing until the pointer rests.
+     `set_bounds` in `moon-gpui-linux/src/linux/x11/window.rs` now only parks
+     the number in `sync_answer_due`; `answer_sync_request` writes it after
+     the frame clock's turn in `refresh`, and the client calls it directly for
+     a window whose frame clock is stopped (`ConfigureNotify` arm and
+     `update_refresh_loop` in `client.rs`). Along with it: `process_x11_events`
+     applies only the newest ConfigureNotify of a window per batch
+     (`x11/coalesce.rs`), a resize asks the server for the extent and the root
+     origin in one round trip and stores that origin, and the counter write no
+     longer waits for a reply. `x11/resize_diag.rs` logs one line per second
+     during a resize, and `X11Window::drop` one per closed window. A re-sync
+     restores the `sync::set_counter` call in `set_bounds`; keep it out, or
+     every interactive resize under KWin stalls again.
    - These are useful upstream fixes on their own. Do not hide them inside
      feature work when preparing Zed pull requests.
 

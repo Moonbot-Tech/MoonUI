@@ -660,8 +660,12 @@ impl X11Client {
                 }
             }
 
-            // Sizes of a window queued behind a newer size of the same window: counted for the
-            // resize log line, which is how a window manager that outruns the window shows up.
+            // Only the newest ConfigureNotify of a window is applied. Each one applied resizes
+            // the GPU surface and asks the server about the window, and the frame is drawn after
+            // the batch, so the sizes before the last one would be paid for and never shown. A
+            // window manager that does not pace its resize by `_NET_WM_SYNC_REQUEST` sends one
+            // per pointer motion. The sync requests of the dropped ones need no care: the
+            // protocol has the number of the last request written back, and that one stays.
             let configured: Vec<Option<xproto::Window>> = events
                 .iter()
                 .map(|event| match event {
@@ -669,15 +673,20 @@ impl X11Client {
                     _ => None,
                 })
                 .collect();
-            let mut stale_sizes: HashMap<xproto::Window, u32> = HashMap::default();
-            for (window, stale) in configured.iter().zip(superseded(&configured)) {
-                if let (Some(window), true) = (window, stale) {
-                    *stale_sizes.entry(*window).or_default() += 1;
+            if configured.iter().flatten().nth(1).is_some() {
+                let superseded = superseded(&configured);
+                let mut skipped_sizes: HashMap<xproto::Window, u32> = HashMap::default();
+                for (window, skip) in configured.iter().zip(&superseded) {
+                    if let (Some(window), true) = (window, skip) {
+                        *skipped_sizes.entry(*window).or_default() += 1;
+                    }
                 }
-            }
-            for (window, count) in stale_sizes {
-                if let Some(window) = self.get_window(window) {
-                    window.note_stale_sizes(count);
+                let mut superseded = superseded.into_iter();
+                events.retain(|_| !superseded.next().unwrap_or(false));
+                for (window, count) in skipped_sizes {
+                    if let Some(window) = self.get_window(window) {
+                        window.note_skipped_sizes(count);
+                    }
                 }
             }
 
@@ -1008,6 +1017,21 @@ impl X11Client {
                     .set_bounds(bounds)
                     .context("X11: Failed to set window bounds")
                     .log_err();
+                // The window manager's sync request is answered after the frame that follows
+                // this size. A window whose frame clock is stopped draws none, so it answers
+                // here rather than leave the window manager waiting for its timeout.
+                let draws_frames = matches!(
+                    self.0
+                        .borrow()
+                        .windows
+                        .get(&event.window)
+                        .and_then(|window_ref| window_ref.refresh_state.as_ref()),
+                    Some(RefreshState::PeriodicRefresh { .. })
+                );
+                if !draws_frames {
+                    window.answer_sync_request();
+                    window.log_resize_summary();
+                }
             }
             Event::PropertyNotify(event) => {
                 let window = self.get_window(event.window)?;
@@ -1981,6 +2005,8 @@ impl X11ClientState {
             ) => {
                 self.loop_handle.remove(event_loop_token);
                 window_ref.refresh_state = Some(RefreshState::Hidden { refresh_rate });
+                // No frame will follow a size applied just before the window was hidden.
+                window_ref.window.answer_sync_request();
             }
             (true, Some(RefreshState::Hidden { refresh_rate })) => {
                 let event_loop_token = self.start_refresh_loop(x_window, refresh_rate);

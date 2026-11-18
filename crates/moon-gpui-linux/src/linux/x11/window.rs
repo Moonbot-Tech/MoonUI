@@ -94,10 +94,15 @@ fn query_render_extent(
     x_window: xproto::Window,
 ) -> anyhow::Result<Size<DevicePixels>> {
     let reply = get_reply(|| "X11 GetGeometry failed.", xcb.get_geometry(x_window))?;
-    Ok(Size {
+    Ok(render_extent(&reply))
+}
+
+/// The size a window's surface has to be, from the server's answer about the window.
+fn render_extent(reply: &xproto::GetGeometryReply) -> Size<DevicePixels> {
+    Size {
         width: DevicePixels(reply.width as i32),
         height: DevicePixels(reply.height as i32),
-    })
+    }
 }
 
 /// The window's top-left corner in root coordinates, in logical pixels.
@@ -115,10 +120,15 @@ fn root_origin(
         .ok()?
         .reply()
         .ok()?;
-    Some(Point {
+    Some(root_point(&reply, scale_factor))
+}
+
+/// The server's answer to "where is this window's corner on the root window", in logical pixels.
+fn root_point(reply: &TranslateCoordinatesReply, scale_factor: f32) -> Point<Pixels> {
+    Point {
         x: px(reply.dst_x as f32 / scale_factor),
         y: px(reply.dst_y as f32 / scale_factor),
-    })
+    }
 }
 
 fn resize_edge_to_moveresize(edge: ResizeEdge) -> u32 {
@@ -289,7 +299,12 @@ pub struct X11WindowState {
     x_screen_index: usize,
     visual_id: u32,
     pub(crate) counter_id: sync::Counter,
+    /// The number of the window manager's last `_NET_WM_SYNC_REQUEST` whose ConfigureNotify has
+    /// not arrived yet.
     pub(crate) last_sync_counter: Option<sync::Int64>,
+    /// The number the window manager is waiting to read back, and since when: the request whose
+    /// size has been applied but not drawn. See `X11WindowStatePtr::answer_sync_request`.
+    sync_answer_due: Option<(sync::Int64, Instant)>,
     /// What the resize going on right now costs, for the once-a-second log line.
     resize_diag: ResizeDiag,
     bounds: Bounds<Pixels>,
@@ -860,6 +875,7 @@ impl X11WindowState {
                 accesskit_adapter: None,
                 counter_id: sync_request_counter,
                 last_sync_counter: None,
+                sync_answer_due: None,
                 resize_diag: ResizeDiag::default(),
             })
         });
@@ -881,8 +897,9 @@ impl X11WindowState {
 
     /// Re-choose the monitor the window is on from the shared list.
     ///
-    /// `bounds` is passed in rather than read from `self.bounds`, whose origin is not always
-    /// the window's own: see `X11WindowStatePtr::set_bounds`.
+    /// `bounds` is passed in rather than read from `self.bounds`: a window the window manager
+    /// has not moved or resized since the monitors changed is asked of the server instead, see
+    /// `X11WindowStatePtr::displays_changed`.
     fn repick_display(&mut self, bounds: Bounds<Pixels>) {
         if let Some(display) = self.displays.containing(self.x_screen_index, bounds) {
             self.display = display;
@@ -917,7 +934,7 @@ impl Drop for X11Window {
         })
         .log_err();
         log::info!(
-            "X11 window {} closed: GPU surface released in {:.1} ms, X server answered in {:.1} ms",
+            "X11 window {} closed: GPU surface released in {:.1} ms, DestroyWindow took {:.1} ms",
             self.0.x_window,
             millis(renderer_released),
             millis(started.elapsed() - renderer_released),
@@ -1213,8 +1230,19 @@ impl X11WindowStatePtr {
             self.callbacks.borrow_mut().request_frame = Some(fun);
         }
 
-        // On the frame clock and not on a size: the last second of a resize ends after its last
-        // size arrived. Idle windows return at once, the period only runs during a resize.
+        // The frame that follows a new size has had its turn: the window manager may send the
+        // next one.
+        self.answer_sync_request();
+        self.log_resize_summary();
+    }
+
+    /// Write the resize log line if a second of resizing has gone by.
+    ///
+    /// Asked on the frame clock and not only on a size: the last second of a resize ends after
+    /// its last size arrived. A window whose frame clock is stopped is asked by the client on
+    /// each size instead, so its last line waits for the next size or the next frame. Idle
+    /// windows return at once, the period only runs during a resize.
+    pub fn log_resize_summary(&self) {
         let summary = self
             .state
             .borrow_mut()
@@ -1225,12 +1253,44 @@ impl X11WindowStatePtr {
         }
     }
 
-    /// Count sizes of this window that sat in an event batch behind a newer one.
-    pub fn note_stale_sizes(&self, count: u32) {
+    /// Tell the window manager that the last size it sent has been handled.
+    ///
+    /// A window manager that speaks `_NET_WM_SYNC_REQUEST` numbers every size it sends during an
+    /// interactive resize and holds the next one back until the window writes that number into
+    /// its counter. The protocol asks for the write after the repaint, and that is the whole
+    /// point of it: the resize then runs at the pace the window draws. Zed writes the number as
+    /// soon as the ConfigureNotify arrives, so the window manager sends the next size at once,
+    /// the frame being drawn is for a size the window no longer has and is thrown away, and the
+    /// window shows nothing until the pointer rests.
+    ///
+    /// Called after every turn of the frame clock, which is where a pending size gets drawn, and
+    /// by the client for a window whose frame clock is not running. Nothing waits for the
+    /// server here: the write cannot fail while the window, which owns the counter, exists.
+    pub fn answer_sync_request(&self) {
+        let mut state = self.state.borrow_mut();
+        let Some((value, since)) = state.sync_answer_due.take() else {
+            return;
+        };
+        if state.destroyed {
+            return;
+        }
+        match sync::set_counter(&self.xcb, state.counter_id, value) {
+            Ok(cookie) => cookie.ignore_error(),
+            Err(err) => {
+                log::warn!("X11 sync SetCounter was not sent: {err}");
+                return;
+            }
+        }
+        xcb_flush(&self.xcb);
+        state.resize_diag.answered(since.elapsed());
+    }
+
+    /// Count sizes of this window that were dropped unapplied because a newer one had arrived.
+    pub fn note_skipped_sizes(&self, count: u32) {
         self.state
             .borrow_mut()
             .resize_diag
-            .sizes_stale(Instant::now(), count);
+            .sizes_skipped(Instant::now(), count);
     }
 
     pub fn handle_input(&self, input: PlatformInput) {
@@ -1332,9 +1392,10 @@ impl X11WindowStatePtr {
 
     /// The window's rectangle with its origin read from the server, one round trip.
     ///
-    /// The stored origin is only as good as the last move: a size-changing ConfigureNotify does
-    /// not update it. Falls back to the stored origin when the server does not answer, as for a
-    /// window being destroyed.
+    /// The stored origin is only as good as the last move or resize the window was told about,
+    /// and a window the window manager leaves alone is told nothing when the monitors change.
+    /// Falls back to the stored origin when the server does not answer, as for a window being
+    /// destroyed.
     fn bounds_on_root(&self, state: &X11WindowState) -> Bounds<Pixels> {
         Bounds {
             origin: root_origin(
@@ -1358,8 +1419,9 @@ impl X11WindowStatePtr {
         let changed = {
             let mut state = self.state.borrow_mut();
             let before = state.display.id();
-            // From the server, not from the stored origin, which a resize leaves behind: picking
-            // from it here would put a window back on the monitor it was resized away from.
+            // From the server, not from the stored origin: that one is as old as the last move
+            // or resize, and a monitor change can shift a window the window manager then leaves
+            // alone.
             let bounds = self.bounds_on_root(&state);
             state.repick_display(bounds);
             state.display.id() != before
@@ -1375,7 +1437,8 @@ impl X11WindowStatePtr {
     /// Apply a ConfigureNotify: store the new rectangle and report it as a resize or a move.
     ///
     /// A size change runs the resize callback and a change of origin alone the moved callback,
-    /// never both, so a window drag does not redraw the window on every step.
+    /// never both, so a window drag does not redraw the window on every step. The caller hands
+    /// over only the newest ConfigureNotify of a window per batch of events.
     pub fn set_bounds(&self, bounds: Bounds<i32>) -> anyhow::Result<()> {
         let (is_resize, content_size, scale_factor) = {
             let mut state = self.state.borrow_mut();
@@ -1392,35 +1455,40 @@ impl X11WindowStatePtr {
                 state.bounds = bounds;
             }
 
-            // A size-changing event leaves the stored origin as it was (above), so a resize that
-            // also moved the window — an edge drag, a window manager fitting it onto another
-            // monitor — would pick the monitor from where the window used to be. Ask the server
-            // where it is: a resize already costs a round trip for the render extent below. A
-            // move reads the shared list only, because it runs on every pointer motion of a drag.
+            // The server is asked how large the surface has to be and, for a size change, where
+            // the window is: a size-changing event leaves the stored origin as it was (above),
+            // so a resize that also moved the window — an edge drag, a window manager fitting it
+            // onto another monitor — would otherwise keep the origin it had before. A move
+            // trusts its event, because it runs on every pointer motion of a drag. Both
+            // questions go out before either answer is read, so a resize waits for the server
+            // once and not once per question.
             let server_started = Instant::now();
-            let pick_bounds = if is_resize {
-                self.bounds_on_root(&state)
-            } else {
-                state.bounds
-            };
+            let extent = self.xcb.get_geometry(self.x_window);
+            let origin = is_resize.then(|| {
+                self.xcb
+                    .translate_coordinates(self.x_window, state.x_root_window, 0, 0)
+            });
+            let extent = get_reply(|| "X11 GetGeometry failed.", extent);
+            let origin = origin
+                .and_then(|cookie| cookie.ok()?.reply().ok())
+                .map(|reply| root_point(&reply, state.scale_factor));
+            let server = server_started.elapsed();
+            if let Some(origin) = origin {
+                state.bounds.origin = origin;
+            }
+            let pick_bounds = state.bounds;
             state.repick_display(pick_bounds);
 
-            let gpu_size = query_render_extent(&self.xcb, self.x_window)?;
-            let mut server = server_started.elapsed();
+            let gpu_size = render_extent(&extent?);
             let surface_started = Instant::now();
             state.renderer.update_drawable_size(gpu_size);
             let surface = surface_started.elapsed();
             let result = (is_resize, state.content_size(), state.scale_factor);
+            // The window manager's request is answered when this size has had its frame, not
+            // here: `answer_sync_request`. A newer request replaces one still unanswered, as
+            // the protocol has only the last number written back.
             if let Some(value) = state.last_sync_counter.take() {
-                let answer_started = Instant::now();
-                check_reply(
-                    || "X11 sync SetCounter failed.",
-                    sync::set_counter(&self.xcb, state.counter_id, value),
-                )?;
-                server += answer_started.elapsed();
-                state
-                    .resize_diag
-                    .answered(Instant::now(), std::time::Duration::ZERO);
+                state.sync_answer_due = Some((value, Instant::now()));
             }
             if is_resize {
                 state

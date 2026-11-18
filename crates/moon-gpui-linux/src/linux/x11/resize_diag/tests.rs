@@ -11,7 +11,7 @@ fn a_summary_covers_one_period_and_the_counters_start_over() {
 
     diag.size_applied(start, 2 * MS, 10 * MS);
     diag.frame(false);
-    diag.answered(start + 5 * MS, 5 * MS);
+    diag.answered(5 * MS);
     diag.size_applied(start + 400 * MS, 4 * MS, 30 * MS);
     diag.frame(true);
 
@@ -45,11 +45,11 @@ fn frames_outside_a_resize_are_not_counted() {
     diag.frame(true);
     assert_eq!(diag.take_summary(start + 3000 * MS), None);
 
-    diag.sizes_stale(start, 3);
+    diag.sizes_skipped(start, 3);
     diag.frame(true);
     let summary = diag
         .take_summary(start + 1000 * MS)
         .expect("the period ended");
-    assert_eq!(summary.stale, 3);
+    assert_eq!(summary.skipped, 3);
     assert_eq!(summary.frames, 1);
 }

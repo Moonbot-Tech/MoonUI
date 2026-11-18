@@ -63,8 +63,8 @@ pub(crate) fn millis(duration: Duration) -> f64 {
 pub(crate) struct Summary {
     /// Sizes the window applied: its surface was resized and the toolkit told.
     pub(crate) applied: u32,
-    /// Sizes that were applied although a newer one for the same window was already queued.
-    pub(crate) stale: u32,
+    /// Sizes dropped unapplied, because a newer one for the same window had already arrived.
+    pub(crate) skipped: u32,
     /// Time spent waiting for the X server while applying a size.
     pub(crate) server: Span,
     /// Time spent resizing the GPU surface while applying a size.
@@ -81,11 +81,11 @@ impl fmt::Display for Summary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} sizes applied, {} of them stale; X server {:.1} ms mean, {:.1} longest; \
+            "{} sizes applied, {} skipped; X server {:.1} ms mean, {:.1} longest; \
              surface {:.1} ms mean, {:.1} longest; {} frames, {} not presented; \
              {} answers to the window manager, {:.1} ms mean after the size, {:.1} longest",
             self.applied,
-            self.stale,
+            self.skipped,
             self.server.mean_ms(),
             self.server.longest_ms(),
             self.surface.mean_ms(),
@@ -121,10 +121,10 @@ impl ResizeDiag {
         self.summary.surface.add(surface);
     }
 
-    /// `count` sizes of this window were queued behind a newer one when the batch was read.
-    pub(crate) fn sizes_stale(&mut self, now: Instant, count: u32) {
+    /// `count` sizes of this window were dropped unapplied: a newer one was in the same batch.
+    pub(crate) fn sizes_skipped(&mut self, now: Instant, count: u32) {
         self.open(now);
-        self.summary.stale += count;
+        self.summary.skipped += count;
     }
 
     /// A frame went to the renderer. Counted only during a resize: frames are the steady state
@@ -140,8 +140,13 @@ impl ResizeDiag {
     }
 
     /// The window manager was told a size is handled, `waited` after that size was applied.
-    pub(crate) fn answered(&mut self, now: Instant, waited: Duration) {
-        self.open(now);
+    ///
+    /// Counted only during a resize, like a frame: a window manager may number a move as well,
+    /// and a drag must not write a line per second.
+    pub(crate) fn answered(&mut self, waited: Duration) {
+        if self.started.is_none() {
+            return;
+        }
         self.summary.answer_wait.add(waited);
     }
 
