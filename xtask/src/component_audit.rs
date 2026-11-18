@@ -400,12 +400,3 @@ fn normalize_path(path: &Path) -> String {
         .unwrap_or(path);
     relative.to_string_lossy().replace('\\', "/")
 }
-
-#[allow(dead_code)]
-fn sorted_set(values: impl IntoIterator<Item = String>) -> Vec<String> {
-    values
-        .into_iter()
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
-}
