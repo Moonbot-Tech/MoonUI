@@ -1,7 +1,9 @@
 mod client;
 mod clipboard;
+mod coalesce;
 mod display;
 mod event;
+mod resize_diag;
 mod window;
 mod xim_handler;
 
