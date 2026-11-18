@@ -88,6 +88,50 @@ fn auto_width_downscale_all_at_min_keeps_overflow() {
     );
 }
 
+/// Catches ignoring `MoonDataTableColumn::min_width` in the fit-mode water fill, which would
+/// shrink a column below the figure its caller measured and cut it. The pinned column stops at
+/// its own minimum and the deficit moves to the column without one.
+#[test]
+fn auto_width_downscale_respects_a_column_min_width() {
+    // 300 + 300 in 400: a plain halving would give 200/200; b pins at its 260 instead.
+    let out = MoonDataTable::auto_width_columns(
+        vec![col("a", 300.0), col("b", 300.0).min_width(260.0)],
+        400.0,
+        0.0,
+        MoonDataTableWidthPolicy::Fit,
+    );
+    assert_eq!(widths(&out), vec![140.0, 260.0]);
+}
+
+/// Catches dropping per-column minimums once even they do not fit: each column stops at its own
+/// minimum (not the shared 40) and the remainder scrolls.
+#[test]
+fn auto_width_downscale_keeps_each_min_width_when_minimums_overflow() {
+    let out = MoonDataTable::auto_width_columns(
+        vec![col("a", 300.0).min_width(120.0), col("b", 300.0)],
+        100.0,
+        0.0,
+        MoonDataTableWidthPolicy::Fit,
+    );
+    assert_eq!(widths(&out), vec![120.0, MIN_COLUMN_WIDTH]);
+}
+
+/// A minimum bounds only the shrink: it never raises a width that already fits, and a minimum
+/// under the shared floor changes nothing.
+#[test]
+fn auto_width_min_width_never_raises_a_fitting_width() {
+    let out = MoonDataTable::auto_width_columns(
+        vec![
+            col("a", 80.0).min_width(200.0),
+            col("b", 100.0).min_width(10.0),
+        ],
+        180.0,
+        0.0,
+        MoonDataTableWidthPolicy::Fit,
+    );
+    assert_eq!(widths(&out), vec![80.0, 100.0]);
+}
+
 /// Catches sizing an unmeasured viewport in `data_table.rs:MoonDataTable::auto_width_columns`,
 /// which would collapse columns on the first frame.
 #[test]

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::{MIN_COLUMN_WIDTH, MoonDataTableColumn, MoonDataTableState, MoonDataTableWidthPolicy};
+use super::{MoonDataTableColumn, MoonDataTableState, MoonDataTableWidthPolicy};
 
 /// Resolve retained order, fixed-left precedence, and user widths for rendering.
 ///
@@ -102,8 +102,10 @@ pub(super) fn auto_width_columns(
 
 /// Proportionally shrink render-only columns with a water-fill minimum.
 ///
-/// Columns that would fall below [`MIN_COLUMN_WIDTH`] pin there and redistribute the remaining
-/// deficit; if even all minimums overflow, the horizontal scroller owns the remainder.
+/// Each column's minimum is [`MoonDataTableColumn::floor`]: [`super::MIN_COLUMN_WIDTH`], or the
+/// caller's [`MoonDataTableColumn::min_width`] when that is larger. Columns that would fall below
+/// their minimum pin there and redistribute the remaining deficit; if even all minimums overflow,
+/// the horizontal scroller owns the remainder.
 ///
 /// Args:
 ///     columns: Render-only columns to resize.
@@ -113,9 +115,10 @@ fn downscale_columns_to_available(columns: &mut [MoonDataTableColumn], available
     if n == 0 {
         return;
     }
-    if available <= n as f32 * MIN_COLUMN_WIDTH {
-        for column in columns.iter_mut() {
-            column.width = MIN_COLUMN_WIDTH;
+    let floors: Vec<f32> = columns.iter().map(MoonDataTableColumn::floor).collect();
+    if available <= floors.iter().sum::<f32>() {
+        for (column, floor) in columns.iter_mut().zip(&floors) {
+            column.width = *floor;
             column.fill = false;
         }
         return;
@@ -125,7 +128,12 @@ fn downscale_columns_to_available(columns: &mut [MoonDataTableColumn], available
     // Each pass either pins at least one new column or finalizes the scale, so at most `n + 1`
     // passes are required.
     for _ in 0..=n {
-        let pinned_sum = pinned.iter().filter(|p| **p).count() as f32 * MIN_COLUMN_WIDTH;
+        let pinned_sum: f32 = floors
+            .iter()
+            .zip(&pinned)
+            .filter(|(_, p)| **p)
+            .map(|(floor, _)| *floor)
+            .sum();
         let flex_base: f32 = columns
             .iter()
             .zip(&pinned)
@@ -138,8 +146,8 @@ fn downscale_columns_to_available(columns: &mut [MoonDataTableColumn], available
         }
         scale = ((available - pinned_sum) / flex_base).max(0.0);
         let mut changed = false;
-        for (column, pin) in columns.iter().zip(pinned.iter_mut()) {
-            if !*pin && column.width * scale < MIN_COLUMN_WIDTH {
+        for ((column, pin), floor) in columns.iter().zip(pinned.iter_mut()).zip(&floors) {
+            if !*pin && column.width * scale < *floor {
                 *pin = true;
                 changed = true;
             }
@@ -148,11 +156,11 @@ fn downscale_columns_to_available(columns: &mut [MoonDataTableColumn], available
             break;
         }
     }
-    for (column, pin) in columns.iter_mut().zip(&pinned) {
+    for ((column, pin), floor) in columns.iter_mut().zip(&pinned).zip(&floors) {
         column.width = if *pin {
-            MIN_COLUMN_WIDTH
+            *floor
         } else {
-            (column.width * scale).max(MIN_COLUMN_WIDTH)
+            (column.width * scale).max(*floor)
         };
         column.fill = false;
     }
