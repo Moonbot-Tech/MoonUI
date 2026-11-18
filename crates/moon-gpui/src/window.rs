@@ -2464,9 +2464,6 @@ impl Window {
     /// window drag, which made the drag run at the pace of the window's own layout. A move that
     /// did change the viewport or the scale factor (onto a monitor with another DPI, before the
     /// platform's resize arrives) still redraws.
-    ///
-    /// X11 is not covered: its backend reports every `ConfigureNotify` through the resize
-    /// callback first, a pure move included, so a drag there still redraws.
     pub(crate) fn moved(&mut self, cx: &mut App) {
         self.sync_bounds(false, cx);
     }

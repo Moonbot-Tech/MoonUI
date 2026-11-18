@@ -1338,6 +1338,10 @@ impl X11WindowStatePtr {
         }
     }
 
+    /// Apply a ConfigureNotify: store the new rectangle and report it as a resize or a move.
+    ///
+    /// A size change runs the resize callback and a change of origin alone the moved callback,
+    /// never both, so a window drag does not redraw the window on every step.
     pub fn set_bounds(&self, bounds: Bounds<i32>) -> anyhow::Result<()> {
         let (is_resize, content_size, scale_factor) = {
             let mut state = self.state.borrow_mut();
@@ -1378,12 +1382,17 @@ impl X11WindowStatePtr {
             result
         };
 
+        // One callback per event: the resize callback makes the toolkit rebuild and redraw the
+        // whole window, and a window manager sends a ConfigureNotify on every pointer motion of
+        // a drag, so running it for a move as well redrew the window at the pace of the drag.
+        // The moved callback re-reads the geometry itself and still redraws if the viewport did
+        // change; the scale factor is fixed per window here, so a move cannot change it.
         let mut callbacks = self.callbacks.borrow_mut();
-        if let Some(ref mut fun) = callbacks.resize {
-            fun(content_size, scale_factor)
-        }
-
-        if !is_resize && let Some(ref mut fun) = callbacks.moved {
+        if is_resize {
+            if let Some(ref mut fun) = callbacks.resize {
+                fun(content_size, scale_factor)
+            }
+        } else if let Some(ref mut fun) = callbacks.moved {
             fun();
         }
 
