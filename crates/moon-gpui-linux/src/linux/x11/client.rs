@@ -44,6 +44,7 @@ use super::{
     ButtonOrScroll, ScrollDirection, X11Display, X11Displays, X11WindowStatePtr, XcbAtoms,
     XimCallbackEvent, XimHandler, button_or_scroll_from_event_detail, check_reply,
     clipboard::{self, Clipboard},
+    coalesce::superseded,
     get_reply, get_valuator_axis_index, handle_connection_error, modifiers_from_state,
     pressed_button_from_mask, watch_monitor_changes, xcb_flush,
 };
@@ -656,6 +657,27 @@ impl X11Client {
                 let mut state = self.0.borrow_mut();
                 if let Some(window) = state.windows.get_mut(&window) {
                     window.expose_event_received = true;
+                }
+            }
+
+            // Sizes of a window queued behind a newer size of the same window: counted for the
+            // resize log line, which is how a window manager that outruns the window shows up.
+            let configured: Vec<Option<xproto::Window>> = events
+                .iter()
+                .map(|event| match event {
+                    Event::ConfigureNotify(event) => Some(event.window),
+                    _ => None,
+                })
+                .collect();
+            let mut stale_sizes: HashMap<xproto::Window, u32> = HashMap::default();
+            for (window, stale) in configured.iter().zip(superseded(&configured)) {
+                if let (Some(window), true) = (window, stale) {
+                    *stale_sizes.entry(*window).or_default() += 1;
+                }
+            }
+            for (window, count) in stale_sizes {
+                if let Some(window) = self.get_window(window) {
+                    window.note_stale_sizes(count);
                 }
             }
 

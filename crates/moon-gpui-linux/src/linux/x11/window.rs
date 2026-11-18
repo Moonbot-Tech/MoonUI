@@ -30,8 +30,10 @@ use x11rb::{
 
 use std::{
     cell::RefCell, ffi::c_void, fmt::Display, num::NonZeroU32, ptr::NonNull, rc::Rc, sync::Arc,
+    time::Instant,
 };
 
+use super::resize_diag::{ResizeDiag, millis};
 use super::{X11Display, X11Displays, XINPUT_ALL_DEVICE_GROUPS, XINPUT_ALL_DEVICES};
 
 x11rb::atom_manager! {
@@ -288,6 +290,8 @@ pub struct X11WindowState {
     visual_id: u32,
     pub(crate) counter_id: sync::Counter,
     pub(crate) last_sync_counter: Option<sync::Int64>,
+    /// What the resize going on right now costs, for the once-a-second log line.
+    resize_diag: ResizeDiag,
     bounds: Bounds<Pixels>,
     scale_factor: f32,
     renderer: WgpuRenderer,
@@ -856,6 +860,7 @@ impl X11WindowState {
                 accesskit_adapter: None,
                 counter_id: sync_request_counter,
                 last_sync_counter: None,
+                resize_diag: ResizeDiag::default(),
             })
         });
 
@@ -895,7 +900,11 @@ impl Drop for X11Window {
             parent.state.borrow_mut().children.remove(&self.0.x_window);
         }
 
+        // Both steps block the one thread every window shares, and closing the application runs
+        // them once per window in a row: the line below is what tells a slow close apart.
+        let started = Instant::now();
         state.renderer.destroy();
+        let renderer_released = started.elapsed();
 
         let destroy_x_window = maybe!({
             check_reply(
@@ -907,6 +916,12 @@ impl Drop for X11Window {
             anyhow::Ok(())
         })
         .log_err();
+        log::info!(
+            "X11 window {} closed: GPU surface released in {:.1} ms, X server answered in {:.1} ms",
+            self.0.x_window,
+            millis(renderer_released),
+            millis(started.elapsed() - renderer_released),
+        );
 
         if destroy_x_window.is_some() {
             state.destroyed = true;
@@ -1197,6 +1212,25 @@ impl X11WindowStatePtr {
             fun(request_frame_options);
             self.callbacks.borrow_mut().request_frame = Some(fun);
         }
+
+        // On the frame clock and not on a size: the last second of a resize ends after its last
+        // size arrived. Idle windows return at once, the period only runs during a resize.
+        let summary = self
+            .state
+            .borrow_mut()
+            .resize_diag
+            .take_summary(Instant::now());
+        if let Some(summary) = summary {
+            log::info!("X11 resize, window {}: {summary}", self.x_window);
+        }
+    }
+
+    /// Count sizes of this window that sat in an event batch behind a newer one.
+    pub fn note_stale_sizes(&self, count: u32) {
+        self.state
+            .borrow_mut()
+            .resize_diag
+            .sizes_stale(Instant::now(), count);
     }
 
     pub fn handle_input(&self, input: PlatformInput) {
@@ -1363,6 +1397,7 @@ impl X11WindowStatePtr {
             // monitor — would pick the monitor from where the window used to be. Ask the server
             // where it is: a resize already costs a round trip for the render extent below. A
             // move reads the shared list only, because it runs on every pointer motion of a drag.
+            let server_started = Instant::now();
             let pick_bounds = if is_resize {
                 self.bounds_on_root(&state)
             } else {
@@ -1371,13 +1406,26 @@ impl X11WindowStatePtr {
             state.repick_display(pick_bounds);
 
             let gpu_size = query_render_extent(&self.xcb, self.x_window)?;
+            let mut server = server_started.elapsed();
+            let surface_started = Instant::now();
             state.renderer.update_drawable_size(gpu_size);
+            let surface = surface_started.elapsed();
             let result = (is_resize, state.content_size(), state.scale_factor);
             if let Some(value) = state.last_sync_counter.take() {
+                let answer_started = Instant::now();
                 check_reply(
                     || "X11 sync SetCounter failed.",
                     sync::set_counter(&self.xcb, state.counter_id, value),
                 )?;
+                server += answer_started.elapsed();
+                state
+                    .resize_diag
+                    .answered(Instant::now(), std::time::Duration::ZERO);
+            }
+            if is_resize {
+                state
+                    .resize_diag
+                    .size_applied(Instant::now(), server, surface);
             }
             result
         };
@@ -1821,6 +1869,7 @@ impl PlatformWindow for X11Window {
         }
 
         let accepted = inner.renderer.draw(scene);
+        inner.resize_diag.frame(accepted);
 
         if inner.renderer.needs_redraw() {
             inner.force_render_after_recovery = true;
