@@ -119,10 +119,7 @@ pub async fn download_server_raw_binary(
             .with_context(|| format!("flushing binary contents for {url}"))?;
 
         if let Some(expected_sha_256) = digest {
-            anyhow::ensure!(
-                asset_sha_256 == expected_sha_256,
-                "{url} asset got SHA-256 mismatch. Expected: {expected_sha_256}, Got: {asset_sha_256}",
-            );
+            ensure_digest_matches(url, expected_sha_256, &asset_sha_256)?;
         }
 
         util::fs::make_file_executable(&binary_path)
@@ -133,9 +130,7 @@ pub async fn download_server_raw_binary(
     .await;
 
     if let Err(err) = result {
-        if let Err(err) = async_fs::remove_dir_all(&staging_path).await {
-            log::warn!("failed to remove staging directory {staging_path:?}: {err:?}");
-        }
+        remove_staging_dir(&staging_path).await;
         return Err(err);
     }
 
@@ -165,10 +160,7 @@ async fn extract_to_staging(
                 })?;
             let asset_sha_256 = format!("{:x}", writer.hasher.finalize());
 
-            anyhow::ensure!(
-                asset_sha_256 == expected_sha_256,
-                "{url} asset got SHA-256 mismatch. Expected: {expected_sha_256}, Got: {asset_sha_256}",
-            );
+            ensure_digest_matches(url, expected_sha_256, &asset_sha_256)?;
             writer
                 .writer
                 .seek(std::io::SeekFrom::Start(0))
@@ -218,9 +210,7 @@ fn staging_path(parent: &Path, asset_kind: AssetKind) -> Result<PathBuf> {
 async fn cleanup_staging_path(staging_path: &Path, asset_kind: AssetKind) {
     match asset_kind {
         AssetKind::TarGz | AssetKind::TarBz2 | AssetKind::Zip => {
-            if let Err(err) = async_fs::remove_dir_all(staging_path).await {
-                log::warn!("failed to remove staging directory {staging_path:?}: {err:?}");
-            }
+            remove_staging_dir(staging_path).await;
         }
         AssetKind::Gz => {
             if let Err(err) = async_fs::remove_file(staging_path).await {
@@ -228,6 +218,24 @@ async fn cleanup_staging_path(staging_path: &Path, asset_kind: AssetKind) {
             }
         }
     }
+}
+
+/// Removes a staging directory after a failed download, logging instead of failing when it
+/// cannot be removed so the caller still sees the download's own error.
+async fn remove_staging_dir(staging_path: &Path) {
+    if let Err(err) = async_fs::remove_dir_all(staging_path).await {
+        log::warn!("failed to remove staging directory {staging_path:?}: {err:?}");
+    }
+}
+
+/// Fails when the lowercase hex SHA-256 of the asset downloaded from `url` differs from the
+/// expected one.
+fn ensure_digest_matches(url: &str, expected_sha_256: &str, asset_sha_256: &str) -> Result<()> {
+    anyhow::ensure!(
+        asset_sha_256 == expected_sha_256,
+        "{url} asset got SHA-256 mismatch. Expected: {expected_sha_256}, Got: {asset_sha_256}",
+    );
+    Ok(())
 }
 
 async fn finalize_download(staging_path: &Path, destination_path: &Path) -> Result<()> {
