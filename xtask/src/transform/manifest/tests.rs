@@ -2,7 +2,9 @@ use std::path::Path;
 
 use toml_edit::{DocumentMut, Item};
 
-use super::{WorkspaceDependencies, remove_dep_from_features, transform_dependencies};
+use super::{
+    WorkspaceDependencies, remove_dep_from_features, resolve_workspace_dep, transform_dependencies,
+};
 
 /// Catches manifest rewrites that stop aliasing internal crates or leave removed git-only optionals in features.
 #[test]
@@ -100,4 +102,41 @@ git_optional = { git = "https://example.invalid/git-optional" }
             .collect::<Vec<_>>();
         assert_eq!(bundle, vec!["collections/test-support"]);
     }
+}
+
+/// Parse one `name = <value>` line and return its value item.
+fn dependency_item(line: &str) -> Item {
+    let doc: DocumentMut = line.parse().expect("parse dependency line");
+    doc.get("dep").expect("dependency value").clone()
+}
+
+/// Return the string entries of a resolved dependency's `features` array.
+fn resolved_features(resolved: &Item) -> Vec<String> {
+    resolved
+        .as_table_like()
+        .and_then(|table| table.get("features"))
+        .and_then(Item::as_array)
+        .expect("resolved features")
+        .iter()
+        .filter_map(|value| value.as_str().map(str::to_string))
+        .collect()
+}
+
+/// Catches `resolve_workspace_dep` replacing the workspace definition's features with the
+/// member's own list. Cargo's reference ("Inheriting a dependency from a workspace") states that
+/// `features` on a `workspace = true` dependency "are additive with the features from the
+/// workspace dependency", so `serde = { version = "1", features = ["derive"] }` in the workspace
+/// and `serde = { workspace = true, features = ["rc"] }` in the member build serde with both
+/// `derive` and `rc`. Dropping `derive` makes the standalone crate stop compiling its
+/// `#[derive(Serialize)]` uses.
+#[test]
+fn member_features_add_to_the_workspace_features() {
+    let workspace = dependency_item(r#"dep = { version = "1", features = ["derive"] }"#);
+    let usage = dependency_item(r#"dep = { workspace = true, features = ["rc"] }"#);
+
+    let resolved = resolve_workspace_dep(&workspace, &usage)
+        .expect("resolve dependency")
+        .expect("versioned dependency stays");
+
+    assert_eq!(resolved_features(&resolved), vec!["derive", "rc"]);
 }

@@ -421,14 +421,29 @@ fn resolve_workspace_dep(workspace_def: &Item, usage: &Item) -> Result<Option<It
         workspace_def.clone()
     };
 
-    // Merge features from usage
+    // Merge features from usage. Cargo treats a member's `features` on a `workspace = true`
+    // dependency as additive to the workspace definition's features, so the member's entries are
+    // appended after the workspace ones rather than replacing them. Only entries the workspace
+    // already lists are skipped; the member's own list is copied as written.
     if let Some(usage_table) = usage.as_table_like() {
         if let Some(result_table) = result.as_table_like_mut() {
             if let Some(features) = usage_table.get("features") {
                 if let Some(arr) = features.as_array() {
-                    let mut feat_arr = toml_edit::Array::new();
+                    let workspace_features = result_table
+                        .get("features")
+                        .and_then(Item::as_array)
+                        .cloned()
+                        .unwrap_or_default();
+                    let mut feat_arr = workspace_features.clone();
                     for f in arr.iter() {
-                        feat_arr.push(f.clone());
+                        let inherited = f.as_str().is_some_and(|name| {
+                            workspace_features
+                                .iter()
+                                .any(|existing| existing.as_str() == Some(name))
+                        });
+                        if !inherited {
+                            feat_arr.push(f.clone());
+                        }
                     }
                     result_table.insert("features", Item::Value(Value::Array(feat_arr)));
                 }
