@@ -38,6 +38,9 @@ pub(super) fn parse_workspace_deps(zed_dir: &Path) -> Result<WorkspaceDependenci
     Ok(deps)
 }
 
+/// Dependency table names Cargo accepts at the top level and under each `[target.*]` table.
+const DEPENDENCY_SECTIONS: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+
 /// Rewrite one copied crate manifest for Moon package and dependency policy.
 pub(super) fn transform_cargo_toml(
     crate_dir: &Path,
@@ -54,77 +57,12 @@ pub(super) fn transform_cargo_toml(
     let package_name = moon_package_name(original_name);
     let version = zed_tag_to_version(zed_tag);
 
-    // Update [package] section
-    if let Some(package) = doc.get_mut("package") {
-        if let Some(table) = package.as_table_like_mut() {
-            // Rename package
-            table.insert("name", toml_edit::value(&package_name));
-
-            // Set version
-            table.insert("version", toml_edit::value(&version));
-
-            // Remove workspace inheritance for edition, use explicit
-            if table
-                .get("edition")
-                .is_some_and(|v| v.as_table_like().is_some())
-            {
-                table.insert("edition", toml_edit::value("2024"));
-            }
-
-            // Set repository
-            table.insert(
-                "repository",
-                toml_edit::value("https://github.com/Moonbot-Tech/MoonUI"),
-            );
-
-            // MoonUI is consumed as a git/path workspace for now.
-            table.insert("publish", toml_edit::value(false));
-
-            // Ensure license is set
-            if !table.contains_key("license") {
-                table.insert("license", toml_edit::value("Apache-2.0"));
-            }
-
-            // Ensure description is set.
-            if !table.contains_key("description") {
-                table.insert(
-                    "description",
-                    toml_edit::value(format!(
-                        "Moon standalone build of Zed's {original_name} crate"
-                    )),
-                );
-            }
-        }
-    }
+    rewrite_package_section(&mut doc, &package_name, &version, original_name);
 
     // For gpui, set lib name to "gpui" so users can `use gpui::...`
     // even though the package is named "moon-gpui".
     if original_name == "gpui" {
-        // Update existing [lib] section or create new one
-        if let Some(lib) = doc.get_mut("lib") {
-            if let Some(table) = lib.as_table_like_mut() {
-                table.insert("name", toml_edit::value("gpui"));
-            }
-        } else {
-            let mut lib_table = toml_edit::Table::new();
-            lib_table.insert("name", toml_edit::value("gpui"));
-            lib_table.insert("path", toml_edit::value("src/lib.rs"));
-            doc.insert("lib", Item::Table(lib_table));
-        }
-
-        // Add dev-dependency alias for gpui_platform so users can `use gpui_platform::...` in tests
-        if let Some(dev_deps) = doc.get_mut("dev-dependencies") {
-            if let Some(table) = dev_deps.as_table_like_mut() {
-                let mut dep = toml_edit::InlineTable::new();
-                dep.insert("package", "moon-gpui-platform".into());
-                if use_local_deps {
-                    dep.insert("path", "../moon-gpui-platform".into());
-                } else {
-                    dep.insert("version", version.clone().into());
-                }
-                table.insert("gpui_platform", Item::Value(Value::InlineTable(dep)));
-            }
-        }
+        alias_gpui_lib_and_platform(&mut doc, &version, use_local_deps);
     }
 
     // Transform dependencies, collecting any optional deps that get removed (git-only, no crates.io equiv)
@@ -134,70 +72,25 @@ pub(super) fn transform_cargo_toml(
         remove_dependency(&mut doc, "dev-dependencies", "zlog");
         remove_dependency(&mut doc, "dev-dependencies", "ctor");
     }
-    transform_dependencies(
-        &mut doc,
-        "dependencies",
-        workspace_deps,
-        &version,
-        output_dir,
-        use_local_deps,
-        &mut removed_optionals,
-    )?;
-    transform_dependencies(
-        &mut doc,
-        "dev-dependencies",
-        workspace_deps,
-        &version,
-        output_dir,
-        use_local_deps,
-        &mut removed_optionals,
-    )?;
-    transform_dependencies(
-        &mut doc,
-        "build-dependencies",
-        workspace_deps,
-        &version,
-        output_dir,
-        use_local_deps,
-        &mut removed_optionals,
-    )?;
-
-    // Handle target-specific dependencies
-    if let Some(target) = doc.get_mut("target") {
-        if let Some(target_table) = target.as_table_like_mut() {
-            let targets: Vec<_> = target_table.iter().map(|(k, _)| k.to_string()).collect();
-            for target_name in targets {
-                if let Some(target_section) =
-                    doc.get_mut("target").and_then(|t| t.get_mut(&target_name))
-                {
-                    if let Some(table) = target_section.as_table_like_mut() {
-                        for dep_section in
-                            ["dependencies", "dev-dependencies", "build-dependencies"]
-                        {
-                            if table.contains_key(dep_section) {
-                                let mut temp_doc = DocumentMut::new();
-                                if let Some(deps) = table.get(dep_section).cloned() {
-                                    temp_doc.insert(dep_section, deps);
-                                    transform_dependencies(
-                                        &mut temp_doc,
-                                        dep_section,
-                                        workspace_deps,
-                                        &version,
-                                        output_dir,
-                                        use_local_deps,
-                                        &mut removed_optionals,
-                                    )?;
-                                    if let Some(new_deps) = temp_doc.get(dep_section).cloned() {
-                                        table.insert(dep_section, new_deps);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    for section in DEPENDENCY_SECTIONS {
+        transform_dependencies(
+            &mut doc,
+            section,
+            workspace_deps,
+            &version,
+            output_dir,
+            use_local_deps,
+            &mut removed_optionals,
+        )?;
     }
+    transform_target_dependencies(
+        &mut doc,
+        workspace_deps,
+        &version,
+        output_dir,
+        use_local_deps,
+        &mut removed_optionals,
+    )?;
 
     // Clean up [features] entries that referenced removed optional deps
     for dep_name in &removed_optionals {
@@ -223,6 +116,147 @@ pub(super) fn transform_cargo_toml(
     // Write back
     fs::write(&cargo_toml_path, doc.to_string())?;
 
+    Ok(())
+}
+
+/// Set the Moon package name, version, repository, publish flag and the license and
+/// description defaults on the `[package]` table; a manifest without one is left as is.
+///
+/// A workspace-inherited `edition` becomes an explicit `"2024"`; an explicit edition stays.
+fn rewrite_package_section(
+    doc: &mut DocumentMut,
+    package_name: &str,
+    version: &str,
+    original_name: &str,
+) {
+    let Some(table) = doc
+        .get_mut("package")
+        .and_then(|package| package.as_table_like_mut())
+    else {
+        return;
+    };
+
+    // Rename package
+    table.insert("name", toml_edit::value(package_name));
+
+    // Set version
+    table.insert("version", toml_edit::value(version));
+
+    // Remove workspace inheritance for edition, use explicit
+    if table
+        .get("edition")
+        .is_some_and(|v| v.as_table_like().is_some())
+    {
+        table.insert("edition", toml_edit::value("2024"));
+    }
+
+    // Set repository
+    table.insert(
+        "repository",
+        toml_edit::value("https://github.com/Moonbot-Tech/MoonUI"),
+    );
+
+    // MoonUI is consumed as a git/path workspace for now.
+    table.insert("publish", toml_edit::value(false));
+
+    // Ensure license is set
+    if !table.contains_key("license") {
+        table.insert("license", toml_edit::value("Apache-2.0"));
+    }
+
+    // Ensure description is set.
+    if !table.contains_key("description") {
+        table.insert(
+            "description",
+            toml_edit::value(format!(
+                "Moon standalone build of Zed's {original_name} crate"
+            )),
+        );
+    }
+}
+
+/// Name gpui's library target `gpui` and add the `gpui_platform` dev-dependency alias.
+///
+/// An existing `[lib]` table only gets its name replaced; a missing one is created with
+/// `path = "src/lib.rs"`. The alias points at the sibling `moon-gpui-platform` crate by
+/// path when `use_local_deps` is set, else by `version`, and is added only when the
+/// manifest already has a `[dev-dependencies]` table.
+fn alias_gpui_lib_and_platform(doc: &mut DocumentMut, version: &str, use_local_deps: bool) {
+    // Update existing [lib] section or create new one
+    if let Some(lib) = doc.get_mut("lib") {
+        if let Some(table) = lib.as_table_like_mut() {
+            table.insert("name", toml_edit::value("gpui"));
+        }
+    } else {
+        let mut lib_table = toml_edit::Table::new();
+        lib_table.insert("name", toml_edit::value("gpui"));
+        lib_table.insert("path", toml_edit::value("src/lib.rs"));
+        doc.insert("lib", Item::Table(lib_table));
+    }
+
+    // Add dev-dependency alias for gpui_platform so users can `use gpui_platform::...` in tests
+    if let Some(dev_deps) = doc.get_mut("dev-dependencies") {
+        if let Some(table) = dev_deps.as_table_like_mut() {
+            let mut dep = toml_edit::InlineTable::new();
+            dep.insert("package", "moon-gpui-platform".into());
+            if use_local_deps {
+                dep.insert("path", "../moon-gpui-platform".into());
+            } else {
+                dep.insert("version", version.into());
+            }
+            table.insert("gpui_platform", Item::Value(Value::InlineTable(dep)));
+        }
+    }
+}
+
+/// Apply [`transform_dependencies`] to every dependency table under each `[target.*]` table.
+///
+/// Each table is rewritten in a scratch document and written back in place, so the
+/// target-specific tables follow the same policy as the top-level ones. Removed git-only
+/// optionals are appended to `removed_optionals`; the first rewrite error is returned.
+fn transform_target_dependencies(
+    doc: &mut DocumentMut,
+    workspace_deps: &WorkspaceDependencies,
+    version: &str,
+    output_dir: &Path,
+    use_local_deps: bool,
+    removed_optionals: &mut Vec<String>,
+) -> Result<()> {
+    let Some(target_table) = doc
+        .get_mut("target")
+        .and_then(|target| target.as_table_like_mut())
+    else {
+        return Ok(());
+    };
+    let targets: Vec<_> = target_table.iter().map(|(k, _)| k.to_string()).collect();
+    for target_name in targets {
+        let Some(table) = doc
+            .get_mut("target")
+            .and_then(|t| t.get_mut(&target_name))
+            .and_then(|target_section| target_section.as_table_like_mut())
+        else {
+            continue;
+        };
+        for dep_section in DEPENDENCY_SECTIONS {
+            let Some(deps) = table.get(dep_section).cloned() else {
+                continue;
+            };
+            let mut temp_doc = DocumentMut::new();
+            temp_doc.insert(dep_section, deps);
+            transform_dependencies(
+                &mut temp_doc,
+                dep_section,
+                workspace_deps,
+                version,
+                output_dir,
+                use_local_deps,
+                removed_optionals,
+            )?;
+            if let Some(new_deps) = temp_doc.get(dep_section).cloned() {
+                table.insert(dep_section, new_deps);
+            }
+        }
+    }
     Ok(())
 }
 
