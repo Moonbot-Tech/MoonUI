@@ -4,6 +4,7 @@ use chrono::{NaiveDate, NaiveTime, Timelike};
 use gpui::{App, AppContext as _, Context, Empty, IntoElement, Render, TestAppContext, Window};
 
 use super::{MoonDateTimePickerState, compose, format_value};
+use crate::moon::time_wheel::MoonWheelMove;
 
 /// Minimal window root: the picker state is driven directly, nothing has to be rendered.
 struct DateTimePickerTestHarness;
@@ -140,6 +141,49 @@ fn clearing_resets_both_halves_of_the_value(cx: &mut TestAppContext) {
         assert_eq!(state.date(), None);
         assert_eq!(state.time(), NaiveTime::MIN);
         assert_eq!(state.value(), None);
+    })
+    .expect("test window is open");
+}
+
+/// Catches mis-routing a wheel event in `date_time_picker.rs:wheel_hours` / `wheel_minutes`: a
+/// notch must walk exactly one row and an empty notch none, and each drum must keep its own sub-row
+/// trackpad carry until it adds up to whole rows. Otherwise one wheel click jumps several values, a
+/// slow trackpad never moves the clock, or spinning the hours nudges the minutes.
+///
+/// Expected values by hand: 10:00 + one hour notch, minus one minute notch (wrapping within the
+/// hour) = 11:59; hour carry 0.6 + 0.6 = 1.2 is one row → 12; minute carry 0.5 - 0.4 + 2.0 = 2.1 is
+/// two rows → 59 + 2 wraps to 01.
+#[gpui::test]
+fn the_wheel_walks_each_drum_by_whole_rows(cx: &mut TestAppContext) {
+    let window = cx.add_window(|_, _| DateTimePickerTestHarness);
+    cx.update_window(window.into(), |_, window, cx: &mut App| {
+        let state = cx.new(|cx| MoonDateTimePickerState::new(window, cx));
+
+        state.update(cx, |this, cx| {
+            this.set_value(Some(day(2026, 8, 4).and_time(at(10, 0))), window, cx);
+            this.wheel_hours(MoonWheelMove::Notches(1), cx);
+            this.wheel_minutes(MoonWheelMove::Notches(-1), cx);
+            this.wheel_minutes(MoonWheelMove::Notches(0), cx);
+        });
+        assert_eq!(state.read(cx).time(), at(11, 59));
+
+        state.update(cx, |this, cx| {
+            this.wheel_hours(MoonWheelMove::Rows(0.6), cx);
+            this.wheel_minutes(MoonWheelMove::Rows(0.5), cx);
+        });
+        assert_eq!(
+            state.read(cx).time(),
+            at(11, 59),
+            "sub-row movement on either drum is not a step yet"
+        );
+
+        state.update(cx, |this, cx| {
+            this.wheel_hours(MoonWheelMove::Rows(0.6), cx);
+            this.wheel_minutes(MoonWheelMove::Rows(-0.4), cx);
+            this.wheel_minutes(MoonWheelMove::Rows(2.0), cx);
+        });
+        assert_eq!(state.read(cx).time(), at(12, 1));
+        assert_eq!(state.read(cx).date(), Some(day(2026, 8, 4)));
     })
     .expect("test window is open");
 }
