@@ -28,7 +28,7 @@ use super::{
     theme::MoonTheme,
     time_picker::normalized_minute_step,
     time_wheel::{
-        HOURS_PER_DAY, MINUTES_PER_HOUR, MoonWheelMove, moon_time_wheel_pair, wheel_steps,
+        HOURS_PER_DAY, MINUTES_PER_HOUR, MoonWheelMove, moon_time_wheel_pair, wheel_rows,
         wrap_value,
     },
     tokens::rgba_from,
@@ -267,31 +267,17 @@ impl MoonDateTimePickerState {
     /// A discrete notch is one hour, whatever the platform's lines-per-notch setting says;
     /// continuous movement accumulates until it adds up to a whole row.
     pub(crate) fn wheel_hours(&mut self, movement: MoonWheelMove, cx: &mut Context<Self>) {
-        match movement {
-            MoonWheelMove::Notches(notches) if notches != 0 => self.step_hours(notches, cx),
-            MoonWheelMove::Notches(_) => {}
-            MoonWheelMove::Rows(rows) => {
-                let (steps, carry) = wheel_steps(rows, self.hour_carry);
-                self.hour_carry = carry;
-                if steps != 0 {
-                    self.step_hours(steps, cx);
-                }
-            }
+        let steps = wheel_rows(movement, &mut self.hour_carry);
+        if steps != 0 {
+            self.step_hours(steps, cx);
         }
     }
 
     /// Spin the minute drum by one wheel event.
     pub(crate) fn wheel_minutes(&mut self, movement: MoonWheelMove, cx: &mut Context<Self>) {
-        match movement {
-            MoonWheelMove::Notches(notches) if notches != 0 => self.step_minutes(notches, cx),
-            MoonWheelMove::Notches(_) => {}
-            MoonWheelMove::Rows(rows) => {
-                let (steps, carry) = wheel_steps(rows, self.minute_carry);
-                self.minute_carry = carry;
-                if steps != 0 {
-                    self.step_minutes(steps, cx);
-                }
-            }
+        let steps = wheel_rows(movement, &mut self.minute_carry);
+        if steps != 0 {
+            self.step_minutes(steps, cx);
         }
     }
 

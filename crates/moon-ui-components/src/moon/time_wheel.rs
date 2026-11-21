@@ -110,6 +110,29 @@ pub(crate) fn wheel_steps(rows: f32, carry: f32) -> (i32, f32) {
     (steps as i32, total - steps)
 }
 
+/// Resolve one wheel event into the whole rows a drum walks.
+///
+/// A discrete notch is one row, whatever the platform's lines-per-notch setting says; continuous
+/// movement accumulates in the drum's own carry through [`wheel_steps`] until it adds up to a whole
+/// row. Both time pickers route each drum's wheel events through here.
+///
+/// Args:
+///     movement: The wheel event, as [`wheel_move`] translated it.
+///     carry: The drum's sub-row remainder; only continuous movement updates it.
+///
+/// Returns:
+///     Whole rows to walk, positive forward; `0` when the drum stays put.
+pub(crate) fn wheel_rows(movement: MoonWheelMove, carry: &mut f32) -> i32 {
+    match movement {
+        MoonWheelMove::Notches(notches) => notches,
+        MoonWheelMove::Rows(rows) => {
+            let (steps, remainder) = wheel_steps(rows, *carry);
+            *carry = remainder;
+            steps
+        }
+    }
+}
+
 /// Render one drum column.
 ///
 /// Args:
