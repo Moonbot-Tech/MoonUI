@@ -386,204 +386,7 @@ fn parse_node(
             ref name,
             ref attrs,
             ..
-        } => match name.local {
-            local_name!("br") => Some(BlockNode::Break {
-                html: true,
-                span: None,
-            }),
-            local_name!("h1")
-            | local_name!("h2")
-            | local_name!("h3")
-            | local_name!("h4")
-            | local_name!("h5")
-            | local_name!("h6") => {
-                let mut children = vec![];
-                consume_paragraph(&mut children, paragraph);
-
-                let level = name
-                    .local
-                    .chars()
-                    .last()
-                    .unwrap_or('6')
-                    .to_digit(10)
-                    .unwrap_or(6) as u8;
-
-                let mut paragraph = Paragraph::default();
-                for child in node.children.borrow().iter() {
-                    parse_paragraph(&mut paragraph, child);
-                }
-
-                let heading = BlockNode::Heading {
-                    level,
-                    children: paragraph,
-                    span: None,
-                };
-                if children.len() > 0 {
-                    children.push(heading);
-
-                    Some(BlockNode::Root {
-                        children,
-                        span: None,
-                    })
-                } else {
-                    Some(heading)
-                }
-            }
-            local_name!("img") => {
-                let mut children = vec![];
-                consume_paragraph(&mut children, paragraph);
-
-                let Some(src) = attr_value(attrs, local_name!("src")) else {
-                    if cfg!(debug_assertions) {
-                        tracing::warn!("image node missing src attribute");
-                    }
-                    return None;
-                };
-
-                let alt = attr_value(&attrs, local_name!("alt"));
-                let title = attr_value(&attrs, local_name!("title"));
-                let (width, height) = attr_width_height(&attrs);
-
-                let mut paragraph = Paragraph::default();
-                paragraph.push_image(ImageNode {
-                    url: src.into(),
-                    link: None,
-                    title: title.map(Into::into),
-                    alt: alt.map(Into::into),
-                    width,
-                    height,
-                });
-
-                if children.len() > 0 {
-                    children.push(BlockNode::Paragraph(paragraph));
-                    Some(BlockNode::Root {
-                        children,
-                        span: None,
-                    })
-                } else {
-                    Some(BlockNode::Paragraph(paragraph))
-                }
-            }
-            local_name!("ul") | local_name!("ol") => {
-                let ordered = name.local == local_name!("ol");
-                let children = consume_children_nodes(node, paragraph, cx);
-                Some(BlockNode::List {
-                    children,
-                    ordered,
-                    span: None,
-                })
-            }
-            local_name!("li") => {
-                let mut children = vec![];
-                consume_paragraph(&mut children, paragraph);
-
-                for child in node.children.borrow().iter() {
-                    let mut child_paragraph = Paragraph::default();
-                    if let Some(child_node) = parse_node(child, &mut child_paragraph, cx) {
-                        children.push(child_node);
-                    }
-                    if child_paragraph.text_len() > 0 {
-                        // If last child is paragraph, merge child
-                        if let Some(last_child) = children.last_mut() {
-                            if let BlockNode::Paragraph(last_paragraph) = last_child {
-                                last_paragraph.merge(child_paragraph);
-                                continue;
-                            }
-                        }
-
-                        children.push(BlockNode::Paragraph(child_paragraph));
-                    }
-                }
-
-                consume_paragraph(&mut children, paragraph);
-
-                Some(BlockNode::ListItem {
-                    children,
-                    spread: false,
-                    checked: None,
-                    span: None,
-                })
-            }
-            local_name!("table") => {
-                let mut children = vec![];
-                consume_paragraph(&mut children, paragraph);
-
-                let mut table = Table::default();
-                for child in node.children.borrow().iter() {
-                    match child.data {
-                        NodeData::Element { ref name, .. }
-                            if name.local == local_name!("tbody")
-                                || name.local == local_name!("thead") =>
-                        {
-                            for sub_child in child.children.borrow().iter() {
-                                parse_table_row(&mut table, &sub_child);
-                            }
-                        }
-                        _ => {
-                            parse_table_row(&mut table, &child);
-                        }
-                    }
-                }
-                consume_paragraph(&mut children, paragraph);
-
-                let table = BlockNode::Table(table);
-                if children.len() > 0 {
-                    children.push(table);
-                    Some(BlockNode::Root {
-                        children,
-                        span: None,
-                    })
-                } else {
-                    Some(table)
-                }
-            }
-            local_name!("blockquote") => {
-                let children = consume_children_nodes(node, paragraph, cx);
-                Some(BlockNode::Blockquote {
-                    children,
-                    span: None,
-                })
-            }
-            local_name!("style") | local_name!("script") => None,
-            _ => {
-                if BLOCK_ELEMENTS.contains(&name.local.trim()) {
-                    let mut children: Vec<BlockNode> = vec![];
-
-                    // Case:
-                    //
-                    // Hello <p>Inner text of block element</p> World
-
-                    // Insert before text as a node -- The "Hello"
-                    consume_paragraph(&mut children, paragraph);
-
-                    // Inner of the block element -- The "Inner text of block element"
-                    for child in node.children.borrow().iter() {
-                        if let Some(child_node) = parse_node(child, paragraph, cx) {
-                            children.push(child_node);
-                        }
-                    }
-                    consume_paragraph(&mut children, paragraph);
-
-                    if children.is_empty() {
-                        None
-                    } else {
-                        Some(BlockNode::Root {
-                            children,
-                            span: None,
-                        })
-                    }
-                } else {
-                    // Others to as Inline
-                    parse_paragraph(paragraph, node);
-
-                    if paragraph.is_image() {
-                        Some(BlockNode::Paragraph(paragraph.take()))
-                    } else {
-                        None
-                    }
-                }
-            }
-        },
+        } => parse_element(node, &name.local, attrs, paragraph, cx),
         NodeData::Document => {
             let children = consume_children_nodes(node, paragraph, cx);
             Some(BlockNode::Root {
@@ -594,6 +397,230 @@ fn parse_node(
         NodeData::Doctype { .. }
         | NodeData::Comment { .. }
         | NodeData::ProcessingInstruction { .. } => None,
+    }
+}
+
+/// Parses one element node into a block, dispatching on its tag name.
+fn parse_element(
+    node: &Rc<Node>,
+    local: &LocalName,
+    attrs: &RefCell<Vec<html5ever::Attribute>>,
+    paragraph: &mut Paragraph,
+    cx: &mut NodeContext,
+) -> Option<BlockNode> {
+    match *local {
+        local_name!("br") => Some(BlockNode::Break {
+            html: true,
+            span: None,
+        }),
+        local_name!("h1")
+        | local_name!("h2")
+        | local_name!("h3")
+        | local_name!("h4")
+        | local_name!("h5")
+        | local_name!("h6") => Some(parse_heading(node, local, paragraph)),
+        local_name!("img") => parse_image(attrs, paragraph),
+        local_name!("ul") | local_name!("ol") => {
+            let ordered = *local == local_name!("ol");
+            let children = consume_children_nodes(node, paragraph, cx);
+            Some(BlockNode::List {
+                children,
+                ordered,
+                span: None,
+            })
+        }
+        local_name!("li") => Some(parse_list_item(node, paragraph, cx)),
+        local_name!("table") => Some(parse_table(node, paragraph)),
+        local_name!("blockquote") => {
+            let children = consume_children_nodes(node, paragraph, cx);
+            Some(BlockNode::Blockquote {
+                children,
+                span: None,
+            })
+        }
+        local_name!("style") | local_name!("script") => None,
+        _ => {
+            if BLOCK_ELEMENTS.contains(&local.trim()) {
+                parse_block_element(node, paragraph, cx)
+            } else {
+                // Others to as Inline
+                parse_paragraph(paragraph, node);
+
+                if paragraph.is_image() {
+                    Some(BlockNode::Paragraph(paragraph.take()))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
+/// Returns `block` alone, or wrapped in a root after `leading` when the pending inline text was
+/// flushed into it first.
+fn after_leading_blocks(mut leading: Vec<BlockNode>, block: BlockNode) -> BlockNode {
+    if leading.len() > 0 {
+        leading.push(block);
+        BlockNode::Root {
+            children: leading,
+            span: None,
+        }
+    } else {
+        block
+    }
+}
+
+/// Parses an `h1`..`h6` element, keeping the pending inline text in front of the heading.
+fn parse_heading(node: &Rc<Node>, local: &LocalName, paragraph: &mut Paragraph) -> BlockNode {
+    let mut children = vec![];
+    consume_paragraph(&mut children, paragraph);
+
+    let level = local
+        .chars()
+        .last()
+        .unwrap_or('6')
+        .to_digit(10)
+        .unwrap_or(6) as u8;
+
+    let mut paragraph = Paragraph::default();
+    for child in node.children.borrow().iter() {
+        parse_paragraph(&mut paragraph, child);
+    }
+
+    let heading = BlockNode::Heading {
+        level,
+        children: paragraph,
+        span: None,
+    };
+    after_leading_blocks(children, heading)
+}
+
+/// Parses an `img` element into an image paragraph, keeping the pending inline text in front.
+///
+/// The pending text is flushed before the `src` check, so an image without `src` still consumes
+/// it.
+fn parse_image(
+    attrs: &RefCell<Vec<html5ever::Attribute>>,
+    paragraph: &mut Paragraph,
+) -> Option<BlockNode> {
+    let mut children = vec![];
+    consume_paragraph(&mut children, paragraph);
+
+    let Some(src) = attr_value(attrs, local_name!("src")) else {
+        if cfg!(debug_assertions) {
+            tracing::warn!("image node missing src attribute");
+        }
+        return None;
+    };
+
+    let alt = attr_value(&attrs, local_name!("alt"));
+    let title = attr_value(&attrs, local_name!("title"));
+    let (width, height) = attr_width_height(&attrs);
+
+    let mut paragraph = Paragraph::default();
+    paragraph.push_image(ImageNode {
+        url: src.into(),
+        link: None,
+        title: title.map(Into::into),
+        alt: alt.map(Into::into),
+        width,
+        height,
+    });
+
+    Some(after_leading_blocks(
+        children,
+        BlockNode::Paragraph(paragraph),
+    ))
+}
+
+/// Parses an `li` element, merging each child's inline text into a trailing paragraph.
+fn parse_list_item(node: &Rc<Node>, paragraph: &mut Paragraph, cx: &mut NodeContext) -> BlockNode {
+    let mut children = vec![];
+    consume_paragraph(&mut children, paragraph);
+
+    for child in node.children.borrow().iter() {
+        let mut child_paragraph = Paragraph::default();
+        if let Some(child_node) = parse_node(child, &mut child_paragraph, cx) {
+            children.push(child_node);
+        }
+        if child_paragraph.text_len() > 0 {
+            // If last child is paragraph, merge child
+            if let Some(last_child) = children.last_mut() {
+                if let BlockNode::Paragraph(last_paragraph) = last_child {
+                    last_paragraph.merge(child_paragraph);
+                    continue;
+                }
+            }
+
+            children.push(BlockNode::Paragraph(child_paragraph));
+        }
+    }
+
+    consume_paragraph(&mut children, paragraph);
+
+    BlockNode::ListItem {
+        children,
+        spread: false,
+        checked: None,
+        span: None,
+    }
+}
+
+/// Parses a `table` element from its rows, read through `thead`/`tbody` or directly.
+fn parse_table(node: &Rc<Node>, paragraph: &mut Paragraph) -> BlockNode {
+    let mut children = vec![];
+    consume_paragraph(&mut children, paragraph);
+
+    let mut table = Table::default();
+    for child in node.children.borrow().iter() {
+        match child.data {
+            NodeData::Element { ref name, .. }
+                if name.local == local_name!("tbody") || name.local == local_name!("thead") =>
+            {
+                for sub_child in child.children.borrow().iter() {
+                    parse_table_row(&mut table, &sub_child);
+                }
+            }
+            _ => {
+                parse_table_row(&mut table, &child);
+            }
+        }
+    }
+    consume_paragraph(&mut children, paragraph);
+
+    after_leading_blocks(children, BlockNode::Table(table))
+}
+
+/// Parses a generic block element, splitting the inline text around it into paragraphs.
+fn parse_block_element(
+    node: &Rc<Node>,
+    paragraph: &mut Paragraph,
+    cx: &mut NodeContext,
+) -> Option<BlockNode> {
+    let mut children: Vec<BlockNode> = vec![];
+
+    // Case:
+    //
+    // Hello <p>Inner text of block element</p> World
+
+    // Insert before text as a node -- The "Hello"
+    consume_paragraph(&mut children, paragraph);
+
+    // Inner of the block element -- The "Inner text of block element"
+    for child in node.children.borrow().iter() {
+        if let Some(child_node) = parse_node(child, paragraph, cx) {
+            children.push(child_node);
+        }
+    }
+    consume_paragraph(&mut children, paragraph);
+
+    if children.is_empty() {
+        None
+    } else {
+        Some(BlockNode::Root {
+            children,
+            span: None,
+        })
     }
 }
 
