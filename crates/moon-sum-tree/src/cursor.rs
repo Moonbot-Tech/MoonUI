@@ -643,7 +643,9 @@ impl<'a, T: Item> Iterator for Iter<'a, T> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let lower_bound = match self.stack.last() {
-            Some(top) => top.tree.0.child_summaries().len() - top.index as usize,
+            // `next` only returns from a leaf and leaves that leaf on top with `index` at the
+            // item it just yielded, so that item is already behind the iterator.
+            Some(top) => top.tree.0.child_summaries().len() - top.index as usize - 1,
             None => self.tree.0.child_summaries().len(),
         };
 
