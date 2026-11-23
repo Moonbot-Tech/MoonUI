@@ -44,12 +44,8 @@ fn parse_table_row(table: &mut Table, node: &mdast::TableRow, cx: &mut NodeConte
 }
 
 fn parse_table_cell(row: &mut node::TableRow, node: &mdast::TableCell, cx: &mut NodeContext) {
-    let mut paragraph = Paragraph::default();
-    node.children.iter().for_each(|c| {
-        parse_paragraph(&mut paragraph, c, cx);
-    });
     let table_cell = node::TableCell {
-        children: paragraph,
+        children: parse_inline_children(&node.children, cx),
         ..Default::default()
     };
     row.children.push(table_cell);
@@ -294,15 +290,48 @@ fn ast_to_document(
         _ => panic!("expected root node"),
     };
 
-    let blocks = root
-        .children
-        .into_iter()
-        .map(|c| ast_to_node(c, cx, highlight_theme))
-        .collect();
+    let blocks = ast_to_nodes(root.children, cx, highlight_theme);
     ParsedDocument {
         source: source.to_string().into(),
         blocks,
     }
+}
+
+/// Converts each block-level node in `children` into a `BlockNode`, keeping their order.
+fn ast_to_nodes(
+    children: Vec<mdast::Node>,
+    cx: &mut NodeContext,
+    highlight_theme: &HighlightTheme,
+) -> Vec<BlockNode> {
+    children
+        .into_iter()
+        .map(|c| ast_to_node(c, cx, highlight_theme))
+        .collect()
+}
+
+/// Parses each inline node in `children`, in order, into one new paragraph.
+///
+/// `parse_paragraph` sets the paragraph's span from every positioned child, so the result
+/// carries the span of its last positioned child; a caller that needs the parent's own span
+/// overwrites it afterwards, as `paragraph_block` does.
+fn parse_inline_children(children: &[mdast::Node], cx: &mut NodeContext) -> Paragraph {
+    let mut paragraph = Paragraph::default();
+    children.iter().for_each(|c| {
+        parse_paragraph(&mut paragraph, c, cx);
+    });
+    paragraph
+}
+
+/// Builds a paragraph block from inline `children` whose span is the parent's own `position`,
+/// shifted by `cx.offset`; the span is computed after the children are parsed.
+fn paragraph_block(
+    children: &[mdast::Node],
+    position: Option<markdown::unist::Position>,
+    cx: &mut NodeContext,
+) -> BlockNode {
+    let mut paragraph = parse_inline_children(children, cx);
+    paragraph.span = new_span(position, cx);
+    BlockNode::Paragraph(paragraph)
 }
 
 fn new_span(pos: Option<markdown::unist::Position>, cx: &NodeContext) -> Option<Span> {
@@ -321,31 +350,16 @@ fn ast_to_node(
 ) -> BlockNode {
     match value {
         Node::Root(_) => unreachable!("node::Root should be handled separately"),
-        Node::Paragraph(val) => {
-            let mut paragraph = Paragraph::default();
-            val.children.iter().for_each(|c| {
-                parse_paragraph(&mut paragraph, c, cx);
-            });
-            paragraph.span = new_span(val.position, cx);
-            BlockNode::Paragraph(paragraph)
-        }
+        Node::Paragraph(val) => paragraph_block(&val.children, val.position, cx),
         Node::Blockquote(val) => {
-            let children = val
-                .children
-                .into_iter()
-                .map(|c| ast_to_node(c, cx, highlight_theme))
-                .collect();
+            let children = ast_to_nodes(val.children, cx, highlight_theme);
             BlockNode::Blockquote {
                 children,
                 span: new_span(val.position, cx),
             }
         }
         Node::List(list) => {
-            let children = list
-                .children
-                .into_iter()
-                .map(|c| ast_to_node(c, cx, highlight_theme))
-                .collect();
+            let children = ast_to_nodes(list.children, cx, highlight_theme);
             BlockNode::List {
                 ordered: list.ordered,
                 children,
@@ -353,11 +367,7 @@ fn ast_to_node(
             }
         }
         Node::ListItem(val) => {
-            let children = val
-                .children
-                .into_iter()
-                .map(|c| ast_to_node(c, cx, highlight_theme))
-                .collect();
+            let children = ast_to_nodes(val.children, cx, highlight_theme);
             BlockNode::ListItem {
                 children,
                 spread: val.spread,
@@ -376,10 +386,7 @@ fn ast_to_node(
             new_span(raw.position, cx),
         )),
         Node::Heading(val) => {
-            let mut paragraph = Paragraph::default();
-            val.children.iter().for_each(|c| {
-                parse_paragraph(&mut paragraph, c, cx);
-            });
+            let paragraph = parse_inline_children(&val.children, cx);
 
             BlockNode::Heading {
                 level: val.depth,
@@ -424,22 +431,8 @@ fn ast_to_node(
             highlight_theme,
             new_span(val.position, cx),
         )),
-        Node::MdxJsxTextElement(val) => {
-            let mut paragraph = Paragraph::default();
-            val.children.iter().for_each(|c| {
-                parse_paragraph(&mut paragraph, c, cx);
-            });
-            paragraph.span = new_span(val.position, cx);
-            BlockNode::Paragraph(paragraph)
-        }
-        Node::MdxJsxFlowElement(val) => {
-            let mut paragraph = Paragraph::default();
-            val.children.iter().for_each(|c| {
-                parse_paragraph(&mut paragraph, c, cx);
-            });
-            paragraph.span = new_span(val.position, cx);
-            BlockNode::Paragraph(paragraph)
-        }
+        Node::MdxJsxTextElement(val) => paragraph_block(&val.children, val.position, cx),
+        Node::MdxJsxFlowElement(val) => paragraph_block(&val.children, val.position, cx),
         Node::ThematicBreak(val) => BlockNode::HorizontalRule {
             span: new_span(val.position, cx),
         },
