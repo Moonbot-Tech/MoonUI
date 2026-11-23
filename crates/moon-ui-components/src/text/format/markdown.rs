@@ -535,4 +535,133 @@ mod tests {
             "nested emphasis should produce a bold and italic mark"
         );
     }
+
+    /// Renders a span as `start..end`, or `-` when the node carries none.
+    fn span_text(span: Option<Span>) -> String {
+        span.map_or_else(|| "-".to_string(), |s| format!("{}..{}", s.start, s.end))
+    }
+
+    /// Renders a block tree as variant names, spans and leaf markdown, so a test pins where a
+    /// block landed, which source bytes it and its inline paragraph claim, and what it holds.
+    fn outline(node: &BlockNode) -> String {
+        let list =
+            |children: &[BlockNode]| children.iter().map(outline).collect::<Vec<_>>().join(", ");
+        match node {
+            BlockNode::Root { children, span } => {
+                format!("Root@{}[{}]", span_text(*span), list(children))
+            }
+            BlockNode::Blockquote { children, span } => {
+                format!("Quote@{}[{}]", span_text(*span), list(children))
+            }
+            BlockNode::List {
+                children,
+                ordered,
+                span,
+            } => format!(
+                "List(ordered={ordered})@{}[{}]",
+                span_text(*span),
+                list(children)
+            ),
+            BlockNode::ListItem {
+                children,
+                spread,
+                checked,
+                span,
+            } => format!(
+                "Item(spread={spread}, checked={checked:?})@{}[{}]",
+                span_text(*span),
+                list(children)
+            ),
+            BlockNode::Heading {
+                level,
+                children,
+                span,
+            } => format!(
+                "H{level}@{}/{}({:?})",
+                span_text(*span),
+                span_text(children.span),
+                node.to_markdown()
+            ),
+            BlockNode::Paragraph(paragraph) => {
+                format!("P@{}({:?})", span_text(paragraph.span), node.to_markdown())
+            }
+            BlockNode::Table(table) => {
+                let rows = table
+                    .children
+                    .iter()
+                    .map(|row| {
+                        row.children
+                            .iter()
+                            .map(|cell| {
+                                format!(
+                                    "{}{:?}",
+                                    span_text(cell.children.span),
+                                    BlockNode::Paragraph(cell.children.clone()).to_markdown()
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" / ");
+                format!("Table@{}[{rows}]", span_text(table.span))
+            }
+            other => format!("Other({other:?})"),
+        }
+    }
+
+    /// Catches a change to `markdown.rs:ast_to_node` or `ast_to_document` that drops, reorders
+    /// or re-nests a block, loses the `cx.offset` shift, or lets a paragraph keep the span of its
+    /// last inline child instead of its own: selection and incremental re-parse in the text view
+    /// would map to the wrong source bytes.
+    #[test]
+    fn markdown_blocks_keep_their_shape_and_spans() {
+        let source = "# Title *em*\n\npara **b**\n\n> quote\n>\n> - nested\n\n1. one\n2. [x] done\n\n| H | I |\n|---|---|\n| a | *b* |\n";
+        let mut cx = NodeContext {
+            offset: 100,
+            ..Default::default()
+        };
+        let document = parse(source, &mut cx, &HighlightTheme::default_light()).unwrap();
+
+        assert_eq!(document.source.as_ref(), source);
+        let actual = document
+            .blocks
+            .iter()
+            .map(outline)
+            .collect::<Vec<_>>()
+            .join(" | ");
+        assert_eq!(
+            actual,
+            r##"H1@100..112/108..112("# Title *em*") | P@114..124("para **b**") | Quote@126..146[P@128..133("quote"), List(ordered=false)@138..146[Item(spread=false, checked=None)@138..146[P@140..146("nested")]]] | List(ordered=true)@148..167[Item(spread=false, checked=None)@148..154[P@151..154("one")], Item(spread=false, checked=Some(true))@155..167[P@162..166("done")]] | Table@168..199[170..171"H" 174..175"I" / 190..191"a" 194..197"*b*"]"##
+        );
+    }
+
+    /// Catches a change to `markdown.rs:ast_to_node` that stops turning an MDX JSX element into
+    /// one paragraph of its inline children carrying the element's own span: MDX content would
+    /// vanish or claim the wrong source bytes.
+    #[test]
+    fn mdx_jsx_elements_become_paragraphs_with_their_own_span() {
+        let source = "<X>\nhi *a*\n</X>\n\nsome <Y>b **c**</Y>\n";
+        let root = markdown::to_mdast(source, &ParseOptions::mdx()).unwrap();
+        let Node::Root(root) = root else {
+            panic!("expected root");
+        };
+        let mut cx = NodeContext::default();
+        let theme = HighlightTheme::default_light();
+
+        let flow = root.children[0].clone();
+        assert!(matches!(flow, Node::MdxJsxFlowElement(_)));
+        let Node::Paragraph(paragraph) = &root.children[1] else {
+            panic!("expected paragraph");
+        };
+        let text = paragraph.children[1].clone();
+        assert!(matches!(text, Node::MdxJsxTextElement(_)));
+
+        let actual = [flow, text]
+            .into_iter()
+            .map(|node| outline(&ast_to_node(node, &mut cx, &theme)))
+            .collect::<Vec<_>>()
+            .join(" | ");
+        assert_eq!(actual, r#"P@0..15("hi *a*") | P@22..36("b **c**")"#);
+    }
 }
