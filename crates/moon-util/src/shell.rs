@@ -232,50 +232,42 @@ impl ShellKind {
         }
     }
 
+    /// Rewrites a POSIX `$NAME` / `${NAME}` argument into cmd's `%NAME%`.
+    ///
+    /// Any other input comes back unchanged; see [`Self::rewrite_env_reference`].
     fn to_cmd_variable(input: &str) -> String {
-        if let Some(var_str) = input.strip_prefix("${") {
-            if var_str.find(':').is_none() {
-                // If the input is a whole "${NAME}", unwrap the name. Without a
-                // trailing "}" there is no braced name to convert, so the input
-                // is returned as is rather than cut by one character.
-                match var_str.strip_suffix('}') {
-                    Some(name) => format!("%{}%", name),
-                    None => input.into(),
-                }
-            } else {
-                // `${SOME_VAR:-SOME_DEFAULT}`, we currently do not handle this situation,
-                // which will result in the task failing to run in such cases.
-                input.into()
-            }
-        } else if let Some(var_str) = input.strip_prefix('$') {
-            // If the input starts with "$", directly append to "$env:"
-            format!("%{}%", var_str)
-        } else {
-            // If no prefix is found, return the input as is
-            input.into()
-        }
+        Self::rewrite_env_reference(input, |name| format!("%{}%", name))
     }
 
+    /// Rewrites a POSIX `$NAME` / `${NAME}` argument into PowerShell's `$env:NAME`.
+    ///
+    /// Any other input comes back unchanged; see [`Self::rewrite_env_reference`].
     fn to_powershell_variable(input: &str) -> String {
+        Self::rewrite_env_reference(input, |name| format!("$env:{}", name))
+    }
+
+    /// Finds the variable name a whole-argument POSIX reference names and
+    /// renders it with `wrap`, the target shell's own variable syntax.
+    ///
+    /// `$NAME` passes everything after the `$` to `wrap`; `${NAME}` passes the
+    /// text between the braces. The input is returned unchanged when it does
+    /// not start with `$`, when a `${` form has no trailing `}` (there is no
+    /// braced name to unwrap, so nothing is cut), and for a `${NAME:-DEFAULT}`
+    /// substitution, which this rewrite does not handle, so such a task fails
+    /// to run in cmd or PowerShell.
+    fn rewrite_env_reference(input: &str, wrap: impl FnOnce(&str) -> String) -> String {
         if let Some(var_str) = input.strip_prefix("${") {
             if var_str.find(':').is_none() {
-                // If the input is a whole "${NAME}", unwrap the name. Without a
-                // trailing "}" there is no braced name to convert, so the input
-                // is returned as is rather than cut by one character.
                 match var_str.strip_suffix('}') {
-                    Some(name) => format!("$env:{}", name),
+                    Some(name) => wrap(name),
                     None => input.into(),
                 }
             } else {
-                // `${SOME_VAR:-SOME_DEFAULT}`, we currently do not handle this situation,
-                // which will result in the task failing to run in such cases.
                 input.into()
             }
         } else if let Some(var_str) = input.strip_prefix('$') {
-            // If the input starts with "$", directly append to "$env:"
-            format!("$env:{}", var_str)
+            wrap(var_str)
         } else {
-            // If no prefix is found, return the input as is
             input.into()
         }
     }
