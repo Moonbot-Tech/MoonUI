@@ -14,7 +14,8 @@ use gpui::{
 };
 
 use crate::{
-    ActiveTheme as _, Edges, Icon, IconName, Sizable as _, StyledExt, TITLE_BAR_HEIGHT,
+    ActiveTheme as _, Disableable as _, Edges, Icon, IconName, Sizable as _, StyledExt,
+    TITLE_BAR_HEIGHT,
     animation::cubic_bezier,
     button::{Button, ButtonVariants as _},
     h_flex, v_flex,
@@ -71,6 +72,7 @@ pub struct Notification {
     message: Option<SharedString>,
     icon: Option<Icon>,
     autohide: bool,
+    autohide_after: Duration,
     action_builder: Option<Rc<dyn Fn(&mut Self, &mut Window, &mut Context<Self>) -> Button>>,
     content_builder: Option<Rc<dyn Fn(&mut Self, &mut Window, &mut Context<Self>) -> AnyElement>>,
     on_click: Option<Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>>,
@@ -129,6 +131,7 @@ impl Notification {
             type_: None,
             icon: None,
             autohide: true,
+            autohide_after: Duration::from_secs(5),
             action_builder: None,
             content_builder: None,
             on_click: None,
@@ -216,6 +219,12 @@ impl Notification {
         self
     }
 
+    /// Set how long an autohiding notification stays open before dismissal starts.
+    pub fn autohide_after(mut self, duration: Duration) -> Self {
+        self.autohide_after = duration;
+        self
+    }
+
     /// Set the click callback of the notification.
     pub fn on_click(
         mut self,
@@ -236,7 +245,7 @@ impl Notification {
 
     /// Set the action button of the notification.
     ///
-    /// When an action is set, the notification will not autohide.
+    /// Adding an action disables autohide until a later call to [`Self::autohide`] enables it.
     pub fn action<F>(mut self, action: F) -> Self
     where
         F: Fn(&mut Self, &mut Window, &mut Context<Self>) -> Button + 'static,
@@ -291,15 +300,18 @@ impl Styled for Notification {
 }
 
 impl Render for Notification {
+    /// Render the notification and disable its action while dismissal is in progress.
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let content = self
             .content_builder
             .clone()
             .map(|builder| builder(self, window, cx));
-        let action = self
-            .action_builder
-            .clone()
-            .map(|builder| builder(self, window, cx).small().mr_3p5());
+        let action = self.action_builder.clone().map(|builder| {
+            builder(self, window, cx)
+                .small()
+                .mr_3p5()
+                .when(self.closing, |button| button.disabled(true))
+        });
 
         let closing = self.closing;
         let icon = match self.type_ {
@@ -464,6 +476,7 @@ impl NotificationList {
         }
     }
 
+    /// Insert or replace a notification and schedule dismissal for the inserted entry.
     pub fn push(
         &mut self,
         notification: impl Into<Notification>,
@@ -473,6 +486,7 @@ impl NotificationList {
         let notification = notification.into();
         let id = notification.id.clone();
         let autohide = notification.autohide;
+        let autohide_after = notification.autohide_after;
 
         // Remove the notification by id, for keep unique.
         self.notifications.retain(|note| note.read(cx).id != id);
@@ -487,17 +501,22 @@ impl NotificationList {
             }),
         );
 
-        self.notifications.push_back(notification.clone());
+        let entity_id = notification.entity_id();
+        self.notifications.push_back(notification);
         if autohide {
-            // Sleep for 5 seconds to autohide the notification
-            cx.spawn_in(window, async move |_, cx| {
-                cx.background_executor().timer(Duration::from_secs(5)).await;
+            cx.spawn_in(window, async move |list, cx| {
+                cx.background_executor().timer(autohide_after).await;
 
-                if let Err(err) =
-                    notification.update_in(cx, |note, window, cx| note.dismiss(window, cx))
-                {
-                    tracing::error!("failed to auto hide notification: {:?}", err);
-                }
+                // An action or replacement may already have removed this entry.
+                _ = list.update_in(cx, |list, window, cx| {
+                    if let Some(note) = list
+                        .notifications
+                        .iter()
+                        .find(|n| n.entity_id() == entity_id)
+                    {
+                        note.update(cx, |note, cx| note.dismiss(window, cx));
+                    }
+                });
             })
             .detach();
         }

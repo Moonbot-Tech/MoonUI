@@ -184,6 +184,7 @@ pub struct MoonMenuItem {
     pub(super) tone: MoonTone,
     pub(super) selected: bool,
     pub(super) checked: bool,
+    emphasized: bool,
     pub(super) disabled: bool,
     pub(super) actionable: bool,
     pub(super) submenu: MoonMenuLevel,
@@ -210,6 +211,7 @@ impl Clone for MoonMenuItem {
             tone: self.tone,
             selected: self.selected,
             checked: self.checked,
+            emphasized: self.emphasized,
             disabled: self.disabled,
             actionable: self.actionable,
             submenu: self.submenu.clone(),
@@ -246,6 +248,7 @@ impl MoonMenuItem {
             tone: MoonTone::Default,
             selected: false,
             checked: false,
+            emphasized: false,
             disabled: false,
             actionable: true,
             submenu: MoonMenuLevel::empty(),
@@ -271,6 +274,7 @@ impl MoonMenuItem {
             tone: MoonTone::Default,
             selected: false,
             checked: false,
+            emphasized: false,
             disabled: false,
             actionable: true,
             submenu: MoonMenuLevel::empty(),
@@ -315,6 +319,7 @@ impl MoonMenuItem {
             tone: MoonTone::Muted,
             selected: false,
             checked: false,
+            emphasized: false,
             disabled: true,
             actionable: false,
             submenu: MoonMenuLevel::empty(),
@@ -332,7 +337,7 @@ impl MoonMenuItem {
     ///
     /// Honoured by ordinary rows and by label rows alike, so a section heading or a click-only
     /// action row can carry a count without borrowing the checkbox column that would make it read
-    /// as selectable state. On an ordinary row it also replaces the submenu chevron.
+    /// as selectable state. On a submenu row it appears immediately before the chevron.
     ///
     /// Args:
     ///     right_label: Trailing text, typically a count or a shortcut.
@@ -360,6 +365,17 @@ impl MoonMenuItem {
     pub fn checked(mut self, checked: bool) -> Self {
         self.checked = checked;
         self
+    }
+
+    /// Set whether the row's main label uses bold weight.
+    pub fn emphasized(mut self, on: bool) -> Self {
+        self.emphasized = on;
+        self
+    }
+
+    /// Resolve the label weight while preserving the caller's normal weight.
+    pub(super) fn label_weight(&self, normal: f32) -> f32 {
+        if self.emphasized { 700.0 } else { normal }
     }
 
     /// Set whether this row rejects pointer and keyboard activation.
