@@ -1,4 +1,4 @@
-use std::{rc::Rc, time::Duration};
+use std::{cell::Cell, rc::Rc, time::Duration};
 
 use gpui::{App, InteractiveElement as _, SharedString, Window};
 
@@ -64,9 +64,12 @@ impl MoonNotification {
         self
     }
 
-    /// Add a small ghost button that invokes the handler and then dismisses the notification.
+    /// Add a small ghost button that invokes the handler once and then dismisses the notification.
     ///
-    /// The action enables autohide. Call [`Self::autohide`] afterward to override it.
+    /// This builder enables autohide, which starts dismissal after five seconds by default.
+    /// Use [`Self::autohide_after`] to change the delay or call [`Self::autohide`] with `false`
+    /// afterward to keep the notification open until it is dismissed.
+    /// The base [`Notification::action`] builder disables autohide.
     pub fn action(
         mut self,
         label: impl Into<SharedString>,
@@ -74,17 +77,23 @@ impl MoonNotification {
     ) -> Self {
         let label = label.into();
         let on_click = Rc::new(on_click);
+        let fired = Rc::new(Cell::new(false));
         self.inner = self
             .inner
             .action(move |_, _, cx| {
                 let notification = cx.weak_entity();
                 let on_click = on_click.clone();
+                let fired = fired.clone();
                 Button::new("moon-notification-action")
                     .debug_selector(|| "moon-notification-action".into())
                     .label(label.clone())
                     .ghost()
                     .on_click(move |_, window, cx| {
                         cx.stop_propagation();
+                        // A second click can arrive before the closing frame disables the button.
+                        if fired.replace(true) {
+                            return;
+                        }
                         on_click(window, cx);
                         _ = notification.update(cx, |note, cx| note.dismiss(window, cx));
                     })

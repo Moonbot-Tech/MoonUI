@@ -1,8 +1,15 @@
 //! Regression coverage for timed and clicked dismissal of Moon notifications.
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
-use gpui::{AppContext as _, Context, IntoElement, Modifiers, Render, TestAppContext, Window};
+use gpui::{
+    AppContext as _, Context, IntoElement, Modifiers, MouseButton, MouseDownEvent, MouseUpEvent,
+    PlatformInput, Render, TestAppContext, Window,
+};
 
 use super::MoonNotification;
 use crate::{
@@ -102,5 +109,63 @@ fn action_click_runs_handler_and_dismisses(cx: &mut TestAppContext) {
             .background_executor
             .advance_clock(Duration::from_millis(200));
         assert_eq!(*events.borrow(), ["undo", "close"]);
+    }
+}
+
+/// Catches relying on the next render to disable the button, which lets a double click run it twice.
+#[gpui::test]
+fn action_runs_once_on_double_click_before_render(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    for mode in [ThemeMode::Dark, ThemeMode::Light] {
+        cx.update(|cx| MoonTheme::set_mode(mode, cx));
+        let runs = Rc::new(Cell::new(0));
+        let clicked = runs.clone();
+        let (_, visual) = cx.add_window_view(|window, cx| {
+            let view = cx.new(|_| NotificationHarness);
+            Root::new(view, window, cx).bordered(false)
+        });
+        visual.update(|window, cx| {
+            window.push_notification(
+                MoonNotification::success("Rule added")
+                    .action("Undo", move |_, _| clicked.set(clicked.get() + 1)),
+                cx,
+            );
+        });
+        visual.run_until_parked();
+        visual
+            .background_executor
+            .advance_clock(Duration::from_millis(300));
+        visual.update(|window, _| window.refresh());
+        visual.run_until_parked();
+        let position = visual
+            .debug_bounds("moon-notification-action")
+            .expect("action button")
+            .center();
+
+        // Dispatch both clicks in the same update, leaving no frame between them.
+        visual.update(|window, cx| {
+            for click_count in [1, 2] {
+                window.dispatch_event(
+                    PlatformInput::MouseDown(MouseDownEvent {
+                        position,
+                        modifiers: Modifiers::none(),
+                        button: MouseButton::Left,
+                        click_count,
+                        first_mouse: false,
+                    }),
+                    cx,
+                );
+                window.dispatch_event(
+                    PlatformInput::MouseUp(MouseUpEvent {
+                        position,
+                        modifiers: Modifiers::none(),
+                        button: MouseButton::Left,
+                        click_count,
+                    }),
+                    cx,
+                );
+            }
+        });
+        assert_eq!(runs.get(), 1);
     }
 }
