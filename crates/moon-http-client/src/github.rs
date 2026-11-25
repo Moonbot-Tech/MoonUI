@@ -99,9 +99,16 @@ pub async fn get_release_by_tag_name(
     tag: &str,
     http: Arc<dyn HttpClient>,
 ) -> anyhow::Result<GithubRelease> {
-    let url = format!("{GITHUB_API_URL}/repos/{repo_name_with_owner}/releases/tags/{tag}");
+    let mut url = Url::parse(&format!(
+        "{GITHUB_API_URL}/repos/{repo_name_with_owner}/releases/tags"
+    ))?;
+    // Tags may contain `#`, `%` and other characters that need to be escaped; `/` stays a
+    // path separator.
+    url.path_segments_mut()
+        .map_err(|()| anyhow!("cannot modify url path segments"))?
+        .extend(tag.split('/'));
 
-    let request = Request::get(&url)
+    let request = Request::get(url.as_str())
         .follow_redirects(crate::RedirectPolicy::FollowAll)
         .when_some(std::env::var("GITHUB_TOKEN").ok(), |builder, token| {
             builder.header("Authorization", format!("Bearer {}", token))
