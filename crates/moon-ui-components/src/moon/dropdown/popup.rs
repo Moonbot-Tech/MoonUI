@@ -738,6 +738,7 @@ impl MoonPopupMenu {
                 .bg(rgba_from(p.border, 0.82))
                 .into_any_element(),
             MoonMenuItemKind::Label => {
+                let weight = item.label_weight(500.0);
                 let disabled = item.disabled;
                 let actionable = moon_menu_item_accepts_click(
                     MoonMenuItemKind::Label,
@@ -767,7 +768,7 @@ impl MoonPopupMenu {
                             .color(p.text_muted)
                             .alpha(0.88)
                             .rendered_metrics(metrics.into())
-                            .weight(500.0)
+                            .weight(weight)
                             .mono(mono)
                             .uppercase(false)
                             .render(),
@@ -802,6 +803,7 @@ impl MoonPopupMenu {
                 let disabled = item.disabled;
                 let selected = item.selected || open;
                 let checked = item.checked;
+                let weight = item.label_weight(if selected { 600.0 } else { 400.0 });
                 let on_click = menu_item_click_handler(&item, context.dropdown_selection.as_ref());
                 let submenu = item.submenu;
                 let has_submenu = !submenu.items.is_empty();
@@ -854,7 +856,7 @@ impl MoonPopupMenu {
                             .color(fg)
                             .alpha(alpha)
                             .rendered_metrics(metrics.into())
-                            .weight(if selected { 600.0 } else { 400.0 })
+                            .weight(weight)
                             .mono(mono)
                             .uppercase(false)
                             .render(),

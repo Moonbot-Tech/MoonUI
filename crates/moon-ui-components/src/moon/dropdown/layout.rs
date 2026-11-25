@@ -291,6 +291,7 @@ fn menu_width_requirements(
         .map(|item| match item.kind {
             MoonMenuItemKind::Separator => (0.0, 0.0),
             MoonMenuItemKind::Label => {
+                let weight = item.label_weight(500.0);
                 let (trailing_natural, trailing_minimum) =
                     trailing_label_widths(item.right_label.as_ref(), metrics, &mut measure);
                 let trailing_gap = if item.right_label.is_some() {
@@ -300,16 +301,17 @@ fn menu_width_requirements(
                 };
                 let chrome = metrics.pad_x * 2.0 + trailing_gap;
                 let natural = chrome
-                    + measure(item.label.as_ref(), metrics.font_size, 500.0)
+                    + measure(item.label.as_ref(), metrics.font_size, weight)
                     + trailing_natural;
                 let marker = if item.label.is_empty() {
                     0.0
                 } else {
-                    measure("\u{2026}", metrics.font_size, 500.0)
+                    measure("\u{2026}", metrics.font_size, weight)
                 };
                 (natural, chrome + marker + trailing_minimum)
             }
             MoonMenuItemKind::Item => {
+                let weight = item.label_weight(600.0);
                 let (trailing_natural, trailing_minimum) = if item.right_label.is_some() {
                     trailing_label_widths(item.right_label.as_ref(), metrics, &mut measure)
                 } else if item.has_submenu() {
@@ -321,11 +323,11 @@ fn menu_width_requirements(
                 let has_trailing = item.right_label.is_some() || item.has_submenu();
                 let gaps = if has_trailing { 3.0 } else { 2.0 };
                 let chrome = metrics.pad_x * 2.0 + menu_check_width(tokens) + metrics.gap * gaps;
-                let label_natural = measure(item.label.as_ref(), metrics.font_size, 600.0);
+                let label_natural = measure(item.label.as_ref(), metrics.font_size, weight);
                 let label_minimum = if item.label.is_empty() {
                     0.0
                 } else {
-                    measure("\u{2026}", metrics.font_size, 600.0)
+                    measure("\u{2026}", metrics.font_size, weight)
                 };
                 (
                     chrome + label_natural + trailing_natural,
@@ -383,6 +385,7 @@ pub(super) fn fit_menu_item_label(
     match item.kind {
         MoonMenuItemKind::Separator => {}
         MoonMenuItemKind::Label => {
+            let weight = item.label_weight(500.0);
             let trailing_gap = if item.right_label.is_some() {
                 metrics.gap
             } else {
@@ -392,19 +395,20 @@ pub(super) fn fit_menu_item_label(
             fit_trailing_label(
                 &mut item.right_label,
                 &mut budget,
-                500.0,
+                weight,
                 metrics,
                 tokens,
                 cx,
                 mono,
             );
             let fitted = fit_text_to_width(item.label.as_ref(), budget, |text| {
-                measure_menu_text_width(cx, tokens, text, metrics.font_size, 500.0, mono)
+                measure_menu_text_width(cx, tokens, text, metrics.font_size, weight, mono)
             })
             .0;
             item.label = SharedString::from(fitted);
         }
         MoonMenuItemKind::Item => {
+            let weight = item.label_weight(600.0);
             let has_submenu = item.has_submenu();
             let trailing_gaps = if item.right_label.is_some() || has_submenu {
                 3.0
@@ -422,7 +426,7 @@ pub(super) fn fit_menu_item_label(
                 fit_trailing_label(
                     &mut item.right_label,
                     &mut text_budget,
-                    600.0,
+                    weight,
                     metrics,
                     tokens,
                     cx,
@@ -442,7 +446,7 @@ pub(super) fn fit_menu_item_label(
             }
 
             let fitted = fit_text_to_width(item.label.as_ref(), text_budget, |text| {
-                measure_menu_text_width(cx, tokens, text, metrics.font_size, 600.0, mono)
+                measure_menu_text_width(cx, tokens, text, metrics.font_size, weight, mono)
             })
             .0;
             item.label = SharedString::from(fitted);

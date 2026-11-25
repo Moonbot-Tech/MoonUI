@@ -1318,6 +1318,45 @@ fn fitted_menu_accounts_for_right_label_and_its_gap() {
     );
 }
 
+/// Catches sizing a fitted bold row with the narrower normal-weight glyphs.
+#[gpui::test]
+fn emphasized_row_measures_bold_and_fits(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let label = "Open trade window";
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        let tokens = MoonThemeTokens {
+            palette,
+            ..MoonThemeTokens::default()
+        };
+        let metrics = menu_row_metrics(MoonMenuSize::from_theme(&tokens), &tokens);
+        let normal = MoonMenuItem::new(label);
+        let mut emphasized = [normal.clone().emphasized(true).clone()];
+        // GPUI's test text system has identical advances at every weight.
+        let measure =
+            |text: &str, _: f32, weight: f32| text.chars().count() as f32 * (weight / 100.0);
+        let normal_width = natural_menu_width(&[normal], metrics, &tokens, measure);
+        let bold_width = natural_menu_width(&emphasized, metrics, &tokens, measure);
+        assert_eq!(bold_width - normal_width, label.len() as f32);
+
+        cx.update(|cx| {
+            let (width, truncate_labels) = resolve_menu_width(
+                MoonMenuWidth::Fit {
+                    min: 60.0,
+                    max: 560.0,
+                },
+                &emphasized,
+                metrics,
+                &tokens,
+                cx,
+                false,
+            );
+            assert!(!truncate_labels);
+            fit_menu_item_labels(&mut emphasized, width, metrics, &tokens, cx, false);
+        });
+        assert_eq!(emphasized[0].label.as_ref(), label);
+    }
+}
+
 /// Root view containing a fitted parent menu with an immediately visible selected submenu.
 struct FittedSubmenuHarness;
 

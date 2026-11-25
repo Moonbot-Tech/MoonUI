@@ -1687,6 +1687,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/dropdown.rs",
+      "signature": "pub fn emphasized(mut self, on: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/dropdown.rs",
       "signature": "pub fn fit_menu_width(mut self, min_width: f32, max_width: f32) -> Self"
     },
     {
