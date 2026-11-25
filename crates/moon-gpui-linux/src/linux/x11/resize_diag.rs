@@ -3,7 +3,8 @@
 //! Whether a resize stalls is a runtime question, and the machine it stalls on is never the one
 //! the code is written on. So the window keeps a handful of counters while sizes arrive and
 //! writes one line per second, for as long as they keep arriving and never otherwise: how many
-//! sizes it applied, how long the X server and the GPU surface took, how many frames it drew and
+//! sizes it applied and how many of those left the surface for later, how long the X server and
+//! each GPU surface rebuild took, how many frames it drew and
 //! how many of those were not presented, and how long the window manager waited for its answer.
 //!
 //! Deliberately free of every X and toolkit type, like `display/geometry.rs`: depending on nothing
@@ -61,13 +62,16 @@ pub(crate) fn millis(duration: Duration) -> f64 {
 /// What one period of a resize cost. Printed as the log line.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct Summary {
-    /// Sizes the window applied: its surface was resized and the toolkit told.
+    /// Sizes the window applied: the toolkit was told, and the surface resized unless deferred.
     pub(crate) applied: u32,
     /// Sizes dropped unapplied, because a newer one for the same window had already arrived.
     pub(crate) skipped: u32,
+    /// Sizes of `applied` whose surface rebuild was left for the end of the burst
+    /// (`surface_pacing.rs`).
+    pub(crate) deferred: u32,
     /// Time spent waiting for the X server while applying a size.
     pub(crate) server: Span,
-    /// Time spent resizing the GPU surface while applying a size.
+    /// Time spent rebuilding the GPU surface, at a size or once a burst of deferred sizes ended.
     pub(crate) surface: Span,
     /// Frames handed to the renderer.
     pub(crate) frames: u32,
@@ -81,13 +85,15 @@ impl fmt::Display for Summary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} sizes applied, {} skipped; X server {:.1} ms mean, {:.1} longest; \
-             surface {:.1} ms mean, {:.1} longest; {} frames, {} not presented; \
+            "{} sizes applied, {} skipped, {} deferred; X server {:.1} ms mean, {:.1} longest; \
+             surface {} rebuilt, {:.1} ms mean, {:.1} longest; {} frames, {} not presented; \
              {} answers to the window manager, {:.1} ms mean after the size, {:.1} longest",
             self.applied,
             self.skipped,
+            self.deferred,
             self.server.mean_ms(),
             self.server.longest_ms(),
+            self.surface.count(),
             self.surface.mean_ms(),
             self.surface.longest_ms(),
             self.frames,
@@ -118,6 +124,20 @@ impl ResizeDiag {
         self.open(now);
         self.summary.applied += 1;
         self.summary.server.add(server);
+        self.summary.surface.add(surface);
+    }
+
+    /// A size was applied with its surface rebuild deferred; `server` is what the X server took.
+    pub(crate) fn size_deferred(&mut self, now: Instant, server: Duration) {
+        self.open(now);
+        self.summary.applied += 1;
+        self.summary.deferred += 1;
+        self.summary.server.add(server);
+    }
+
+    /// The surface was rebuilt for the sizes deferred until now, and took `surface`.
+    pub(crate) fn surface_rebuilt(&mut self, now: Instant, surface: Duration) {
+        self.open(now);
         self.summary.surface.add(surface);
     }
 
