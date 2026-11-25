@@ -4,11 +4,15 @@ use super::{
     MoonContextMenuOverlay, MoonContextMenuWindowExt as _, context_menu_clamped_origin,
     context_menu_max_height,
 };
-use crate::moon::dropdown::{MoonMenuItem, take_menu_item_clone_probe_count};
+use crate::moon::dropdown::{
+    MoonMenuItem, MoonMenuSize, menu_row_metrics, take_menu_item_clone_probe_count,
+};
+use crate::moon::text::measure_rendered_text_width;
 use crate::moon::{MoonPalette, MoonScale, MoonTheme};
 use crate::{Root, WindowExt as _};
 use gpui::{
-    AppContext as _, Context, IntoElement, Modifiers, Render, Styled as _, Window, point, px,
+    AppContext as _, Context, IntoElement, Modifiers, Render, Styled as _, VisualTestContext,
+    Window, point, px,
 };
 use std::{cell::Cell, rc::Rc};
 
@@ -104,6 +108,83 @@ fn open_fitted_and_measure(
         .expect("fitted Root-owned context menu must expose its popup bounds");
     let viewport = visual.update(|window, _| window.viewport_size());
     (bounds, viewport)
+}
+
+/// Render one fitted menu row through the root overlay for geometry assertions.
+fn open_fit_probe(
+    cx: &mut gpui::TestAppContext,
+    palette: MoonPalette,
+    item: MoonMenuItem,
+) -> &mut VisualTestContext {
+    cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+    let (_, visual) = cx.add_window_view(|window, cx| {
+        let view = cx.new(|_| ContextMenuHarness);
+        Root::new(view, window, cx).bordered(false)
+    });
+    visual.update(|window, cx| {
+        window.open_fitted_moon_context_menu(
+            cx,
+            "fit-probe",
+            point(px(30.0), px(30.0)),
+            vec![item],
+            60.0,
+            560.0,
+        );
+    });
+    for _ in 0..8 {
+        visual.update(|window, _| window.refresh());
+        visual.run_until_parked();
+        if visual.debug_bounds("fit-probe:menu:popup:item:0").is_some() {
+            break;
+        }
+    }
+    visual
+}
+
+/// Catches dropping either trailing element or leaving too little room for the full labels.
+#[gpui::test]
+fn submenu_row_with_right_label_shows_both_without_overlap(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    let label = "Blacklist";
+    let status = "2 hours";
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        let item = MoonMenuItem::new(label)
+            .right_label(status)
+            .submenu([MoonMenuItem::new("Manage")]);
+        let visual = open_fit_probe(cx, palette, item);
+        let row = visual
+            .debug_bounds("fit-probe:menu:popup:item:0")
+            .expect("submenu row");
+        let main = visual
+            .debug_bounds("fit-probe:menu:popup:item:0:label")
+            .expect("main label");
+        let right = visual
+            .debug_bounds("fit-probe:menu:popup:item:0:right-label")
+            .expect("right label");
+        let caret = visual
+            .debug_bounds("fit-probe:menu:popup:item:0:caret")
+            .expect("submenu caret");
+        let (main_width, right_width) = visual.update(|_, cx| {
+            let tokens = MoonTheme::active_tokens(cx);
+            let metrics = menu_row_metrics(MoonMenuSize::from_theme(&tokens), &tokens);
+            (
+                measure_rendered_text_width(cx, &tokens, label, metrics.font_size, 400.0, false),
+                measure_rendered_text_width(
+                    cx,
+                    &tokens,
+                    status,
+                    metrics.trailing_font_size,
+                    400.0,
+                    false,
+                ),
+            )
+        });
+
+        assert!(row.left() < main.left() && main.right() < right.left());
+        assert!(right.right() < caret.left() && caret.right() < row.right());
+        assert!((f32::from(main.size.width) - main_width).abs() <= 1.0);
+        assert!((f32::from(right.size.width) - right_width).abs() <= 1.0);
+    }
 }
 
 /// Catches collapsing the fitted context-menu route back to its minimum width or leaving its

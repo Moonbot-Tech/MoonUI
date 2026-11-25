@@ -337,7 +337,7 @@ impl MoonMenuItem {
     ///
     /// Honoured by ordinary rows and by label rows alike, so a section heading or a click-only
     /// action row can carry a count without borrowing the checkbox column that would make it read
-    /// as selectable state. On an ordinary row it also replaces the submenu chevron.
+    /// as selectable state. On a submenu row it appears immediately before the chevron.
     ///
     /// Args:
     ///     right_label: Trailing text, typically a count or a shortcut.

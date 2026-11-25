@@ -2,6 +2,7 @@
 
 use super::super::skin::{MoonFacet, MoonFacetKind, facet};
 use super::super::theme::MoonTextMetrics;
+use super::layout::{MENU_SUBMENU_CARET, MENU_SUBMENU_CARET_WEIGHT};
 use super::*;
 
 mod submenu;
@@ -90,7 +91,7 @@ fn menu_trailing_label(
     metrics: MenuMetrics,
     mono: bool,
     alpha: f32,
-) -> AnyElement {
+) -> MoonText {
     MoonText::new(right_label)
         .color(p.text_muted)
         .alpha(alpha)
@@ -102,7 +103,18 @@ fn menu_trailing_label(
         .mono(mono)
         .uppercase(false)
         .render()
-        .into_any_element()
+}
+
+/// Add a bounds selector to text in a row with both trailing elements.
+fn menu_row_text(text: MoonText, both_trailing: bool, row_id: &str, part: &str) -> AnyElement {
+    if both_trailing {
+        div()
+            .debug_selector(|| format!("{row_id}:{part}"))
+            .child(text)
+            .into_any_element()
+    } else {
+        text.into_any_element()
+    }
 }
 
 /// Design-reference corner radius of a menu under the Facet skin.
@@ -807,6 +819,7 @@ impl MoonPopupMenu {
                 let on_click = menu_item_click_handler(&item, context.dropdown_selection.as_ref());
                 let submenu = item.submenu;
                 let has_submenu = !submenu.items.is_empty();
+                let both_trailing = has_submenu && item.right_label.is_some();
                 let fg = if disabled {
                     p.text_muted
                 } else if selected {
@@ -851,7 +864,7 @@ impl MoonPopupMenu {
                                 ))
                             }),
                     )
-                    .child(
+                    .child(menu_row_text(
                         MoonText::new(item.label)
                             .color(fg)
                             .alpha(alpha)
@@ -860,28 +873,34 @@ impl MoonPopupMenu {
                             .mono(mono)
                             .uppercase(false)
                             .render(),
-                    )
+                        both_trailing,
+                        &row_id,
+                        "label",
+                    ))
                     .child(div().flex_1());
 
                 if let Some(right_label) = item.right_label {
-                    row = row.child(menu_trailing_label(
-                        right_label,
-                        p,
-                        metrics,
-                        mono,
-                        alpha * 0.88,
+                    row = row.child(menu_row_text(
+                        menu_trailing_label(right_label, p, metrics, mono, alpha * 0.88),
+                        both_trailing,
+                        &row_id,
+                        "right-label",
                     ));
-                } else if has_submenu {
-                    row = row.child(
-                        MoonText::new("›")
+                }
+                if has_submenu {
+                    row = row.child(menu_row_text(
+                        MoonText::new(MENU_SUBMENU_CARET)
                             .color(p.text_muted)
                             .alpha(alpha * 0.88)
                             .rendered_metrics(metrics.into())
-                            .weight(600.0)
+                            .weight(MENU_SUBMENU_CARET_WEIGHT)
                             .mono(mono)
                             .uppercase(false)
                             .render(),
-                    );
+                        both_trailing,
+                        &row_id,
+                        "caret",
+                    ));
                 }
 
                 if moon_menu_item_accepts_click(MoonMenuItemKind::Item, disabled, false) {

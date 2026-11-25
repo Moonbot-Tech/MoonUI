@@ -21,6 +21,9 @@ pub(crate) const MENU_CHECK_WIDTH: f32 = 12.0;
 pub(super) const MENU_TRAILING_FONT_DELTA: f32 = 0.5;
 /// Font weight shared by trailing-text measurement, fitting, and rendering.
 pub(super) const MENU_TRAILING_WEIGHT: f32 = 400.0;
+/// Glyph and font weight shared by submenu caret measurement and rendering.
+pub(super) const MENU_SUBMENU_CARET: &str = "\u{203a}";
+pub(super) const MENU_SUBMENU_CARET_WEIGHT: f32 = 600.0;
 const DEFAULT_VIRTUAL_MENU_MAX_HEIGHT: f32 = 320.0;
 #[cfg(test)]
 pub(super) const MENU_MEASUREMENT_PROBE_PREFIX: &str = "moon-menu-measurement-probe-";
@@ -279,6 +282,11 @@ struct MenuWidthRequirements {
     minimum: f32,
 }
 
+/// Count the gaps between the check column, label, spacer, and each trailing element.
+fn item_gap_count(item: &MoonMenuItem) -> f32 {
+    2.0 + u8::from(item.right_label.is_some()) as f32 + u8::from(item.has_submenu()) as f32
+}
+
 /// Measure natural and minimum viable widths in one pass.
 fn menu_width_requirements(
     items: &[MoonMenuItem],
@@ -311,18 +319,25 @@ fn menu_width_requirements(
                 (natural, chrome + marker + trailing_minimum)
             }
             MoonMenuItemKind::Item => {
-                let weight = item.label_weight(600.0);
-                let (trailing_natural, trailing_minimum) = if item.right_label.is_some() {
-                    trailing_label_widths(item.right_label.as_ref(), metrics, &mut measure)
-                } else if item.has_submenu() {
-                    let glyph = measure("\u{203a}", metrics.font_size, 600.0);
-                    (glyph, glyph)
+                let (trailing_natural, trailing_minimum) =
+                    trailing_label_widths(item.right_label.as_ref(), metrics, &mut measure);
+                let caret_width = if item.has_submenu() {
+                    measure(
+                        MENU_SUBMENU_CARET,
+                        metrics.font_size,
+                        MENU_SUBMENU_CARET_WEIGHT,
+                    )
                 } else {
-                    (0.0, 0.0)
+                    0.0
                 };
-                let has_trailing = item.right_label.is_some() || item.has_submenu();
-                let gaps = if has_trailing { 3.0 } else { 2.0 };
-                let chrome = metrics.pad_x * 2.0 + menu_check_width(tokens) + metrics.gap * gaps;
+                let (trailing_natural, trailing_minimum) = (
+                    trailing_natural + caret_width,
+                    trailing_minimum + caret_width,
+                );
+                let chrome = metrics.pad_x * 2.0
+                    + menu_check_width(tokens)
+                    + metrics.gap * item_gap_count(item);
+                let weight = item.label_weight(600.0);
                 let label_natural = measure(item.label.as_ref(), metrics.font_size, weight);
                 let label_minimum = if item.label.is_empty() {
                     0.0
@@ -409,41 +424,34 @@ pub(super) fn fit_menu_item_label(
         }
         MoonMenuItemKind::Item => {
             let weight = item.label_weight(600.0);
-            let has_submenu = item.has_submenu();
-            let trailing_gaps = if item.right_label.is_some() || has_submenu {
-                3.0
-            } else {
-                2.0
-            };
             let mut text_budget = (width
                 - outer
                 - metrics.pad_x * 2.0
                 - menu_check_width(tokens)
-                - metrics.gap * trailing_gaps)
-                .max(0.0);
+                - metrics.gap * item_gap_count(item))
+            .max(0.0);
 
-            if item.right_label.is_some() {
-                fit_trailing_label(
-                    &mut item.right_label,
-                    &mut text_budget,
-                    weight,
-                    metrics,
-                    tokens,
-                    cx,
-                    mono,
-                );
-            } else if has_submenu {
+            if item.has_submenu() {
                 text_budget = (text_budget
                     - measure_menu_text_width(
                         cx,
                         tokens,
-                        "\u{203a}",
+                        MENU_SUBMENU_CARET,
                         metrics.font_size,
-                        600.0,
+                        MENU_SUBMENU_CARET_WEIGHT,
                         mono,
                     ))
                 .max(0.0);
             }
+            fit_trailing_label(
+                &mut item.right_label,
+                &mut text_budget,
+                weight,
+                metrics,
+                tokens,
+                cx,
+                mono,
+            );
 
             let fitted = fit_text_to_width(item.label.as_ref(), text_budget, |text| {
                 measure_menu_text_width(cx, tokens, text, metrics.font_size, weight, mono)
