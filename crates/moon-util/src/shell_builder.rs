@@ -88,7 +88,7 @@ impl ShellBuilder {
             } else {
                 task_command
             };
-            let mut combined_command = task_args.iter().fold(task_command, |mut command, arg| {
+            let combined_command = task_args.iter().fold(task_command, |mut command, arg| {
                 command.push(' ');
                 let shell_variable = self.kind.to_shell_variable(arg);
                 command.push_str(&match self.kind.try_quote(&shell_variable) {
@@ -97,32 +97,7 @@ impl ShellBuilder {
                 });
                 command
             });
-            if self.redirect_stdin {
-                match self.kind {
-                    ShellKind::Fish | ShellKind::Posix => {
-                        combined_command.insert_str(0, "exec </dev/null; ");
-                    }
-                    ShellKind::Nushell
-                    | ShellKind::Csh
-                    | ShellKind::Tcsh
-                    | ShellKind::Rc
-                    | ShellKind::Xonsh
-                    | ShellKind::Elvish => {
-                        combined_command.insert(0, '(');
-                        combined_command.push_str("\n) </dev/null");
-                    }
-                    ShellKind::PowerShell | ShellKind::Pwsh => {
-                        combined_command.insert_str(0, "$null | & {");
-                        combined_command.push_str("}");
-                    }
-                    ShellKind::Cmd => {
-                        combined_command.push_str("< NUL");
-                    }
-                }
-            }
-
-            self.args
-                .extend(self.kind.args_for_shell(self.interactive, combined_command));
+            self.push_task_command(combined_command);
         }
 
         (self.program, self.args)
@@ -136,40 +111,49 @@ impl ShellBuilder {
         task_args: &[String],
     ) -> (String, Vec<String>) {
         if let Some(task_command) = task_command {
-            let mut combined_command = task_args.iter().fold(task_command, |mut command, arg| {
+            let combined_command = task_args.iter().fold(task_command, |mut command, arg| {
                 command.push(' ');
                 command.push_str(&self.kind.to_shell_variable(arg));
                 command
             });
-            if self.redirect_stdin {
-                match self.kind {
-                    ShellKind::Fish | ShellKind::Posix => {
-                        combined_command.insert_str(0, "exec </dev/null; ");
-                    }
-                    ShellKind::Nushell
-                    | ShellKind::Csh
-                    | ShellKind::Tcsh
-                    | ShellKind::Rc
-                    | ShellKind::Xonsh
-                    | ShellKind::Elvish => {
-                        combined_command.insert(0, '(');
-                        combined_command.push_str("\n) </dev/null");
-                    }
-                    ShellKind::PowerShell | ShellKind::Pwsh => {
-                        combined_command.insert_str(0, "$null | & {");
-                        combined_command.push_str("}");
-                    }
-                    ShellKind::Cmd => {
-                        combined_command.push_str("< NUL");
-                    }
-                }
-            }
-
-            self.args
-                .extend(self.kind.args_for_shell(self.interactive, combined_command));
+            self.push_task_command(combined_command);
         }
 
         (self.program, self.args)
+    }
+
+    /// Appends the shell's launch arguments that run `combined_command`, the
+    /// task command already joined with its arguments.
+    ///
+    /// When stdin is redirected, the command is first wrapped so it reads from
+    /// the null device, with the wrapper the shell family understands.
+    fn push_task_command(&mut self, mut combined_command: String) {
+        if self.redirect_stdin {
+            match self.kind {
+                ShellKind::Fish | ShellKind::Posix => {
+                    combined_command.insert_str(0, "exec </dev/null; ");
+                }
+                ShellKind::Nushell
+                | ShellKind::Csh
+                | ShellKind::Tcsh
+                | ShellKind::Rc
+                | ShellKind::Xonsh
+                | ShellKind::Elvish => {
+                    combined_command.insert(0, '(');
+                    combined_command.push_str("\n) </dev/null");
+                }
+                ShellKind::PowerShell | ShellKind::Pwsh => {
+                    combined_command.insert_str(0, "$null | & {");
+                    combined_command.push_str("}");
+                }
+                ShellKind::Cmd => {
+                    combined_command.push_str("< NUL");
+                }
+            }
+        }
+
+        self.args
+            .extend(self.kind.args_for_shell(self.interactive, combined_command));
     }
 
     /// Builds a `smol::process::Command` with the given task command and arguments.
