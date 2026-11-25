@@ -140,6 +140,12 @@
       "reason": "Donor baseline shows reviewed base-file drift for Moon tree surface/style hooks. Behavior remains Longbridge-owned, but clean Mirror must mean zero donor drift."
     },
     {
+      "concept": "notification",
+      "from": "Mirror",
+      "to": "TrackedFork",
+      "reason": "Support configurable autohide for Moon action notifications within the base notification file."
+    },
+    {
       "concept": "combobox",
       "from": "Mirror",
       "to": "TrackedFork",

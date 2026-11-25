@@ -471,12 +471,13 @@
     },
     {
       "concept": "notification",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "behavior_source": "Longbridge Notification",
       "theme_source": "MoonTheme bridge through Root notification list",
       "public_path": "moon_ui::MoonNotification",
       "upstream_ref": "Longbridge::notification@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
-      "fork_reason": null,
+      "fork_reason": "The Moon action button needs configurable autohide while preserving Longbridge notification rendering and dismissal.",
+      "donor_drift_budget": 1,
       "contracts": [
         "gallery.visual_coverage"
       ]

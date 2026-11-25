@@ -2879,7 +2879,15 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/notification.rs",
+      "signature": "pub fn action( mut self, label: impl Into<SharedString>, on_click: impl Fn(&mut Window, &mut App) + 'static, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/notification.rs",
       "signature": "pub fn autohide(mut self, autohide: bool) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/notification.rs",
+      "signature": "pub fn autohide_after(mut self, duration: Duration) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/notification.rs",

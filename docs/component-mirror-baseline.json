@@ -994,18 +994,18 @@
     },
     {
       "concept": "notification",
-      "class": "Mirror",
+      "class": "TrackedFork",
       "public_path": "moon_ui::MoonNotification",
       "upstream_ref": "Longbridge::notification@cda0fc7fd4e4809dd2a8bae0337ac43b49e9f675",
       "local_paths": [
         "notification.rs"
       ],
-      "local_hash": "bf00b5ef957591f6",
+      "local_hash": "d86268e4e207d52b",
       "local_files": [
         {
           "path": "notification.rs",
-          "hash": "9d201cad9ed5f761",
-          "bytes": 25600
+          "hash": "88a17286d7e8362e",
+          "bytes": 26451
         }
       ],
       "donor_hash": "bf00b5ef957591f6",
@@ -1016,7 +1016,9 @@
           "bytes": 25600
         }
       ],
-      "donor_changed_files": []
+      "donor_changed_files": [
+        "notification.rs"
+      ]
     },
     {
       "concept": "pagination",
