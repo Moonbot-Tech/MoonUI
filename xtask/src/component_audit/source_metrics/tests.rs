@@ -4,8 +4,107 @@
 use std::fs;
 
 use super::{
-    function_body_uses_param, normalize_path, scan_raw_hex_in_moon, underscore_self_param,
+    function_body_uses_param, normalize_path, scan_raw_hex_in_moon, scan_raw_hex_in_moon_base,
+    underscore_self_param,
 };
+
+/// Lines exercising every branch of the raw-hex rule: the four literal constructors are hits, a
+/// whole-line `//` comment and a `MOON-ONEOFF` tag are not, a plain line is not, and a literal
+/// before a trailing comment still is. Hits keep the trimmed line text.
+const RAW_HEX_RULE_PROBE: &str = concat!(
+    "    .bg(rgb(0x112233))\n",
+    "    .bg(rgba(0x11223344))\n",
+    "    .bg(Hsla::from(rgba_from(0x112233, 0.5)))\n",
+    "    .bg(hsla(0x1))\n",
+    "    // .bg(rgb(0x445566))\n",
+    "    .bg(rgb(0x778899)) // MOON-ONEOFF: reviewed\n",
+    "    .bg(cx.theme().background)\n",
+    "    .bg(rgb(0xAABBCC)) // trailing note\n",
+);
+
+/// The `(line, text)` hits [`RAW_HEX_RULE_PROBE`] must produce under the raw-hex rule.
+const RAW_HEX_RULE_PROBE_HITS: &[(usize, &str)] = &[
+    (1, ".bg(rgb(0x112233))"),
+    (2, ".bg(rgba(0x11223344))"),
+    (3, ".bg(Hsla::from(rgba_from(0x112233, 0.5)))"),
+    (4, ".bg(hsla(0x1))"),
+    (8, ".bg(rgb(0xAABBCC)) // trailing note"),
+];
+
+/// Pins `source_metrics.rs:scan_raw_hex_in_moon`'s line rule on every literal form and exemption,
+/// so the `raw_hex_in_moon_runtime` metric cannot silently stop counting a constructor or start
+/// counting comments and `MOON-ONEOFF` lines.
+#[test]
+fn raw_hex_scan_in_moon_counts_every_literal_form_and_skips_exemptions() -> anyhow::Result<()> {
+    let moon = tempfile::tempdir()?;
+    fs::write(moon.path().join("widget.rs"), RAW_HEX_RULE_PROBE)?;
+
+    let hits: Vec<(usize, String)> = scan_raw_hex_in_moon(moon.path())?
+        .into_iter()
+        .map(|hit| (hit.line, hit.text))
+        .collect();
+
+    let expected: Vec<(usize, String)> = RAW_HEX_RULE_PROBE_HITS
+        .iter()
+        .map(|(line, text)| (*line, text.to_string()))
+        .collect();
+    assert_eq!(hits, expected);
+    Ok(())
+}
+
+/// Pins `source_metrics.rs:scan_raw_hex_in_moon_base`: the same line rule as the Moon scan, applied
+/// to exactly the six audited base files in their listed order, with a missing file an error rather
+/// than zero hits, so the `raw_hex_in_moon_base_runtime` metric cannot drift from the Moon one or
+/// pass on an unreadable tree.
+#[test]
+fn raw_hex_scan_in_moon_base_applies_the_same_rule_to_the_listed_files() -> anyhow::Result<()> {
+    let src = tempfile::tempdir()?;
+    let files = [
+        "checkbox.rs",
+        "input/input.rs",
+        "label.rs",
+        "radio.rs",
+        "slider.rs",
+        "table/table.rs",
+    ];
+    fs::create_dir(src.path().join("input"))?;
+    fs::create_dir(src.path().join("table"))?;
+    for file in files {
+        fs::write(src.path().join(file), "")?;
+    }
+    fs::write(src.path().join("radio.rs"), RAW_HEX_RULE_PROBE)?;
+    fs::write(src.path().join("checkbox.rs"), "    .bg(rgb(0x010203))\n")?;
+    fs::write(src.path().join("button.rs"), "    .bg(rgb(0x040506))\n")?;
+
+    let prefix = format!("{}/", normalize_path(src.path()));
+    let hits: Vec<(String, usize, String)> = scan_raw_hex_in_moon_base(src.path())?
+        .into_iter()
+        .map(|hit| {
+            let file = hit
+                .file
+                .strip_prefix(&prefix)
+                .unwrap_or(&hit.file)
+                .to_string();
+            (file, hit.line, hit.text)
+        })
+        .collect();
+
+    let mut expected = vec![(
+        "checkbox.rs".to_string(),
+        1,
+        ".bg(rgb(0x010203))".to_string(),
+    )];
+    expected.extend(
+        RAW_HEX_RULE_PROBE_HITS
+            .iter()
+            .map(|(line, text)| ("radio.rs".to_string(), *line, text.to_string())),
+    );
+    assert_eq!(hits, expected);
+
+    fs::remove_file(src.path().join("slider.rs"))?;
+    assert!(scan_raw_hex_in_moon_base(src.path()).is_err());
+    Ok(())
+}
 
 /// Catches losing underscore-prefixed parameter extraction, which would hide no-op builders.
 #[test]
