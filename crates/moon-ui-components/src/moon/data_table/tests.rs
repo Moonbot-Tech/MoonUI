@@ -722,10 +722,29 @@ impl gpui::Render for CellOverflowHarness {
             .columns([
                 col("narrow", 50.0).no_grow().right(),
                 col("wide", 190.0).no_grow().right(),
-                col("element", 100.0).no_grow(),
+                col("element", 100.0).no_grow().right(),
             ])
             .width_policy(MoonDataTableWidthPolicy::Preserve),
         )
+    }
+}
+
+/// Catches a content wrapper that shrink-wraps an element or loses the column's alignment.
+#[gpui::test]
+fn element_cell_content_spans_the_padded_column(cx: &mut gpui::TestAppContext) {
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+        let window = cx.add_window(|_, _| CellOverflowHarness);
+        let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+        settle(&mut visual);
+
+        let cell = visual.debug_bounds("moon-table-cell-0-2").unwrap();
+        let content = visual.debug_bounds("moon-table-cell-0-2-content").unwrap();
+        let caption = visual.debug_bounds("table-custom-caption").unwrap();
+        assert_eq!(content.left(), cell.left() + gpui::px(12.0), "{palette:?}");
+        assert_eq!(content.right(), cell.right() - gpui::px(8.0), "{palette:?}");
+        assert_eq!(caption.right(), content.right(), "{palette:?}");
     }
 }
 

@@ -453,6 +453,11 @@ impl MoonTable {
     ) -> Div {
         let color = cell.color.unwrap_or_else(|| cell.tone.color(p));
         let text_metrics = tokens.text(cell.font_size, cell.line_height);
+        let align = |content: Div| match column.align {
+            MoonTableAlign::Left => content.justify_start(),
+            MoonTableAlign::Right => content.justify_end(),
+            MoonTableAlign::Center => content.justify_center(),
+        };
         let el = div()
             .debug_selector(move || format!("moon-table-cell-{row_ix}-{column_ix}"))
             .when(column.fill, |this| this.min_w(px(column.width)).flex_1())
@@ -460,11 +465,7 @@ impl MoonTable {
             .h_full()
             .flex()
             .items_center()
-            .map(|this| match column.align {
-                MoonTableAlign::Left => this.justify_start(),
-                MoonTableAlign::Right => this.justify_end(),
-                MoonTableAlign::Center => this.justify_center(),
-            })
+            .map(align)
             .pl(px(column.cell_pad_left))
             .pr(px(column.cell_pad_right))
             .overflow_hidden()
@@ -489,7 +490,14 @@ impl MoonTable {
                 (content.truncate().child(text), Some(tooltip))
             }
             MoonTableCellContent::Element(element) => (
-                content.h_full().flex().items_center().child(element),
+                // Full-width children and overflow measurements share the padded column width.
+                content
+                    .flex_1()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .map(align)
+                    .child(element),
                 cell.tooltip,
             ),
         };
