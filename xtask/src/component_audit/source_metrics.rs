@@ -120,19 +120,23 @@ fn scan_raw_hex_in_moon(root: &Path) -> Result<Vec<SourceHit>> {
         .iter()
         .map(|file| normalize_path(&root.join(file)))
         .collect();
-    let mut hits = scan_files(root, |line| {
-        let trimmed = line.trim();
-        if trimmed.starts_with("//") {
-            return false;
-        }
-        (trimmed.contains("rgb(0x")
-            || trimmed.contains("rgba(0x")
-            || trimmed.contains("rgba_from(0x")
-            || trimmed.contains("hsla(0x"))
-            && !trimmed.contains("MOON-ONEOFF")
-    })?;
+    let mut hits = scan_files(root, is_raw_hex_line)?;
     hits.retain(|hit| !token_sources.contains(&hit.file));
     Ok(hits)
+}
+
+/// Return whether one source line paints an unapproved raw colour literal: it calls `rgb(0x`,
+/// `rgba(0x`, `rgba_from(0x` or `hsla(0x`, is not a whole-line `//` comment, and carries no
+/// `MOON-ONEOFF` tag. Both raw-hex metrics count lines by this one rule.
+fn is_raw_hex_line(line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.starts_with("//") || trimmed.contains("MOON-ONEOFF") {
+        return false;
+    }
+    trimmed.contains("rgb(0x")
+        || trimmed.contains("rgba(0x")
+        || trimmed.contains("rgba_from(0x")
+        || trimmed.contains("hsla(0x")
 }
 
 /// Moon source files that define colour tokens, where hex literals are the content rather than a
@@ -161,21 +165,16 @@ fn scan_raw_hex_in_moon_base(src: &Path) -> Result<Vec<SourceHit>> {
     for file in files {
         let path = src.join(file);
         let text = read(&path)?;
-        hits.extend(text.lines().enumerate().filter_map(|(ix, line)| {
-            let trimmed = line.trim();
-            if trimmed.starts_with("//") || trimmed.contains("MOON-ONEOFF") {
-                return None;
-            }
-            (trimmed.contains("rgb(0x")
-                || trimmed.contains("rgba(0x")
-                || trimmed.contains("rgba_from(0x")
-                || trimmed.contains("hsla(0x"))
-            .then(|| SourceHit {
-                file: normalize_path(&path),
-                line: ix + 1,
-                text: trimmed.to_string(),
-            })
-        }));
+        hits.extend(
+            text.lines()
+                .enumerate()
+                .filter(|(_, line)| is_raw_hex_line(line))
+                .map(|(ix, line)| SourceHit {
+                    file: normalize_path(&path),
+                    line: ix + 1,
+                    text: line.trim().to_string(),
+                }),
+        );
     }
     Ok(hits)
 }
