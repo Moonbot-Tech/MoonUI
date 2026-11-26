@@ -82,7 +82,7 @@ pub struct MoonTableCell {
     weight: f32,
     font_size: f32,
     line_height: f32,
-    tooltip: Option<SharedString>,
+    tooltip: Option<CellTooltip>,
 }
 
 enum MoonTableCellContent {
@@ -119,7 +119,22 @@ impl MoonTableCell {
 
     /// Attach a tooltip to a custom element whose natural width the table cannot measure.
     pub(crate) fn tooltip(mut self, text: SharedString) -> Self {
-        self.tooltip = Some(text);
+        self.tooltip = Some(CellTooltip::Always(text));
+        self
+    }
+
+    /// Measure the caption in the content width left by an optional leading decoration.
+    pub(crate) fn overflow_tooltip(
+        mut self,
+        text: SharedString,
+        inset: Pixels,
+        minimum_caption: Pixels,
+    ) -> Self {
+        self.tooltip = Some(CellTooltip::Overflow {
+            text,
+            inset,
+            minimum_caption,
+        });
         self
     }
 
@@ -466,19 +481,22 @@ impl MoonTable {
 
         let (content, tooltip) = match cell.content {
             MoonTableCellContent::Text(text) => {
-                let tooltip = CellTooltip::Overflow(text.clone());
+                let tooltip = CellTooltip::Overflow {
+                    text: text.clone(),
+                    inset: px(0.0),
+                    minimum_caption: px(0.0),
+                };
                 (content.truncate().child(text), Some(tooltip))
             }
             MoonTableCellContent::Element(element) => (
-                content.child(element),
-                // Custom element cells opt in regardless of their width.
-                cell.tooltip.map(CellTooltip::Always),
+                content.h_full().flex().items_center().child(element),
+                cell.tooltip,
             ),
         };
 
         match tooltip {
             Some(tooltip) => el.child(TooltippedCellContent {
-                content: content.id("content"),
+                content: content.id(("content", tooltip.text_id())),
                 tooltip,
             }),
             None => el.child(content),
@@ -488,8 +506,26 @@ impl MoonTable {
 
 /// When a cell should expose its full text on hover.
 enum CellTooltip {
-    Overflow(SharedString),
+    Overflow {
+        text: SharedString,
+        inset: Pixels,
+        minimum_caption: Pixels,
+    },
     Always(SharedString),
+}
+
+impl CellTooltip {
+    /// GPUI retains hover state by element ID, so a changed caption needs a fresh slot.
+    fn text_id(&self) -> u64 {
+        let text = match self {
+            Self::Overflow { text, .. } | Self::Always(text) => text,
+        };
+        use std::hash::{DefaultHasher, Hash as _, Hasher as _};
+
+        let mut hasher = DefaultHasher::new();
+        text.hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
 /// A content div that decides whether it needs a tooltip after flex layout.
@@ -536,13 +572,23 @@ impl Element for TooltippedCellContent {
     ) -> Self::PrepaintState {
         let text = match &self.tooltip {
             CellTooltip::Always(text) => Some(text),
-            CellTooltip::Overflow(text) => {
+            CellTooltip::Overflow {
+                text,
+                inset,
+                minimum_caption,
+            } => {
+                let width = bounds.size.width;
+                let caption_width = if width >= *inset + *minimum_caption {
+                    width - *inset
+                } else {
+                    width
+                };
                 // Match GPUI's ellipsis threshold and reuse its cached glyph widths.
                 let style = window.text_style();
                 let font_size = style.font_size.to_pixels(window.rem_size());
                 cx.text_system()
                     .line_wrapper(style.font(), font_size)
-                    .should_truncate_line(text, bounds.size.width, "\u{2026}", TruncateFrom::End)
+                    .should_truncate_line(text, caption_width, "\u{2026}", TruncateFrom::End)
                     .map(|_| text)
             }
         };

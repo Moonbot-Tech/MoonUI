@@ -604,6 +604,95 @@ fn settle(visual: &mut gpui::VisualTestContext) {
 const OVERFLOWING_CELL_TEXT: &str = "12345678901234567890";
 const ELEMENT_CELL_TOOLTIP: &str = "Full custom cell value";
 
+/// Render an updatable custom caption at fitting and overflowing widths.
+struct ElementOverflowHarness(gpui::SharedString);
+
+impl gpui::Render for ElementOverflowHarness {
+    /// Keep caption styling and widths fixed so a publication only changes the text.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{ParentElement as _, Styled as _};
+
+        let caption = self.0.clone();
+        div().size_full().child(
+            MoonDataTable::new("element-overflow-test", 1, move |_, _, _| {
+                let cell = || {
+                    MoonDataCell::element(
+                        div()
+                            .h_full()
+                            .w_full()
+                            .min_w_0()
+                            .truncate()
+                            .child(caption.clone()),
+                    )
+                    .overflow_tooltip(caption.clone())
+                };
+                MoonDataRow::new([cell(), cell()])
+            })
+            .bounds(MoonRect::new(0.0, 0.0, 280.0, 120.0))
+            .columns([col("narrow", 50.0).no_grow(), col("wide", 230.0).no_grow()])
+            .width_policy(MoonDataTableWidthPolicy::Preserve),
+        )
+    }
+}
+
+/// Pin overflow-only hover, full-height content, and invalidation of a visible stale tooltip.
+#[gpui::test]
+fn custom_cells_keep_full_height_and_refresh_overflow_tooltips(cx: &mut gpui::TestAppContext) {
+    use gpui::AppContext as _;
+
+    const BEFORE: &str = "12345678901234567890";
+    const AFTER: &str = "09876543210987654321";
+    const BEFORE_POPUP: &str = "moon-table-cell-tooltip:12345678901234567890";
+    const AFTER_POPUP: &str = "moon-table-cell-tooltip:09876543210987654321";
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+        let clock = cx.background_executor.clone();
+        let window = cx.add_window(|_, _| ElementOverflowHarness(BEFORE.into()));
+        let root = cx
+            .update_window(window.into(), |root, _, _| {
+                root.clone().downcast::<ElementOverflowHarness>().unwrap()
+            })
+            .unwrap();
+        let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+        settle(&mut visual);
+
+        let cell = visual.debug_bounds("moon-table-cell-0-0").unwrap();
+        let narrow = visual.debug_bounds("moon-table-cell-0-0-content").unwrap();
+        let wide = visual.debug_bounds("moon-table-cell-0-1-content").unwrap();
+        assert_eq!(narrow.size.height, cell.size.height);
+        for (position, expected) in [(wide.center(), false), (narrow.center(), true)] {
+            visual.simulate_mouse_move(position, None, Modifiers::none());
+            settle(&mut visual);
+            clock.advance_clock(Duration::from_millis(900));
+            settle(&mut visual);
+            assert_eq!(
+                visual.debug_bounds(BEFORE_POPUP).is_some(),
+                expected,
+                "{palette:?}"
+            );
+        }
+
+        visual.update(|_, cx| {
+            root.update(cx, |harness, cx| {
+                harness.0 = AFTER.into();
+                cx.notify();
+            })
+        });
+        settle(&mut visual);
+        assert!(visual.debug_bounds(BEFORE_POPUP).is_none(), "{palette:?}");
+        visual.simulate_mouse_move(narrow.center(), None, Modifiers::none());
+        settle(&mut visual);
+        clock.advance_clock(Duration::from_millis(900));
+        settle(&mut visual);
+        assert!(visual.debug_bounds(AFTER_POPUP).is_some(), "{palette:?}");
+    }
+}
+
 /// Render the same value in narrow and wide right-aligned columns, plus a custom element.
 struct CellOverflowHarness;
 
@@ -614,14 +703,19 @@ impl gpui::Render for CellOverflowHarness {
         _window: &mut gpui::Window,
         _cx: &mut gpui::Context<Self>,
     ) -> impl gpui::IntoElement {
-        use gpui::{ParentElement as _, Styled as _};
+        use gpui::{InteractiveElement as _, ParentElement as _, Styled as _};
 
         div().size_full().child(
             MoonDataTable::new("cell-overflow-test", 1, |_, _, _| {
                 MoonDataRow::new([
                     MoonDataCell::text(OVERFLOWING_CELL_TEXT),
                     MoonDataCell::text(OVERFLOWING_CELL_TEXT),
-                    MoonDataCell::element(div().child("Custom")).tooltip(ELEMENT_CELL_TOOLTIP),
+                    MoonDataCell::element(
+                        div()
+                            .debug_selector(|| "table-custom-caption".to_string())
+                            .child("Custom"),
+                    )
+                    .tooltip(ELEMENT_CELL_TOOLTIP),
                 ])
             })
             .bounds(MoonRect::new(0.0, 0.0, 340.0, 120.0))
@@ -654,6 +748,9 @@ fn only_overflowing_text_and_opted_in_elements_show_cell_tooltips(cx: &mut gpui:
         let narrow_content = visual.debug_bounds("moon-table-cell-0-0-content").unwrap();
         let wide_content = visual.debug_bounds("moon-table-cell-0-1-content").unwrap();
         let element_content = visual.debug_bounds("moon-table-cell-0-2-content").unwrap();
+        let custom_caption = visual.debug_bounds("table-custom-caption").unwrap();
+        assert!(custom_caption.size.height < element_content.size.height);
+        assert!((custom_caption.center().y - element_content.center().y).abs() <= gpui::px(0.5));
         assert_eq!(narrow_content.left(), narrow.left() + gpui::px(12.0));
         assert_eq!(narrow_content.right(), narrow.right() - gpui::px(8.0));
         assert!(narrow_content.right() <= wide.left());

@@ -274,6 +274,25 @@ impl MoonDataCell {
         self
     }
 
+    /// Show the supplied custom-cell caption only if it overflows the laid-out content.
+    pub fn overflow_tooltip(self, text: impl Into<SharedString>) -> Self {
+        self.overflow_tooltip_with_inset(text, px(0.0), px(0.0))
+    }
+
+    /// Show an overflow tooltip when a leading decoration leaves too little room for the caption.
+    /// The inset includes its gap and applies only if the minimum caption width also fits.
+    pub fn overflow_tooltip_with_inset(
+        mut self,
+        text: impl Into<SharedString>,
+        inset: Pixels,
+        minimum_caption: Pixels,
+    ) -> Self {
+        self.cell = self
+            .cell
+            .overflow_tooltip(text.into(), inset, minimum_caption);
+        self
+    }
+
     pub fn tone(mut self, tone: MoonTone) -> Self {
         self.cell = self.cell.tone(tone);
         self
