@@ -1031,6 +1031,10 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn tooltip(mut self, text: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self"
     },
     {

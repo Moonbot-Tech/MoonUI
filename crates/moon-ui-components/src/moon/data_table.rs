@@ -267,6 +267,13 @@ impl MoonDataCell {
         }
     }
 
+    /// Supply hover text for a custom element cell. Text cells show their own full text
+    /// automatically when it overflows.
+    pub fn tooltip(mut self, text: impl Into<SharedString>) -> Self {
+        self.cell = self.cell.tooltip(text.into());
+        self
+    }
+
     pub fn tone(mut self, tone: MoonTone) -> Self {
         self.cell = self.cell.tone(tone);
         self
@@ -1313,6 +1320,7 @@ impl RenderOnce for MoonDataTable {
                 let row_content = super::table::MoonTable::render_row_inline_with_cells(
                     &row_columns,
                     row.as_table_row(),
+                    ix,
                     row_height,
                     style,
                     p,

@@ -10,6 +10,7 @@ use crate::moon::{
     MOON_SCROLLBAR_TRACK, MoonPalette, MoonRect, MoonScrollbarVisibility, MoonTheme,
 };
 use gpui::{Modifiers, div};
+use std::time::Duration;
 use std::{cell::RefCell, rc::Rc};
 
 /// Build a test column with matching key and label.
@@ -598,6 +599,192 @@ fn settle(visual: &mut gpui::VisualTestContext) {
         visual.update(|window, _| window.refresh());
         visual.run_until_parked();
     }
+}
+
+const OVERFLOWING_CELL_TEXT: &str = "12345678901234567890";
+const ELEMENT_CELL_TOOLTIP: &str = "Full custom cell value";
+
+/// Render the same value in narrow and wide right-aligned columns, plus a custom element.
+struct CellOverflowHarness;
+
+impl gpui::Render for CellOverflowHarness {
+    /// Give the text cells different inner widths without automatic column expansion.
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{ParentElement as _, Styled as _};
+
+        div().size_full().child(
+            MoonDataTable::new("cell-overflow-test", 1, |_, _, _| {
+                MoonDataRow::new([
+                    MoonDataCell::text(OVERFLOWING_CELL_TEXT),
+                    MoonDataCell::text(OVERFLOWING_CELL_TEXT),
+                    MoonDataCell::element(div().child("Custom")).tooltip(ELEMENT_CELL_TOOLTIP),
+                ])
+            })
+            .bounds(MoonRect::new(0.0, 0.0, 340.0, 120.0))
+            .columns([
+                col("narrow", 50.0).no_grow().right(),
+                col("wide", 190.0).no_grow().right(),
+                col("element", 100.0).no_grow(),
+            ])
+            .width_policy(MoonDataTableWidthPolicy::Preserve),
+        )
+    }
+}
+
+/// Catches left clipping of right-aligned values, overflow into neighbors, and attaching
+/// a tooltip to every text cell or dropping the custom element's opt-in.
+#[gpui::test]
+fn only_overflowing_text_and_opted_in_elements_show_cell_tooltips(cx: &mut gpui::TestAppContext) {
+    const TEXT_POPUP: &str = "moon-table-cell-tooltip:12345678901234567890";
+    const ELEMENT_POPUP: &str = "moon-table-cell-tooltip:Full custom cell value";
+    cx.update(crate::init);
+    for palette in [MoonPalette::TERMINAL, MoonPalette::LIGHT] {
+        cx.update(|cx| MoonTheme::global_mut(cx).palette = palette);
+        let clock = cx.background_executor.clone();
+        let window = cx.add_window(|_, _| CellOverflowHarness);
+        let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+        settle(&mut visual);
+
+        let narrow = visual.debug_bounds("moon-table-cell-0-0").unwrap();
+        let wide = visual.debug_bounds("moon-table-cell-0-1").unwrap();
+        let narrow_content = visual.debug_bounds("moon-table-cell-0-0-content").unwrap();
+        let wide_content = visual.debug_bounds("moon-table-cell-0-1-content").unwrap();
+        let element_content = visual.debug_bounds("moon-table-cell-0-2-content").unwrap();
+        assert_eq!(narrow_content.left(), narrow.left() + gpui::px(12.0));
+        assert_eq!(narrow_content.right(), narrow.right() - gpui::px(8.0));
+        assert!(narrow_content.right() <= wide.left());
+        assert!(wide_content.left() > wide.left() + gpui::px(12.0));
+        assert_eq!(wide_content.right(), wide.right() - gpui::px(8.0));
+        assert!(visual.debug_bounds(TEXT_POPUP).is_none());
+
+        visual.simulate_mouse_move(wide_content.center(), None, Modifiers::none());
+        settle(&mut visual);
+        clock.advance_clock(Duration::from_millis(900));
+        settle(&mut visual);
+        assert!(visual.debug_bounds(TEXT_POPUP).is_none(), "{palette:?}");
+
+        visual.simulate_mouse_move(narrow_content.center(), None, Modifiers::none());
+        settle(&mut visual);
+        assert!(visual.debug_bounds(TEXT_POPUP).is_none(), "{palette:?}");
+        clock.advance_clock(Duration::from_millis(900));
+        settle(&mut visual);
+        let popup = visual.debug_bounds(TEXT_POPUP).expect("full text tooltip");
+        assert!(popup.bottom() > narrow.bottom(), "{popup:?} in {palette:?}");
+
+        visual.simulate_mouse_move(element_content.center(), None, Modifiers::none());
+        settle(&mut visual);
+        clock.advance_clock(Duration::from_millis(900));
+        settle(&mut visual);
+        assert!(visual.debug_bounds(TEXT_POPUP).is_none(), "{palette:?}");
+        assert!(visual.debug_bounds(ELEMENT_POPUP).is_some(), "{palette:?}");
+    }
+}
+
+/// Record the table's shaped strings while retaining deterministic headless font metrics.
+#[derive(Default)]
+struct CellTextRecorder(std::sync::Mutex<Vec<String>>);
+
+impl gpui::PlatformTextSystem for CellTextRecorder {
+    /// Ignore font bytes just as GPUI's headless text system does.
+    fn add_fonts(&self, fonts: Vec<std::borrow::Cow<'static, [u8]>>) -> gpui::Result<()> {
+        gpui::NoopTextSystem.add_fonts(fonts)
+    }
+
+    /// Expose the headless font inventory.
+    fn all_font_names(&self) -> Vec<String> {
+        gpui::NoopTextSystem.all_font_names()
+    }
+
+    /// Resolve fonts to the headless font ID.
+    fn font_id(&self, font: &gpui::Font) -> gpui::Result<gpui::FontId> {
+        gpui::NoopTextSystem.font_id(font)
+    }
+
+    /// Use GPUI's deterministic headless font metrics.
+    fn font_metrics(&self, font: gpui::FontId) -> gpui::FontMetrics {
+        gpui::NoopTextSystem.font_metrics(font)
+    }
+
+    /// Use GPUI's headless glyph bounds.
+    fn typographic_bounds(
+        &self,
+        font: gpui::FontId,
+        glyph: gpui::GlyphId,
+    ) -> gpui::Result<gpui::Bounds<f32>> {
+        gpui::NoopTextSystem.typographic_bounds(font, glyph)
+    }
+
+    /// Use GPUI's headless glyph advance.
+    fn advance(&self, font: gpui::FontId, glyph: gpui::GlyphId) -> gpui::Result<gpui::Size<f32>> {
+        gpui::NoopTextSystem.advance(font, glyph)
+    }
+
+    /// Map characters to GPUI's headless glyph IDs.
+    fn glyph_for_char(&self, font: gpui::FontId, ch: char) -> Option<gpui::GlyphId> {
+        gpui::NoopTextSystem.glyph_for_char(font, ch)
+    }
+
+    /// Keep the renderer headless.
+    fn glyph_raster_bounds(
+        &self,
+        params: &gpui::RenderGlyphParams,
+    ) -> gpui::Result<gpui::Bounds<gpui::DevicePixels>> {
+        gpui::NoopTextSystem.glyph_raster_bounds(params)
+    }
+
+    /// Delegate rasterization to GPUI's headless backend.
+    fn rasterize_glyph(
+        &self,
+        params: &gpui::RenderGlyphParams,
+        bounds: gpui::Bounds<gpui::DevicePixels>,
+    ) -> gpui::Result<(gpui::Size<gpui::DevicePixels>, Vec<u8>)> {
+        gpui::NoopTextSystem.rasterize_glyph(params, bounds)
+    }
+
+    /// Capture the string selected for shaping after GPUI applies text overflow.
+    fn layout_line(
+        &self,
+        text: &str,
+        size: gpui::Pixels,
+        runs: &[gpui::FontRun],
+    ) -> gpui::LineLayout {
+        self.0.lock().unwrap().push(text.to_owned());
+        gpui::NoopTextSystem.layout_line(text, size, runs)
+    }
+
+    /// Use GPUI's headless rendering mode.
+    fn recommended_rendering_mode(
+        &self,
+        font: gpui::FontId,
+        size: gpui::Pixels,
+    ) -> gpui::TextRenderingMode {
+        gpui::NoopTextSystem.recommended_rendering_mode(font, size)
+    }
+}
+
+/// Catches removing text ellipsis or switching to a leading ellipsis in a right-aligned
+/// column, either of which would hide the start of a long value.
+#[test]
+fn a_narrow_right_aligned_cell_shapes_its_prefix_and_a_trailing_ellipsis() {
+    let recorder = std::sync::Arc::new(CellTextRecorder::default());
+    let mut app = gpui::TestApp::with_text_system(recorder.clone());
+    app.update(crate::init);
+    let mut window = app.open_window(|_, _| CellOverflowHarness);
+    window.draw();
+
+    let shaped = recorder.0.lock().unwrap();
+    assert!(
+        shaped.iter().any(|text| {
+            text.strip_suffix('\u{2026}').is_some_and(|prefix| {
+                prefix.len() >= 3 && OVERFLOWING_CELL_TEXT.starts_with(prefix)
+            })
+        }),
+        "the narrow cell must shape the leading digits and a trailing ellipsis: {shaped:?}"
+    );
 }
 
 /// Catches dropping the resting resize mark from `data_table/header.rs:render_header` (issue
