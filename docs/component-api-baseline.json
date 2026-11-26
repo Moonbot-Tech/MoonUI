@@ -955,6 +955,14 @@
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn overflow_tooltip(self, text: impl Into<SharedString>) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn overflow_tooltip_with_inset( mut self, text: impl Into<SharedString>, inset: Pixels, minimum_caption: Pixels, ) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn right(mut self) -> Self"
     },
     {
@@ -1028,6 +1036,10 @@
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",
       "signature": "pub fn tone(mut self, tone: MoonTone) -> Self"
+    },
+    {
+      "file": "crates/moon-ui-components/src/moon/data_table.rs",
+      "signature": "pub fn tooltip(mut self, text: impl Into<SharedString>) -> Self"
     },
     {
       "file": "crates/moon-ui-components/src/moon/data_table.rs",

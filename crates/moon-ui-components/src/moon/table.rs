@@ -3,9 +3,9 @@ use gpui::*;
 
 use super::{
     foundation::selected_background,
-    text::MoonText,
     theme::MoonThemeTokens,
     tokens::{MoonPalette, MoonTone, rgb_from, rgba_from},
+    tooltip::MoonTooltip,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -74,6 +74,7 @@ impl MoonTableColumn {
     }
 }
 
+/// Content, typography and optional element tooltip for a table cell.
 pub struct MoonTableCell {
     content: MoonTableCellContent,
     tone: MoonTone,
@@ -81,6 +82,7 @@ pub struct MoonTableCell {
     weight: f32,
     font_size: f32,
     line_height: f32,
+    tooltip: Option<CellTooltip>,
 }
 
 enum MoonTableCellContent {
@@ -89,6 +91,7 @@ enum MoonTableCellContent {
 }
 
 impl MoonTableCell {
+    /// Build a text cell with overflow truncation and an automatic full-text tooltip.
     pub fn text(text: impl Into<SharedString>, tone: MoonTone, weight: f32) -> Self {
         Self {
             content: MoonTableCellContent::Text(text.into()),
@@ -97,9 +100,11 @@ impl MoonTableCell {
             weight,
             font_size: 10.5,
             line_height: 14.0,
+            tooltip: None,
         }
     }
 
+    /// Build a cell with caller-provided content.
     pub fn element(element: impl IntoElement + 'static) -> Self {
         Self {
             content: MoonTableCellContent::Element(element.into_any_element()),
@@ -108,7 +113,29 @@ impl MoonTableCell {
             weight: 400.0,
             font_size: 10.5,
             line_height: 14.0,
+            tooltip: None,
         }
+    }
+
+    /// Attach a tooltip to a custom element whose natural width the table cannot measure.
+    pub(crate) fn tooltip(mut self, text: SharedString) -> Self {
+        self.tooltip = Some(CellTooltip::Always(text));
+        self
+    }
+
+    /// Measure the caption in the content width left by an optional leading decoration.
+    pub(crate) fn overflow_tooltip(
+        mut self,
+        text: SharedString,
+        inset: Pixels,
+        minimum_caption: Pixels,
+    ) -> Self {
+        self.tooltip = Some(CellTooltip::Overflow {
+            text,
+            inset,
+            minimum_caption,
+        });
+        self
     }
 
     pub fn tone(mut self, tone: MoonTone) -> Self {
@@ -352,9 +379,11 @@ pub(crate) struct TableHeaderFacet {
 pub(crate) struct MoonTable;
 
 impl MoonTable {
+    /// Lay out one row and let the data table add selection and pointer behavior to each cell.
     pub(crate) fn render_row_inline_with_cells(
         columns: &[MoonTableColumn],
         row: MoonTableRow,
+        row_ix: usize,
         row_height: f32,
         style: MoonTableStyle,
         p: MoonPalette,
@@ -388,7 +417,8 @@ impl MoonTable {
         }
 
         for (column_ix, (column, cell)) in columns.iter().zip(row.cells).enumerate() {
-            let cell = Self::render_cell(column, cell, row.text_alpha, p, tokens);
+            let cell =
+                Self::render_cell(column, cell, (row_ix, column_ix), row.text_alpha, p, tokens);
             row_el = row_el.child(decorate_cell(column_ix, cell));
         }
 
@@ -412,14 +442,19 @@ impl MoonTable {
         row_el
     }
 
+    /// Clip the content to the padded column and align it at its available width.
     fn render_cell(
         column: &MoonTableColumn,
         cell: MoonTableCell,
+        (row_ix, column_ix): (usize, usize),
         text_alpha: f32,
         p: MoonPalette,
         tokens: &MoonThemeTokens,
     ) -> Div {
-        let mut el = div()
+        let color = cell.color.unwrap_or_else(|| cell.tone.color(p));
+        let text_metrics = tokens.text(cell.font_size, cell.line_height);
+        let el = div()
+            .debug_selector(move || format!("moon-table-cell-{row_ix}-{column_ix}"))
             .when(column.fill, |this| this.min_w(px(column.width)).flex_1())
             .when(!column.fill, |this| this.w(px(column.width)).flex_none())
             .h_full()
@@ -433,41 +468,172 @@ impl MoonTable {
             .pl(px(column.cell_pad_left))
             .pr(px(column.cell_pad_right))
             .overflow_hidden()
-            .whitespace_nowrap();
+            .whitespace_nowrap()
+            .font_family(tokens.font_family(true))
+            .text_size(px(text_metrics.font_size))
+            .line_height(px(text_metrics.line_height))
+            .font_weight(FontWeight(cell.weight))
+            .text_color(rgba_from(color, text_alpha));
+        let content = div()
+            .debug_selector(move || format!("moon-table-cell-{row_ix}-{column_ix}-content"))
+            .min_w(px(0.0))
+            .overflow_hidden();
 
-        match cell.content {
+        let (content, tooltip) = match cell.content {
             MoonTableCellContent::Text(text) => {
-                let color = cell.color.unwrap_or_else(|| cell.tone.color(p));
-                el = el.child(
-                    MoonText::new(text)
-                        .color(color)
-                        .alpha(text_alpha)
-                        .font_size(cell.font_size)
-                        .line_height(cell.line_height)
-                        .weight(cell.weight)
-                        .mono(true)
-                        .uppercase(false)
-                        .render(),
-                );
+                let tooltip = CellTooltip::Overflow {
+                    text: text.clone(),
+                    inset: px(0.0),
+                    minimum_caption: px(0.0),
+                };
+                (content.truncate().child(text), Some(tooltip))
             }
-            MoonTableCellContent::Element(element) => {
-                // Element cells inherit the cell's text style through the GPUI style
-                // cascade — the same style the Text branch applies explicitly. Children
-                // that set their own text properties (e.g. MoonText, MoonButton) still
-                // override it, so consumers no longer have to duplicate the table's
-                // default metrics inside every clickable cell.
-                let color = cell.color.unwrap_or_else(|| cell.tone.color(p));
-                let text_metrics = tokens.text(cell.font_size, cell.line_height);
-                el = el
-                    .font_family(tokens.font_family(true))
-                    .text_size(px(text_metrics.font_size))
-                    .line_height(px(text_metrics.line_height))
-                    .font_weight(FontWeight(cell.weight))
-                    .text_color(rgba_from(color, text_alpha))
-                    .child(element);
-            }
-        }
+            MoonTableCellContent::Element(element) => (
+                content.h_full().flex().items_center().child(element),
+                cell.tooltip,
+            ),
+        };
 
-        el
+        match tooltip {
+            Some(tooltip) => el.child(TooltippedCellContent {
+                content: content.id(("content", tooltip.text_id())),
+                tooltip,
+            }),
+            None => el.child(content),
+        }
+    }
+}
+
+/// When a cell should expose its full text on hover.
+enum CellTooltip {
+    Overflow {
+        text: SharedString,
+        inset: Pixels,
+        minimum_caption: Pixels,
+    },
+    Always(SharedString),
+}
+
+impl CellTooltip {
+    /// GPUI retains hover state by element ID, so a changed caption needs a fresh slot.
+    fn text_id(&self) -> u64 {
+        let text = match self {
+            Self::Overflow { text, .. } | Self::Always(text) => text,
+        };
+        use std::hash::{DefaultHasher, Hash as _, Hasher as _};
+
+        let mut hasher = DefaultHasher::new();
+        text.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+
+/// A content div that decides whether it needs a tooltip after flex layout.
+struct TooltippedCellContent {
+    content: Stateful<Div>,
+    tooltip: CellTooltip,
+}
+
+impl Element for TooltippedCellContent {
+    type RequestLayoutState = <Stateful<Div> as Element>::RequestLayoutState;
+    type PrepaintState = <Stateful<Div> as Element>::PrepaintState;
+
+    /// Use the content's stable ID, scoped by the data table's row and cell IDs.
+    fn id(&self) -> Option<ElementId> {
+        Element::id(&self.content)
+    }
+
+    /// Delegate source metadata to the content div.
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        self.content.source_location()
+    }
+
+    /// Measure and lay out the content with its normal GPUI styles.
+    fn request_layout(
+        &mut self,
+        id: Option<&GlobalElementId>,
+        inspector_id: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, Self::RequestLayoutState) {
+        self.content.request_layout(id, inspector_id, window, cx)
+    }
+
+    /// Attach the tooltip before GPUI registers hitboxes, using the actual laid-out
+    /// width after column fitting, padding and flex growth.
+    fn prepaint(
+        &mut self,
+        id: Option<&GlobalElementId>,
+        inspector_id: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        state: &mut Self::RequestLayoutState,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self::PrepaintState {
+        let text = match &self.tooltip {
+            CellTooltip::Always(text) => Some(text),
+            CellTooltip::Overflow {
+                text,
+                inset,
+                minimum_caption,
+            } => {
+                let width = bounds.size.width;
+                let caption_width = if width >= *inset + *minimum_caption {
+                    width - *inset
+                } else {
+                    width
+                };
+                // Match GPUI's ellipsis threshold and reuse its cached glyph widths.
+                let style = window.text_style();
+                let font_size = style.font_size.to_pixels(window.rem_size());
+                cx.text_system()
+                    .line_wrapper(style.font(), font_size)
+                    .should_truncate_line(text, caption_width, "\u{2026}", TruncateFrom::End)
+                    .map(|_| text)
+            }
+        };
+        if let Some(text) = text.cloned() {
+            self.content
+                .interactivity()
+                .tooltip(move |_window, cx| cx.new(|_| TableCellTooltip(text.clone())).into());
+        }
+        self.content
+            .prepaint(id, inspector_id, bounds, state, window, cx)
+    }
+
+    /// Paint the clipped content and let GPUI handle deferred hover behavior.
+    fn paint(
+        &mut self,
+        id: Option<&GlobalElementId>,
+        inspector_id: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        state: &mut Self::RequestLayoutState,
+        prepaint: &mut Self::PrepaintState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.content
+            .paint(id, inspector_id, bounds, state, prepaint, window, cx);
+    }
+}
+
+impl IntoElement for TooltippedCellContent {
+    type Element = Self;
+
+    /// Keep the normal div layout and use the resolved bounds for tooltip registration.
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+/// The deferred Moon tooltip for a table cell.
+struct TableCellTooltip(SharedString);
+
+impl Render for TableCellTooltip {
+    /// Render the full text with the shared tooltip styling.
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .debug_selector(|| format!("moon-table-cell-tooltip:{}", self.0))
+            .child(MoonTooltip::new(self.0.clone()))
     }
 }
