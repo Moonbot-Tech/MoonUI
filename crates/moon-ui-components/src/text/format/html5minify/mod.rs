@@ -11,45 +11,6 @@ use html5ever::{
 };
 use markup5ever_rcdom::{Node, NodeData, RcDom};
 
-/// Defines the minify trait.
-#[allow(dead_code)]
-pub(crate) trait Minify {
-    /// Minifies the source returning the minified HTML5.
-    ///
-    /// # Errors
-    ///
-    /// Will return `Err` if unable to read from the input reader or unable to
-    /// write to the output writer.
-    fn minify(&self) -> Result<Vec<u8>, io::Error>;
-}
-
-/// Minifies the HTML input to the destination writer.
-/// Outputs HTML5; non-HTML5 input will be transformed to HTML5.
-///
-/// # Errors
-///
-/// Will return `Err` if unable to read from the input reader or unable to write
-/// to the output writer.
-#[inline]
-#[allow(dead_code)]
-pub(crate) fn minify<R: io::Read, W: io::Write>(mut r: &mut R, w: &mut W) -> io::Result<()> {
-    Minifier::new(w).minify(&mut r)
-}
-
-impl<T> Minify for T
-where
-    T: AsRef<[u8]>,
-{
-    #[inline]
-    fn minify(&self) -> Result<Vec<u8>, io::Error> {
-        let mut minified = vec![];
-
-        minify(&mut self.as_ref(), &mut minified)?;
-
-        Ok(minified)
-    }
-}
-
 /// Minifier implementation for `io::Write`.
 #[allow(clippy::struct_excessive_bools)]
 pub struct Minifier<'a, W: io::Write> {
@@ -146,7 +107,6 @@ where
     /// Omit writing the HTML5 doctype.
     /// Disabled by default.
     #[inline]
-    #[allow(dead_code)]
     pub fn omit_doctype(&mut self, omit: bool) -> &mut Self {
         self.omit_doctype = omit;
         self
@@ -167,7 +127,6 @@ where
     ///
     /// Will return `Err` if unable to write to the output writer.
     #[inline]
-    #[allow(dead_code)]
     pub fn minify<R: io::Read>(&mut self, mut r: &mut R) -> io::Result<()> {
         let dom = parse_document(RcDom::default(), ParseOpts::default())
             .from_utf8()
