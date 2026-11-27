@@ -356,7 +356,23 @@ pub fn read_proxy_from_env() -> Option<Url> {
     ENV_VARS
         .iter()
         .find_map(|var| std::env::var(var).ok())
-        .and_then(|env| env.parse().ok())
+        .and_then(|env| parse_proxy_env_value(&env))
+}
+
+/// Parses one proxy variable's value. A scheme-less `host:port` such as `proxy.example:3128`
+/// parses as a URL whose scheme is `proxy.example` and which has no host; curl treats such a value
+/// as an HTTP proxy, so only that host-less case is retried with `http://` prepended. A value that
+/// parses with a host, or fails to parse, keeps its result unchanged.
+fn parse_proxy_env_value(value: &str) -> Option<Url> {
+    let url: Url = value.parse().ok()?;
+    if url.host().is_none()
+        && !value.contains("://")
+        && let Ok(with_scheme) = format!("http://{value}").parse::<Url>()
+        && with_scheme.host().is_some()
+    {
+        return Some(with_scheme);
+    }
+    Some(url)
 }
 
 pub fn read_no_proxy_from_env() -> Option<String> {
