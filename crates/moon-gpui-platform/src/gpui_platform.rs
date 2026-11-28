@@ -3,6 +3,14 @@
 
 pub use gpui::Platform;
 
+/// The application's choice of GPU and present mode for the Linux renderer: set it before the
+/// first window, list the adapters a user can name.
+#[cfg(all(
+    any(target_os = "linux", target_os = "freebsd"),
+    any(feature = "wayland", feature = "x11")
+))]
+pub use gpui_linux::gpu_selection;
+
 use std::rc::Rc;
 
 /// Returns a background executor for the current platform.

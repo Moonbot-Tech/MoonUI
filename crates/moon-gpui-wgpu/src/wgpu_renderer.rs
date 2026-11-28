@@ -111,9 +111,9 @@ pub struct WgpuSurfaceConfig {
     pub size: Size<DevicePixels>,
     pub transparent: bool,
     /// Preferred presentation mode. When `Some`, the renderer will use this
-    /// mode if supported by the surface, falling back to `Mailbox` and then `Fifo`:
-    /// a caller that asks for a mode asks to avoid FIFO's wait for vblank, and mailbox keeps that.
-    /// When `None`, defaults to `Fifo` (VSync).
+    /// mode if supported by the surface, falling back to `Fifo`.
+    /// When `None`, defaults to `Fifo` (VSync). A mode the application chose
+    /// explicitly (`gpu_selection`) takes precedence over both.
     ///
     /// Mobile platforms may prefer `Mailbox` (triple-buffering) to avoid
     /// blocking in `get_current_texture()` during lifecycle transitions.
@@ -209,6 +209,9 @@ pub struct WgpuRenderer {
     /// when the swapchain reports itself suboptimal for the window; a swapchain that refuses them
     /// outright (out of date, lost) gets this size at once instead of its old one.
     deferred_drawable_size: Option<Size<DevicePixels>>,
+    /// The platform's present-mode preference this renderer was built with, handed on unchanged
+    /// when it is rebuilt after a device loss so the mode and its logged source stay the same.
+    preferred_present_mode: Option<wgpu::PresentMode>,
 }
 
 struct WgpuRetainedGpuCanvasTextCache {
@@ -401,17 +404,11 @@ impl WgpuRenderer {
             format: surface_format,
             width: clamped_width.max(1),
             height: clamped_height.max(1),
-            present_mode: match config.preferred_present_mode {
-                Some(mode) if surface_caps.present_modes.contains(&mode) => mode,
-                Some(_)
-                    if surface_caps
-                        .present_modes
-                        .contains(&wgpu::PresentMode::Mailbox) =>
-                {
-                    wgpu::PresentMode::Mailbox
-                }
-                _ => wgpu::PresentMode::Fifo,
-            },
+            present_mode: crate::gpu_selection::resolve_present_mode(
+                config.preferred_present_mode,
+                &surface_caps.present_modes,
+                &context.adapter.get_info(),
+            )?,
             desired_maximum_frame_latency: 2,
             alpha_mode,
             view_formats: vec![],
@@ -556,6 +553,9 @@ impl WgpuRenderer {
             path_msaa_view: None,
         };
 
+        // A session exists from here on: an explicit GPU choice failing later is an error, not
+        // the end of the process (`gpu_selection::refuse`).
+        crate::gpu_selection::mark_rendering_started();
         Ok(Self {
             context: gpu_context,
             compositor_gpu,
@@ -584,6 +584,7 @@ impl WgpuRenderer {
             needs_redraw: false,
             clear_color: wgpu::Color::TRANSPARENT,
             deferred_drawable_size: None,
+            preferred_present_mode: config.preferred_present_mode,
         })
     }
 
@@ -2564,7 +2565,7 @@ impl WgpuRenderer {
                 height: gpui::DevicePixels(self.surface_config.height as i32),
             }),
             transparent: self.surface_config.alpha_mode != wgpu::CompositeAlphaMode::Opaque,
-            preferred_present_mode: Some(self.surface_config.present_mode),
+            preferred_present_mode: self.preferred_present_mode,
         };
         let gpu_context = Rc::clone(gpu_context);
         let ctx_ref = gpu_context.borrow();

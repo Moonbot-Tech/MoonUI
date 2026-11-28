@@ -65,7 +65,7 @@ use gpui::{
     PlatformKeyboardLayout, PlatformWindow, Point, RequestFrameOptions, ScrollDelta, Size,
     TouchPhase, WindowButtonLayout, WindowParams, point, px,
 };
-use gpui_wgpu::{CompositorGpuHint, GpuContext, wgpu};
+use gpui_wgpu::{CompositorGpuHint, GpuContext};
 
 /// Value for DeviceId parameters which selects all devices.
 pub(crate) const XINPUT_ALL_DEVICES: xinput::DeviceId = 0;
@@ -190,8 +190,6 @@ pub struct X11ClientState {
     pub(crate) xcb_connection: Rc<XCBConnection>,
     xkb_device_id: i32,
     client_side_decorations_supported: bool,
-    /// How every window of this client presents its frames: [`x11_present_mode`].
-    present_mode: wgpu::PresentMode,
     pub(crate) x_root_index: usize,
     pub(crate) resource_database: Database,
     pub(crate) atoms: XcbAtoms,
@@ -377,7 +375,6 @@ impl X11Client {
 
         let root = xcb_connection.setup().roots[0].root;
         let compositor_present = check_compositor_present(&xcb_connection, root);
-        let present_mode = x11_present_mode(compositing_manager_running(&xcb_connection, root));
         let gtk_frame_extents_supported =
             check_gtk_frame_extents_supported(&xcb_connection, &atoms, root);
         let client_side_decorations_supported = compositor_present && gtk_frame_extents_supported;
@@ -529,7 +526,6 @@ impl X11Client {
             xcb_connection,
             xkb_device_id,
             client_side_decorations_supported,
-            present_mode,
             x_root_index,
             resource_database,
             atoms,
@@ -1717,7 +1713,6 @@ impl LinuxClient for X11Client {
             state.common.foreground_executor.clone(),
             state.gpu_context.clone(),
             compositor_gpu,
-            state.present_mode,
             params,
             &xcb_connection,
             client_side_decorations_supported,
@@ -2286,40 +2281,14 @@ fn detect_compositor_gpu(
     crate::linux::compositor_gpu_hint_from_dev_t(metadata.rdev())
 }
 
-/// How the windows present their frames: never FIFO, the swapchain default.
-///
-/// Under FIFO every frame waits for the monitor's vblank. On a hybrid machine whose monitor
-/// hangs off a second GPU (an NVIDIA output sink under reverse PRIME, PRIME Synchronization on)
-/// a resize then stalled the whole X server, pointer included, for two seconds at a time; NVIDIA's
-/// forum carries the same report for FIFO Vulkan windows in general. Measured on that machine
-/// (`MESA_VK_WSI_PRESENT_MODE`): mailbox was better, immediate the best. While a compositing
-/// manager runs, the compositor reads the window's buffer on its own vblank, so immediate does
-/// not tear a composited window and is the choice; a compositor that unredirects a fullscreen
-/// window can still show tearing there. Without one immediate would tear, and mailbox is taken.
-/// Decided once, when the client starts. A surface that lacks the mode gets mailbox if it has
-/// that, FIFO otherwise (the renderer).
-///
-/// What both give up is FIFO's own brake: drawing stays paced by the window's frame clock, so a
-/// window redrawing without pause on a monitor slower than the clock's rate (the first CRTC's,
-/// see the refresh loop) draws at the clock's rate, the surplus frames replaced before they show.
-fn x11_present_mode(compositing: bool) -> wgpu::PresentMode {
-    if compositing {
-        wgpu::PresentMode::Immediate
-    } else {
-        wgpu::PresentMode::Mailbox
-    }
-}
-
-/// Whether a compositing manager runs on the screen of `root`: the owner of the EWMH selection
-/// `_NET_WM_CM_S<screen>`, which only a compositing manager takes. Unlike
-/// [`check_compositor_present`], not true merely because a window manager runs.
-fn compositing_manager_running(xcb_connection: &XCBConnection, root: xproto::Window) -> bool {
+fn check_compositor_present(xcb_connection: &XCBConnection, root: xproto::Window) -> bool {
+    // Method 1: Check for _NET_WM_CM_S{root}
     let atom_name = format!("_NET_WM_CM_S{}", root);
     let atom1 = get_reply(
         || format!("Failed to intern {atom_name}"),
         xcb_connection.intern_atom(false, atom_name.as_bytes()),
     );
-    match atom1.log_with_level(Level::Debug) {
+    let method1 = match atom1.log_with_level(Level::Debug) {
         Some(reply) if reply.atom != x11rb::NONE => {
             let atom = reply.atom;
             get_reply(
@@ -2331,12 +2300,7 @@ fn compositing_manager_running(xcb_connection: &XCBConnection, root: xproto::Win
             .unwrap_or(false)
         }
         _ => false,
-    }
-}
-
-fn check_compositor_present(xcb_connection: &XCBConnection, root: xproto::Window) -> bool {
-    // Method 1: Check for _NET_WM_CM_S{root}
-    let method1 = compositing_manager_running(xcb_connection, root);
+    };
 
     // Method 2: Check for _NET_WM_CM_OWNER
     let atom_name = "_NET_WM_CM_OWNER";

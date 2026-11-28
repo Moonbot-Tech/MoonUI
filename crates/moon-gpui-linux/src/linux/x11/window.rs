@@ -9,7 +9,7 @@ use gpui::{
     Size, Tiling, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
     WindowDecorations, WindowKind, WindowParams, px,
 };
-use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig, wgpu};
+use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig};
 
 use collections::FxHashSet;
 use gpui_util::{ResultExt, maybe};
@@ -461,7 +461,6 @@ impl X11WindowState {
         executor: ForegroundExecutor,
         gpu_context: gpui_wgpu::GpuContext,
         compositor_gpu: Option<CompositorGpuHint>,
-        present_mode: wgpu::PresentMode,
         params: WindowParams,
         xcb: &Rc<XCBConnection>,
         client_side_decorations_supported: bool,
@@ -786,8 +785,8 @@ impl X11WindowState {
                     // If the window appearance changes, then the renderer will get updated
                     // too
                     transparent: false,
-                    // Not FIFO: see `x11_present_mode` in the client.
-                    preferred_present_mode: Some(present_mode),
+                    // None: FIFO, unless the application named a mode (`gpu_selection`).
+                    preferred_present_mode: None,
                 };
                 WgpuRenderer::new(gpu_context, &raw_window, config, compositor_gpu)?
             };
@@ -977,7 +976,6 @@ impl X11Window {
         executor: ForegroundExecutor,
         gpu_context: gpui_wgpu::GpuContext,
         compositor_gpu: Option<CompositorGpuHint>,
-        present_mode: wgpu::PresentMode,
         params: WindowParams,
         xcb: &Rc<XCBConnection>,
         client_side_decorations_supported: bool,
@@ -998,7 +996,6 @@ impl X11Window {
                 executor,
                 gpu_context,
                 compositor_gpu,
-                present_mode,
                 params,
                 xcb,
                 client_side_decorations_supported,
