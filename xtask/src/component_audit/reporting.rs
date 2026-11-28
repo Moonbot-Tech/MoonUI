@@ -2,10 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{
-    ComponentAuditReport, ComponentClass, ComponentEntry, ContractCheck, ContractStatus,
-    MetricPolicy, SourceMetric,
-};
+use super::{ComponentAuditReport, ComponentClass, ContractStatus, MetricPolicy};
 
 #[cfg(test)]
 mod tests;
@@ -24,8 +21,8 @@ pub(super) fn compare_with_baseline(
         ));
     }
 
-    let baseline_components = keyed_components(&baseline.components);
-    let current_components = keyed_components(&current.components);
+    let baseline_components = keyed_by(&baseline.components, |entry| entry.concept.as_str());
+    let current_components = keyed_by(&current.components, |entry| entry.concept.as_str());
     for concept in baseline_components.keys() {
         if !current_components.contains_key(concept) {
             failures.push(format!("component manifest entry removed: {concept}"));
@@ -49,8 +46,8 @@ pub(super) fn compare_with_baseline(
         }
     }
 
-    let baseline_metrics = keyed_metrics(&baseline.source_metrics);
-    let current_metrics = keyed_metrics(&current.source_metrics);
+    let baseline_metrics = keyed_by(&baseline.source_metrics, |entry| entry.id.as_str());
+    let current_metrics = keyed_by(&current.source_metrics, |entry| entry.id.as_str());
     for (id, current_metric) in current_metrics {
         if let Some(baseline_metric) = baseline_metrics.get(id) {
             match current_metric.policy {
@@ -67,8 +64,8 @@ pub(super) fn compare_with_baseline(
         }
     }
 
-    let baseline_contracts = keyed_contracts(&baseline.contracts);
-    let current_contracts = keyed_contracts(&current.contracts);
+    let baseline_contracts = keyed_by(&baseline.contracts, |entry| entry.id.as_str());
+    let current_contracts = keyed_by(&current.contracts, |entry| entry.id.as_str());
     for (id, baseline_contract) in baseline_contracts {
         let Some(current_contract) = current_contracts.get(id) else {
             failures.push(format!("contract removed: {id}"));
@@ -87,28 +84,12 @@ pub(super) fn compare_with_baseline(
     failures
 }
 
-/// Index component entries by their stable manifest concept.
-fn keyed_components(entries: &[ComponentEntry]) -> BTreeMap<&str, &ComponentEntry> {
-    entries
-        .iter()
-        .map(|entry| (entry.concept.as_str(), entry))
-        .collect()
-}
-
-/// Index source metrics by their stable audit identifier.
-fn keyed_metrics(entries: &[SourceMetric]) -> BTreeMap<&str, &SourceMetric> {
-    entries
-        .iter()
-        .map(|entry| (entry.id.as_str(), entry))
-        .collect()
-}
-
-/// Index contract checks by their stable contract identifier.
-fn keyed_contracts(entries: &[ContractCheck]) -> BTreeMap<&str, &ContractCheck> {
-    entries
-        .iter()
-        .map(|entry| (entry.id.as_str(), entry))
-        .collect()
+/// Index report entries by the stable identifier `key` reads from each one: a component's
+/// manifest concept, a source metric's or a contract's audit id.
+///
+/// A later entry with the same key replaces an earlier one, as `collect` into a map does.
+fn keyed_by<'a, T>(entries: &'a [T], key: impl Fn(&'a T) -> &'a str) -> BTreeMap<&'a str, &'a T> {
+    entries.iter().map(|entry| (key(entry), entry)).collect()
 }
 
 /// Prints the human-readable report and any accumulated failures.
