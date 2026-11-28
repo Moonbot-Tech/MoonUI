@@ -112,7 +112,8 @@ pub struct WgpuSurfaceConfig {
     pub transparent: bool,
     /// Preferred presentation mode. When `Some`, the renderer will use this
     /// mode if supported by the surface, falling back to `Fifo`.
-    /// When `None`, defaults to `Fifo` (VSync).
+    /// When `None`, defaults to `Fifo` (VSync). A mode the application chose
+    /// explicitly (`gpu_selection`) takes precedence over both.
     ///
     /// Mobile platforms may prefer `Mailbox` (triple-buffering) to avoid
     /// blocking in `get_current_texture()` during lifecycle transitions.
@@ -201,6 +202,16 @@ pub struct WgpuRenderer {
     surface_configured: bool,
     needs_redraw: bool,
     clear_color: wgpu::Color,
+    /// A size the window already has but the surface does not yet, set by
+    /// [`Self::defer_drawable_size`].
+    ///
+    /// While it is set, frames keep going to the surface of the old size and are presented even
+    /// when the swapchain reports itself suboptimal for the window; a swapchain that refuses them
+    /// outright (out of date, lost) gets this size at once instead of its old one.
+    deferred_drawable_size: Option<Size<DevicePixels>>,
+    /// The platform's present-mode preference this renderer was built with, handed on unchanged
+    /// when it is rebuilt after a device loss so the mode and its logged source stay the same.
+    preferred_present_mode: Option<wgpu::PresentMode>,
 }
 
 struct WgpuRetainedGpuCanvasTextCache {
@@ -393,10 +404,11 @@ impl WgpuRenderer {
             format: surface_format,
             width: clamped_width.max(1),
             height: clamped_height.max(1),
-            present_mode: config
-                .preferred_present_mode
-                .filter(|mode| surface_caps.present_modes.contains(mode))
-                .unwrap_or(wgpu::PresentMode::Fifo),
+            present_mode: crate::gpu_selection::resolve_present_mode(
+                config.preferred_present_mode,
+                &surface_caps.present_modes,
+                &context.adapter.get_info(),
+            )?,
             desired_maximum_frame_latency: 2,
             alpha_mode,
             view_formats: vec![],
@@ -541,6 +553,9 @@ impl WgpuRenderer {
             path_msaa_view: None,
         };
 
+        // A session exists from here on: an explicit GPU choice failing later is an error, not
+        // the end of the process (`gpu_selection::refuse`).
+        crate::gpu_selection::mark_rendering_started();
         Ok(Self {
             context: gpu_context,
             compositor_gpu,
@@ -568,6 +583,8 @@ impl WgpuRenderer {
             surface_configured: true,
             needs_redraw: false,
             clear_color: wgpu::Color::TRANSPARENT,
+            deferred_drawable_size: None,
+            preferred_present_mode: config.preferred_present_mode,
         })
     }
 
@@ -1034,11 +1051,55 @@ impl WgpuRenderer {
         Some((texture, view))
     }
 
+    /// Whether `size` differs from the size the surface is configured for.
+    fn differs_from_surface(&self, size: Size<DevicePixels>) -> bool {
+        size.width.0 as u32 != self.surface_config.width
+            || size.height.0 as u32 != self.surface_config.height
+    }
+
+    /// Note a new window size without rebuilding the surface for it yet.
+    ///
+    /// Rebuilding the surface waits for the device to go idle and replaces the swapchain, and on
+    /// some multi-GPU X11 setups that wait stalls the whole X server for seconds. A window being
+    /// dragged to a new size gets a size per pointer motion, so the backend defers all but the
+    /// first and calls [`Self::apply_deferred_drawable_size`] once the sizes stop. Until then
+    /// frames are drawn into the surface of the old size, clipped or short of the window edge.
+    /// A size equal to the surface's own clears what was deferred.
+    pub fn defer_drawable_size(&mut self, size: Size<DevicePixels>) {
+        self.deferred_drawable_size = self.differs_from_surface(size).then_some(size);
+    }
+
+    /// Whether a size is waiting for [`Self::apply_deferred_drawable_size`].
+    pub fn has_deferred_drawable_size(&self) -> bool {
+        self.deferred_drawable_size.is_some()
+    }
+
+    /// Rebuild the surface for the size [`Self::defer_drawable_size`] noted, if one is waiting.
+    /// Returns whether the surface was rebuilt, so the caller can ask for a frame of the new size.
+    ///
+    /// Waits while the renderer has no resources — a device recovery that failed and is retried
+    /// on the next frame — and leaves the size deferred: [`Self::recover`] builds the new surface
+    /// at that size.
+    pub fn apply_deferred_drawable_size(&mut self) -> bool {
+        if self.resources.is_none() {
+            return false;
+        }
+        match self.deferred_drawable_size.take() {
+            Some(size) => {
+                self.update_drawable_size(size);
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn update_drawable_size(&mut self, size: Size<DevicePixels>) {
+        // Whatever was deferred is superseded by the size applied now.
+        self.deferred_drawable_size = None;
         let width = size.width.0 as u32;
         let height = size.height.0 as u32;
 
-        if width != self.surface_config.width || height != self.surface_config.height {
+        if self.differs_from_surface(size) {
             let clamped_width = width.min(self.max_texture_size);
             let clamped_height = height.min(self.max_texture_size);
 
@@ -1261,10 +1322,15 @@ impl WgpuRenderer {
                 continue;
             }
 
+            // Clamped to the render target: wgpu rejects a scissor that reaches past it, and the
+            // scene is laid out for the window while the surface can still have its old, smaller
+            // size (`defer_drawable_size`).
             let left = clip.left().0.floor().max(0.) as u32;
             let top = clip.top().0.floor().max(0.) as u32;
-            let right = clip.right().0.ceil().max(left as f32) as u32;
-            let bottom = clip.bottom().0.ceil().max(top as f32) as u32;
+            let right =
+                (clip.right().0.ceil().max(left as f32) as u32).min(self.surface_config.width);
+            let bottom =
+                (clip.bottom().0.ceil().max(top as f32) as u32).min(self.surface_config.height);
             let width = right.saturating_sub(left);
             let height = bottom.saturating_sub(top);
             if width == 0 || height == 0 {
@@ -1326,6 +1392,13 @@ impl WgpuRenderer {
 
         let frame = match self.resources().surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
+            // The swapchain no longer matches the window, which is what a deferred size means:
+            // present it as it is rather than rebuild it on every frame of a drag.
+            wgpu::CurrentSurfaceTexture::Suboptimal(frame)
+                if self.deferred_drawable_size.is_some() =>
+            {
+                frame
+            }
             wgpu::CurrentSurfaceTexture::Suboptimal(frame) => {
                 // Textures must be destroyed before the surface can be reconfigured.
                 drop(frame);
@@ -1337,6 +1410,13 @@ impl WgpuRenderer {
                 return false;
             }
             wgpu::CurrentSurfaceTexture::Lost | wgpu::CurrentSurfaceTexture::Outdated => {
+                // A swapchain that refuses frames of the old size cannot wait for the end of a
+                // drag: rebuild it for the window's real size, not for the one it had. A driver
+                // that reports a size mismatch as out of date rather than suboptimal therefore
+                // still rebuilds once per size, as it did before sizes were deferred.
+                if self.apply_deferred_drawable_size() {
+                    return false;
+                }
                 let surface_config = self.surface_config.clone();
                 let resources = self.resources_mut();
                 resources
@@ -2478,12 +2558,14 @@ impl WgpuRenderer {
         };
 
         let config = WgpuSurfaceConfig {
-            size: gpui::Size {
+            // A size still deferred is the window's real one; the rebuilt renderer starts with
+            // nothing deferred, so it has to be built at that size or it would keep the old one.
+            size: self.deferred_drawable_size.unwrap_or(gpui::Size {
                 width: gpui::DevicePixels(self.surface_config.width as i32),
                 height: gpui::DevicePixels(self.surface_config.height as i32),
-            },
+            }),
             transparent: self.surface_config.alpha_mode != wgpu::CompositeAlphaMode::Opaque,
-            preferred_present_mode: Some(self.surface_config.present_mode),
+            preferred_present_mode: self.preferred_present_mode,
         };
         let gpu_context = Rc::clone(gpu_context);
         let ctx_ref = gpu_context.borrow();

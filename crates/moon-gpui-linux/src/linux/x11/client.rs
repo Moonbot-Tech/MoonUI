@@ -1029,6 +1029,8 @@ impl X11Client {
                     Some(RefreshState::PeriodicRefresh { .. })
                 );
                 if !draws_frames {
+                    // Nor would its frame clock rebuild a deferred surface: rebuild it now.
+                    window.apply_deferred_surface_size(true);
                     window.answer_sync_request();
                     window.log_resize_summary();
                 }

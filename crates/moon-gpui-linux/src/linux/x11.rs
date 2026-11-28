@@ -4,6 +4,7 @@ mod coalesce;
 mod display;
 mod event;
 mod resize_diag;
+mod surface_pacing;
 mod window;
 mod xim_handler;
 

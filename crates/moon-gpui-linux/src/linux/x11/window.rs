@@ -34,6 +34,7 @@ use std::{
 };
 
 use super::resize_diag::{ResizeDiag, millis};
+use super::surface_pacing::SurfacePacing;
 use super::{X11Display, X11Displays, XINPUT_ALL_DEVICE_GROUPS, XINPUT_ALL_DEVICES};
 
 x11rb::atom_manager! {
@@ -307,6 +308,8 @@ pub struct X11WindowState {
     sync_answer_due: Option<(sync::Int64, Instant)>,
     /// What the resize going on right now costs, for the once-a-second log line.
     resize_diag: ResizeDiag,
+    /// Which sizes rebuild the GPU surface at once and when a deferred rebuild is due.
+    surface_pacing: SurfacePacing,
     bounds: Bounds<Pixels>,
     scale_factor: f32,
     renderer: WgpuRenderer,
@@ -782,6 +785,7 @@ impl X11WindowState {
                     // If the window appearance changes, then the renderer will get updated
                     // too
                     transparent: false,
+                    // None: FIFO, unless the application named a mode (`gpu_selection`).
                     preferred_present_mode: None,
                 };
                 WgpuRenderer::new(gpu_context, &raw_window, config, compositor_gpu)?
@@ -877,6 +881,7 @@ impl X11WindowState {
                 last_sync_counter: None,
                 sync_answer_due: None,
                 resize_diag: ResizeDiag::default(),
+                surface_pacing: SurfacePacing::default(),
             })
         });
 
@@ -1223,7 +1228,12 @@ impl X11WindowStatePtr {
         }
     }
 
-    pub fn refresh(&self, request_frame_options: RequestFrameOptions) {
+    pub fn refresh(&self, mut request_frame_options: RequestFrameOptions) {
+        // A surface rebuilt here has nothing on it yet: present the scene again even when
+        // nothing in it changed.
+        if self.apply_deferred_surface_size(false) {
+            request_frame_options.require_presentation = true;
+        }
         let callback = self.callbacks.borrow_mut().request_frame.take();
         if let Some(mut fun) = callback {
             fun(request_frame_options);
@@ -1251,6 +1261,30 @@ impl X11WindowStatePtr {
         if let Some(summary) = summary {
             log::info!("X11 resize, window {}: {summary}", self.x_window);
         }
+    }
+
+    /// Rebuild the GPU surface for a size deferred during a resize, once the sizes have stopped
+    /// or at once with `force`. Returns whether it was rebuilt.
+    ///
+    /// Asked on the frame clock, before the frame, so the frame that follows draws at the size
+    /// the window has. A window whose frame clock is stopped is asked by the client on each size
+    /// instead, with `force` set: no tick would come back to ask again.
+    pub fn apply_deferred_surface_size(&self, force: bool) -> bool {
+        let mut state = self.state.borrow_mut();
+        let now = Instant::now();
+        if !state.renderer.has_deferred_drawable_size()
+            || !(force || state.surface_pacing.settled(now))
+        {
+            return false;
+        }
+        let rebuilt = state.renderer.apply_deferred_drawable_size();
+        if rebuilt {
+            let handled = Instant::now();
+            state.resize_diag.surface_rebuilt(handled, handled - now);
+            // From the end of the rebuild: sizes queued while it stalled belong to the drag.
+            state.surface_pacing.size_handled(handled);
+        }
+        rebuilt
     }
 
     /// Tell the window manager that the last size it sent has been handled.
@@ -1480,9 +1514,28 @@ impl X11WindowStatePtr {
             state.repick_display(pick_bounds);
 
             let gpu_size = render_extent(&extent?);
-            let surface_started = Instant::now();
-            state.renderer.update_drawable_size(gpu_size);
-            let surface = surface_started.elapsed();
+            let now = Instant::now();
+            // A size that follows the previous one closely belongs to a drag: only note it, and
+            // rebuild the surface once the sizes stop (`refresh`). A move keeps a deferred size
+            // deferred, so it does not end the wait half way through. See `surface_pacing.rs`.
+            let defer = if is_resize {
+                state.surface_pacing.defers(now)
+            } else {
+                state.renderer.has_deferred_drawable_size()
+            };
+            let surface = if defer {
+                state.renderer.defer_drawable_size(gpu_size);
+                None
+            } else {
+                let surface_started = Instant::now();
+                state.renderer.update_drawable_size(gpu_size);
+                Some(surface_started.elapsed())
+            };
+            if is_resize {
+                // Stamped after the rebuild, not on arrival: a rebuild that stalled must not
+                // make the size queued behind it look like the start of a new drag.
+                state.surface_pacing.size_handled(Instant::now());
+            }
             let result = (is_resize, state.content_size(), state.scale_factor);
             // The window manager's request is answered when this size has had its frame, not
             // here: `answer_sync_request`. A newer request replaces one still unanswered, as
@@ -1491,9 +1544,10 @@ impl X11WindowStatePtr {
                 state.sync_answer_due = Some((value, Instant::now()));
             }
             if is_resize {
-                state
-                    .resize_diag
-                    .size_applied(Instant::now(), server, surface);
+                match surface {
+                    Some(surface) => state.resize_diag.size_applied(now, server, surface),
+                    None => state.resize_diag.size_deferred(now, server),
+                }
             }
             result
         };
@@ -1936,8 +1990,20 @@ impl PlatformWindow for X11Window {
             return false;
         }
 
+        let deferred = inner.renderer.has_deferred_drawable_size();
+        let draw_started = Instant::now();
         let accepted = inner.renderer.draw(scene);
         inner.resize_diag.frame(accepted);
+        // A swapchain that refused the old size made the renderer rebuild it inside the draw:
+        // count that rebuild like the one on the frame clock. Its time includes the refused
+        // acquire before it, a little more than the rebuild alone.
+        if deferred && !inner.renderer.has_deferred_drawable_size() {
+            let handled = Instant::now();
+            inner
+                .resize_diag
+                .surface_rebuilt(handled, handled - draw_started);
+            inner.surface_pacing.size_handled(handled);
+        }
 
         if inner.renderer.needs_redraw() {
             inner.force_render_after_recovery = true;

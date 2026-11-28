@@ -53,3 +53,26 @@ fn frames_outside_a_resize_are_not_counted() {
     assert_eq!(summary.skipped, 3);
     assert_eq!(summary.frames, 1);
 }
+
+/// A deferred size counts as applied but costs no surface time; the rebuild that ends the burst
+/// is the one surface entry, so the line tells a drag that rebuilt once from one that rebuilt on
+/// every size.
+#[test]
+fn deferred_sizes_leave_the_surface_to_the_rebuild() {
+    let start = Instant::now();
+    let mut diag = ResizeDiag::default();
+
+    diag.size_applied(start, MS, 4 * MS);
+    diag.size_deferred(start + 16 * MS, 2 * MS);
+    diag.size_deferred(start + 32 * MS, 3 * MS);
+    diag.surface_rebuilt(start + 200 * MS, 6 * MS);
+
+    let summary = diag
+        .take_summary(start + 1000 * MS)
+        .expect("the period ended");
+    assert_eq!(summary.applied, 3);
+    assert_eq!(summary.deferred, 2);
+    assert_eq!(summary.server.mean_ms(), 2.0);
+    assert_eq!(summary.surface.count(), 2);
+    assert_eq!(summary.surface.mean_ms(), 5.0);
+}

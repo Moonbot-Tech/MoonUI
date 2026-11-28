@@ -1,4 +1,6 @@
 #[cfg(not(target_family = "wasm"))]
+use crate::gpu_selection;
+#[cfg(not(target_family = "wasm"))]
 use anyhow::Context as _;
 #[cfg(not(target_family = "wasm"))]
 use gpui_util::ResultExt;
@@ -81,12 +83,6 @@ impl WgpuContext {
                 }
             }
         });
-
-        log::info!(
-            "Selected GPU adapter: {:?} ({:?})",
-            adapter.get_info().name,
-            adapter.get_info().backend
-        );
 
         Ok(Self {
             instance,
@@ -225,7 +221,76 @@ impl WgpuContext {
         bool,
         TextureFormat,
     )> {
-        let mut adapters: Vec<_> = instance.enumerate_adapters(native_backends()).await;
+        let enumerated: Vec<wgpu::Adapter> = instance.enumerate_adapters(native_backends()).await;
+        let infos: Vec<wgpu::AdapterInfo> = enumerated.iter().map(|a| a.get_info()).collect();
+        let keys: Vec<gpu_selection::AdapterKey<'_>> =
+            infos.iter().map(gpu_selection::AdapterKey::of).collect();
+        let ids = gpu_selection::adapter_ids(&keys);
+        let mut adapters: Vec<(wgpu::Adapter, String)> = enumerated.into_iter().zip(ids).collect();
+
+        // The display server's GPU is a hint, logged beside the adapter chosen and never as it.
+        let hint = compositor_gpu.map_or_else(
+            || "none".to_string(),
+            |hint| format!("{:04x}:{:04x}", hint.vendor_id, hint.device_id),
+        );
+        let choice = gpu_selection::adapter_choice();
+        let explicit = matches!(choice, gpu_selection::AdapterChoice::Id(_));
+        let overrides = gpu_selection::env_overrides();
+        if !overrides.is_empty() {
+            log::info!(
+                "GPU environment overrides: {}",
+                overrides
+                    .iter()
+                    .map(|o| {
+                        // It reorders only the automatic choice, which an explicit GPU skips.
+                        let ignored = if explicit && o.name == "ZED_DEVICE_ID" {
+                            "; ignored, the GPU is chosen explicitly"
+                        } else {
+                            ""
+                        };
+                        format!("{}={} ({}{ignored})", o.name, o.value, o.effect)
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            );
+        }
+
+        // An adapter the application named is the only candidate: no order, no fallback.
+        if let gpu_selection::AdapterChoice::Id(wanted) = choice {
+            let wanted = wanted.trim().to_ascii_lowercase();
+            let available = adapters
+                .iter()
+                .map(|(adapter, id)| format!("{id} ({})", adapter.get_info().name))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let available = if available.is_empty() {
+                "none — no Vulkan GPU was found".to_string()
+            } else {
+                available
+            };
+            let Some((adapter, id)) = adapters.into_iter().find(|(_, id)| *id == wanted) else {
+                return Err(gpu_selection::refuse(format!(
+                    "GPU {wanted} not found; available: {available}"
+                )));
+            };
+            let info = adapter.get_info();
+            return match Self::try_adapter_with_surface(&adapter, surface).await {
+                Ok((device, queue, dual_source_blending, color_atlas_texture_format)) => {
+                    log_selection(&info, &id, "chosen explicitly", &hint);
+                    Ok((
+                        adapter,
+                        device,
+                        queue,
+                        dual_source_blending,
+                        color_atlas_texture_format,
+                    ))
+                }
+                Err(e) => Err(gpu_selection::refuse(format!(
+                    "GPU {id} ({}) cannot draw to this window: {e}; GPUs found: {available}",
+                    info.name
+                ))),
+            };
+        }
 
         if adapters.is_empty() {
             anyhow::bail!("No GPU adapters found");
@@ -242,7 +307,7 @@ impl WgpuContext {
         // 3. Device type (Discrete > Integrated > Other > Virtual > Cpu).
         //    "Other" ranks above "Virtual" because OpenGL seems to count as "Other".
         // 4. Backend — prefer Vulkan/Metal/Dx12 over GL/etc.
-        adapters.sort_by_key(|adapter| {
+        adapters.sort_by_key(|(adapter, _)| {
             let info = adapter.get_info();
 
             // Backends like OpenGL report device=0 for all adapters, so
@@ -292,10 +357,10 @@ impl WgpuContext {
 
         // Log all available adapters (in sorted order)
         log::info!("Found {} GPU adapter(s):", adapters.len());
-        for adapter in &adapters {
+        for (adapter, id) in &adapters {
             let info = adapter.get_info();
             log::info!(
-                "  - {} (vendor={:#06x}, device={:#06x}, backend={:?}, type={:?})",
+                "  - {} [{id}] (vendor={:#06x}, device={:#06x}, backend={:?}, type={:?})",
                 info.name,
                 info.vendor,
                 info.device,
@@ -305,7 +370,8 @@ impl WgpuContext {
         }
 
         // Test each adapter by creating a device and configuring the surface
-        for adapter in adapters {
+        let mut failed = 0usize;
+        for (adapter, id) in adapters {
             let info = adapter.get_info();
 
             if reject_software && info.device_type == wgpu::DeviceType::Cpu {
@@ -317,15 +383,29 @@ impl WgpuContext {
                 continue;
             }
 
-            log::info!("Testing adapter: {} ({:?})...", info.name, info.backend);
+            log::debug!("Testing adapter: {} ({:?})...", info.name, info.backend);
 
             match Self::try_adapter_with_surface(&adapter, surface).await {
                 Ok((device, queue, dual_source_blending, color_atlas_texture_format)) => {
-                    log::info!(
-                        "Selected GPU (passed configuration test): {} ({:?})",
-                        info.name,
-                        info.backend
-                    );
+                    let device_known = info.device != 0;
+                    let reason =
+                        if device_id_filter.is_some_and(|d| device_known && info.device == d) {
+                            "ZED_DEVICE_ID"
+                        } else if compositor_gpu.is_some_and(|h| {
+                            device_known && info.vendor == h.vendor_id && info.device == h.device_id
+                        }) {
+                            "automatic order, the display server's GPU"
+                        } else {
+                            "automatic order, by device type"
+                        };
+                    let reason = if failed > 0 {
+                        format!(
+                            "{reason}, after {failed} adapter(s) ahead of it failed the surface test"
+                        )
+                    } else {
+                        reason.to_string()
+                    };
+                    log_selection(&info, &id, &reason, &hint);
                     return Ok((
                         adapter,
                         device,
@@ -335,6 +415,7 @@ impl WgpuContext {
                     ));
                 }
                 Err(e) => {
+                    failed += 1;
                     log::info!(
                         "  Adapter {} ({:?}) failed: {}, trying next...",
                         info.name,
@@ -446,11 +527,26 @@ impl WgpuContext {
     }
 }
 
+/// The one line that says which adapter renders and why: its name, id, driver and backend, what
+/// chose it, and the display server's GPU hint beside it, which is a different thing.
+#[cfg(not(target_family = "wasm"))]
+fn log_selection(info: &wgpu::AdapterInfo, id: &str, reason: &str, hint: &str) {
+    log::info!(
+        "GPU in use: {} [{id}], driver {} {}, {:?}, {:?}; chosen by {reason}; \
+         display server GPU hint: {hint}",
+        info.name,
+        info.driver,
+        info.driver_info,
+        info.backend,
+        info.device_type,
+    );
+}
+
 #[cfg(all(
     not(target_family = "wasm"),
     any(target_os = "linux", target_os = "freebsd")
 ))]
-fn native_backends() -> wgpu::Backends {
+pub(crate) fn native_backends() -> wgpu::Backends {
     // wgpu-hal 29's GL/EGL path does not support XCB surfaces. Including GL in a
     // Linux instance can panic during surface creation before Vulkan is selected.
     wgpu::Backends::VULKAN
@@ -460,7 +556,7 @@ fn native_backends() -> wgpu::Backends {
     not(target_family = "wasm"),
     not(any(target_os = "linux", target_os = "freebsd"))
 ))]
-fn native_backends() -> wgpu::Backends {
+pub(crate) fn native_backends() -> wgpu::Backends {
     wgpu::Backends::VULKAN | wgpu::Backends::GL
 }
 
